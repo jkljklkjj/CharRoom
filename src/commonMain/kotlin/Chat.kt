@@ -44,13 +44,11 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
             "chat" -> {
                 val messageText = json.get("content").asText()
                 println("New message from $senderName: $messageText")
-                messages+=(Message(userId, message, false))
-                //TODO Add the message to the appropriate list (e.g., groupMessages)
+                messages+=Message(userId, message, false)
             }
             "groupChat" -> {
                 val groupId = json.get("groupId").asText().toInt()
                 groupMessages+=(GroupMessage(groupId, senderName, message, userId))
-                //TODO Add the message to the appropriate list (e.g., groupMessages)
             }
             //TODO Handle other message types as needed
         }
@@ -108,7 +106,6 @@ object Chat {
             // Add a listener to handle reconnection
             channel.closeFuture().addListener(ChannelFutureListener {
                 println("启动聊天服务器服务！")
-                start()
             })
 
             channel.closeFuture().sync()
@@ -139,7 +136,7 @@ object Chat {
     ) {
         println("正在发送信息")
         if (::channel.isInitialized) {
-            // 这里的主机名可以进行优化
+            // TODO 升级成websocket后url需要改成ws://$host:$port/send
             val uri = URI("http://$host:$port/send")
             // 传输信息，处理类型和目标用户
             val json = jacksonObjectMapper().writeValueAsString(
@@ -151,7 +148,9 @@ object Chat {
             )
 
             val request = DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.POST, uri.rawPath,
+                HttpVersion.HTTP_1_1,
+                HttpMethod.POST,
+                uri.rawPath,
                 Unpooled.wrappedBuffer(json.toByteArray(Charsets.UTF_8))
             )
             request.headers().set(HttpHeaderNames.HOST, host)
