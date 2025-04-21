@@ -38,7 +38,7 @@ fun userList(onUserClick: (User) -> Unit) {
     LaunchedEffect(Unit) {
         userList = updateList(Token)
     }
-    println("User list: $userList")
+//    println("User list: $userList")
     Column {
         LazyColumn {
             items(userList.size) { index ->
@@ -55,6 +55,7 @@ fun userList(onUserClick: (User) -> Unit) {
                 }
             }
         }
+        // 测试按钮：新增好友
         Button(onClick = {
             // Add a new user to the list for testing
             val newUser = User(id = userList.size + 1, username = "New User ${userList.size + 1}")
@@ -357,6 +358,7 @@ fun chatApp(windowSize: DpSize, token: String) {
     var showDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        // 更新好友和群组列表
         updateList(token)
         CoroutineScope(Dispatchers.IO).launch {
             Chat.start()
