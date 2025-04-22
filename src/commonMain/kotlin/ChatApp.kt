@@ -358,11 +358,11 @@ fun chatApp(windowSize: DpSize, token: String) {
     var showDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        // 更新好友和群组列表
-        updateList(token)
         CoroutineScope(Dispatchers.IO).launch {
             Chat.start()
         }
+        // 更新好友和群组列表
+        updateList(token)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
