@@ -48,6 +48,8 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:1.7.32")
                 implementation("org.jboss.marshalling:jboss-marshalling:2.0.10.Final")
                 implementation("org.jboss.marshalling:jboss-marshalling-river:2.0.10.Final")
+                implementation("org.slf4j:slf4j-api:2.0.9")
+                implementation("ch.qos.logback:logback-classic:1.4.11")
             }
         }
         val commonTest by getting {
