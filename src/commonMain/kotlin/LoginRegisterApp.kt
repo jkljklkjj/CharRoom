@@ -18,8 +18,11 @@ import java.net.http.HttpTimeoutException
 import java.time.Duration
 
 import ServerConfig.id
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import javax.xml.bind.annotation.XmlRootElement
 
+private val logger: Logger = LoggerFactory.getLogger("LoginRegisterApp")
 /**
  * 登录注册应用窗口
  */
@@ -231,10 +234,10 @@ fun login(id: String, password: String): String {
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         response.body()
     } catch (e: HttpTimeoutException) {
-        println("服务器超时")
+        logger.error("请求超时，请检查网络连接或服务器状态")
         ""
     } catch (e: Exception) {
-        e.printStackTrace()
+        logger.error(e.message.toString())
         "" // Return a default value or handle the error as needed
     }
 }

@@ -20,7 +20,7 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
     override fun channelRead0(ctx: ChannelHandlerContext, msg: FullHttpResponse) {
         val content = msg.content().toString(Charsets.UTF_8)
         println("Received message: $content")
-        
+
         if (responses.size < expectedResponses) {
             responses.add(msg)
             if (responses.size == expectedResponses) {
@@ -50,7 +50,6 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
                 val groupId = json.get("groupId").asText().toInt()
                 groupMessages+=(GroupMessage(groupId, senderName, message, userId))
             }
-            //TODO Handle other message types as needed
         }
     }
 
