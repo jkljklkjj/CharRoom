@@ -38,7 +38,7 @@ fun userList(onUserClick: (User) -> Unit) {
     LaunchedEffect(Unit) {
         userList = updateList(Token)
     }
-//    println("User list: $userList")
+    println("User list: $userList")
     Column {
         LazyColumn {
             items(userList.size) { index ->
@@ -59,6 +59,7 @@ fun userList(onUserClick: (User) -> Unit) {
         Button(onClick = {
             // Add a new user to the list for testing
             val newUser = User(id = userList.size + 1, username = "New User ${userList.size + 1}")
+            messages+=Message(1, "hahaha", false)
             userList = userList + newUser
         }) {
             Text("Add User")

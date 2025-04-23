@@ -73,7 +73,11 @@ object Chat {
     fun start(newHost: String = host, newPort: Int = port) {
         host = newHost
         port = newPort
-        println("正在启动...")
+        // 注册关闭钩子
+        Runtime.getRuntime().addShutdownHook(Thread {
+            shutdown()
+        })
+//        println("正在启动...")
         val group = NioEventLoopGroup()
 
         try {
@@ -200,15 +204,22 @@ object Chat {
      * 关闭连接
      */
     fun shutdown() {
-        send("Shutting down", "logout", "0", 1) { success, responses ->
+        println("正在关闭")
+        val shutdownCompleted = CompletableFuture<Boolean>()
+        send("Shutting down", "logout", "0", 1) { success, _ ->
             if (success) {
                 println("Shutdown message sent successfully")
             } else {
                 println("Failed to send shutdown message")
             }
+            shutdownCompleted.complete(true)
             // 释放channel
-            channel.close()
+            if (::channel.isInitialized) {
+                channel.close()
+            }
         }
+        // 等待发送完成
+        shutdownCompleted.get()
     }
 }
 
