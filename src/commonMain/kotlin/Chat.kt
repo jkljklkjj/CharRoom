@@ -65,8 +65,8 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
  */
 object Chat {
     private lateinit var channel: Channel
-    private var host = "localhost"
-    private var port = 8080
+    private var host = ServerConfig.SERVER_IP
+    private var port = ServerConfig.NETTY_SERVER_PORT
     private lateinit var responseHandler: CustomHttpResponseHandler
 
     fun start(newHost: String = host, newPort: Int = port) {
