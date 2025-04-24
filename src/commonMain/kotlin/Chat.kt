@@ -1,4 +1,5 @@
 import ServerConfig.Token
+import androidx.compose.runtime.mutableStateOf
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
@@ -35,21 +36,43 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
     }
 
     private fun handleIncomingMessage(content: String) {
-        val json = jacksonObjectMapper().readTree(content)
-        val messageType = json.get("type").asText()
-        val message = json.get("content").toString()
-        val senderName = json.get("sender").asText()
-        val userId = json.get("UserId").asText().toInt()
-        when (messageType) {
-            "chat" -> {
-                val messageText = json.get("content").asText()
-                println("New message from $senderName: $messageText")
-                messages+=Message(userId, message, false)
+        try {
+            val json = jacksonObjectMapper().readTree(content)
+            val messageType = json.get("type")?.asText() ?: throw IllegalArgumentException("Missing message type")
+            val messageContent = json.get("content")?.asText() ?: throw IllegalArgumentException("Missing content")
+            val senderName = json.get("sender")?.asText() ?: "Unknown"
+            val userId = json.get("userId")?.asInt() ?: -1
+
+            when (messageType) {
+                "chat" -> {
+                    println("New private message from $senderName: $messageContent")
+                    messages += Message(
+                        id = userId,
+                        text = messageContent,
+                        sender = false,
+                        timestamp = System.currentTimeMillis(),
+                        isSent = mutableStateOf(true)
+                    )
+                }
+                "groupChat" -> {
+                    val groupId = json.get("groupId")?.asInt() ?: throw IllegalArgumentException("Missing groupId")
+                    println("New group message in group $groupId from $senderName: $messageContent")
+                    groupMessages += GroupMessage(
+                        groupId = groupId,
+                        senderName = senderName,
+                        text = messageContent,
+                        sender = userId,
+                        timestamp = System.currentTimeMillis(),
+                        isSent = mutableStateOf(true)
+                    )
+                }
+                else -> {
+                    println("Unknown message type: $messageType")
+                }
             }
-            "groupChat" -> {
-                val groupId = json.get("groupId").asText().toInt()
-                groupMessages+=(GroupMessage(groupId, senderName, message, userId))
-            }
+        } catch (e: Exception) {
+            println("Error handling incoming message: ${e.message}")
+            e.printStackTrace()
         }
     }
 
@@ -146,7 +169,8 @@ object Chat {
                 mapOf(
                     "content" to message,
                     "type" to type,
-                    "targetClientId" to targetClientId
+                    "targetClientId" to targetClientId,
+                    "timestamp" to System.currentTimeMillis(),
                 )
             )
 

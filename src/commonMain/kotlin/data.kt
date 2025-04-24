@@ -1,12 +1,9 @@
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.mutableStateOf
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
@@ -15,9 +12,22 @@ import java.net.URI
 @Serializable
 data class User(val id: Int, var username: String)
 @Serializable
-data class Message(val id: Int, val text: String, val sender: Boolean)
+data class Message(
+    val id: Int,                // 消息的唯一标识
+    val text: String,           // 消息内容
+    val sender: Boolean,        // 是否是发送者
+    val timestamp: Long,        // 消息的时间戳
+    var isSent: MutableState<Boolean>  // 消息是否发送成功
+)
 @Serializable
-data class GroupMessage(val groupId: Int, val senderName: String, val text: String, val sender: Int)
+data class GroupMessage(
+    val groupId: Int,           // 群组ID
+    val senderName: String,     // 发送者名称
+    val text: String,           // 消息内容
+    val sender: Int,          // 发送者ID
+    val timestamp: Long,        // 消息的时间戳
+    var isSent: MutableState<Boolean>  // 消息是否发送成功
+)
 @Serializable
 data class Group(val id: Int, val name: String)
 
@@ -35,20 +45,20 @@ var users by mutableStateOf(listOf(
 ))
 
 var messages = mutableStateListOf(
-    Message(1, "Hello from Alice", false),
-    Message(2, "Hello from Bob", false),
-    Message(3, "Hello from Charlie", false),
-    Message(1, "How are you?", false),
-    Message(2, "I'm fine, thanks!", false),
-    Message(1, "I'm fine, thanks!", true)
+    Message(1, "Hello from Alice", false, timestamp = 1698765600000, isSent = mutableStateOf(true)),
+    Message(2, "Hello from Bob", false, timestamp = 1698765660000, isSent = mutableStateOf(true)),
+    Message(3, "Hello from Charlie", false, timestamp = 1698765720000, isSent = mutableStateOf(true)),
+    Message(1, "How are you?", false, timestamp = 1698765780000, isSent = mutableStateOf(true)),
+    Message(2, "I'm fine, thanks!", false, timestamp = 1698765840000, isSent = mutableStateOf(true)),
+    Message(1, "I'm fine, thanks!", true, timestamp = 1698765900000, isSent = mutableStateOf(false))
 )
 
 var groupMessages = mutableStateListOf(
-    GroupMessage(1, "Alice", "Hello from Alice", 1),
-    GroupMessage(1, "Bob", "Hello from Bob", 2),
-    GroupMessage(1, "Charlie", "Hello from Charlie", 3),
-    GroupMessage(1, "Alice", "How are you?", 1),
-    GroupMessage(1, "Bob", "I'm fine, thanks!", 2)
+    GroupMessage(1, "Alice", "Hello from Alice", 1, timestamp = 1698765600000, isSent = mutableStateOf(true)),
+    GroupMessage(1, "Bob", "Hello from Bob", 2, timestamp = 1698765660000, isSent = mutableStateOf(true)),
+    GroupMessage(1, "Charlie", "Hello from Charlie", 3, timestamp = 1698765720000, isSent = mutableStateOf(true)),
+    GroupMessage(1, "Alice", "How are you?", 1, timestamp = 1698765780000, isSent = mutableStateOf(true)),
+    GroupMessage(1, "Bob", "I'm fine, thanks!", 2, timestamp = 1698765840000, isSent = mutableStateOf(false))
 )
 
 /**

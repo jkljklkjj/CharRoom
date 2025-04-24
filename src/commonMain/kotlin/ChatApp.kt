@@ -9,12 +9,15 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -57,12 +60,18 @@ fun userList(onUserClick: (User) -> Unit) {
         }
         // 测试按钮：新增好友
         Button(onClick = {
-            // Add a new user to the list for testing
-            val newUser = User(id = userList.size + 1, username = "New User ${userList.size + 1}")
-            messages+=Message(1, "hahaha", false)
-            userList = userList + newUser
+            // 添加一条测试消息
+            val newMessage = Message(
+                id = 1, // 假设是用户ID为1的消息
+                text = "This is a test message",
+                sender = true, // 表示是发送者
+                timestamp = System.currentTimeMillis(),
+                isSent = mutableStateOf(true)
+            )
+            messages += newMessage
+            println("测试消息已添加: $newMessage")
         }) {
-            Text("Add User")
+            Text("Add Test Message")
         }
     }
 }
@@ -191,9 +200,9 @@ fun groupChatScreen(group: User) {
                 val message = filteredGroupMessages[index]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = if (message.sender == 1) Arrangement.End else Arrangement.Start
+                    horizontalArrangement = if (message.sender==Integer.valueOf(ServerConfig.id)) Arrangement.End else Arrangement.Start
                 ) {
-                    if (message.sender != 1) {
+                    if (message.sender != Integer.valueOf(ServerConfig.id)) {
                         Text(
                             text = message.senderName,
                             style = MaterialTheme.typography.body1,
@@ -271,13 +280,28 @@ fun chatScreen(user: User) {
                             modifier = Modifier.padding(end = 8.dp)
                         )
                     } else {
-                        Text(
-                            text = message.text,
-                            style = MaterialTheme.typography.body1,
-                            modifier = Modifier
-                                .background(if (message.sender) Color(0xFF1E88E5) else Color.LightGray)
-                                .padding(8.dp)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (!message.isSent.value) {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = "Resend",
+                                    tint = Color.Red,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clickable {
+                                            resendMessage(user, message)
+                                        }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(
+                                text = message.text,
+                                style = MaterialTheme.typography.body1,
+                                modifier = Modifier
+                                    .background(if (message.sender) Color(0xFF1E88E5) else Color.LightGray)
+                                    .padding(8.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -316,29 +340,27 @@ fun chatScreen(user: User) {
     }
 }
 
-/**
- * 处理信息发送的方法
- */
 fun sendMessage(user: User, message: String) {
     val currentTime = System.currentTimeMillis()
     if (currentTime - lastMessageTime >= 2000) {
         lastMessageTime = currentTime
         println("Sending message to ${user.username}: $message")
+        val newMessage = Message(user.id, message, true, System.currentTimeMillis(),isSent = mutableStateOf(false))
+        messages += newMessage
         if (user.id > 0) {
             Chat.send(message, "chat", user.id.toString(), 1) { success, response ->
                 if (success && response[response.size - 1].status().code() == 200) {
                     println("Message sent successfully")
-                    messages += Message(user.id, message, true)
+                    newMessage.isSent = mutableStateOf(true)
                 } else {
                     println("Error: $response")
                 }
             }
         } else {
-            // 增加群组的账号
-            Chat.send(message+"/r/ngroupId:${-user.id}", "groupChat", user.id.toString(), 1) { success, response ->
+            Chat.send(message + "/r/ngroupId:${-user.id}", "groupChat", user.id.toString(), 1) { success, response ->
                 if (success && response[response.size - 1].status().code() == 200) {
                     println("Message sent successfully")
-                    messages += Message(user.id, message, true)
+                    newMessage.isSent = mutableStateOf(true)
                 } else {
                     println("Error: $response")
                 }
@@ -346,6 +368,29 @@ fun sendMessage(user: User, message: String) {
         }
     } else {
         println("You can only send a message every 2 seconds.")
+    }
+}
+
+fun resendMessage(user: User, message: Message) {
+    println("Resending message: ${message.text}")
+    if (user.id > 0) {
+        Chat.send(message.text, "chat", user.id.toString(), 1) { success, response ->
+            if (success && response[response.size - 1].status().code() == 200) {
+                println("Message resent successfully")
+                message.isSent = mutableStateOf(true)
+            } else {
+                println("Error: $response")
+            }
+        }
+    } else {
+        Chat.send(message.text + "/r/ngroupId:${-user.id}", "groupChat", user.id.toString(), 1) { success, response ->
+            if (success && response[response.size - 1].status().code() == 200) {
+                println("Message resent successfully")
+                message.isSent = mutableStateOf(true)
+            } else {
+                println("Error: $response")
+            }
+        }
     }
 }
 
@@ -374,14 +419,22 @@ fun chatApp(windowSize: DpSize, token: String) {
                         selectedUser = user
                         if (user.id > 0) {
                             Chat.send("chat", "check", user.id.toString(), 1) { success, response ->
-                                if (success && response[response.size - 1].status().code() == 200) {
-                                    if (selectedUser!!.username.contains(" (offline)")) {
-                                        selectedUser!!.username = selectedUser!!.username.replace(" (offline)", "")
-                                    }
+                                if (!success) {
+                                    println("Error: $response")
                                 } else {
-                                    if (!selectedUser!!.username.contains(" (offline)")) {
-                                        selectedUser!!.username += " (offline)"
-                                    }
+                                    val res = Util.jsonToMap(response[response.size - 1].content().toString(CharsetUtil.UTF_8))
+                                    val isOnline = res["online"] as Boolean
+                                    selectedUser = selectedUser?.copy(
+                                        username = if (isOnline) {
+                                            selectedUser!!.username.replace(" (offline)", "")
+                                        } else {
+                                            if (!selectedUser!!.username.contains(" (offline)")) {
+                                                selectedUser!!.username + " (offline)"
+                                            } else {
+                                                selectedUser!!.username
+                                            }
+                                        }
+                                    )
                                 }
                             }
                         } else {
@@ -403,24 +456,35 @@ fun chatApp(windowSize: DpSize, token: String) {
             if (selectedUser == null) {
                 userList(onUserClick = { user ->
                     selectedUser = user
-                    Chat.send("chat", "check", user.id.toString(), 1) { success, response ->
-                        if (success && response[response.size - 1].status().code() == 200) {
-                            println("User is online")
-                            if (selectedUser!!.username.contains(" (offline)")) {
-                                selectedUser!!.username = selectedUser!!.username.replace(" (offline)", "")
-                            }
-                        } else {
-                            if (!selectedUser!!.username.contains(" (offline)")) {
-                                selectedUser!!.username += " (offline)"
+                    if (user.id > 0) {
+                        Chat.send("chat", "check", user.id.toString(), 1) { success, response ->
+                            if (success) {
+                                val res = Util.jsonToMap(response[response.size - 1].content().toString(CharsetUtil.UTF_8))
+                                val isOnline = res["online"] as Boolean
+                                selectedUser = selectedUser?.copy(
+                                    username = if (isOnline) {
+                                        selectedUser!!.username.replace(" (offline)", "")
+                                    } else {
+                                        if (!selectedUser!!.username.contains(" (offline)")) {
+                                            selectedUser!!.username + " (offline)"
+                                        } else {
+                                            selectedUser!!.username
+                                        }
+                                    }
+                                )
+                            } else {
+                                println("Error: $response")
                             }
                         }
                     }
                 })
             } else {
-                if (selectedUser!!.id < 0) {
-                    groupChatScreen(group = selectedUser!!)
-                } else {
-                    chatScreen(user = selectedUser!!)
+                selectedUser?.let { user ->
+                    if (user.id < 0) {
+                        groupChatScreen(group = user)
+                    } else {
+                        chatScreen(user = user)
+                    }
                 }
             }
         }
