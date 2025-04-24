@@ -39,7 +39,6 @@ kotlin {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material)
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
                 implementation("javax.xml.bind:jaxb-api:2.3.1")
                 implementation("org.glassfish.jaxb:jaxb-runtime:2.3.1")
@@ -50,6 +49,7 @@ kotlin {
                 implementation("org.jboss.marshalling:jboss-marshalling-river:2.0.10.Final")
                 implementation("org.slf4j:slf4j-api:2.0.9")
                 implementation("ch.qos.logback:logback-classic:1.4.11")
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
             }
         }
         val commonTest by getting {

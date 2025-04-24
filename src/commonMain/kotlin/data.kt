@@ -13,21 +13,39 @@ import java.net.URI
 data class User(val id: Int, var username: String)
 @Serializable
 data class Message(
-    val id: Int,                // 消息的唯一标识
+    val id: Int,                // 消息的发送用户
     val text: String,           // 消息内容
     val sender: Boolean,        // 是否是发送者
     val timestamp: Long,        // 消息的时间戳
-    var isSent: MutableState<Boolean>  // 消息是否发送成功
-)
+    var isSent: MutableState<Boolean>,  // 消息是否发送成功
+    var messageId: String = ""// 消息ID
+) {
+    init {
+        if (messageId.isEmpty()) {
+            val minuteTimestamp = timestamp / 60000 // 转换为分钟级时间戳
+            val generatedId = (id.toString() + text.hashCode() + minuteTimestamp).hashCode()
+            this.messageId = generatedId.toString()
+        }
+    }
+}
 @Serializable
 data class GroupMessage(
     val groupId: Int,           // 群组ID
     val senderName: String,     // 发送者名称
     val text: String,           // 消息内容
-    val sender: Int,          // 发送者ID
+    val sender: Int,            // 发送者ID
     val timestamp: Long,        // 消息的时间戳
-    var isSent: MutableState<Boolean>  // 消息是否发送成功
-)
+    var isSent: MutableState<Boolean>,  // 消息是否发送成功
+    var messageId: String = ""  // 消息ID
+) {
+    init {
+        if (messageId.isEmpty()) {
+            val minuteTimestamp = timestamp / 60000 // 转换为分钟级时间戳
+            val generatedId = (groupId.toString() + sender.toString() + text.hashCode() + minuteTimestamp).hashCode()
+            this.messageId = generatedId.toString()
+        }
+    }
+}
 @Serializable
 data class Group(val id: Int, val name: String)
 

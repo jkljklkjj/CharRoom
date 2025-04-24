@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Notification
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import io.netty.util.CharsetUtil
@@ -340,27 +340,36 @@ fun chatScreen(user: User) {
     }
 }
 
-fun sendMessage(user: User, message: String) {
+fun sendMessage(user: User, messageText: String) {
     val currentTime = System.currentTimeMillis()
     if (currentTime - lastMessageTime >= 2000) {
         lastMessageTime = currentTime
-        println("Sending message to ${user.username}: $message")
-        val newMessage = Message(user.id, message, true, System.currentTimeMillis(),isSent = mutableStateOf(false))
+        println("Sending message to ${user.username}: $messageText")
+
+        val newMessage = Message(
+            id = user.id,
+            text = messageText,
+            sender = true,
+            timestamp = currentTime,
+            isSent = mutableStateOf(false)
+        )
         messages += newMessage
+        val messageJson = jacksonObjectMapper().writeValueAsString(newMessage)
+
         if (user.id > 0) {
-            Chat.send(message, "chat", user.id.toString(), 1) { success, response ->
+            Chat.send(messageJson, "chat", user.id.toString(), 1) { success, response ->
                 if (success && response[response.size - 1].status().code() == 200) {
                     println("Message sent successfully")
-                    newMessage.isSent = mutableStateOf(true)
+                    newMessage.isSent.value = true
                 } else {
                     println("Error: $response")
                 }
             }
         } else {
-            Chat.send(message + "/r/ngroupId:${-user.id}", "groupChat", user.id.toString(), 1) { success, response ->
+            Chat.send(messageJson + "/r/ngroupId:${-user.id}", "groupChat", user.id.toString(), 1) { success, response ->
                 if (success && response[response.size - 1].status().code() == 200) {
                     println("Message sent successfully")
-                    newMessage.isSent = mutableStateOf(true)
+                    newMessage.isSent.value = true
                 } else {
                     println("Error: $response")
                 }
