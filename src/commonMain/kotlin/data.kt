@@ -96,7 +96,6 @@ suspend fun fetchGroups(token: String): List<User> {
             .uri(URI.create("http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}/group/get"))
             .header("Authorization", "Bearer $token")
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{}"))
             .build()
 
         val response = withContext(Dispatchers.IO) {
