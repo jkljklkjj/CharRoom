@@ -165,7 +165,7 @@ object Chat {
 
             channel.writeAndFlush(request).addListener { future ->
                 if (future.isSuccess) {
-                    println("设定的期望响应数：$expectedResponses")
+//                    println("设定的期望响应数：$expectedResponses")
                     responseHandler.responseFuture.thenAccept { responses ->
                         callback(true, responses)
                     }.exceptionally { throwable: Throwable ->
