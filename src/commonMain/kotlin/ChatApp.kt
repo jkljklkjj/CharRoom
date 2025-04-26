@@ -1,4 +1,5 @@
 import ServerConfig.Token
+import ServerConfig.id
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -346,23 +347,30 @@ fun sendMessage(user: User, messageText: String) {
         lastMessageTime = currentTime
         println("Sending message to ${user.username}: $messageText")
 
+        val newSendMessage = Message(
+            id = Integer.valueOf(id),
+            text = messageText,
+            sender = true,
+            timestamp = currentTime,
+            isSent = mutableStateOf(true)
+        )
         val newMessage = Message(
             id = user.id,
             text = messageText,
             sender = true,
             timestamp = currentTime,
-            isSent = mutableStateOf(false)
+            isSent = mutableStateOf(true)
         )
         messages += newMessage
-        val messageJson = jacksonObjectMapper().writeValueAsString(newMessage)
+        val messageJson = jacksonObjectMapper().writeValueAsString(newSendMessage)
 
         if (user.id > 0) {
             Chat.send(messageJson, "chat", user.id.toString(), 1) { success, response ->
                 if (success && response[response.size - 1].status().code() == 200) {
                     println("Message sent successfully")
-                    newMessage.isSent.value = true
                 } else {
                     println("Error: $response")
+                    newMessage.isSent.value = false
                 }
             }
         } else {
