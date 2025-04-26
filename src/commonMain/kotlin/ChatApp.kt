@@ -382,8 +382,11 @@ fun sendMessage(user: User, messageText: String) {
 
 fun resendMessage(user: User, message: Message) {
     println("Resending message: ${message.text}")
+    // 将 Message 对象序列化为 JSON
+    val messageJson = jacksonObjectMapper().writeValueAsString(message)
+
     if (user.id > 0) {
-        Chat.send(message.text, "chat", user.id.toString(), 1) { success, response ->
+        Chat.send(messageJson, "chat", user.id.toString(), 1) { success, response ->
             if (success && response[response.size - 1].status().code() == 200) {
                 println("Message resent successfully")
                 message.isSent = mutableStateOf(true)
@@ -392,7 +395,7 @@ fun resendMessage(user: User, message: Message) {
             }
         }
     } else {
-        Chat.send(message.text + "/r/ngroupId:${-user.id}", "groupChat", user.id.toString(), 1) { success, response ->
+        Chat.send(messageJson + "/r/ngroupId:${user.id}", "groupChat", user.id.toString(), 1) { success, response ->
             if (success && response[response.size - 1].status().code() == 200) {
                 println("Message resent successfully")
                 message.isSent = mutableStateOf(true)
@@ -447,6 +450,7 @@ fun chatApp(windowSize: DpSize, token: String) {
                                 }
                             }
                         } else {
+                            // TODO
                             println("Group chat")
                         }
                     })
