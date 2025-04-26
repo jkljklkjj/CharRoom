@@ -7,6 +7,8 @@ import io.netty.channel.*
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.*
+import io.netty.handler.logging.LogLevel
+import io.netty.handler.logging.LoggingHandler
 import java.net.URI
 import java.util.concurrent.CompletableFuture
 
@@ -25,6 +27,12 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
         if (responses.size < expectedResponses) {
             responses.add(msg)
             if (responses.size == expectedResponses) {
+                val json = jacksonObjectMapper().readTree(content)
+                val messageId = json.get("messageId")?.asText()
+
+                if (messageId != null){
+                    handleIncomingMessage(msg)
+                }
                 responseFuture.complete(responses)
                 responses.clear()
             }
@@ -32,6 +40,33 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
             // Handle unsolicited messages (e.g., messages from other users)
             println("接收到了来自外界的信息: $content")
             handleIncomingMessage(content)
+        }
+    }
+
+//    override fun channelRead(ctx: ChannelHandlerContext?, msg: Any?) {
+//        println("收到哈哈哈信息: $msg")
+//        super.channelRead(ctx, msg)
+//    }
+
+    private fun handleIncomingMessage(msg: FullHttpResponse) {
+        try{
+            val json = jacksonObjectMapper().readTree(msg.content().toString(Charsets.UTF_8))
+            val senderId = json.get("id")?.asInt() ?: throw IllegalArgumentException("Missing senderId")
+            val messageId = json.get("messageId")?.asText()
+            val timestamp = json.get("timestamp")?.asLong() ?: throw IllegalArgumentException("Missing timestamp")
+            val sender = false
+            val text = json.get("text")?.asText() ?: throw IllegalArgumentException("Missing content")
+            messages += Message(
+                id = senderId,
+                text = text,
+                sender = sender,
+                timestamp = timestamp,
+                isSent = mutableStateOf(true),
+                messageId = messageId ?: ""
+            )
+        } catch (E: Exception){
+            println("Error handling incoming message: ${E.message}")
+            E.printStackTrace()
         }
     }
 
@@ -110,6 +145,7 @@ object Chat {
                     override fun initChannel(ch: Channel) {
                         ch.pipeline().addLast(HttpClientCodec())
                         ch.pipeline().addLast(HttpObjectAggregator(8192))
+//                        ch.pipeline().addLast(LoggingHandler(LogLevel.DEBUG))
                         responseHandler = CustomHttpResponseHandler()
                         ch.pipeline().addLast(responseHandler)
                     }
