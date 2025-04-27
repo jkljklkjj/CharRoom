@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -187,21 +188,28 @@ fun addUserOrGroupDialog(onDismiss: () -> Unit) {
     )
 }
 
+/**
+ * 群组聊天界面
+ */
 @Composable
 fun groupChatScreen(group: User) {
     var messageText by remember { mutableStateOf("") }
     val filteredGroupMessages = groupMessages.filter { it.groupId == -group.id }
     var isSending by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(text = group.username, style = MaterialTheme.typography.h4)
         Spacer(modifier = Modifier.height(16.dp))
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            state = listState
+        ) {
             items(filteredGroupMessages.size) { index ->
                 val message = filteredGroupMessages[index]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = if (message.sender==Integer.valueOf(ServerConfig.id)) Arrangement.End else Arrangement.Start
+                    horizontalArrangement = if (message.sender == Integer.valueOf(ServerConfig.id)) Arrangement.End else Arrangement.Start
                 ) {
                     if (message.sender != Integer.valueOf(ServerConfig.id)) {
                         Text(
@@ -210,33 +218,44 @@ fun groupChatScreen(group: User) {
                             modifier = Modifier.padding(end = 8.dp)
                         )
                     }
-                    Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.body1,
-                        modifier = Modifier
-                            .background(if (message.sender == 1) Color(0xFF1E88E5) else Color.LightGray)
-                            .padding(8.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (message.sender == Integer.valueOf(ServerConfig.id) && !message.isSent.value) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Resend",
+                                tint = Color.Red,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable {
+                                        resendMessage(User(-message.groupId, ""), message)
+                                    }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = message.text,
+                            style = MaterialTheme.typography.body1,
+                            modifier = Modifier
+                                .background(if (message.sender == Integer.valueOf(ServerConfig.id)) Color(0xFF1E88E5) else Color.LightGray)
+                                .padding(8.dp)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
+
+        // 自动滚动到底部
+        LaunchedEffect(filteredGroupMessages.size) {
+            listState.animateScrollToItem(filteredGroupMessages.size - 1)
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextField(
                 value = messageText,
                 onValueChange = { messageText = it },
-                modifier = Modifier.weight(1f).onKeyEvent { event: KeyEvent ->
-                    if (event.key == Key.Enter && event.isShiftPressed && !isSending) {
-                        isSending = true
-                        sendMessage(group, messageText)
-                        messageText = ""
-                        isSending = false
-                        true
-                    } else {
-                        false
-                    }
-                },
+                modifier = Modifier.weight(1f),
                 label = { Text("Type a message") }
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -256,18 +275,22 @@ fun groupChatScreen(group: User) {
 
 /**
  * 聊天信息界面
- * 和特有的用户或群组
+ * 和特有的用户
  */
 @Composable
 fun chatScreen(user: User) {
     var messageText by remember { mutableStateOf("") }
     val userMessages = messages.filter { it.id == user.id }
     var isSending by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(text = "Chat with ${user.username}", style = MaterialTheme.typography.h4)
         Spacer(modifier = Modifier.height(16.dp))
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            state = listState
+        ) {
             items(userMessages.size) { index ->
                 val message = userMessages[index]
                 Row(
@@ -308,6 +331,12 @@ fun chatScreen(user: User) {
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
+
+        // 自动滚动到底部
+        LaunchedEffect(userMessages.size) {
+            listState.animateScrollToItem(userMessages.size - 1)
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextField(
@@ -347,24 +376,23 @@ fun sendMessage(user: User, messageText: String) {
         lastMessageTime = currentTime
         println("Sending message to ${user.username}: $messageText")
 
-        val newSendMessage = Message(
-            id = Integer.valueOf(id),
-            text = messageText,
-            sender = true,
-            timestamp = currentTime,
-            isSent = mutableStateOf(true)
-        )
-        val newMessage = Message(
-            id = user.id,
-            text = messageText,
-            sender = true,
-            timestamp = currentTime,
-            isSent = mutableStateOf(true)
-        )
-        messages += newMessage
-        val messageJson = jacksonObjectMapper().writeValueAsString(newSendMessage)
-
         if (user.id > 0) {
+            val newSendMessage = Message(
+                id = Integer.valueOf(id),
+                text = messageText,
+                sender = true,
+                timestamp = currentTime,
+                isSent = mutableStateOf(true)
+            )
+            val newMessage = Message(
+                id = user.id,
+                text = messageText,
+                sender = true,
+                timestamp = currentTime,
+                isSent = mutableStateOf(true)
+            )
+            messages += newMessage
+            val messageJson = jacksonObjectMapper().writeValueAsString(newSendMessage)
             Chat.send(messageJson, "chat", user.id.toString(), 1) { success, response ->
                 if (success && response[response.size - 1].status().code() == 200) {
                     println("Message sent successfully")
@@ -374,12 +402,23 @@ fun sendMessage(user: User, messageText: String) {
                 }
             }
         } else {
-            Chat.send(messageJson + "/r/ngroupId:${-user.id}", "groupChat", user.id.toString(), 1) { success, response ->
+            // 群组消息
+            val newSendMessage = GroupMessage(
+                groupId = user.id,
+                sender = Integer.valueOf(id),
+                text = messageText,
+                senderName = "",// TODO 登录时记录自己的用户名
+                timestamp = currentTime,
+                isSent = mutableStateOf(true)
+            )
+            val messageJson = jacksonObjectMapper().writeValueAsString(newSendMessage)
+            Chat.send(messageJson, "groupChat", user.id.toString(), 1) { success, response ->
                 if (success && response[response.size - 1].status().code() == 200) {
                     println("Message sent successfully")
-                    newMessage.isSent.value = true
+
                 } else {
                     println("Error: $response")
+                    newSendMessage.isSent.value = false
                 }
             }
         }
@@ -390,23 +429,13 @@ fun sendMessage(user: User, messageText: String) {
 
 fun resendMessage(user: User, message: Message) {
     println("Resending message: ${message.text}")
-    // 将 Message 对象序列化为 JSON
     val messageJson = jacksonObjectMapper().writeValueAsString(message)
 
     if (user.id > 0) {
         Chat.send(messageJson, "chat", user.id.toString(), 1) { success, response ->
             if (success && response[response.size - 1].status().code() == 200) {
                 println("Message resent successfully")
-                message.isSent = mutableStateOf(true)
-            } else {
-                println("Error: $response")
-            }
-        }
-    } else {
-        Chat.send(messageJson + "/r/ngroupId:${user.id}", "groupChat", user.id.toString(), 1) { success, response ->
-            if (success && response[response.size - 1].status().code() == 200) {
-                println("Message resent successfully")
-                message.isSent = mutableStateOf(true)
+                message.isSent.value = true
             } else {
                 println("Error: $response")
             }
@@ -414,6 +443,19 @@ fun resendMessage(user: User, message: Message) {
     }
 }
 
+fun resendMessage(user: User, groupMessage: GroupMessage) {
+    println("Resending group message: ${groupMessage.text}")
+    val messageJson = jacksonObjectMapper().writeValueAsString(groupMessage)
+
+    Chat.send(messageJson, "groupChat", user.id.toString(), 1) { success, response ->
+        if (success && response[response.size - 1].status().code() == 200) {
+            println("Group message resent successfully")
+            groupMessage.isSent.value = true
+        } else {
+            println("Error: $response")
+        }
+    }
+}
 /**
  * 聊天应用
  */

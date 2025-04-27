@@ -40,7 +40,6 @@ kotlin {
                 implementation(compose.foundation)
                 implementation(compose.material)
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
-                implementation("javax.xml.bind:jaxb-api:2.3.1")
                 implementation("org.glassfish.jaxb:jaxb-runtime:2.3.1")
                 implementation("com.konghq:unirest-java:3.13.6")
                 implementation("io.netty:netty-all:4.1.68.Final")
@@ -49,7 +48,7 @@ kotlin {
                 implementation("org.jboss.marshalling:jboss-marshalling-river:2.0.10.Final")
                 implementation("org.slf4j:slf4j-api:2.0.9")
                 implementation("ch.qos.logback:logback-classic:1.4.11")
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
             }
         }
         val commonTest by getting {
@@ -72,7 +71,6 @@ kotlin {
                 implementation("androidx.compose.ui:ui-tooling-preview:1.7.5")
                 implementation("androidx.activity:activity-compose:1.9.3")
                 implementation("androidx.appcompat:appcompat:1.7.0")
-                implementation("javax.xml.bind:jaxb-api:2.3.1")
                 implementation("org.glassfish.jaxb:jaxb-runtime:2.3.2")
                 implementation(compose.desktop.currentOs)
             }
@@ -130,8 +128,8 @@ tasks.register<Jar>("customJar") {
     archiveBaseName.set("在线聊天App")
     archiveVersion.set("1.0.0")
     // 从 commonMain/kotlin 和 desktopMain/kotlin 目录中包含所有文件
-//    from(kotlin.sourceSets["commonMain"].kotlin.srcDirs)
-//    from(kotlin.sourceSets["desktopMain"].kotlin.srcDirs)
+    from(kotlin.sourceSets["commonMain"].kotlin.srcDirs)
+    from(kotlin.sourceSets["desktopMain"].kotlin.srcDirs)
     from("build/classes/kotlin/desktop/main")
 
     // Include dependencies
