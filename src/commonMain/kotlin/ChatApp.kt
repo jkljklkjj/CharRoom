@@ -64,13 +64,14 @@ fun userList(onUserClick: (User) -> Unit) {
         Button(onClick = {
             // 添加一条测试消息
             val newMessage = Message(
-                id = 1, // 假设是用户ID为1的消息
+                id = 4, // 假设是用户ID为1的消息
                 text = "This is a test message",
-                sender = true, // 表示是发送者
+                sender = false, // 表示是发送者
                 timestamp = System.currentTimeMillis(),
                 isSent = mutableStateOf(true)
             )
             messages += newMessage
+            println(messages.joinToString(separator = "\n") { it.toString() })
             println("测试消息已添加: $newMessage")
         }) {
             Text("Add Test Message")
@@ -255,7 +256,17 @@ fun groupChatScreen(group: User) {
             TextField(
                 value = messageText,
                 onValueChange = { messageText = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).onKeyEvent { event: KeyEvent ->
+                    if (event.key == Key.Enter && event.isShiftPressed && !isSending) {
+                        isSending = true
+                        sendMessage(group, messageText)
+                        messageText = ""
+                        isSending = false
+                        true
+                    } else {
+                        false
+                    }
+                },
                 label = { Text("Type a message") }
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -435,7 +446,7 @@ fun resendMessage(user: User, message: Message) {
         Chat.send(messageJson, "chat", user.id.toString(), 1) { success, response ->
             if (success && response[response.size - 1].status().code() == 200) {
                 println("Message resent successfully")
-                message.isSent.value = true
+                message.isSent = mutableStateOf(true)
             } else {
                 println("Error: $response")
             }
@@ -456,6 +467,7 @@ fun resendMessage(user: User, groupMessage: GroupMessage) {
         }
     }
 }
+
 /**
  * 聊天应用
  */
