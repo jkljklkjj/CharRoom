@@ -248,7 +248,9 @@ fun groupChatScreen(group: User) {
 
         // 自动滚动到底部
         LaunchedEffect(filteredGroupMessages.size) {
-            listState.animateScrollToItem(filteredGroupMessages.size - 1)
+            if (filteredGroupMessages.isNotEmpty()) {
+                listState.animateScrollToItem(filteredGroupMessages.size - 1)
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -345,7 +347,9 @@ fun chatScreen(user: User) {
 
         // 自动滚动到底部
         LaunchedEffect(userMessages.size) {
-            listState.animateScrollToItem(userMessages.size - 1)
+            if (userMessages.isNotEmpty()) {
+                listState.animateScrollToItem(userMessages.size - 1)
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
