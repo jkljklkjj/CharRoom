@@ -1,10 +1,11 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("multiplatform") version "1.8.10"
-    id("org.jetbrains.compose") version "1.5.0"
-    id("com.android.application") version "7.4.2"
-    kotlin("plugin.serialization") version "1.8.10"
+    kotlin("multiplatform") version "2.2.20"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.2.20"
+    kotlin("plugin.serialization") version "2.2.20"
+    id("org.jetbrains.compose") version "1.7.0"
+    id("com.android.application") version "8.11.2"
 }
 
 group = "com.example"
@@ -18,18 +19,16 @@ repositories {
 }
 
 kotlin {
+    jvmToolchain(17)
+
     jvm("desktop") {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
-    android {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
+    androidTarget() {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
 
@@ -39,16 +38,15 @@ kotlin {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material)
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
-                implementation("org.glassfish.jaxb:jaxb-runtime:2.3.1")
-                implementation("com.konghq:unirest-java:3.13.6")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                implementation("org.glassfish.jaxb:jaxb-runtime:4.0.5")
+                implementation("com.konghq:unirest-java:3.14.5")
                 implementation("io.netty:netty-all:4.1.68.Final")
-                implementation("org.slf4j:slf4j-simple:1.7.32")
                 implementation("org.jboss.marshalling:jboss-marshalling:2.0.10.Final")
                 implementation("org.jboss.marshalling:jboss-marshalling-river:2.0.10.Final")
-                implementation("org.slf4j:slf4j-api:2.0.9")
-                implementation("ch.qos.logback:logback-classic:1.4.11")
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
+                implementation("org.slf4j:slf4j-api:2.0.17")
+                implementation("ch.qos.logback:logback-classic:1.5.18")
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.20.0")
             }
         }
         val commonTest by getting {
@@ -66,12 +64,12 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation("androidx.compose.ui:ui:1.7.5")
-                implementation("androidx.compose.material:material:1.7.5")
-                implementation("androidx.compose.ui:ui-tooling-preview:1.7.5")
-                implementation("androidx.activity:activity-compose:1.9.3")
-                implementation("androidx.appcompat:appcompat:1.7.0")
-                implementation("org.glassfish.jaxb:jaxb-runtime:2.3.2")
+                implementation("androidx.compose.ui:ui:1.9.1")
+                implementation("androidx.compose.material:material:1.9.1")
+                implementation("androidx.compose.ui:ui-tooling-preview:1.9.1")
+                implementation("androidx.activity:activity-compose:1.11.0")
+                implementation("androidx.appcompat:appcompat:1.7.1")
+                implementation("org.glassfish.jaxb:jaxb-runtime:4.0.5")
                 implementation(compose.desktop.currentOs)
             }
         }
@@ -83,13 +81,13 @@ kotlin {
 
 android {
     namespace = "com.example.charroom"
-    compileSdk = 34
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.example.charroom"
-        minSdk = 21
+        minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -103,12 +101,12 @@ android {
     }
 }
 dependencies {
-    implementation("com.google.android.gms:play-services-pal:20.3.0")
+    implementation("com.google.android.gms:play-services-pal:22.1.0")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        jvmTarget = "17"
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

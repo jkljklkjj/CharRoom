@@ -4,7 +4,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
 import java.net.URI
@@ -151,7 +150,7 @@ suspend fun fetchGroups(token: String): List<User> {
 suspend fun updateFriendList(token: String): List<User> {
     val tmp = fetchFriends(token)
     users = users + tmp
-    return fetchFriends(token)
+    return tmp
 }
 
 /**

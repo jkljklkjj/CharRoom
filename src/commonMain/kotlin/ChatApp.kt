@@ -7,11 +7,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.Icon
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.DpSize
@@ -23,7 +25,6 @@ import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -40,6 +41,7 @@ var lastMessageTime = 0L
 fun userList(onUserClick: (User) -> Unit) {
     var userList by remember { mutableStateOf(listOf<User>()) }
 
+    // 加载时拉取好友和群聊
     LaunchedEffect(Unit) {
         userList = updateList(Token)
     }
@@ -124,12 +126,12 @@ fun addUserOrGroupDialog(onDismiss: () -> Unit) {
             // 添加用户或群组的按钮
             Button(onClick = {
                 println("正在添加。。。${account}")
-                val boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-                val requestBody = if (isUser) {
-                    buildFormDataBody(boundary, mapOf("friendId" to account))
+                val payload = if (isUser) {
+                    mapOf("friendId" to account)
                 } else {
-                    buildFormDataBody(boundary, mapOf("groupId" to account))
+                    mapOf("groupId" to account)
                 }
+                val requestBody = jacksonObjectMapper().writeValueAsString(payload)
                 val uri = if (isUser) {
                     "http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}/friend/add"
                 } else {
@@ -141,8 +143,8 @@ fun addUserOrGroupDialog(onDismiss: () -> Unit) {
 
                 val request = HttpRequest.newBuilder()
                     .uri(URI.create(uri))
-                    .header("Content-Type", "multipart/form-data; boundary=$boundary")
-                    .POST(requestBody)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .header("Authorization", "Bearer $Token")
                     .timeout(Duration.ofSeconds(10))
                     .build()
@@ -221,7 +223,7 @@ fun groupChatScreen(group: User) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (message.sender == Integer.valueOf(ServerConfig.id) && !message.isSent.value) {
                             Icon(
-                                imageVector = Icons.Default.Send,
+                                imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "Resend",
                                 tint = Color.Red,
                                 modifier = Modifier
@@ -307,7 +309,7 @@ fun chatScreen(user: User) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (!message.isSent.value) {
                                 Icon(
-                                    imageVector = Icons.Default.Send,
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
                                     contentDescription = "Resend",
                                     tint = Color.Red,
                                     modifier = Modifier
@@ -469,8 +471,6 @@ fun chatApp(windowSize: DpSize, token: String) {
         CoroutineScope(Dispatchers.IO).launch {
             Chat.start()
         }
-        // 更新好友和群组列表
-        updateList(token)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

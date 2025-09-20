@@ -1,5 +1,6 @@
 import ServerConfig.Token
 import androidx.compose.runtime.mutableStateOf
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
@@ -7,10 +8,45 @@ import io.netty.channel.*
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.*
-import io.netty.handler.logging.LogLevel
-import io.netty.handler.logging.LoggingHandler
 import java.net.URI
 import java.util.concurrent.CompletableFuture
+
+// 统一的API解包结果与提示
+private data class ApiUnwrap(
+    val hasEnvelope: Boolean,
+    val success: Boolean,
+    val dataJson: String?,
+    val message: String?
+)
+
+private fun unwrapApi(content: String): ApiUnwrap {
+    return try {
+        val trimmed = content.trim()
+        if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+            // 非JSON，按无包裹成功直传
+            ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
+        } else {
+            val mapper = jacksonObjectMapper()
+            val root = mapper.readTree(trimmed)
+            if (root.has("code")) {
+                val code = root.get("code").asInt()
+                val msg = root.get("message")?.asText()
+                val dataNode = root.get("data")
+                val dataStr = dataNode?.let { mapper.writeValueAsString(it) }
+                ApiUnwrap(hasEnvelope = true, success = code == 0, dataJson = dataStr, message = msg)
+            } else {
+                // 旧格式，直接当数据
+                ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
+            }
+        }
+    } catch (e: Exception) {
+        ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
+    }
+}
+
+private fun prompt(msg: String?) {
+    if (!msg.isNullOrBlank()) println("提示: $msg")
+}
 
 /**
  * 处理接收到的http信息
@@ -27,12 +63,17 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
         if (responses.size < expectedResponses) {
             responses.add(msg)
             if (responses.size == expectedResponses) {
-                if (content.trim().startsWith("{") && content.trim().endsWith("}")){
-                    val json = jacksonObjectMapper().readTree(content)
+                val unwrap = unwrapApi(content)
+                if (unwrap.hasEnvelope && !unwrap.success) {
+                    prompt(unwrap.message)
+                }
+                val dataStr = unwrap.dataJson ?: content
+                if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")){
+                    val json = jacksonObjectMapper().readTree(dataStr)
                     val messageId = json.get("messageId")?.asText()
 
                     if (messageId != null){
-                        handleIncomingMessage(msg)
+                        handleIncomingFromJson(json)
                     }
                 }
 
@@ -42,7 +83,13 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
         } else {
             // Handle unsolicited messages (e.g., messages from other users)
             println("接收到了来自外界的信息: $content")
-            handleIncomingMessage(content)
+            val unwrap = unwrapApi(content)
+            if (unwrap.hasEnvelope && !unwrap.success) {
+                prompt(unwrap.message)
+            } else {
+                val dataStr = unwrap.dataJson ?: content
+                handleIncomingMessage(dataStr)
+            }
         }
     }
 
@@ -51,9 +98,8 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
 //        super.channelRead(ctx, msg)
 //    }
 
-    private fun handleIncomingMessage(msg: FullHttpResponse) {
+    private fun handleIncomingFromJson(json: JsonNode) {
         try{
-            val json = jacksonObjectMapper().readTree(msg.content().toString(Charsets.UTF_8))
             val senderId = json.get("id")?.asInt() ?: throw IllegalArgumentException("Missing senderId")
             val messageId = json.get("messageId")?.asText()
             val timestamp = json.get("timestamp")?.asLong() ?: throw IllegalArgumentException("Missing timestamp")
@@ -73,9 +119,32 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
         }
     }
 
+    private fun handleIncomingMessage(msg: FullHttpResponse) {
+        try{
+            val raw = msg.content().toString(Charsets.UTF_8)
+            val unwrap = unwrapApi(raw)
+            if (unwrap.hasEnvelope && !unwrap.success) {
+                prompt(unwrap.message)
+                return
+            }
+            val dataStr = unwrap.dataJson ?: raw
+            val json = jacksonObjectMapper().readTree(dataStr)
+            handleIncomingFromJson(json)
+        } catch (E: Exception){
+            println("Error handling incoming message: ${E.message}")
+            E.printStackTrace()
+        }
+    }
+
     private fun handleIncomingMessage(content: String) {
         try {
-            val json = jacksonObjectMapper().readTree(content)
+            val unwrap = unwrapApi(content)
+            if (unwrap.hasEnvelope && !unwrap.success) {
+                prompt(unwrap.message)
+                return
+            }
+            val dataStr = unwrap.dataJson ?: content
+            val json = jacksonObjectMapper().readTree(dataStr)
             val messageType = json.get("type")?.asText() ?: throw IllegalArgumentException("Missing message type")
             val messageContent = json.get("content")?.asText() ?: throw IllegalArgumentException("Missing content")
             val senderName = json.get("sender")?.asText() ?: "Unknown"
@@ -158,7 +227,7 @@ object Chat {
             channel = channelFuture.channel()
             println("后端服务器连接成功！")
 
-            send("", "login", "0",1) { success, responses ->
+            send("", "login", ServerConfig.id,1) { success, responses ->
                 if (success) {
                     println("登录成功")
                     responses.forEach { response ->
@@ -230,7 +299,21 @@ object Chat {
                 if (future.isSuccess) {
 //                    println("设定的期望响应数：$expectedResponses")
                     responseHandler.responseFuture.thenAccept { responses ->
-                        callback(true, responses)
+                        // 统一按业务code判断成功，并在失败时提示
+                        var allOk = true
+                        var firstErrMsg: String? = null
+                        responses.forEach { r ->
+                            val body = r.content().toString(Charsets.UTF_8)
+                            val unwrap = unwrapApi(body)
+                            if (unwrap.hasEnvelope) {
+                                if (!unwrap.success) {
+                                    allOk = false
+                                    if (firstErrMsg == null) firstErrMsg = unwrap.message
+                                }
+                            }
+                        }
+                        if (!allOk) prompt(firstErrMsg)
+                        callback(allOk, responses)
                     }.exceptionally { throwable: Throwable ->
                         callback(
                             false,

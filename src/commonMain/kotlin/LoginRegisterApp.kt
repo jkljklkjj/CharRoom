@@ -7,7 +7,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.net.URI
@@ -18,9 +17,10 @@ import java.net.http.HttpTimeoutException
 import java.time.Duration
 
 import ServerConfig.id
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import javax.xml.bind.annotation.XmlRootElement
 
 private val logger: Logger = LoggerFactory.getLogger("LoginRegisterApp")
 /**
@@ -63,9 +63,6 @@ fun LoginRegisterApp() {
     }
 
     if (isLoggedIn) {
-        LaunchedEffect(Unit) {
-            updateList(token)
-        }
         chatApp(DpSize(800.dp, 600.dp), token)
     } else {
         Column(
@@ -142,7 +139,6 @@ fun LoginRegisterApp() {
     }
 }
 
-@XmlRootElement
 @Serializable
 data class RegisterUser(
     val username: String = "",
@@ -208,6 +204,9 @@ fun validateToken(token: String): Boolean {
     }
 }
 
+@Serializable
+data class LoginRequest(val id: String, val password: String)
+
 /**
  * 登录
  *
@@ -221,18 +220,19 @@ fun login(id: String, password: String): String {
             .connectTimeout(Duration.ofSeconds(10))
             .build()
 
-        val boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-        val requestBody = buildFormDataBody(boundary, mapOf("id" to id, "password" to password))
-
+        val bodyJson = Json.encodeToString(LoginRequest(id, password))
         val request = HttpRequest.newBuilder()
             .uri(URI.create("http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}/user/login"))
-            .header("Content-Type", "multipart/form-data; boundary=$boundary")
-            .POST(requestBody)
+            .header("Content-Type", "application/json")
+            .POST(bodyJson.let { HttpRequest.BodyPublishers.ofString(it) })
             .timeout(Duration.ofSeconds(10))
             .build()
 
+        ServerConfig.id = id
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        response.body()
+        val json = Json.parseToJsonElement(response.body()).jsonObject
+        val data = json["data"]?.jsonPrimitive?.content ?: ""
+        data
     } catch (e: HttpTimeoutException) {
         logger.error("请求超时，请检查网络连接或服务器状态")
         ""
@@ -240,16 +240,4 @@ fun login(id: String, password: String): String {
         logger.error(e.message.toString())
         "" // Return a default value or handle the error as needed
     }
-}
-
-fun buildFormDataBody(boundary: String, data: Map<String, String>): HttpRequest.BodyPublisher {
-    val byteArrays = data.flatMap { (key, value) ->
-        listOf(
-            "--$boundary\r\n".toByteArray(),
-            "Content-Disposition: form-data; name=\"$key\"\r\n\r\n".toByteArray(),
-            "$value\r\n".toByteArray()
-        )
-    } + "--$boundary--\r\n".toByteArray()
-
-    return HttpRequest.BodyPublishers.ofByteArrays(byteArrays)
 }
