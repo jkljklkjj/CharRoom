@@ -7,7 +7,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import users
+import core.ApiService
+import core.ServerConfig
+import model.users
 
 @Composable
 fun addUserOrGroupDialog(onDismiss: () -> Unit) {

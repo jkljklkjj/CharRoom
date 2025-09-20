@@ -1,6 +1,5 @@
 package component
 
-import User
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,7 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import groupMessages
+import core.ServerConfig
+import model.User
+import model.groupMessages
 
 @Composable
 fun groupChatScreen(group: User) {
@@ -94,4 +95,3 @@ fun groupChatScreen(group: User) {
         }
     }
 }
-

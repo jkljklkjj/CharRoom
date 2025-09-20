@@ -1,7 +1,5 @@
 package component
 
-import Message
-import User
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,10 +7,11 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import messages
-import updateList
-
-// 依赖全局：users/messages/updateList/Token/User/Message 已在 data.kt / component.ChatApp.kt 中
+import core.ServerConfig
+import model.User
+import model.Message
+import model.messages
+import model.updateList
 
 @Composable
 fun UserList(onUserClick: (User) -> Unit) {

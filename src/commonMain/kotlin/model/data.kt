@@ -1,6 +1,8 @@
+package model
+
 import androidx.compose.runtime.*
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
+import core.ApiService
 
 @Serializable
 data class User(val id: Int, var username: String)

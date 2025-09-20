@@ -1,10 +1,14 @@
 package component
 
-import GroupMessage
-import Message
-import User
-import ServerConfig.Token
-import ServerConfig.id
+import core.ServerConfig
+import core.Chat
+import core.MsgType
+import model.User
+import model.Message
+import model.GroupMessage
+import model.groupMessages
+import model.messages
+import Util
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
@@ -21,19 +25,16 @@ import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import messages
 
 var lastMessageTime = 0L
 
-// 仅保留消息发送相关逻辑
 fun sendMessage(user: User, messageText: String) {
     val currentTime = System.currentTimeMillis()
     if (currentTime - lastMessageTime >= 2000) {
         lastMessageTime = currentTime
-        println("Sending message to ${user.username}: $messageText")
         if (user.id > 0) {
             val outbound = Message(
-                id = Integer.valueOf(id),
+                id = Integer.valueOf(ServerConfig.id),
                 text = messageText,
                 sender = true,
                 timestamp = currentTime,
@@ -48,7 +49,7 @@ fun sendMessage(user: User, messageText: String) {
             )
             messages += localCopy
             val json = jacksonObjectMapper().writeValueAsString(outbound)
-            Chat.send(json, "chat", user.id.toString(), 1) { success, resp ->
+            Chat.send(json, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
                 if (!(success && resp.last().status().code() == 200)) {
                     localCopy.isSent.value = false
                 }
@@ -56,27 +57,25 @@ fun sendMessage(user: User, messageText: String) {
         } else {
             val outbound = GroupMessage(
                 groupId = user.id,
-                sender = Integer.valueOf(id),
+                sender = Integer.valueOf(ServerConfig.id),
                 text = messageText,
                 senderName = "",
                 timestamp = currentTime,
                 isSent = mutableStateOf(true)
             )
             val json = jacksonObjectMapper().writeValueAsString(outbound)
-            Chat.send(json, "groupChat", user.id.toString(), 1) { success, resp ->
+            Chat.send(json, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
                 if (!(success && resp.last().status().code() == 200)) {
                     outbound.isSent.value = false
                 }
             }
         }
-    } else {
-        println("You can only send a message every 2 seconds.")
     }
 }
 
 fun resendMessage(user: User, message: Message) {
     val json = jacksonObjectMapper().writeValueAsString(message)
-    Chat.send(json, "chat", user.id.toString(), 1) { success, resp ->
+    Chat.send(json, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
         if (success && resp.last().status().code() == 200) {
             message.isSent.value = true
         }
@@ -85,7 +84,7 @@ fun resendMessage(user: User, message: Message) {
 
 fun resendMessage(user: User, groupMessage: GroupMessage) {
     val json = jacksonObjectMapper().writeValueAsString(groupMessage)
-    Chat.send(json, "groupChat", user.id.toString(), 1) { success, resp ->
+    Chat.send(json, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
         if (success && resp.last().status().code() == 200) {
             groupMessage.isSent.value = true
         }
@@ -94,7 +93,7 @@ fun resendMessage(user: User, groupMessage: GroupMessage) {
 
 @Composable
 fun ChatApp(windowSize: DpSize, token: String) {
-    Token = token
+    ServerConfig.Token = token
     var selectedUser by remember { mutableStateOf<User?>(null) }
     var showDialog by remember { mutableStateOf(false) }
 
@@ -109,7 +108,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                     UserList { user ->
                         selectedUser = user
                         if (user.id > 0) {
-                            Chat.send("", "check", user.id.toString(), 1) { success, resp ->
+                            Chat.send("", MsgType.CHECK, user.id.toString(), 1) { success, resp ->
                                 if (success) {
                                     val map = Util.jsonToMap(resp.last().content().toString(CharsetUtil.UTF_8))
                                     val online = map["online"] as? Boolean ?: false
@@ -126,9 +125,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                     }
                 }
                 Box(Modifier.weight(2f)) {
-                    selectedUser?.let { u ->
-                        if (u.id < 0) groupChatScreen(u) else ChatScreen(u)
-                    }
+                    selectedUser?.let { u -> if (u.id < 0) groupChatScreen(u) else ChatScreen(u) }
                 }
             }
         } else {
@@ -136,7 +133,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                 UserList { user ->
                     selectedUser = user
                     if (user.id > 0) {
-                        Chat.send("", "check", user.id.toString(), 1) { success, resp ->
+                        Chat.send("", MsgType.CHECK, user.id.toString(), 1) { success, resp ->
                             if (success) {
                                 val map = Util.jsonToMap(resp.last().content().toString(CharsetUtil.UTF_8))
                                 val online = map["online"] as? Boolean ?: false

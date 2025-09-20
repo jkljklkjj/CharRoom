@@ -1,4 +1,10 @@
-import ServerConfig.Token
+package core
+
+import core.ServerConfig.Token
+import model.Message
+import model.GroupMessage
+import model.messages
+import model.groupMessages
 import androidx.compose.runtime.mutableStateOf
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -10,6 +16,17 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.*
 import java.net.URI
 import java.util.concurrent.CompletableFuture
+
+// 定义发送类型枚举，统一管理后端协议中的字符串
+enum class MsgType(val wire: String) {
+    LOGIN("login"),
+    LOGOUT("logout"),
+    CHAT("chat"),
+    GROUP_CHAT("groupChat"),
+    CHECK("check");
+}
+// 兼容旧代码引用
+typealias SendType = MsgType
 
 // 统一的API解包结果与提示
 private data class ApiUnwrap(
@@ -227,7 +244,7 @@ object Chat {
             channel = channelFuture.channel()
             println("后端服务器连接成功！")
 
-            send("", "login", ServerConfig.id,1) { success, responses ->
+            send("", MsgType.LOGIN, ServerConfig.id,1) { success, responses ->
                 if (success) {
                     println("登录成功")
                     responses.forEach { response ->
@@ -263,20 +280,18 @@ object Chat {
      */
     fun send(
         message: String,
-        type: String,
+        type: MsgType,
         targetClientId: String,
         expectedResponses: Int,
         callback: (Boolean, List<FullHttpResponse>) -> Unit
     ) {
         println("正在发送信息")
         if (::channel.isInitialized) {
-            // TODO 升级成websocket后url需要改成ws://$host:$port/send
             val uri = URI("http://$host:$port/send")
-            // 传输信息，处理类型和目标用户
             val json = jacksonObjectMapper().writeValueAsString(
                 mapOf(
                     "content" to message,
-                    "type" to type,
+                    "type" to type.wire,
                     "targetClientId" to targetClientId,
                     "timestamp" to System.currentTimeMillis(),
                 )
@@ -351,7 +366,7 @@ object Chat {
     fun shutdown() {
         println("正在关闭")
         val shutdownCompleted = CompletableFuture<Boolean>()
-        send("Shutting down", "logout", "0", 1) { success, _ ->
+        send("Shutting down", MsgType.LOGOUT, "0", 1) { success, _ ->
             if (success) {
                 println("Shutdown message sent successfully")
             } else {

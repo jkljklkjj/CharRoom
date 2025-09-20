@@ -1,3 +1,5 @@
+package core
+
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlinx.serialization.builtins.ListSerializer
@@ -6,6 +8,9 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import model.User
+import model.Group
+import model.convertMessages
 
 // 接口路径常量集中管理
 object ApiEndpoints {
