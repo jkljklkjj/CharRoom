@@ -1,3 +1,5 @@
+package component
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -5,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,24 +14,12 @@ import androidx.compose.material.Icon
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
-import io.netty.util.CharsetUtil
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
+import messages
+import User
 
 @Composable
-fun chatScreen(user: User) {
+fun ChatScreen(user: User) {
     var messageText by remember { mutableStateOf("") }
     val userMessages = messages.filter { it.id == user.id }
     var isSending by remember { mutableStateOf(false) }

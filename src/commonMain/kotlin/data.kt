@@ -1,12 +1,6 @@
 import androidx.compose.runtime.*
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
-import java.net.URI
 
 @Serializable
 data class User(val id: Int, var username: String)
@@ -79,68 +73,14 @@ var groupMessages = mutableStateListOf(
 )
 
 /**
- * 获取好友列表
- *
- * @param token 用户的token
- * @return 好友列表
+ * 获取好友列表（委托 ApiService）
  */
-suspend fun fetchFriends(token: String): List<User> {
-    return try {
-        val client = HttpClient.newHttpClient()
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create("http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}/friend/get"))
-            .header("Authorization", "Bearer $token")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{}"))
-            .build()
-
-        val response = withContext(Dispatchers.IO) {
-            client.send(request, HttpResponse.BodyHandlers.ofString())
-        }
-        val json = Json { ignoreUnknownKeys = true }
-        if(response.statusCode() != 200) {
-            println("拉取好友失败，状态码：${response.statusCode()}")
-            return emptyList()
-        }
-        println("拉取好友的结果：${response.body()}")
-        json.decodeFromString(response.body())
-    } catch (e: Exception) {
-        e.printStackTrace()
-        emptyList()
-    }
-}
+suspend fun fetchFriends(token: String): List<User> = ApiService.fetchFriends(token)
 
 /**
- * 获取群组列表
- *
- * @param token 用户的token
- * @return List<User> 返回群组列表
+ * 获取群组列表（委托 ApiService）
  */
-suspend fun fetchGroups(token: String): List<User> {
-    return try {
-        val client = HttpClient.newHttpClient()
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create("http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}/group/get"))
-            .header("Authorization", "Bearer $token")
-            .header("Content-Type", "application/json")
-            .build()
-
-        val response = withContext(Dispatchers.IO) {
-            client.send(request, HttpResponse.BodyHandlers.ofString())
-        }
-        val json = Json { ignoreUnknownKeys = true }
-        if(response.statusCode() != 200) {
-            println("拉取群组失败，状态码：${response.statusCode()}")
-            return emptyList()
-        }
-        println(response.body())
-        val groups = json.decodeFromString<List<Group>>(response.body())
-        convertMessages(groups)
-    } catch (e: Exception) {
-        e.printStackTrace()
-        emptyList()
-    }
-}
+suspend fun fetchGroups(token: String): List<User> = ApiService.fetchGroups(token)
 
 /**
  * 更新好友列表

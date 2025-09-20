@@ -1,3 +1,8 @@
+package component
+
+import GroupMessage
+import Message
+import User
 import ServerConfig.Token
 import ServerConfig.id
 import androidx.compose.foundation.layout.*
@@ -16,6 +21,7 @@ import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import messages
 
 var lastMessageTime = 0L
 
@@ -121,7 +127,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                 }
                 Box(Modifier.weight(2f)) {
                     selectedUser?.let { u ->
-                        if (u.id < 0) groupChatScreen(u) else chatScreen(u)
+                        if (u.id < 0) groupChatScreen(u) else ChatScreen(u)
                     }
                 }
             }
@@ -146,7 +152,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                     }
                 }
             } else {
-                selectedUser?.let { u -> if (u.id < 0) groupChatScreen(u) else chatScreen(u) }
+                selectedUser?.let { u -> if (u.id < 0) groupChatScreen(u) else ChatScreen(u) }
             }
         }
 
