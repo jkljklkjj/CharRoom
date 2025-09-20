@@ -63,7 +63,7 @@ fun LoginRegisterApp() {
     }
 
     if (isLoggedIn) {
-        chatApp(DpSize(800.dp, 600.dp), token)
+        ChatApp(DpSize(800.dp, 600.dp), token)
     } else {
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
