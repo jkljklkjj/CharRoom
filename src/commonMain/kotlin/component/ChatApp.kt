@@ -101,13 +101,17 @@ fun ChatApp(windowSize: DpSize, token: String) {
     // 拉取离线消息
     LaunchedEffect(Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            while (true) {
-                val resp = ApiService.getOfflineMessages(ServerConfig.Token)
-                if (resp.isNullOrEmpty()) break
-                messages += resp // 假设 resp 已经是 List<Message>
+            launch { // 拉取消息
+                while (true) {
+                    val resp = ApiService.getOfflineMessages(ServerConfig.Token)
+                    if (resp.isNullOrEmpty()) break
+                    messages += resp
+                }
+            }
+            launch { // 启动 Chat
+                Chat.start()
             }
         }
-        Chat.start()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
