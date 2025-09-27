@@ -17,8 +17,11 @@ import core.ServerConfig
 import model.User
 import model.groupMessages
 
+/**
+ * 群聊界面
+ */
 @Composable
-fun groupChatScreen(group: User) {
+fun GroupChatScreen(group: User) {
     var messageText by remember { mutableStateOf("") }
     val filteredGroupMessages = groupMessages.filter { it.groupId == -group.id }
     var isSending by remember { mutableStateOf(false) }

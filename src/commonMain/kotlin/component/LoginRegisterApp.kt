@@ -16,6 +16,9 @@ import org.slf4j.LoggerFactory
 
 private val logger: Logger = LoggerFactory.getLogger("component.LoginRegisterApp")
 
+/**
+ * 登录或注册界面
+ */
 @Composable
 fun LoginRegisterApp() {
     var isLogin by remember { mutableStateOf(true) }

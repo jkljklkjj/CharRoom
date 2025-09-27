@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import model.User
 import model.messages
 
+/**
+ * 好友聊天界面
+ */
 @Composable
 fun ChatScreen(user: User) {
     var messageText by remember { mutableStateOf("") }

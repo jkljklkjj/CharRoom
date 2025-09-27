@@ -11,6 +11,7 @@ data class Message(
     val id: Int,                // 消息的发送用户
     val text: String,           // 消息内容
     val sender: Boolean,        // 是否是发送者
+    val target: Int = -1,      // 目标用户ID
     val timestamp: Long,        // 消息的时间戳
     var isSent: MutableState<Boolean>,  // 消息是否发送成功
     var messageId: String = ""// 消息ID
@@ -77,12 +78,12 @@ var groupMessages = mutableStateListOf(
 /**
  * 获取好友列表（委托 ApiService）
  */
-suspend fun fetchFriends(token: String): List<User> = ApiService.fetchFriends(token)
+fun fetchFriends(token: String): List<User> = ApiService.fetchFriends(token)
 
 /**
  * 获取群组列表（委托 ApiService）
  */
-suspend fun fetchGroups(token: String): List<User> = ApiService.fetchGroups(token)
+fun fetchGroups(token: String): List<User> = ApiService.fetchGroups(token)
 
 /**
  * 更新好友列表
@@ -107,12 +108,12 @@ suspend fun updateGroupList(token: String): List<User> {
 }
 
 /**
- * 更新好友和群组列表
- *
- * @param token 用户的token
+ * 更新好友和群组列表：同时写回全局 users 以触发 UI 重组
  */
 suspend fun updateList(token: String): List<User> {
     val friends = fetchFriends(token)
     val groups = fetchGroups(token)
-    return friends + groups
+    val merged = friends + groups
+    users = merged
+    return merged
 }

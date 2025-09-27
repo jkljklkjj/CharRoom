@@ -3,10 +3,10 @@ package component
 import core.ServerConfig
 import core.Chat
 import core.MsgType
+import core.ApiService
 import model.User
 import model.Message
 import model.GroupMessage
-import model.groupMessages
 import model.messages
 import Util
 import androidx.compose.foundation.layout.*
@@ -35,6 +35,7 @@ fun sendMessage(user: User, messageText: String) {
         if (user.id > 0) {
             val outbound = Message(
                 id = Integer.valueOf(ServerConfig.id),
+                target = user.id,
                 text = messageText,
                 sender = true,
                 timestamp = currentTime,
@@ -97,8 +98,16 @@ fun ChatApp(windowSize: DpSize, token: String) {
     var selectedUser by remember { mutableStateOf<User?>(null) }
     var showDialog by remember { mutableStateOf(false) }
 
+    // 拉取离线消息
     LaunchedEffect(Unit) {
-        CoroutineScope(Dispatchers.IO).launch { Chat.start() }
+        CoroutineScope(Dispatchers.IO).launch {
+            while (true) {
+                val resp = ApiService.getOfflineMessages(ServerConfig.Token)
+                if (resp.isNullOrEmpty()) break
+                messages += resp // 假设 resp 已经是 List<Message>
+            }
+        }
+        Chat.start()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -125,7 +134,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                     }
                 }
                 Box(Modifier.weight(2f)) {
-                    selectedUser?.let { u -> if (u.id < 0) groupChatScreen(u) else ChatScreen(u) }
+                    selectedUser?.let { u -> if (u.id < 0) GroupChatScreen(u) else ChatScreen(u) }
                 }
             }
         } else {
@@ -149,7 +158,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                     }
                 }
             } else {
-                selectedUser?.let { u -> if (u.id < 0) groupChatScreen(u) else ChatScreen(u) }
+                selectedUser?.let { u -> if (u.id < 0) GroupChatScreen(u) else ChatScreen(u) }
             }
         }
 
@@ -157,7 +166,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
             Icon(Icons.Default.Search, contentDescription = "Search")
         }
         if (showDialog) {
-            addUserOrGroupDialog { showDialog = false }
+            AddUserOrGroupDialog { showDialog = false }
         }
     }
 }

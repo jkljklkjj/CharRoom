@@ -10,34 +10,44 @@ import androidx.compose.ui.unit.dp
 import core.ApiService
 import core.ServerConfig
 import model.users
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
+/**
+ * 添加用户或群组对话框
+ */
 @Composable
-fun addUserOrGroupDialog(onDismiss: () -> Unit) {
+fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
     var account by remember { mutableStateOf("") }
     var isUser by remember { mutableStateOf(true) }
     var responseMessage by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
         title = { Text("Add User or Group") },
         text = {
             Column {
                 TextField(
                     value = account,
                     onValueChange = { account = it },
-                    label = { Text("Account") }
+                    label = { Text("Account") },
+                    singleLine = true,
+                    enabled = !isSubmitting
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(
                         selected = isUser,
-                        onClick = { isUser = true }
+                        onClick = { if (!isSubmitting) isUser = true }
                     )
                     Text("User")
                     Spacer(modifier = Modifier.width(16.dp))
                     RadioButton(
                         selected = !isUser,
-                        onClick = { isUser = false }
+                        onClick = { if (!isSubmitting) isUser = false }
                     )
                     Text("Group")
                 }
@@ -45,42 +55,57 @@ fun addUserOrGroupDialog(onDismiss: () -> Unit) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = it,
-                        color = if (it == "添加成功") Color.Green else Color.Red
+                        color = when (it) {
+                            "添加成功" -> Color(0xFF2E7D32)
+                            else -> Color.Red
+                        }
                     )
                 }
             }
         },
         confirmButton = {
-            Button(onClick = {
-                println("正在添加。。。$account")
-                if (account.isBlank()) {
-                    responseMessage = "账号不能为空"
-                    return@Button
-                }
-                val token = ServerConfig.Token
-                val success = if (isUser) {
-                    ApiService.addFriend(token, account)
-                } else {
-                    ApiService.addGroup(token, account)
-                }
-                responseMessage = if (success) "添加成功" else "添加失败"
-                if (success) {
-                    val detailUser = if (isUser) {
-                        ApiService.getUserDetail(token, account)
-                    } else {
-                        ApiService.getGroupDetail(token, account)
+            Button(
+                enabled = !isSubmitting,
+                onClick = {
+                    if (account.isBlank()) {
+                        responseMessage = "账号不能为空"
+                        return@Button
                     }
-                    detailUser?.let { u ->
-                        val adjusted = if (isUser) u else u.copy(id = -u.id)
-                        users += adjusted
+                    scope.launch {
+                        isSubmitting = true
+                        responseMessage = null
+                        val token = ServerConfig.Token
+                        val success = withContext(Dispatchers.IO) {
+                            if (isUser) {
+                                ApiService.addFriend(token, account)
+                            } else {
+                                ApiService.addGroup(token, account)
+                            }
+                        }
+                        responseMessage = if (success) "添加成功" else "添加失败"
+                        if (success) {
+                            val detailUser = withContext(Dispatchers.IO) {
+                                if (isUser) {
+                                    ApiService.getUserDetail(token, account)
+                                } else {
+                                    ApiService.getGroupDetail(token, account)
+                                }
+                            }
+                            detailUser?.let { u ->
+                                val adjusted = if (isUser) u else u.copy(id = -u.id)
+                                // 去重：根据 id 判断是否已存在
+                                if (users.none { it.id == adjusted.id }) {
+                                    users = users + adjusted
+                                }
+                            }
+                        }
+                        isSubmitting = false
                     }
                 }
-            }) {
-                Text("Add")
-            }
+            ) { Text(if (isSubmitting) "Adding..." else "Add") }
         },
         dismissButton = {
-            Button(onClick = onDismiss) { Text("Cancel") }
+            Button(onClick = { if (!isSubmitting) onDismiss() }, enabled = !isSubmitting) { Text("Cancel") }
         }
     )
 }

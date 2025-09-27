@@ -25,8 +25,6 @@ enum class MsgType(val wire: String) {
     GROUP_CHAT("groupChat"),
     CHECK("check");
 }
-// 兼容旧代码引用
-typealias SendType = MsgType
 
 // 统一的API解包结果与提示
 private data class ApiUnwrap(
@@ -244,7 +242,7 @@ object Chat {
             channel = channelFuture.channel()
             println("后端服务器连接成功！")
 
-            send("", MsgType.LOGIN, ServerConfig.id,1) { success, responses ->
+            send("", MsgType.LOGIN, ServerConfig.Token,1) { success, responses ->
                 if (success) {
                     println("登录成功")
                     responses.forEach { response ->

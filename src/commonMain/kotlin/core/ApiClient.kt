@@ -3,14 +3,13 @@ package core
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlinx.serialization.builtins.ListSerializer
+import androidx.compose.runtime.mutableStateOf
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
-import model.User
-import model.Group
-import model.convertMessages
+import model.*
 
 // 接口路径常量集中管理
 object ApiEndpoints {
@@ -24,6 +23,7 @@ object ApiEndpoints {
     const val GROUP_ADD = "/user/addgroup"
     const val USER_DETAIL = "/user/get"          // ?id=xxx
     const val GROUP_DETAIL = "/group/getDetail"  // ?id=xxx
+    const val OFFLINE = "/message/getOfflineMessage"
 
     fun url(path: String): String = BASE + path
 }
@@ -36,7 +36,7 @@ private val json = Json { ignoreUnknownKeys = true }
 @Serializable private data class AddFriendBody(val friendId: String)
 @Serializable private data class AddGroupBody(val groupId: String)
 
-// 统一 API 客户端封装
+// 统一 Spring的API 客户端封装
 class ApiClient(
     private val http: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
@@ -154,6 +154,55 @@ class ApiClient(
         return try { decodeUserFlexible(http.send(req, HttpResponse.BodyHandlers.ofString()).body()) } catch (e: Exception) { null }
     }
 
+    /** 拉取离线消息，返回 List<Message>，code==0 时有效 */
+    fun getOfflineMessages(token: String): List<Message> {
+        return try {
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create(ApiEndpoints.url(ApiEndpoints.OFFLINE)))
+                .header("Authorization", "Bearer $token")
+                .header("Content-Type", "application/json")
+                .GET()
+                .timeout(Duration.ofSeconds(10))
+                .build()
+            val body = http.send(request, HttpResponse.BodyHandlers.ofString()).body()
+            val root = json.parseToJsonElement(body).jsonObject
+            val code = root["code"]?.jsonPrimitive?.intOrNull
+            if (code != 0) emptyList()
+            else {
+                val dataEl = root["data"] ?: return emptyList()
+                // 反序列化为通用结构
+                val rawList = runCatching { json.decodeFromJsonElement<List<JsonObject>>(dataEl) }.getOrElse { emptyList() }
+                rawList.mapNotNull { raw ->
+                    try {
+                        val id = raw["id"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
+                        val text = raw["text"]?.jsonPrimitive?.content ?: ""
+                        val target = raw["target"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
+                        val timestamp = raw["timestamp"]?.jsonPrimitive?.longOrNull
+                            ?: raw["timestamp"]?.jsonPrimitive?.content?.let { parseDateToMillis(it) } ?: 0L
+                        val sender = id == ServerConfig.id.toIntOrNull() // 本人发的
+                        Message(
+                            id = id,
+                            text = text,
+                            sender = sender,
+                            target = target,
+                            timestamp = timestamp,
+                            isSent = mutableStateOf(true)
+                        )
+                    } catch (_: Exception) { null }
+                }
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    // 辅助：解析 Date 字符串为毫秒
+    private fun parseDateToMillis(dateStr: String): Long {
+        return try {
+            java.time.OffsetDateTime.parse(dateStr).toInstant().toEpochMilli()
+        } catch (_: Exception) {
+            try { java.time.LocalDateTime.parse(dateStr).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() } catch (_: Exception) { 0L }
+        }
+    }
+
     // ---------------- 私有解析辅助 ----------------
     private fun parseToken(body: String): String {
         val root = json.parseToJsonElement(body).jsonObject
@@ -209,7 +258,6 @@ class ApiClient(
     }.getOrNull()
 }
 
-// 对外暴露的单例，直接调用 ApiService.login(...)
 object ApiService {
     private val client = ApiClient()
     fun login(id: String, password: String) = client.login(id, password)
@@ -221,4 +269,5 @@ object ApiService {
     fun addGroup(token: String, groupId: String) = client.addGroup(token, groupId)
     fun getUserDetail(token: String, userId: String) = client.getUserDetail(token, userId)
     fun getGroupDetail(token: String, groupId: String) = client.getGroupDetail(token, groupId)
+    fun getOfflineMessages(token: String) = client.getOfflineMessages(token)
 }

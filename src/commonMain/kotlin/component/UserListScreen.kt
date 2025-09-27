@@ -12,14 +12,20 @@ import model.User
 import model.Message
 import model.messages
 import model.updateList
+import model.users
 
+/**
+ * 左侧用户和群组列表边栏
+ */
 @Composable
 fun UserList(onUserClick: (User) -> Unit) {
-    var userListState by remember { mutableStateOf(listOf<User>()) }
+    val userListState = users
 
+    // 首次进入时拉取列表，写回 users（在 updateList 内部）
     LaunchedEffect(Unit) {
-        userListState = updateList(ServerConfig.Token)
+        updateList(ServerConfig.Token)
     }
+
     println("User list: $userListState")
     Column {
         LazyColumn {
@@ -44,7 +50,7 @@ fun UserList(onUserClick: (User) -> Unit) {
                 isSent = mutableStateOf(true)
             )
             messages += newMessage
-            println(messages.joinToString(separator = "\n") { it.toString() })
+//            println(messages.joinToString(separator = "\n") { it.toString() })
             println("测试消息已添加: $newMessage")
         }) {
             Text("Add Test Message")
