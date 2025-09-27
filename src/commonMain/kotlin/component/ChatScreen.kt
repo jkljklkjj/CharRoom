@@ -24,7 +24,7 @@ import model.messages
 @Composable
 fun ChatScreen(user: User) {
     var messageText by remember { mutableStateOf("") }
-    val userMessages = messages.filter { it.id == user.id }
+    val userMessages = messages.filter { it.senderId == user.id }
     var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
@@ -43,7 +43,7 @@ fun ChatScreen(user: User) {
                 ) {
                     if (!message.sender) {
                         Text(
-                            text = message.text,
+                            text = message.message,
                             style = MaterialTheme.typography.body1,
                             modifier = Modifier.padding(end = 8.dp)
                         )
@@ -61,7 +61,7 @@ fun ChatScreen(user: User) {
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
                             Text(
-                                text = message.text,
+                                text = message.message,
                                 style = MaterialTheme.typography.body1,
                                 modifier = Modifier
                                     .background(if (message.sender) Color(0xFF1E88E5) else Color.LightGray)

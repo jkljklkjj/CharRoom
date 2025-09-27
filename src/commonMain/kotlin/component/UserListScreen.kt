@@ -43,8 +43,8 @@ fun UserList(onUserClick: (User) -> Unit) {
         }
         Button(onClick = {
             val newMessage = Message(
-                id = 4,
-                text = "This is a test message",
+                senderId = 4,
+                message = "This is a test message",
                 sender = false,
                 timestamp = System.currentTimeMillis(),
                 isSent = mutableStateOf(true)

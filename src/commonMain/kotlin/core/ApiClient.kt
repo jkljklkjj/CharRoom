@@ -1,15 +1,18 @@
 package core
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
-import kotlinx.serialization.builtins.ListSerializer
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.*
+import model.Group
+import model.Message
+import model.User
+import model.convertMessages
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
-import model.*
 
 // 接口路径常量集中管理
 object ApiEndpoints {
@@ -31,10 +34,14 @@ object ApiEndpoints {
 // 简单 Json 工具（忽略未知字段）
 private val json = Json { ignoreUnknownKeys = true }
 
-@Serializable private data class LoginBody(val id: String, val password: String)
-@Serializable private data class RegisterBody(val username: String, val password: String)
-@Serializable private data class AddFriendBody(val friendId: String)
-@Serializable private data class AddGroupBody(val groupId: String)
+@Serializable
+private data class LoginBody(val id: String, val password: String)
+@Serializable
+private data class RegisterBody(val username: String, val password: String)
+@Serializable
+private data class AddFriendBody(val friendId: String)
+@Serializable
+private data class AddGroupBody(val groupId: String)
 
 // 统一 Spring的API 客户端封装
 class ApiClient(
@@ -51,7 +58,11 @@ class ApiClient(
             .POST(HttpRequest.BodyPublishers.ofString(bodyJson))
             .timeout(Duration.ofSeconds(10))
             .build()
-        return try { parseToken(http.send(request, HttpResponse.BodyHandlers.ofString()).body()) } catch (e: Exception) { "" }
+        return try {
+            parseToken(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
+        } catch (e: Exception) {
+            ""
+        }
     }
 
     /** 注册，成功返回账号 id，否则 -1 */
@@ -63,7 +74,11 @@ class ApiClient(
             .POST(HttpRequest.BodyPublishers.ofString(bodyJson))
             .timeout(Duration.ofSeconds(20))
             .build()
-        return try { parseIntData(http.send(request, HttpResponse.BodyHandlers.ofString()).body()) ?: -1 } catch (e: Exception) { -1 }
+        return try {
+            parseIntData(http.send(request, HttpResponse.BodyHandlers.ofString()).body()) ?: -1
+        } catch (e: Exception) {
+            -1
+        }
     }
 
     /** 验证 token 是否有效（code==0 且 data==true） */
@@ -79,7 +94,9 @@ class ApiClient(
             val code = root["code"]?.jsonPrimitive?.intOrNull
             val dataBool = root["data"]?.jsonPrimitive?.booleanOrNull
             code == 0 && dataBool == true
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /** 获取好友列表 */
@@ -91,7 +108,9 @@ class ApiClient(
             .POST(HttpRequest.BodyPublishers.ofString("{}"))
             .build()
         parseUserList(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-    } catch (e: Exception) { emptyList() }
+    } catch (e: Exception) {
+        emptyList()
+    }
 
     /** 获取群组列表 */
     fun fetchGroups(token: String): List<User> = try {
@@ -102,7 +121,9 @@ class ApiClient(
             .GET()
             .build()
         parseGroupList(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-    } catch (e: Exception) { emptyList() }
+    } catch (e: Exception) {
+        emptyList()
+    }
 
     /** 添加好友 */
     fun addFriend(token: String, friendId: String): Boolean {
@@ -114,7 +135,11 @@ class ApiClient(
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .timeout(Duration.ofSeconds(10))
             .build()
-        return try { interpretBooleanResponse(http.send(req, HttpResponse.BodyHandlers.ofString()).body()) } catch (e: Exception) { false }
+        return try {
+            interpretBooleanResponse(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /** 加入群组 */
@@ -127,7 +152,11 @@ class ApiClient(
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .timeout(Duration.ofSeconds(10))
             .build()
-        return try { interpretBooleanResponse(http.send(req, HttpResponse.BodyHandlers.ofString()).body()) } catch (e: Exception) { false }
+        return try {
+            interpretBooleanResponse(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /** 用户详情 */
@@ -139,7 +168,11 @@ class ApiClient(
             .GET()
             .timeout(Duration.ofSeconds(10))
             .build()
-        return try { decodeUserFlexible(http.send(req, HttpResponse.BodyHandlers.ofString()).body()) } catch (e: Exception) { null }
+        return try {
+            decodeUserFlexible(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** 群组详情（返回转为 User 供列表复用） */
@@ -151,7 +184,11 @@ class ApiClient(
             .GET()
             .timeout(Duration.ofSeconds(10))
             .build()
-        return try { decodeUserFlexible(http.send(req, HttpResponse.BodyHandlers.ofString()).body()) } catch (e: Exception) { null }
+        return try {
+            decodeUserFlexible(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** 拉取离线消息，返回 List<Message>，code==0 时有效 */
@@ -167,31 +204,16 @@ class ApiClient(
             val body = http.send(request, HttpResponse.BodyHandlers.ofString()).body()
             val root = json.parseToJsonElement(body).jsonObject
             val code = root["code"]?.jsonPrimitive?.intOrNull
-            if (code != 0) emptyList()
-            else {
-                val dataEl = root["data"] ?: return emptyList()
-                // 反序列化为通用结构
-                val rawList = runCatching { json.decodeFromJsonElement<List<JsonObject>>(dataEl) }.getOrElse { emptyList() }
-                rawList.mapNotNull { raw ->
-                    try {
-                        val id = raw["id"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
-                        val text = raw["text"]?.jsonPrimitive?.content ?: ""
-                        val target = raw["target"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
-                        val timestamp = raw["timestamp"]?.jsonPrimitive?.longOrNull
-                            ?: raw["timestamp"]?.jsonPrimitive?.content?.let { parseDateToMillis(it) } ?: 0L
-                        val sender = id == ServerConfig.id.toIntOrNull() // 本人发的
-                        Message(
-                            id = id,
-                            text = text,
-                            sender = sender,
-                            target = target,
-                            timestamp = timestamp,
-                            isSent = mutableStateOf(true)
-                        )
-                    } catch (_: Exception) { null }
-                }
+            if (code != 0) {
+                return emptyList()
             }
-        } catch (e: Exception) { emptyList() }
+            val dataEl = root["data"] ?: return emptyList()
+            val messages = json.decodeFromJsonElement(ListSerializer(Message.serializer()), dataEl)
+            messages.forEach { it.isSent = mutableStateOf(true) } // 离线消息均视为已发送
+            return messages
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     // 辅助：解析 Date 字符串为毫秒
@@ -199,7 +221,12 @@ class ApiClient(
         return try {
             java.time.OffsetDateTime.parse(dateStr).toInstant().toEpochMilli()
         } catch (_: Exception) {
-            try { java.time.LocalDateTime.parse(dateStr).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() } catch (_: Exception) { 0L }
+            try {
+                java.time.LocalDateTime.parse(dateStr).atZone(java.time.ZoneId.systemDefault()).toInstant()
+                    .toEpochMilli()
+            } catch (_: Exception) {
+                0L
+            }
         }
     }
 
@@ -223,7 +250,12 @@ class ApiClient(
         val code = root["code"]?.jsonPrimitive?.intOrNull
         if (code != 0) return emptyList()
         val dataEl = root["data"] ?: return emptyList()
-        return runCatching { json.decodeFromJsonElement(ListSerializer(User.serializer()), dataEl) }.getOrElse { emptyList() }
+        return runCatching {
+            json.decodeFromJsonElement(
+                ListSerializer(User.serializer()),
+                dataEl
+            )
+        }.getOrElse { emptyList() }
     }
 
     private fun parseGroupList(body: String): List<User> {
@@ -231,7 +263,12 @@ class ApiClient(
         val code = root["code"]?.jsonPrimitive?.intOrNull
         if (code != 0) return emptyList()
         val dataEl = root["data"] ?: return emptyList()
-        val groups = runCatching { json.decodeFromJsonElement(ListSerializer(Group.serializer()), dataEl) }.getOrElse { emptyList() }
+        val groups = runCatching {
+            json.decodeFromJsonElement(
+                ListSerializer(Group.serializer()),
+                dataEl
+            )
+        }.getOrElse { emptyList() }
         return convertMessages(groups)
     }
 

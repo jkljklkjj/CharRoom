@@ -34,16 +34,16 @@ fun sendMessage(user: User, messageText: String) {
         lastMessageTime = currentTime
         if (user.id > 0) {
             val outbound = Message(
-                id = Integer.valueOf(ServerConfig.id),
-                target = user.id,
-                text = messageText,
+                senderId = Integer.valueOf(ServerConfig.id),
+                receiverId = user.id,
+                message = messageText,
                 sender = true,
                 timestamp = currentTime,
                 isSent = mutableStateOf(true)
             )
             val localCopy = Message(
-                id = user.id,
-                text = messageText,
+                senderId = user.id,
+                message = messageText,
                 sender = true,
                 timestamp = currentTime,
                 isSent = mutableStateOf(true)

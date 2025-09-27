@@ -121,8 +121,8 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
             val sender = false
             val text = json.get("text")?.asText() ?: throw IllegalArgumentException("Missing content")
             messages += Message(
-                id = senderId,
-                text = text,
+                senderId = senderId,
+                message = text,
                 sender = sender,
                 timestamp = timestamp,
                 isSent = mutableStateOf(true),
@@ -169,8 +169,8 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
                 "chat" -> {
                     println("New private message from $senderName: $messageContent")
                     messages += Message(
-                        id = userId,
-                        text = messageContent,
+                        senderId = userId,
+                        message = messageContent,
                         sender = false,
                         timestamp = System.currentTimeMillis(),
                         isSent = mutableStateOf(true)
