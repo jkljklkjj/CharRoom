@@ -58,7 +58,7 @@ fun sendMessage(user: User, messageText: String) {
         } else {
             val outbound = GroupMessage(
                 groupId = user.id,
-                sender = Integer.valueOf(ServerConfig.id),
+                senderId = Integer.valueOf(ServerConfig.id),
                 text = messageText,
                 senderName = "",
                 timestamp = currentTime,

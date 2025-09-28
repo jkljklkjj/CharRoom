@@ -29,7 +29,7 @@ data class GroupMessage(
     val groupId: Int,           // 群组ID
     val senderName: String,     // 发送者名称
     val text: String,           // 消息内容
-    val sender: Int,            // 发送者ID
+    val senderId: Int,            // 发送者ID
     val timestamp: Long,        // 消息的时间戳
     var isSent: MutableState<Boolean>,  // 消息是否发送成功
     var messageId: String = ""  // 消息ID
@@ -37,7 +37,7 @@ data class GroupMessage(
     init {
         if (messageId.isEmpty()) {
             val minuteTimestamp = timestamp / 60000 // 转换为分钟级时间戳
-            val generatedId = (groupId.toString() + sender.toString() + text.hashCode() + minuteTimestamp).hashCode()
+            val generatedId = (groupId.toString() + senderId.toString() + text.hashCode() + minuteTimestamp).hashCode()
             this.messageId = generatedId.toString()
         }
     }
@@ -51,29 +51,32 @@ fun convertMessages(messages: List<Group>): List<User> {
     }
 }
 
-var users by mutableStateOf(listOf(
-    User(1, "Alice"),
-    User(2, "Bob"),
-    User(3, "Charlie"),
-    User(-1, "fucking group")
-))
-
-var messages = mutableStateListOf(
-    Message(1, "Hello from Alice", false, timestamp = 1698765600000, isSent = mutableStateOf(true)),
-    Message(2, "Hello from Bob", false, timestamp = 1698765660000, isSent = mutableStateOf(true)),
-    Message(3, "Hello from Charlie", false, timestamp = 1698765720000, isSent = mutableStateOf(true)),
-    Message(1, "How are you?", false, timestamp = 1698765780000, isSent = mutableStateOf(true)),
-    Message(2, "I'm fine, thanks!", false, timestamp = 1698765840000, isSent = mutableStateOf(true)),
-    Message(1, "I'm fine, thanks!", true, timestamp = 1698765900000, isSent = mutableStateOf(false))
-)
-
-var groupMessages = mutableStateListOf(
-    GroupMessage(1, "Alice", "Hello from Alice", 1, timestamp = 1698765600000, isSent = mutableStateOf(true)),
-    GroupMessage(1, "Bob", "Hello from Bob", 2, timestamp = 1698765660000, isSent = mutableStateOf(true)),
-    GroupMessage(1, "Charlie", "Hello from Charlie", 3, timestamp = 1698765720000, isSent = mutableStateOf(true)),
-    GroupMessage(1, "Alice", "How are you?", 1, timestamp = 1698765780000, isSent = mutableStateOf(true)),
-    GroupMessage(1, "Bob", "I'm fine, thanks!", 2, timestamp = 1698765840000, isSent = mutableStateOf(false))
-)
+//var users by mutableStateOf(listOf(
+//    User(1, "Alice"),
+//    User(2, "Bob"),
+//    User(3, "Charlie"),
+//    User(-1, "fucking group")
+//))
+//
+//var messages = mutableStateListOf(
+//    Message(1, "Hello from Alice", false, timestamp = 1698765600000, isSent = mutableStateOf(true)),
+//    Message(2, "Hello from Bob", false, timestamp = 1698765660000, isSent = mutableStateOf(true)),
+//    Message(3, "Hello from Charlie", false, timestamp = 1698765720000, isSent = mutableStateOf(true)),
+//    Message(1, "How are you?", false, timestamp = 1698765780000, isSent = mutableStateOf(true)),
+//    Message(2, "I'm fine, thanks!", false, timestamp = 1698765840000, isSent = mutableStateOf(true)),
+//    Message(1, "I'm fine, thanks!", true, timestamp = 1698765900000, isSent = mutableStateOf(false))
+//)
+//
+//var groupMessages = mutableStateListOf(
+//    GroupMessage(1, "Alice", "Hello from Alice", 1, timestamp = 1698765600000, isSent = mutableStateOf(true)),
+//    GroupMessage(1, "Bob", "Hello from Bob", 2, timestamp = 1698765660000, isSent = mutableStateOf(true)),
+//    GroupMessage(1, "Charlie", "Hello from Charlie", 3, timestamp = 1698765720000, isSent = mutableStateOf(true)),
+//    GroupMessage(1, "Alice", "How are you?", 1, timestamp = 1698765780000, isSent = mutableStateOf(true)),
+//    GroupMessage(1, "Bob", "I'm fine, thanks!", 2, timestamp = 1698765840000, isSent = mutableStateOf(false))
+//)
+var users by mutableStateOf<List<User>>(emptyList())
+var messages = mutableStateListOf<Message>()
+var groupMessages = mutableStateListOf<GroupMessage>()
 
 /**
  * 获取好友列表（委托 ApiService）

@@ -38,9 +38,9 @@ fun GroupChatScreen(group: User) {
                 val message = filteredGroupMessages[index]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = if (message.sender == Integer.valueOf(ServerConfig.id)) Arrangement.End else Arrangement.Start
+                    horizontalArrangement = if (message.senderId == Integer.valueOf(ServerConfig.id)) Arrangement.End else Arrangement.Start
                 ) {
-                    if (message.sender != Integer.valueOf(ServerConfig.id)) {
+                    if (message.senderId != Integer.valueOf(ServerConfig.id)) {
                         Text(
                             text = message.senderName,
                             style = MaterialTheme.typography.body1,
@@ -48,7 +48,7 @@ fun GroupChatScreen(group: User) {
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (message.sender == Integer.valueOf(ServerConfig.id) && !message.isSent.value) {
+                        if (message.senderId == Integer.valueOf(ServerConfig.id) && !message.isSent.value) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "Resend",
@@ -63,7 +63,7 @@ fun GroupChatScreen(group: User) {
                             text = message.text,
                             style = MaterialTheme.typography.body1,
                             modifier = Modifier
-                                .background(if (message.sender == Integer.valueOf(ServerConfig.id)) Color(0xFF1E88E5) else Color.LightGray)
+                                .background(if (message.senderId == Integer.valueOf(ServerConfig.id)) Color(0xFF1E88E5) else Color.LightGray)
                                 .padding(8.dp)
                         )
                     }

@@ -23,7 +23,8 @@ enum class MsgType(val wire: String) {
     LOGOUT("logout"),
     CHAT("chat"),
     GROUP_CHAT("groupChat"),
-    CHECK("check");
+    CHECK("check"),
+    HEARTBEAT("heartbeat");
 }
 
 // 统一的API解包结果与提示
@@ -183,7 +184,7 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
                         groupId = groupId,
                         senderName = senderName,
                         text = messageContent,
-                        sender = userId,
+                        senderId = userId,
                         timestamp = System.currentTimeMillis(),
                         isSent = mutableStateOf(true)
                     )
