@@ -16,6 +16,8 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.*
 import java.net.URI
 import java.util.concurrent.CompletableFuture
+import kotlinx.coroutines.*
+import androidx.compose.runtime.mutableStateOf
 
 // 定义发送类型枚举，统一管理后端协议中的字符串
 enum class MsgType(val wire: String) {
@@ -215,6 +217,10 @@ object Chat {
     private var port = ServerConfig.NETTY_SERVER_PORT
     private lateinit var responseHandler: CustomHttpResponseHandler
 
+    val isServerConnected = mutableStateOf(true)
+    private var heartbeatJob: Job? = null
+    private val heartbeatIntervalMillis = 10000L // 10秒
+
     fun start(newHost: String = host, newPort: Int = port) {
         host = newHost
         port = newPort
@@ -222,7 +228,6 @@ object Chat {
         Runtime.getRuntime().addShutdownHook(Thread {
             shutdown()
         })
-//        println("正在启动...")
         val group = NioEventLoopGroup()
 
         try {
@@ -233,7 +238,6 @@ object Chat {
                     override fun initChannel(ch: Channel) {
                         ch.pipeline().addLast(HttpClientCodec())
                         ch.pipeline().addLast(HttpObjectAggregator(8192))
-//                        ch.pipeline().addLast(LoggingHandler(LogLevel.DEBUG))
                         responseHandler = CustomHttpResponseHandler()
                         ch.pipeline().addLast(responseHandler)
                     }
@@ -242,6 +246,9 @@ object Chat {
             val channelFuture: ChannelFuture = b.connect(host, port).sync()
             channel = channelFuture.channel()
             println("后端服务器连接成功！")
+
+            // 启动心跳定时任务
+            startHeartbeat()
 
             send("", MsgType.LOGIN, ServerConfig.Token,1) { success, responses ->
                 if (success) {
@@ -253,18 +260,36 @@ object Chat {
                     println("Error: $responses")
                 }
             }
-            // Add a listener to handle reconnection
             channel.closeFuture().addListener(ChannelFutureListener {
                 println("启动聊天服务器服务！")
             })
-
             channel.closeFuture().sync()
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
-            // 进行资源的释放
             shutdown()
             group.shutdownGracefully()
+        }
+    }
+
+    private fun startHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
+            while (true) {
+                try {
+                    val heartbeatTimeout = 5000L // 5秒超时
+                    val heartbeatResult = CompletableDeferred<Boolean>()
+                    send("", MsgType.HEARTBEAT, ServerConfig.Token, 1) { success, _ ->
+                        heartbeatResult.complete(success)
+                    }
+                    val ok = withTimeoutOrNull(heartbeatTimeout) { heartbeatResult.await() } ?: false
+                    println(ok)
+                    isServerConnected.value = ok
+                } catch (e: Exception) {
+                    isServerConnected.value = false
+                }
+                delay(heartbeatIntervalMillis)
+            }
         }
     }
 
@@ -364,6 +389,7 @@ object Chat {
      */
     fun shutdown() {
         println("正在关闭")
+        heartbeatJob?.cancel()
         val shutdownCompleted = CompletableFuture<Boolean>()
         send("Shutting down", MsgType.LOGOUT, "0", 1) { success, _ ->
             if (success) {
@@ -372,7 +398,6 @@ object Chat {
                 println("Failed to send shutdown message")
             }
             shutdownCompleted.complete(true)
-            // 释放channel
             if (::channel.isInitialized) {
                 channel.close()
             }
