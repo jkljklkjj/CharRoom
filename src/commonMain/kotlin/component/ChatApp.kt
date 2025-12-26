@@ -103,8 +103,8 @@ fun ChatApp(windowSize: DpSize, token: String) {
         CoroutineScope(Dispatchers.IO).launch {
             launch { // 拉取消息
                 while (true) {
-                    val resp = ApiService.getOfflineMessages(ServerConfig.Token)
-                    if (resp.isNullOrEmpty()) break
+                    val resp = ApiService.getOfflineMessages()
+                    if (resp.isEmpty()) break
                     messages += resp
                 }
             }

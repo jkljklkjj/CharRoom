@@ -60,7 +60,7 @@ class ApiClient(
             .build()
         return try {
             parseToken(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             ""
         }
     }
@@ -76,13 +76,13 @@ class ApiClient(
             .build()
         return try {
             parseIntData(http.send(request, HttpResponse.BodyHandlers.ofString()).body()) ?: -1
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             -1
         }
     }
 
     /** 验证 token 是否有效（code==0 且 data==true） */
-    fun validateToken(token: String): Boolean {
+    fun validateToken(token: String = ServerConfig.Token): Boolean {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(ApiEndpoints.url(ApiEndpoints.VALIDATE_TOKEN)))
             .header("Authorization", "Bearer $token")
@@ -94,13 +94,13 @@ class ApiClient(
             val code = root["code"]?.jsonPrimitive?.intOrNull
             val dataBool = root["data"]?.jsonPrimitive?.booleanOrNull
             code == 0 && dataBool == true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
 
     /** 获取好友列表 */
-    fun fetchFriends(token: String): List<User> = try {
+    fun fetchFriends(token: String = ServerConfig.Token): List<User> = try {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(ApiEndpoints.url(ApiEndpoints.FRIEND_GET)))
             .header("Authorization", "Bearer $token")
@@ -108,12 +108,12 @@ class ApiClient(
             .POST(HttpRequest.BodyPublishers.ofString("{}"))
             .build()
         parseUserList(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         emptyList()
     }
 
     /** 获取群组列表 */
-    fun fetchGroups(token: String): List<User> = try {
+    fun fetchGroups(token: String = ServerConfig.Token): List<User> = try {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(ApiEndpoints.url(ApiEndpoints.GROUP_GET)))
             .header("Authorization", "Bearer $token")
@@ -121,12 +121,12 @@ class ApiClient(
             .GET()
             .build()
         parseGroupList(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         emptyList()
     }
 
     /** 添加好友 */
-    fun addFriend(token: String, friendId: String): Boolean {
+    fun addFriend(friendId: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(friendId))
         val req = HttpRequest.newBuilder()
             .uri(URI.create(ApiEndpoints.url(ApiEndpoints.FRIEND_ADD)))
@@ -137,13 +137,13 @@ class ApiClient(
             .build()
         return try {
             interpretBooleanResponse(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
 
     /** 加入群组 */
-    fun addGroup(token: String, groupId: String): Boolean {
+    fun addGroup(groupId: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddGroupBody.serializer(), AddGroupBody(groupId))
         val req = HttpRequest.newBuilder()
             .uri(URI.create(ApiEndpoints.url(ApiEndpoints.GROUP_ADD)))
@@ -154,13 +154,13 @@ class ApiClient(
             .build()
         return try {
             interpretBooleanResponse(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
 
     /** 用户详情 */
-    fun getUserDetail(token: String, userId: String): User? {
+    fun getUserDetail(userId: String, token: String = ServerConfig.Token): User? {
         val req = HttpRequest.newBuilder()
             .uri(URI.create(ApiEndpoints.url(ApiEndpoints.USER_DETAIL) + "?id=$userId"))
             .header("Authorization", "Bearer $token")
@@ -170,13 +170,13 @@ class ApiClient(
             .build()
         return try {
             decodeUserFlexible(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
 
     /** 群组详情（返回转为 User 供列表复用） */
-    fun getGroupDetail(token: String, groupId: String): User? {
+    fun getGroupDetail(groupId: String, token: String = ServerConfig.Token): User? {
         val req = HttpRequest.newBuilder()
             .uri(URI.create(ApiEndpoints.url(ApiEndpoints.GROUP_DETAIL) + "?id=$groupId"))
             .header("Authorization", "Bearer $token")
@@ -186,13 +186,13 @@ class ApiClient(
             .build()
         return try {
             decodeUserFlexible(http.send(req, HttpResponse.BodyHandlers.ofString()).body())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
 
     /** 拉取离线消息，返回 List<Message>，code==0 时有效 */
-    fun getOfflineMessages(token: String): List<Message> {
+    fun getOfflineMessages(token: String = ServerConfig.Token): List<Message> {
         return try {
             val request = HttpRequest.newBuilder()
                 .uri(URI.create(ApiEndpoints.url(ApiEndpoints.OFFLINE)))
@@ -211,7 +211,7 @@ class ApiClient(
             val messages = json.decodeFromJsonElement(ListSerializer(Message.serializer()), dataEl)
             messages.forEach { it.isSent = mutableStateOf(true) } // 离线消息均视为已发送
             return messages
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -299,12 +299,12 @@ object ApiService {
     private val client = ApiClient()
     fun login(id: String, password: String) = client.login(id, password)
     fun register(username: String, password: String) = client.register(username, password)
-    fun validateToken(token: String) = client.validateToken(token)
-    fun fetchFriends(token: String) = client.fetchFriends(token)
-    fun fetchGroups(token: String) = client.fetchGroups(token)
-    fun addFriend(token: String, friendId: String) = client.addFriend(token, friendId)
-    fun addGroup(token: String, groupId: String) = client.addGroup(token, groupId)
-    fun getUserDetail(token: String, userId: String) = client.getUserDetail(token, userId)
-    fun getGroupDetail(token: String, groupId: String) = client.getGroupDetail(token, groupId)
-    fun getOfflineMessages(token: String) = client.getOfflineMessages(token)
+    fun validateToken(token: String = ServerConfig.Token) = client.validateToken(token)
+    fun fetchFriends(token: String = ServerConfig.Token) = client.fetchFriends(token)
+    fun fetchGroups(token: String = ServerConfig.Token) = client.fetchGroups(token)
+    fun addFriend(friendId: String, token: String = ServerConfig.Token) = client.addFriend(friendId, token)
+    fun addGroup(groupId: String, token: String = ServerConfig.Token) = client.addGroup(groupId, token)
+    fun getUserDetail(userId: String, token: String = ServerConfig.Token) = client.getUserDetail(userId, token)
+    fun getGroupDetail(groupId: String, token: String = ServerConfig.Token) = client.getGroupDetail(groupId, token)
+    fun getOfflineMessages(token: String = ServerConfig.Token) = client.getOfflineMessages(token)
 }

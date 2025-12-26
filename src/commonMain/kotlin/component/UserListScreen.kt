@@ -7,7 +7,6 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import core.ServerConfig
 import model.User
 import model.Message
 import model.messages
@@ -23,7 +22,7 @@ fun UserList(onUserClick: (User) -> Unit) {
 
     // 首次进入时拉取列表，写回 users（在 updateList 内部）
     LaunchedEffect(Unit) {
-        updateList(ServerConfig.Token)
+        updateList()
     }
 
     println("User list: $userListState")

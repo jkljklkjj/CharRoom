@@ -8,7 +8,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import core.ApiService
-import core.ServerConfig
 import model.users
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -74,21 +73,20 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
                     scope.launch {
                         isSubmitting = true
                         responseMessage = null
-                        val token = ServerConfig.Token
                         val success = withContext(Dispatchers.IO) {
                             if (isUser) {
-                                ApiService.addFriend(token, account)
+                                ApiService.addFriend(account)
                             } else {
-                                ApiService.addGroup(token, account)
+                                ApiService.addGroup(account)
                             }
                         }
                         responseMessage = if (success) "添加成功" else "添加失败"
                         if (success) {
                             val detailUser = withContext(Dispatchers.IO) {
                                 if (isUser) {
-                                    ApiService.getUserDetail(token, account)
+                                    ApiService.getUserDetail(account)
                                 } else {
-                                    ApiService.getGroupDetail(token, account)
+                                    ApiService.getGroupDetail(account)
                                 }
                             }
                             detailUser?.let { u ->

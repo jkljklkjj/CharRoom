@@ -79,43 +79,39 @@ var messages = mutableStateListOf<Message>()
 var groupMessages = mutableStateListOf<GroupMessage>()
 
 /**
- * 获取好友列表（委托 ApiService）
+ * 获取好友列表（委托 ApiService，使用全局 Token）
  */
-fun fetchFriends(token: String): List<User> = ApiService.fetchFriends(token)
+fun fetchFriends(): List<User> = ApiService.fetchFriends()
 
 /**
- * 获取群组列表（委托 ApiService）
+ * 获取群组列表（委托 ApiService，使用全局 Token）
  */
-fun fetchGroups(token: String): List<User> = ApiService.fetchGroups(token)
+fun fetchGroups(): List<User> = ApiService.fetchGroups()
 
 /**
  * 更新好友列表
- *
- * @param token 用户的token
  */
-suspend fun updateFriendList(token: String): List<User> {
-    val tmp = fetchFriends(token)
+fun updateFriendList(): List<User> {
+    val tmp = fetchFriends()
     users = users + tmp
     return tmp
 }
 
 /**
  * 更新群组列表
- *
- * @param token 用户的token
  */
-suspend fun updateGroupList(token: String): List<User> {
-    val tmp = fetchGroups(token)
+fun updateGroupList(): List<User> {
+    val tmp = fetchGroups()
     users = users + tmp
-    return fetchGroups(token)
+    return tmp
 }
 
 /**
  * 更新好友和群组列表：同时写回全局 users 以触发 UI 重组
  */
-suspend fun updateList(token: String): List<User> {
-    val friends = fetchFriends(token)
-    val groups = fetchGroups(token)
+fun updateList(): List<User> {
+    val friends = fetchFriends()
+    val groups = fetchGroups()
     val merged = friends + groups
     users = merged
     return merged
