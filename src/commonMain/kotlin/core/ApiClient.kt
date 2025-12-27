@@ -16,7 +16,7 @@ import java.time.Duration
 
 // 接口路径常量集中管理
 object ApiEndpoints {
-    private const val BASE = "http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}" // 运行期读取 ServerConfig
+    private val BASE = "http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}" // 运行期读取 ServerConfig
     const val LOGIN = "/user/login"
     const val REGISTER = "/user/register"
     const val VALIDATE_TOKEN = "/user/validateToken"

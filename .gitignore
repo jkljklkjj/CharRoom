@@ -43,3 +43,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# Local server properties (do not track sensitive runtime config)
+/src/commonMain/resources/server.properties
