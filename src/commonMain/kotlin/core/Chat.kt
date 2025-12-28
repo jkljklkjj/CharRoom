@@ -118,11 +118,11 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
 
     private fun handleIncomingFromJson(json: JsonNode) {
         try{
-            val senderId = json.get("id")?.asInt() ?: throw IllegalArgumentException("Missing senderId")
+            val senderId = json.get("senderId")?.asInt() ?: throw IllegalArgumentException("Missing senderId")
             val messageId = json.get("messageId")?.asText()
             val timestamp = json.get("timestamp")?.asLong() ?: throw IllegalArgumentException("Missing timestamp")
             val sender = false
-            val text = json.get("text")?.asText() ?: throw IllegalArgumentException("Missing content")
+            val text = json.get("message")?.asText() ?: throw IllegalArgumentException("Missing content")
             messages += Message(
                 senderId = senderId,
                 message = text,

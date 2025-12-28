@@ -128,6 +128,14 @@ tasks.register<Jar>("customJar") {
     // 从 commonMain/kotlin 和 desktopMain/kotlin 目录中包含所有文件
     from(kotlin.sourceSets["commonMain"].kotlin.srcDirs)
     from(kotlin.sourceSets["desktopMain"].kotlin.srcDirs)
+
+    // 包含 resources（关键修改，确保 resources 被打包进 jar）
+    from(kotlin.sourceSets["commonMain"].resources.srcDirs)
+    from(kotlin.sourceSets["desktopMain"].resources.srcDirs)
+    // 兼容性：如果 resources 没有放在上面的位置，也把经典的 src/.../resources 目录作为后备
+    from("src/commonMain/resources") { into("") }
+    from("src/desktopMain/resources") { into("") }
+
     from("build/classes/kotlin/desktop/main")
 
     // Include dependencies

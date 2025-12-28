@@ -101,7 +101,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
     // 拉取离线消息
     LaunchedEffect(Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            launch { // 拉取消息
+            launch {
                 while (true) {
                     val resp = ApiService.getOfflineMessages()
                     if (resp.isEmpty()) break
