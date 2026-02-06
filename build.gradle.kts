@@ -47,6 +47,8 @@ kotlin {
                 implementation("org.slf4j:slf4j-api:2.0.17")
                 implementation("ch.qos.logback:logback-classic:1.5.18")
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.20.0")
+                // Kermit core (multiplatform logging)
+                implementation("co.touchlab:kermit:1.2.2")
             }
         }
         val commonTest by getting {
@@ -71,6 +73,8 @@ kotlin {
                 implementation("androidx.appcompat:appcompat:1.7.1")
                 implementation("org.glassfish.jaxb:jaxb-runtime:4.0.5")
                 implementation(compose.desktop.currentOs)
+                // Kermit Android logger (Logcat bridge)
+                implementation("co.touchlab:kermit-android:1.2.2")
             }
         }
         val androidUnitTest by getting {

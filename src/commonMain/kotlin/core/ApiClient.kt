@@ -60,7 +60,8 @@ class ApiClient(
             .build()
         return try {
             parseToken(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            println("遇到错误"+e.message)
             ""
         }
     }

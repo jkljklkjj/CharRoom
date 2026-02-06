@@ -18,6 +18,7 @@ import java.net.URI
 import java.util.concurrent.CompletableFuture
 import kotlinx.coroutines.*
 import androidx.compose.runtime.mutableStateOf
+import java.util.logging.Logger
 
 // 定义发送类型枚举，统一管理后端协议中的字符串
 enum class MsgType(val wire: String) {
@@ -111,11 +112,6 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
         }
     }
 
-//    override fun channelRead(ctx: ChannelHandlerContext?, msg: Any?) {
-//        println("收到哈哈哈信息: $msg")
-//        super.channelRead(ctx, msg)
-//    }
-
     private fun handleIncomingFromJson(json: JsonNode) {
         try{
             val senderId = json.get("senderId")?.asInt() ?: throw IllegalArgumentException("Missing senderId")
@@ -131,7 +127,7 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
                 isSent = mutableStateOf(true),
                 messageId = messageId ?: ""
             )
-        } catch (E: Exception){
+        } catch (E: Exception) {
             println("Error handling incoming message: ${E.message}")
             E.printStackTrace()
         }
@@ -309,7 +305,7 @@ object Chat {
         expectedResponses: Int,
         callback: (Boolean, List<FullHttpResponse>) -> Unit
     ) {
-        println("正在发送信息")
+        AppLog.d{"正在发送信息"}
         if (::channel.isInitialized) {
             val uri = URI("http://$host:$port/send")
             val json = jacksonObjectMapper().writeValueAsString(
@@ -333,7 +329,7 @@ object Chat {
             request.headers().set(HttpHeaderNames.AUTHORIZATION, "Bearer $Token")
 
             responseHandler.setExpectedResponses(expectedResponses)
-
+            println()
             channel.writeAndFlush(request).addListener { future ->
                 if (future.isSuccess) {
 //                    println("设定的期望响应数：$expectedResponses")
