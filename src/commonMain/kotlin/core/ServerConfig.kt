@@ -32,9 +32,12 @@ object ServerConfig {
         // 4) fallback
         "localhost"
     }
-
+    // 后端Netty服务地址
     const val NETTY_SERVER_PORT = 8080
+    // 后端Spring服务地址
     const val SPRING_SERVER_PORT = 8088
+    // 缓存的token
     var Token: String = ""
+    // 登陆的用户账号
     var id: String = ""
 }

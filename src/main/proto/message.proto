@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package com.example.proto;
+
+option java_package = "com.example.proto";
+option java_outer_classname = "MessageProtos";
+option java_multiple_files = false;
+
+// 登录消息
+message LoginMessage {
+    string targetClientId = 1;  // 通过token和redis获取的客户端ID
+}
+
+// 聊天消息
+message ChatMessage {
+    string targetClientId = 1;  // 目标客户端ID
+    string content = 2;       // 消息内容
+    string userId = 3;        // 发送者用户ID
+    string timestamp = 4;      // 时间戳
+}
+
+// 群聊消息
+message GroupChatMessage {
+    string targetClientId = 1;  // 群组ID
+    string content = 2;       // 消息内容
+    string userId = 3;        // 发送者用户ID
+}
+
+// 检查在线状态消息
+message CheckMessage {
+    string targetClientId = 1;  // 要检查的客户端ID
+}
+
+// 心跳消息
+message HeartbeatMessage {
+    // 心跳消息可以包含一些状态信息
+    int64 timestamp = 1;  // 时间戳
+}
+
+// 登出消息
+message LogoutMessage {
+    string userId = 1;  // 用户ID
+}
+
+// 通用消息包装器
+message MessageWrapper {
+    string type = 1;  // 消息类型: login, chat, groupChat, check, heartbeat, logout
+
+    oneof payload {
+        LoginMessage login = 2;
+        ChatMessage chat = 3;
+        GroupChatMessage groupChat = 4;
+        CheckMessage check = 5;
+        HeartbeatMessage heartbeat = 6;
+        LogoutMessage logout = 7;
+    }
+}
+
+// 响应消息
+message ResponseMessage {
+    string message = 1;      // 响应消息
+    bool success = 2;       // 是否成功
+    string clientId = 3;     // 客户端ID (用于CheckMessage响应)
+    bool online = 4;        // 是否在线 (用于CheckMessage响应)
+}
+
