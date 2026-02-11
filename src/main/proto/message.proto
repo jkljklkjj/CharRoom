@@ -64,3 +64,4 @@ message ResponseMessage {
     bool online = 4;        // 是否在线 (用于CheckMessage响应)
 }
 
+

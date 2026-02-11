@@ -20,11 +20,15 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableStateOf
+import core.buildChatPayload
+import core.buildGroupChatPayload
+import core.buildCheckPayload
+import core.parseProtoResponse
 
 var lastMessageTime = 0L
 
@@ -33,14 +37,6 @@ fun sendMessage(user: User, messageText: String) {
     if (currentTime - lastMessageTime >= 2000) {
         lastMessageTime = currentTime
         if (user.id > 0) {
-            val outbound = Message(
-                senderId = Integer.valueOf(ServerConfig.id),
-                receiverId = user.id,
-                message = messageText,
-                sender = true,
-                timestamp = currentTime,
-                isSent = mutableStateOf(true)
-            )
             val localCopy = Message(
                 senderId = user.id,
                 message = messageText,
@@ -49,10 +45,25 @@ fun sendMessage(user: User, messageText: String) {
                 isSent = mutableStateOf(true)
             )
             messages += localCopy
-            val json = jacksonObjectMapper().writeValueAsString(outbound)
-            Chat.send(json, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
-                if (!(success && resp.last().status().code() == 200)) {
+
+            // build protobuf ChatMessage via platform builder
+            val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
+            val payload = buildChatPayload(user.id.toString(), messageText, userIdInt, currentTime)
+
+            Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
+                if (!(success && resp.isNotEmpty())) {
                     localCopy.isSent.value = false
+                } else {
+                    // parse proto response
+                    val lastBytes = resp.last() as? ByteArray
+                    if (lastBytes != null) {
+                        val unwrap = parseProtoResponse(lastBytes)
+                        if (!(unwrap.success)) {
+                            localCopy.isSent.value = false
+                        }
+                    } else {
+                        localCopy.isSent.value = false
+                    }
                 }
             }
         } else {
@@ -64,10 +75,23 @@ fun sendMessage(user: User, messageText: String) {
                 timestamp = currentTime,
                 isSent = mutableStateOf(true)
             )
-            val json = jacksonObjectMapper().writeValueAsString(outbound)
-            Chat.send(json, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
-                if (!(success && resp.last().status().code() == 200)) {
+            // build protobuf GroupChatMessage via platform builder
+            val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
+            val payload = buildGroupChatPayload(user.id.toString(), messageText, userIdInt)
+
+            Chat.send(payload, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
+                if (!(success && resp.isNotEmpty())) {
                     outbound.isSent.value = false
+                } else {
+                    val lastBytes = resp.last() as? ByteArray
+                    if (lastBytes != null) {
+                        val unwrap = parseProtoResponse(lastBytes)
+                        if (!(unwrap.success)) {
+                            outbound.isSent.value = false
+                        }
+                    } else {
+                        outbound.isSent.value = false
+                    }
                 }
             }
         }
@@ -75,19 +99,27 @@ fun sendMessage(user: User, messageText: String) {
 }
 
 fun resendMessage(user: User, message: Message) {
-    val json = jacksonObjectMapper().writeValueAsString(message)
-    Chat.send(json, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
-        if (success && resp.last().status().code() == 200) {
-            message.isSent.value = true
+    val payload = buildChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
+    Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
+        if (success && resp.isNotEmpty()) {
+            val lastBytes = resp.last() as? ByteArray
+            if (lastBytes != null) {
+                val unwrap = parseProtoResponse(lastBytes)
+                if (unwrap.success) message.isSent.value = true
+            }
         }
     }
 }
 
 fun resendMessage(user: User, groupMessage: GroupMessage) {
-    val json = jacksonObjectMapper().writeValueAsString(groupMessage)
-    Chat.send(json, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
-        if (success && resp.last().status().code() == 200) {
-            groupMessage.isSent.value = true
+    val payload = buildGroupChatPayload(user.id.toString(), groupMessage.text, groupMessage.senderId)
+    Chat.send(payload, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
+        if (success && resp.isNotEmpty()) {
+            val lastBytes = resp.last() as? ByteArray
+            if (lastBytes != null) {
+                val unwrap = parseProtoResponse(lastBytes)
+                if (unwrap.success) groupMessage.isSent.value = true
+            }
         }
     }
 }
@@ -121,17 +153,25 @@ fun ChatApp(windowSize: DpSize, token: String) {
                     UserList { user ->
                         selectedUser = user
                         if (user.id > 0) {
-                            Chat.send("", MsgType.CHECK, user.id.toString(), 1) { success, resp ->
-                                if (success) {
-                                    val map = Util.jsonToMap(resp.last().content().toString(CharsetUtil.UTF_8))
-                                    val online = map["online"] as? Boolean ?: false
-                                    selectedUser = selectedUser?.copy(
-                                        username = if (online) {
-                                            selectedUser!!.username.replace(" (offline)", "")
-                                        } else if (!selectedUser!!.username.contains(" (offline)")) {
-                                            selectedUser!!.username + " (offline)"
-                                        } else selectedUser!!.username
-                                    )
+                            // build CHECK wrapper via builder
+                            val payload = buildCheckPayload(user.id.toString())
+
+                            Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
+                                if (success && resp.isNotEmpty()) {
+                                    val lastBytes = resp.last() as? ByteArray
+                                    if (lastBytes != null) {
+                                        val unwrap = parseProtoResponse(lastBytes)
+                                        val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
+                                        val map = Util.jsonToMap(dataStr)
+                                        val online = map["online"] as? Boolean ?: false
+                                        selectedUser = selectedUser?.copy(
+                                            username = if (online) {
+                                                selectedUser!!.username.replace(" (offline)", "")
+                                            } else if (!selectedUser!!.username.contains(" (offline)")) {
+                                                selectedUser!!.username + " (offline)"
+                                            } else selectedUser!!.username
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -146,17 +186,23 @@ fun ChatApp(windowSize: DpSize, token: String) {
                 UserList { user ->
                     selectedUser = user
                     if (user.id > 0) {
-                        Chat.send("", MsgType.CHECK, user.id.toString(), 1) { success, resp ->
-                            if (success) {
-                                val map = Util.jsonToMap(resp.last().content().toString(CharsetUtil.UTF_8))
-                                val online = map["online"] as? Boolean ?: false
-                                selectedUser = selectedUser?.copy(
-                                    username = if (online) {
-                                        selectedUser!!.username.replace(" (offline)", "")
-                                    } else if (!selectedUser!!.username.contains(" (offline)")) {
-                                        selectedUser!!.username + " (offline)"
-                                    } else selectedUser!!.username
-                                )
+                        val payload = buildCheckPayload(user.id.toString())
+                        Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
+                            if (success && resp.isNotEmpty()) {
+                                val lastBytes = resp.last() as? ByteArray
+                                if (lastBytes != null) {
+                                    val unwrap = parseProtoResponse(lastBytes)
+                                    val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
+                                    val map = Util.jsonToMap(dataStr)
+                                    val online = map["online"] as? Boolean ?: false
+                                    selectedUser = selectedUser?.copy(
+                                        username = if (online) {
+                                            selectedUser!!.username.replace(" (offline)", "")
+                                        } else if (!selectedUser!!.username.contains(" (offline)")) {
+                                            selectedUser!!.username + " (offline)"
+                                        } else selectedUser!!.username
+                                    )
+                                }
                             }
                         }
                     }

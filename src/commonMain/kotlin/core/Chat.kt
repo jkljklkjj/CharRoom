@@ -1,6 +1,5 @@
 package core
 
-import core.ServerConfig.Token
 import model.Message
 import model.GroupMessage
 import model.messages
@@ -9,16 +8,23 @@ import androidx.compose.runtime.mutableStateOf
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.netty.bootstrap.Bootstrap
-import io.netty.buffer.Unpooled
 import io.netty.channel.*
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.*
+import io.netty.handler.codec.http.websocketx.*
+import io.netty.handler.logging.LogLevel
+import io.netty.handler.logging.LoggingHandler
 import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlinx.coroutines.*
-import androidx.compose.runtime.mutableStateOf
-import java.util.logging.Logger
+
 
 // 定义发送类型枚举，统一管理后端协议中的字符串
 enum class MsgType(val wire: String) {
@@ -30,13 +36,7 @@ enum class MsgType(val wire: String) {
     HEARTBEAT("heartbeat");
 }
 
-// 统一的API解包结果与提示
-private data class ApiUnwrap(
-    val hasEnvelope: Boolean,
-    val success: Boolean,
-    val dataJson: String?,
-    val message: String?
-)
+// ApiUnwrap is defined in core.ApiUnwrap (ApiUnwrap.kt)
 
 private fun unwrapApi(content: String): ApiUnwrap {
     return try {
@@ -58,7 +58,7 @@ private fun unwrapApi(content: String): ApiUnwrap {
                 ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
             }
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
     }
 }
@@ -68,46 +68,85 @@ private fun prompt(msg: String?) {
 }
 
 /**
- * 处理接收到的http信息
+ * 处理接收到的WebSocket信息
  */
-class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>() {
-    private val responses = mutableListOf<FullHttpResponse>()
+class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
+    // store raw binary responses
+    private val responses = mutableListOf<ByteArray>()
     private var expectedResponses = 1
-    var responseFuture = CompletableFuture<List<FullHttpResponse>>()
+    var responseFuture: CompletableFuture<List<ByteArray>> = CompletableFuture()
+    // handshake future to notify when WebSocket handshake completes
+    val handshakeFuture: CompletableFuture<Unit> = CompletableFuture()
 
-    override fun channelRead0(ctx: ChannelHandlerContext, msg: FullHttpResponse) {
-        val content = msg.content().toString(Charsets.UTF_8)
-        println("Received message: $content")
+    override fun handlerAdded(ctx: ChannelHandlerContext) {
+        try { println("CustomWebSocketHandler added to pipeline: ${ctx.pipeline().toString()}") } catch (_: Exception) {}
+        super.handlerAdded(ctx)
+    }
 
-        if (responses.size < expectedResponses) {
-            responses.add(msg)
-            if (responses.size == expectedResponses) {
-                val unwrap = unwrapApi(content)
-                if (unwrap.hasEnvelope && !unwrap.success) {
-                    prompt(unwrap.message)
+    override fun channelActive(ctx: ChannelHandlerContext) {
+        try { println("CustomWebSocketHandler channelActive: ${ctx.channel().remoteAddress()}") } catch (_: Exception) {}
+        super.channelActive(ctx)
+    }
+
+    override fun channelInactive(ctx: ChannelHandlerContext) {
+        try { println("CustomWebSocketHandler channelInactive: ${ctx.channel().localAddress()} -> ${ctx.channel().remoteAddress()}") } catch (_: Exception) {}
+        if (!handshakeFuture.isDone) {
+            handshakeFuture.completeExceptionally(Exception("Channel closed before handshake completed"))
+        }
+        super.channelInactive(ctx)
+    }
+
+    override fun exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
+        try { println("CustomWebSocketHandler exceptionCaught: ${cause::class.java.name} - ${cause.message}") } catch (_: Exception) {}
+        if (!handshakeFuture.isDone) {
+            handshakeFuture.completeExceptionally(cause)
+        }
+        cause.printStackTrace()
+        try { ctx.close() } catch (_: Exception) {}
+    }
+
+    override fun channelRead0(ctx: ChannelHandlerContext, msg: Any) {
+        when (msg) {
+            is TextWebSocketFrame -> {
+                val contentStr = msg.text()
+                println("Received WebSocket message: $contentStr")
+                handleIncomingMessage(contentStr)
+            }
+            is BinaryWebSocketFrame -> {
+                val bodyBytes = ByteArray(msg.content().readableBytes())
+                msg.content().readBytes(bodyBytes)
+
+                // try to parse as proto wrapper; normal incoming flows use parseProtoResponse
+                try {
+                    val unwrap = parseProtoResponse(bodyBytes)
+                    if (unwrap.hasEnvelope && !unwrap.success) {
+                        prompt(unwrap.message)
+                    } else {
+                        // if it's JSON-wrapped message inside proto, handle it
+                        val dataStr = unwrap.dataJson ?: String(bodyBytes, Charsets.UTF_8)
+                        if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")){
+                            val json = jacksonObjectMapper().readTree(dataStr)
+                            val messageId = json.get("messageId")?.asText()
+                            if (messageId != null){
+                                handleIncomingFromJson(json)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // ignore parse error here; still keep the raw bytes for callers
                 }
-                val dataStr = unwrap.dataJson ?: content
-                if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")){
-                    val json = jacksonObjectMapper().readTree(dataStr)
-                    val messageId = json.get("messageId")?.asText()
 
-                    if (messageId != null){
-                        handleIncomingFromJson(json)
+                // collect response for callers waiting in send()
+                synchronized(this) {
+                    responses.add(bodyBytes)
+                    if (responses.size >= expectedResponses && !responseFuture.isDone) {
+                        responseFuture.complete(responses.toList())
                     }
                 }
-
-                responseFuture.complete(responses)
-                responses.clear()
             }
-        } else {
-            // Handle unsolicited messages (e.g., messages from other users)
-            println("接收到了来自外界的信息: $content")
-            val unwrap = unwrapApi(content)
-            if (unwrap.hasEnvelope && !unwrap.success) {
-                prompt(unwrap.message)
-            } else {
-                val dataStr = unwrap.dataJson ?: content
-                handleIncomingMessage(dataStr)
+            is WebSocketFrame -> {
+                // 处理其他类型的WebSocket帧
+                println("Received WebSocket frame: ${msg.javaClass.simpleName}")
             }
         }
     }
@@ -128,23 +167,6 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
                 messageId = messageId ?: ""
             )
         } catch (E: Exception) {
-            println("Error handling incoming message: ${E.message}")
-            E.printStackTrace()
-        }
-    }
-
-    private fun handleIncomingMessage(msg: FullHttpResponse) {
-        try{
-            val raw = msg.content().toString(Charsets.UTF_8)
-            val unwrap = unwrapApi(raw)
-            if (unwrap.hasEnvelope && !unwrap.success) {
-                prompt(unwrap.message)
-                return
-            }
-            val dataStr = unwrap.dataJson ?: raw
-            val json = jacksonObjectMapper().readTree(dataStr)
-            handleIncomingFromJson(json)
-        } catch (E: Exception){
             println("Error handling incoming message: ${E.message}")
             E.printStackTrace()
         }
@@ -197,10 +219,35 @@ class CustomHttpResponseHandler : SimpleChannelInboundHandler<FullHttpResponse>(
         }
     }
 
+    override fun userEventTriggered(ctx: ChannelHandlerContext, evt: Any) {
+        try {
+            println("CustomWebSocketHandler userEventTriggered: $evt")
+            if (evt is WebSocketClientProtocolHandler.ClientHandshakeStateEvent) {
+                when (evt) {
+                    WebSocketClientProtocolHandler.ClientHandshakeStateEvent.HANDSHAKE_COMPLETE -> {
+                        println("WebSocket handshake complete")
+                        if (!handshakeFuture.isDone) handshakeFuture.complete(Unit)
+                    }
+                    WebSocketClientProtocolHandler.ClientHandshakeStateEvent.HANDSHAKE_TIMEOUT -> {
+                        println("WebSocket handshake timeout event")
+                        if (!handshakeFuture.isDone) handshakeFuture.completeExceptionally(Exception("Handshake timeout event"))
+                    }
+                    else -> {}
+                }
+            } else {
+                super.userEventTriggered(ctx, evt)
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
+    }
+
     fun setExpectedResponses(count: Int) {
-        expectedResponses = count
-        responses.clear()
-        responseFuture = CompletableFuture() // Reset the future for a new request
+        synchronized(this) {
+            expectedResponses = count
+            responses.clear()
+            responseFuture = CompletableFuture()
+        }
     }
 }
 
@@ -211,7 +258,8 @@ object Chat {
     private lateinit var channel: Channel
     private var host = ServerConfig.SERVER_IP
     private var port = ServerConfig.NETTY_SERVER_PORT
-    private lateinit var responseHandler: CustomHttpResponseHandler
+    private lateinit var responseHandler: CustomWebSocketHandler
+    private val sendLock = Any()
 
     val isServerConnected = mutableStateOf(true)
     private var heartbeatJob: Job? = null
@@ -232,32 +280,96 @@ object Chat {
                 .channel(NioSocketChannel::class.java)
                 .handler(object : ChannelInitializer<Channel>() {
                     override fun initChannel(ch: Channel) {
-                        ch.pipeline().addLast(HttpClientCodec())
-                        ch.pipeline().addLast(HttpObjectAggregator(8192))
-                        responseHandler = CustomHttpResponseHandler()
-                        ch.pipeline().addLast(responseHandler)
+                        val pipeline = ch.pipeline()
+                        pipeline.addLast(HttpClientCodec())
+                        pipeline.addLast(HttpObjectAggregator(8192))
+                        // Use WebSocketClientProtocolHandler to handle handshake and install frame encoders/decoders
+                        val wsUri = URI("ws://$host:$port/ws")
+                        // create explicit handshaker and install protocol handler (this ensures correct encoders/decoders)
+                        val headers = DefaultHttpHeaders()
+                        // include Authorization header if token available (many servers require JWT in upgrade request)
+                        try {
+                            val token = ServerConfig.Token
+                            if (!token.isNullOrBlank()) {
+                                headers.add("Authorization", "Bearer $token")
+                            }
+                        } catch (_: Exception) {}
+                        // set a sensible Origin to avoid some servers rejecting cross-origin upgrades
+                        try { headers.add("Origin", "http://$host") } catch (_: Exception) {}
+
+                        val handshaker = WebSocketClientHandshakerFactory.newHandshaker(
+                            wsUri,
+                            WebSocketVersion.V13,
+                            null,
+                            true,
+                            headers,
+                            64 * 1024
+                        )
+                        // add a logging handler to help debug handshake and frames
+//                        pipeline.addLast(LoggingHandler(LogLevel.DEBUG))
+                        // log any HTTP responses during handshake (useful to see 401/403/400)
+//                        pipeline.addLast(HttpResponseLogger())
+                        pipeline.addLast(WebSocketClientProtocolHandler(handshaker, true))
+                        responseHandler = CustomWebSocketHandler()
+                        pipeline.addLast(responseHandler)
                     }
                 })
 
-            val channelFuture: ChannelFuture = b.connect(host, port).sync()
-            channel = channelFuture.channel()
-            println("后端服务器连接成功！")
+            // Quick HTTP probe to see if server returns an HTTP error at the WS endpoint
+            try {
+                val probeClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
+                val probeUri = URI.create("http://$host:$port/ws${if (!ServerConfig.Token.isNullOrBlank()) "?token=" + java.net.URLEncoder.encode(ServerConfig.Token, "UTF-8") else ""}")
+                val probeReq = HttpRequest.newBuilder().uri(probeUri).timeout(Duration.ofSeconds(2)).GET().build()
+                val probeResp = probeClient.send(probeReq, HttpResponse.BodyHandlers.ofString())
+                println("HTTP probe to $probeUri returned: ${probeResp.statusCode()}")
+                if (probeResp.body() != null && probeResp.body().isNotBlank()) println("Probe body: ${probeResp.body()}")
+            } catch (e: Exception) {
+                println("HTTP probe failed: ${e.message}")
+            }
 
-            // 启动心跳定时任务
-            startHeartbeat()
-
-            send("", MsgType.LOGIN, ServerConfig.Token,1) { success, responses ->
-                if (success) {
-                    println("登录成功")
-                    responses.forEach { response ->
-                        println("Response: $response")
-                    }
+            val channelFuture: ChannelFuture = b.connect(host, port)
+            channelFuture.addListener {
+                if (it.isSuccess) {
+                    println("Connected to $host:$port, channel active=${channelFuture.channel().isActive}")
                 } else {
-                    println("Error: $responses")
+                    println("Connection failed: ${it.cause()}")
                 }
             }
+            channelFuture.sync()
+            channel = channelFuture.channel()
+
+            // wait for websocket handshake to complete (installed in pipeline)
+            try {
+                val handshakeWaitSeconds = 10L
+                println("Waiting up to ${handshakeWaitSeconds}s for websocket handshake...")
+                responseHandler.handshakeFuture.get(handshakeWaitSeconds, TimeUnit.SECONDS)
+                println("WebSocket握手完成")
+                // print pipeline for debugging
+                try {
+                    println("Pipeline after handshake: ${channel.pipeline().toString()}")
+                } catch (_: Exception) {}
+            } catch (e: java.util.concurrent.TimeoutException) {
+                println("WebSocket 握手超时 (${e.message}), dumping pipeline and closing channel")
+                try { println("Pipeline at timeout: ${channel.pipeline().toString()}") } catch (_: Exception) {}
+                throw e
+            } catch (e: Exception) {
+                println("WebSocket 握手失败或超时: ${e.message}")
+                throw e
+            }
+
+            // 发送登录消息
+            val loginWrapperBytes = buildLoginPayload(ServerConfig.Token)
+            send(loginWrapperBytes, MsgType.LOGIN, ServerConfig.Token, 1) { success, _ ->
+                if (success) {
+                    println("登录成功")
+                } else {
+                    println("登录失败")
+                }
+            }
+            // 启动心跳定时任务
+            startHeartbeat()
             channel.closeFuture().addListener(ChannelFutureListener {
-                println("启动聊天服务器服务！")
+                println("聊天服务器连接已关闭！")
             })
             channel.closeFuture().sync()
         } catch (e: Exception) {
@@ -275,7 +387,11 @@ object Chat {
                 try {
                     val heartbeatTimeout = 5000L // 5秒超时
                     val heartbeatResult = CompletableDeferred<Boolean>()
-                    send("", MsgType.HEARTBEAT, ServerConfig.Token, 1) { success, _ ->
+
+                    // 构建心跳消息
+                    val wrapperBytes = buildHeartbeatPayload()
+
+                    send(wrapperBytes, MsgType.HEARTBEAT, ServerConfig.Token, 1) { success, _ ->
                         heartbeatResult.complete(success)
                     }
                     val ok = withTimeoutOrNull(heartbeatTimeout) { heartbeatResult.await() } ?: false
@@ -290,122 +406,158 @@ object Chat {
     }
 
     /**
-     * 发送信息到服务器
+     * 发送信息到服务器（WebSocket）
      *
-     * @param message 发送的信息
-     * @param type 发送的信息类型
+     * @param payload 已序列化的 protobuf 字节数组
+     * @param type 消息类型
      * @param targetClientId 目标用户的ID
      * @param expectedResponses 预期的响应数量
      * @param callback 发送完成后的回调函数
      */
     fun send(
-        message: String,
+        payload: ByteArray,
         type: MsgType,
         targetClientId: String,
         expectedResponses: Int,
-        callback: (Boolean, List<FullHttpResponse>) -> Unit
+        callback: (Boolean, List<Any>) -> Unit
     ) {
-        AppLog.d{"正在发送信息"}
-        if (::channel.isInitialized) {
-            val uri = URI("http://$host:$port/send")
-            val json = jacksonObjectMapper().writeValueAsString(
-                mapOf(
-                    "content" to message,
-                    "type" to type.wire,
-                    "targetClientId" to targetClientId,
-                    "timestamp" to System.currentTimeMillis(),
-                )
-            )
-
-            val request = DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1,
-                HttpMethod.POST,
-                uri.rawPath,
-                Unpooled.wrappedBuffer(json.toByteArray(Charsets.UTF_8))
-            )
-            request.headers().set(HttpHeaderNames.HOST, host)
-            request.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
-            request.headers().set(HttpHeaderNames.CONTENT_LENGTH, request.content().readableBytes())
-            request.headers().set(HttpHeaderNames.AUTHORIZATION, "Bearer $Token")
-
+        AppLog.d{"正在发送WebSocket消息"}
+        if (::channel.isInitialized && channel.isActive) {
+            // 发送二进制WebSocket帧
             responseHandler.setExpectedResponses(expectedResponses)
-            println()
-            channel.writeAndFlush(request).addListener { future ->
-                if (future.isSuccess) {
-//                    println("设定的期望响应数：$expectedResponses")
-                    responseHandler.responseFuture.thenAccept { responses ->
-                        // 统一按业务code判断成功，并在失败时提示
-                        var allOk = true
-                        var firstErrMsg: String? = null
-                        responses.forEach { r ->
-                            val body = r.content().toString(Charsets.UTF_8)
-                            val unwrap = unwrapApi(body)
-                            if (unwrap.hasEnvelope) {
-                                if (!unwrap.success) {
-                                    allOk = false
-                                    if (firstErrMsg == null) firstErrMsg = unwrap.message
-                                }
-                            }
+
+            // ensure write happens on channel event loop
+            channel.eventLoop().execute {
+                synchronized(sendLock) {
+                    try {
+                        println("Writing frame to channel, frame class: ${BinaryWebSocketFrame::class.java.name}")
+                    } catch (_: Exception) {}
+                    try {
+                        val pipelineNames = channel.pipeline().names()
+                        println("Pipeline before write: $pipelineNames")
+                    } catch (_: Exception) {}
+                     // allocate buffer from the channel's allocator to match pipeline expectations
+                     val buf = channel.alloc().buffer(payload.size)
+                     buf.writeBytes(payload)
+                     val outFrame = BinaryWebSocketFrame(buf)
+                     channel.writeAndFlush(outFrame).addListener { future ->
+                         if (future.isSuccess) {
+                             println("WebSocket消息发送成功")
+                             // 等待响应（带超时），默认 5 秒
+                             try {
+                                 val responses = responseHandler.responseFuture.get(5, TimeUnit.SECONDS)
+                                 callback(true, responses.map { it as Any })
+                             } catch (e: TimeoutException) {
+                                 println("等待响应超时: ${e.message}")
+                                 callback(false, emptyList())
+                             } catch (e: Exception) {
+                                 println("等待响应时出现错误: ${e.message}")
+                                 callback(false, emptyList())
+                             } finally {
+                                 // reset expectation after handling
+                                 responseHandler.setExpectedResponses(1)
+                             }
+                         } else {
+                             println("WebSocket消息发送失败: ${future.cause()}")
+                             future.cause()?.let { t ->
+                                 try {
+                                     if (t is io.netty.handler.codec.EncoderException) {
+                                         val names = channel.pipeline().names()
+                                         println("EncoderException - pipeline names: $names")
+                                     }
+                                 } catch (_: Exception) {}
+                                 t.printStackTrace()
+                             }
+                             callback(false, emptyList())
+                             responseHandler.setExpectedResponses(1)
+                         }
+                     }
+                 }
+             }
+         } else {
+             println("Channel未初始化或已关闭，无法发送消息")
+             callback(false, emptyList())
+         }
+     }
+
+    fun sendText(
+        content: String,
+        callback: (Boolean) -> Unit
+    ) {
+        AppLog.d{"正在发送WebSocket文本消息"}
+        if (::channel.isInitialized && channel.isActive) {
+            // perform write on event loop to avoid encoder race conditions
+            channel.eventLoop().execute {
+                synchronized(sendLock) {
+                    channel.writeAndFlush(TextWebSocketFrame(content)).addListener { future ->
+                        if (future.isSuccess) {
+                            println("WebSocket文本消息发送成功")
+                            callback(true)
+                        } else {
+                            println("WebSocket文本消息发送失败: ${future.cause()}")
+                            future.cause()?.printStackTrace()
+                            callback(false)
                         }
-                        if (!allOk) prompt(firstErrMsg)
-                        callback(allOk, responses)
-                    }.exceptionally { throwable: Throwable ->
-                        callback(
-                            false,
-                            listOf(
-                                DefaultFullHttpResponse(
-                                    HttpVersion.HTTP_1_1,
-                                    HttpResponseStatus.INTERNAL_SERVER_ERROR
-                                )
-                            )
-                        )
-                        null
                     }
-                } else {
-                    println("发送信息的时发生错误！！")
-                    future.cause().printStackTrace()
-                    callback(
-                        false,
-                        listOf(DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
-                    )
                 }
             }
-        } else {
-            println("Channel is not initialized")
-            callback(
-                false,
-                listOf(DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
-            )
+         } else {
+             println("Channel未初始化或已关闭，无法发送消息")
+             callback(false)
+         }
+     }
+
+    private fun shutdown() {
+        try {
+            // 发送注销消息
+            val logoutWrapperBytes = buildLogoutPayload(ServerConfig.Token)
+            send(logoutWrapperBytes, MsgType.LOGOUT, ServerConfig.Token, 1) { success, _ ->
+                if (success) {
+                    println("注销消息发送成功")
+                } else {
+                    println("注销消息发送失败")
+                }
+            }
+        } catch (e: Exception) {
+            println("注销时发生错误: ${e.message}")
+        } finally {
+            try {
+                if (::channel.isInitialized) {
+                    channel.close().sync()
+                }
+            } catch (e: Exception) {
+                println("关闭通道时发生错误: ${e.message}")
+            }
         }
-        responseHandler.setExpectedResponses(1)
     }
 
     /**
-     * 关闭连接
+     * Netty handler to log FullHttpResponse received during handshake (status, headers, body)
+     * Install this handler before the WebSocket protocol handler to capture server rejection reasons.
      */
-    fun shutdown() {
-        println("正在关闭")
-        heartbeatJob?.cancel()
-        val shutdownCompleted = CompletableFuture<Boolean>()
-        send("Shutting down", MsgType.LOGOUT, "0", 1) { success, _ ->
-            if (success) {
-                println("Shutdown message sent successfully")
-            } else {
-                println("Failed to send shutdown message")
-            }
-            shutdownCompleted.complete(true)
-            if (::channel.isInitialized) {
-                channel.close()
+    class HttpResponseLogger : ChannelInboundHandlerAdapter() {
+        override fun channelRead(ctx: ChannelHandlerContext, msg: Any) {
+            try {
+                if (msg is FullHttpResponse) {
+                    try {
+                        println("HTTP response during handshake: ${msg.status()} ${msg.protocolVersion()}")
+                        println("Headers: ${msg.headers().toString()}")
+                        val content = msg.content()
+                        if (content.isReadable) {
+                            val bytes = ByteArray(content.readableBytes())
+                            content.readBytes(bytes)
+                            val s = try { String(bytes, Charsets.UTF_8) } catch (_: Exception) { "<binary>" }
+                            println("Response body: $s")
+                        }
+                    } catch (e: Exception) {
+                        println("Failed to log HTTP response: ${e.message}")
+                    }
+                } else {
+                    println("HttpResponseLogger saw message of type: ${msg.javaClass.name}")
+                }
+            } finally {
+                ctx.fireChannelRead(msg)
             }
         }
-        // 等待发送完成
-        shutdownCompleted.get()
     }
-}
-
-fun main() {
-    Runtime.getRuntime().addShutdownHook(Thread {
-        Chat.shutdown()
-    })
-    Chat.start("localhost", 8080)
 }
