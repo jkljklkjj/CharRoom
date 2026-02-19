@@ -19,3 +19,4 @@ plugins {
 
 rootProject.name = "CharRoom"
 include("main")
+include("proto")

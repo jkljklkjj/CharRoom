@@ -152,6 +152,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                 Box(Modifier.weight(1f)) {
                     UserList { user ->
                         selectedUser = user
+                        selectedUser = user
                         if (user.id > 0) {
                             // build CHECK wrapper via builder
                             val payload = buildCheckPayload(user.id.toString())

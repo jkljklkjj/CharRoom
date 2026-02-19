@@ -106,6 +106,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
     }
 
     override fun channelRead0(ctx: ChannelHandlerContext, msg: Any) {
+        AppLog.i({"Received WebSocket message of type ${msg.javaClass.name}"})
         when (msg) {
             is TextWebSocketFrame -> {
                 val contentStr = msg.text()
@@ -367,7 +368,7 @@ object Chat {
                 }
             }
             // 启动心跳定时任务
-            startHeartbeat()
+//            startHeartbeat()
             channel.closeFuture().addListener(ChannelFutureListener {
                 println("聊天服务器连接已关闭！")
             })
@@ -443,20 +444,42 @@ object Chat {
                      channel.writeAndFlush(outFrame).addListener { future ->
                          if (future.isSuccess) {
                              println("WebSocket消息发送成功")
-                             // 等待响应（带超时），默认 5 秒
+                            // 非阻塞等待响应（带超时），避免阻塞 Netty 事件循环线程
                              try {
-                                 val responses = responseHandler.responseFuture.get(5, TimeUnit.SECONDS)
-                                 callback(true, responses.map { it as Any })
-                             } catch (e: TimeoutException) {
-                                 println("等待响应超时: ${e.message}")
-                                 callback(false, emptyList())
-                             } catch (e: Exception) {
-                                 println("等待响应时出现错误: ${e.message}")
-                                 callback(false, emptyList())
-                             } finally {
-                                 // reset expectation after handling
-                                 responseHandler.setExpectedResponses(1)
-                             }
+                                val timeoutSeconds = 30L // 调试时延长等待时间
+                                val timeoutTask = channel.eventLoop().schedule({
+                                    try {
+                                        if (!responseHandler.responseFuture.isDone) {
+                                            responseHandler.responseFuture.completeExceptionally(
+                                                TimeoutException("等待响应超时")
+                                            )
+                                        }
+                                    } catch (_: Exception) {}
+                                }, timeoutSeconds, TimeUnit.SECONDS)
+
+                                responseHandler.responseFuture.whenCompleteAsync { responses, ex ->
+                                    try {
+                                        try { timeoutTask.cancel(false) } catch (_: Exception) {}
+                                        if (ex != null) {
+                                            if (ex is TimeoutException) {
+                                                println("等待响应超时: ${ex.message}")
+                                            } else {
+                                                println("等待响应时出现错误: ${ex.message}")
+                                            }
+                                            callback(false, emptyList())
+                                        } else {
+                                            callback(true, responses.map { it as Any })
+                                        }
+                                    } finally {
+                                        // reset expectation after handling
+                                        responseHandler.setExpectedResponses(1)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                println("等待响应时出现错误: ${e.message}")
+                                callback(false, emptyList())
+                                responseHandler.setExpectedResponses(1)
+                            }
                          } else {
                              println("WebSocket消息发送失败: ${future.cause()}")
                              future.cause()?.let { t ->
