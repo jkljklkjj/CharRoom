@@ -613,6 +613,45 @@ object Chat {
          }
      }
 
+    fun logoutAndDisconnect() {
+        heartbeatJob?.cancel()
+
+        if (!::channel.isInitialized) {
+            return
+        }
+
+        try {
+            if (!channel.isActive) {
+                channel.close()
+                return
+            }
+
+            val logoutWrapperBytes = buildLogoutPayload(ServerConfig.Token)
+            channel.eventLoop().execute {
+                try {
+                    val buf = channel.alloc().buffer(logoutWrapperBytes.size)
+                    buf.writeBytes(logoutWrapperBytes)
+                    channel.writeAndFlush(BinaryWebSocketFrame(buf)).addListener {
+                        try {
+                            channel.close()
+                        } catch (_: Exception) {
+                        }
+                    }
+                } catch (_: Exception) {
+                    try {
+                        channel.close()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            try {
+                channel.close()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private fun shutdown() {
         try {
             // 发送注销消息

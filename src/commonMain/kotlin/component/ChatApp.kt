@@ -12,8 +12,6 @@ import model.users
 import Util
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -220,10 +218,25 @@ fun resendMessage(user: User, groupMessage: GroupMessage) {
 }
 
 @Composable
-fun ChatApp(windowSize: DpSize, token: String) {
+fun ChatApp(
+    windowSize: DpSize,
+    token: String,
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
+    onLogout: () -> Unit
+) {
     ServerConfig.Token = token
     var selectedUser by remember { mutableStateOf<User?>(null) }
     var showDialog by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+
+    fun openSearchDialog() {
+        try {
+            ActionLogger.log(Action(type = ActionType.SEARCH, metadata = mapOf("ui" to "sidebar_search")))
+        } catch (_: Exception) {
+        }
+        showDialog = true
+    }
 
     // 拉取离线消息
     LaunchedEffect(Unit) {
@@ -245,7 +258,11 @@ fun ChatApp(windowSize: DpSize, token: String) {
         if (windowSize.width > windowSize.height) {
             Row(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f)) {
-                    UserList { user ->
+                    UserList(
+                        selectedUserId = selectedUser?.id,
+                        onOpenSearch = { openSearchDialog() },
+                        onOpenSettings = { showSettings = true }
+                    ) { user ->
                         selectedUser = user
                         if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                             // build CHECK wrapper via builder
@@ -275,7 +292,11 @@ fun ChatApp(windowSize: DpSize, token: String) {
             }
         } else {
             if (selectedUser == null) {
-                UserList { user ->
+                UserList(
+                    selectedUserId = selectedUser?.id,
+                    onOpenSearch = { openSearchDialog() },
+                    onOpenSettings = { showSettings = true }
+                ) { user ->
                     selectedUser = user
                     if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                         val payload = buildCheckPayload(user.id.toString())
@@ -301,21 +322,61 @@ fun ChatApp(windowSize: DpSize, token: String) {
             }
         }
 
-        IconButton(onClick = {
-            // log search action
-            try { ActionLogger.log(Action(type = ActionType.SEARCH, metadata = mapOf("ui" to "top_search"))) } catch (_: Exception) {}
-            showDialog = true
-        }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
-            Icon(Icons.Default.Search, contentDescription = "搜索")
-        }
         if (showDialog) {
             AddUserOrGroupDialog { showDialog = false }
+        }
+
+        if (showSettings) {
+            AlertDialog(
+                onDismissRequest = { showSettings = false },
+                title = { Text("设置") },
+                text = {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("夜间模式", modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = isDarkMode,
+                                onCheckedChange = { onToggleDarkMode() }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                showSettings = false
+                                Chat.logoutAndDisconnect()
+                                onLogout()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colors.error)
+                        ) {
+                            Text("退出登录")
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSettings = false }) {
+                        Text("关闭")
+                    }
+                }
+            )
         }
     }
 }
 
 fun main() = application {
     Window(onCloseRequest = ::exitApplication) {
-        ChatApp(DpSize(800.dp, 600.dp), "token")
+        var isDarkMode by remember { mutableStateOf(false) }
+        ChatApp(
+            windowSize = DpSize(800.dp, 600.dp),
+            token = "token",
+            isDarkMode = isDarkMode,
+            onToggleDarkMode = { isDarkMode = !isDarkMode },
+            onLogout = {}
+        )
     }
 }

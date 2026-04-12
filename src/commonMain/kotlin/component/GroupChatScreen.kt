@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -12,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import core.ServerConfig
 import kotlinx.coroutines.launch
@@ -44,46 +47,99 @@ fun GroupChatScreen(group: User) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text(text = group.username, style = MaterialTheme.typography.h4)
-        Spacer(modifier = Modifier.height(16.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colors.surface,
+            elevation = 2.dp,
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Text(
+                    text = group.username,
+                    style = MaterialTheme.typography.h6,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "群聊会话",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         LazyColumn(
             modifier = Modifier.weight(1f),
             state = listState
         ) {
             items(filteredGroupMessages.size) { index ->
                 val message = filteredGroupMessages[index]
+                val self = message.senderId == Integer.valueOf(ServerConfig.id)
+                val bubbleColor = if (self) Color(0xFF1E88E5) else Color(0xFFF0F0F0)
+                val contentColor = if (self) Color.White else MaterialTheme.colors.onSurface
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = if (message.senderId == Integer.valueOf(ServerConfig.id)) Arrangement.End else Arrangement.Start
+                    horizontalArrangement = if (self) Arrangement.End else Arrangement.Start
                 ) {
-                    if (message.senderId != Integer.valueOf(ServerConfig.id)) {
-                        Text(
-                            text = message.senderName,
-                            style = MaterialTheme.typography.body1,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (message.senderId == Integer.valueOf(ServerConfig.id) && !message.isSent.value) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        if (self && !message.isSent.value) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "重发",
-                                tint = Color.Red,
+                                tint = Color(0xFFD32F2F),
                                 modifier = Modifier
-                                    .size(24.dp)
+                                    .size(20.dp)
                                     .clickable { resendMessage(User(-message.groupId, ""), message) }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
+
+                        Surface(
+                            color = bubbleColor,
+                            shape = RoundedCornerShape(14.dp),
+                            elevation = 1.dp,
+                            modifier = Modifier.widthIn(max = 450.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                if (!self) {
+                                    Text(
+                                        text = message.senderName,
+                                        style = MaterialTheme.typography.caption,
+                                        color = MaterialTheme.colors.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                }
+                                Text(
+                                    text = message.text,
+                                    style = MaterialTheme.typography.body1,
+                                    color = contentColor
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    Text(
+                                        text = formatGroupTime(message.timestamp),
+                                        style = MaterialTheme.typography.caption,
+                                        color = if (self) Color.White.copy(alpha = 0.78f) else MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+                                        textAlign = TextAlign.End
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (self && !message.isSent.value) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Text(
-                            text = message.text,
-                            style = MaterialTheme.typography.body1,
-                            modifier = Modifier
-                                .background(if (message.senderId == Integer.valueOf(ServerConfig.id)) Color(0xFF1E88E5) else Color.LightGray)
-                                .padding(8.dp)
+                            text = "发送失败，可点击图标重试",
+                            style = MaterialTheme.typography.caption,
+                            color = Color(0xFFD32F2F)
                         )
                     }
                 }
+
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
@@ -108,5 +164,14 @@ fun GroupChatScreen(group: User) {
                 enabled = !isSending && messageText.isNotBlank()
             ) { Text(if (isSending) "发送中..." else "发送") }
         }
+    }
+}
+
+private fun formatGroupTime(timestamp: Long): String {
+    return try {
+        val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+        sdf.format(java.util.Date(timestamp))
+    } catch (_: Exception) {
+        ""
     }
 }
