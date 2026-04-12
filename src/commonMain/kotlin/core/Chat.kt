@@ -288,7 +288,13 @@ object Chat {
                         pipeline.addLast(HttpClientCodec())
                         pipeline.addLast(HttpObjectAggregator(8192))
                         // Use WebSocketClientProtocolHandler to handle handshake and install frame encoders/decoders
-                        val wsUri = URI("ws://$host:$port/ws")
+                        val uidQuery = try {
+                            val uid = ServerConfig.id
+                            if (uid.isNotBlank()) "?uid=" + java.net.URLEncoder.encode(uid, "UTF-8") else ""
+                        } catch (_: Exception) {
+                            ""
+                        }
+                        val wsUri = URI("ws://$host:$port/ws$uidQuery")
                         // create explicit handshaker and install protocol handler (this ensures correct encoders/decoders)
                         val headers = DefaultHttpHeaders()
                         // include Authorization header if token available (many servers require JWT in upgrade request)
@@ -322,7 +328,13 @@ object Chat {
             // Quick HTTP probe to see if server returns an HTTP error at the WS endpoint
             try {
                 val probeClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
-                val probeUri = URI.create("http://$host:$port/ws${if (!ServerConfig.Token.isNullOrBlank()) "?token=" + java.net.URLEncoder.encode(ServerConfig.Token, "UTF-8") else ""}")
+                val probeUidQuery = try {
+                    val uid = ServerConfig.id
+                    if (uid.isNotBlank()) "?uid=" + java.net.URLEncoder.encode(uid, "UTF-8") else ""
+                } catch (_: Exception) {
+                    ""
+                }
+                val probeUri = URI.create("http://$host:$port/ws$probeUidQuery")
                 val probeReq = HttpRequest.newBuilder().uri(probeUri).timeout(Duration.ofSeconds(2)).GET().build()
                 val probeResp = probeClient.send(probeReq, HttpResponse.BodyHandlers.ofString())
                 println("HTTP probe to $probeUri returned: ${probeResp.statusCode()}")
