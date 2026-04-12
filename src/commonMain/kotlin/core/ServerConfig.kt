@@ -3,6 +3,9 @@ package core
 import java.util.Properties
 
 object ServerConfig {
+    const val AGENT_ASSISTANT_ID = 900000001
+    const val AGENT_ASSISTANT_NAME = "AI助手"
+
     // SERVER_IP resolution order:
     // 1) JVM system property: -Dserver.ip=1.2.3.4
     // 2) environment variable SERVER_IP
@@ -40,4 +43,6 @@ object ServerConfig {
     var Token: String = ""
     // 登陆的用户账号
     var id: String = ""
+
+    fun isAgentAssistant(userId: Int): Boolean = userId == AGENT_ASSISTANT_ID
 }

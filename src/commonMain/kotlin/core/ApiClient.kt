@@ -35,6 +35,9 @@ object ApiEndpoints {
 
 // 简单 Json 工具（忽略未知字段）
 private val json = Json { ignoreUnknownKeys = true }
+private val apiHttp = HttpClient.newBuilder()
+    .connectTimeout(Duration.ofSeconds(10))
+    .build()
 
 private fun attachActionHeader(builder: HttpRequest.Builder): HttpRequest.Builder {
     // No longer attach client actions to every request header.
@@ -50,6 +53,26 @@ private fun sendRequest(
     token: String? = null,
     timeoutSeconds: Long = 10
 ): String {
+    val normalizedMethod = method.uppercase()
+
+    // Record outbound API calls for agent context, but skip /agent/nl itself.
+    try {
+        if (path != ApiEndpoints.AGENT_NL) {
+            ActionLogger.log(
+                Action(
+                    type = ActionType.OTHER,
+                    targetId = path,
+                    metadata = mapOf(
+                        "source" to "sendRequest",
+                        "method" to normalizedMethod
+                    )
+                )
+            )
+        }
+    } catch (_: Exception) {
+        // keep existing request behavior
+    }
+
     val builder = HttpRequest.newBuilder()
         .uri(URI.create(ApiEndpoints.url(path)))
         .timeout(Duration.ofSeconds(timeoutSeconds))
@@ -61,15 +84,15 @@ private fun sendRequest(
         builder.header("Authorization", "Bearer $token")
     }
 
-    when (method.uppercase()) {
+    when (normalizedMethod) {
         "GET" -> builder.GET()
         "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(body ?: "{}"))
-        else -> builder.method(method.uppercase(), if (body != null) HttpRequest.BodyPublishers.ofString(body) else HttpRequest.BodyPublishers.noBody())
+        else -> builder.method(normalizedMethod, if (body != null) HttpRequest.BodyPublishers.ofString(body) else HttpRequest.BodyPublishers.noBody())
     }
 
     val request = builder.build()
     return try {
-        http.send(request, HttpResponse.BodyHandlers.ofString()).body()
+        apiHttp.send(request, HttpResponse.BodyHandlers.ofString()).body()
     } catch (e: Exception) {
         // swallow and return empty string to preserve existing callers' behavior
         ""

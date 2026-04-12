@@ -3,6 +3,7 @@ package model
 import androidx.compose.runtime.*
 import kotlinx.serialization.Serializable
 import core.ApiService
+import core.ServerConfig
 
 @Serializable
 data class User(val id: Int, var username: String)
@@ -78,6 +79,13 @@ var users by mutableStateOf<List<User>>(emptyList())
 var messages = mutableStateListOf<Message>()
 var groupMessages = mutableStateListOf<GroupMessage>()
 
+private fun withAgentAssistant(list: List<User>): List<User> {
+    if (list.any { ServerConfig.isAgentAssistant(it.id) }) {
+        return list
+    }
+    return listOf(User(ServerConfig.AGENT_ASSISTANT_ID, ServerConfig.AGENT_ASSISTANT_NAME)) + list
+}
+
 /**
  * 获取好友列表（委托 ApiService，使用全局 Token）
  */
@@ -93,7 +101,7 @@ fun fetchGroups(): List<User> = ApiService.fetchGroups()
  */
 fun updateFriendList(): List<User> {
     val tmp = fetchFriends()
-    users = users + tmp
+    users = withAgentAssistant(users + tmp)
     return tmp
 }
 
@@ -102,7 +110,7 @@ fun updateFriendList(): List<User> {
  */
 fun updateGroupList(): List<User> {
     val tmp = fetchGroups()
-    users = users + tmp
+    users = withAgentAssistant(users + tmp)
     return tmp
 }
 
@@ -113,6 +121,6 @@ fun updateList(): List<User> {
     val friends = fetchFriends()
     val groups = fetchGroups()
     val merged = friends + groups
-    users = merged
-    return merged
+    users = withAgentAssistant(merged)
+    return users
 }

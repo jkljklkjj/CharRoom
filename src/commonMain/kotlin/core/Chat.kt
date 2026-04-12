@@ -31,6 +31,7 @@ enum class MsgType(val wire: String) {
     LOGIN("login"),
     LOGOUT("logout"),
     CHAT("chat"),
+    AGENT_CHAT("agentChat"),
     GROUP_CHAT("groupChat"),
     CHECK("check"),
     HEARTBEAT("heartbeat");
@@ -123,13 +124,16 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     if (unwrap.hasEnvelope && !unwrap.success) {
                         prompt(unwrap.message)
                     } else {
-                        // if it's JSON-wrapped message inside proto, handle it
                         val dataStr = unwrap.dataJson ?: String(bodyBytes, Charsets.UTF_8)
-                        if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")){
+                        if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
                             val json = jacksonObjectMapper().readTree(dataStr)
-                            val messageId = json.get("messageId")?.asText()
-                            if (messageId != null){
-                                handleIncomingFromJson(json)
+                            if (json.has("type") && json.has("payload")) {
+                                handleIncomingFromProtoWrapper(json)
+                            } else {
+                                val messageId = json.get("messageId")?.asText()
+                                if (messageId != null) {
+                                    handleIncomingFromJson(json)
+                                }
                             }
                         }
                     }
@@ -171,6 +175,70 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
         } catch (E: Exception) {
             println("Error handling incoming message: ${E.message}")
             E.printStackTrace()
+        }
+    }
+
+    private fun handleIncomingFromProtoWrapper(json: JsonNode) {
+        try {
+            val type = json.get("type")?.asText() ?: return
+            val payload = json.get("payload") ?: return
+
+            when (type) {
+                MsgType.CHAT.wire, MsgType.AGENT_CHAT.wire -> {
+                    val senderId = payload.get("userId")?.asText()?.toIntOrNull() ?: return
+                    val text = payload.get("content")?.asText() ?: return
+                    val ts = payload.get("timestamp")?.asText()?.toLongOrNull() ?: System.currentTimeMillis()
+
+                    messages += Message(
+                        senderId = senderId,
+                        message = text,
+                        sender = false,
+                        timestamp = ts,
+                        isSent = mutableStateOf(true)
+                    )
+                    try {
+                        ActionLogger.log(
+                            Action(
+                                type = ActionType.RECEIVE_MESSAGE,
+                                targetId = senderId.toString(),
+                                metadata = mapOf("text" to text.take(64), "source" to "proto")
+                            )
+                        )
+                    } catch (_: Exception) {
+                    }
+                }
+
+                MsgType.GROUP_CHAT.wire -> {
+                    val groupId = payload.get("targetClientId")?.asText()?.toIntOrNull() ?: return
+                    val senderId = payload.get("userId")?.asText()?.toIntOrNull() ?: return
+                    val text = payload.get("content")?.asText() ?: return
+
+                    groupMessages += GroupMessage(
+                        groupId = groupId,
+                        senderName = senderId.toString(),
+                        text = text,
+                        senderId = senderId,
+                        timestamp = System.currentTimeMillis(),
+                        isSent = mutableStateOf(true)
+                    )
+                    try {
+                        ActionLogger.log(
+                            Action(
+                                type = ActionType.RECEIVE_MESSAGE,
+                                targetId = groupId.toString(),
+                                metadata = mapOf("text" to text.take(64), "group" to "true", "source" to "proto")
+                            )
+                        )
+                    } catch (_: Exception) {
+                    }
+                }
+
+                else -> {
+                    // ignore other proto wrapper types
+                }
+            }
+        } catch (e: Exception) {
+            println("Error handling proto wrapper message: ${e.message}")
         }
     }
 

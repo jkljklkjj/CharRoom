@@ -5,5 +5,6 @@ expect fun buildLoginPayload(token: String?): ByteArray
 expect fun buildHeartbeatPayload(): ByteArray
 expect fun buildLogoutPayload(userId: String): ByteArray
 expect fun buildChatPayload(targetClientId: String, content: String, userId: Int, timestamp: Long): ByteArray
+expect fun buildAgentChatPayload(targetClientId: String, content: String, userId: Int, timestamp: Long): ByteArray
 expect fun buildGroupChatPayload(targetClientId: String, content: String, userId: Int): ByteArray
 expect fun buildCheckPayload(targetClientId: String): ByteArray

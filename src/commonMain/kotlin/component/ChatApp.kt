@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
 import core.buildChatPayload
+import core.buildAgentChatPayload
 import core.buildGroupChatPayload
 import core.buildCheckPayload
 import core.parseProtoResponse
@@ -39,7 +40,46 @@ fun sendMessage(user: User, messageText: String) {
     val currentTime = System.currentTimeMillis()
     if (currentTime - lastMessageTime >= 2000) {
         lastMessageTime = currentTime
-        if (user.id > 0) {
+        if (ServerConfig.isAgentAssistant(user.id)) {
+            val localCopy = Message(
+                senderId = user.id,
+                message = messageText,
+                sender = true,
+                timestamp = currentTime,
+                isSent = mutableStateOf(true)
+            )
+            messages += localCopy
+
+            try {
+                ActionLogger.log(
+                    Action(
+                        type = ActionType.SEND_MESSAGE,
+                        targetId = user.id.toString(),
+                        metadata = mapOf("text" to messageText.take(64), "agent" to "true")
+                    )
+                )
+            } catch (_: Exception) {
+            }
+
+            val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
+            val payload = buildAgentChatPayload(user.id.toString(), messageText, userIdInt, currentTime)
+
+            Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, resp ->
+                if (!(success && resp.isNotEmpty())) {
+                    localCopy.isSent.value = false
+                } else {
+                    val lastBytes = resp.last() as? ByteArray
+                    if (lastBytes != null) {
+                        val unwrap = parseProtoResponse(lastBytes)
+                        if (unwrap.hasEnvelope && !unwrap.success) {
+                            localCopy.isSent.value = false
+                        }
+                    } else {
+                        localCopy.isSent.value = false
+                    }
+                }
+            }
+        } else if (user.id > 0) {
             val localCopy = Message(
                 senderId = user.id,
                 message = messageText,
@@ -109,13 +149,19 @@ fun sendMessage(user: User, messageText: String) {
 }
 
 fun resendMessage(user: User, message: Message) {
-    val payload = buildChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
-    Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
+    val payload = if (ServerConfig.isAgentAssistant(user.id)) {
+        buildAgentChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
+    } else {
+        buildChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
+    }
+    val type = if (ServerConfig.isAgentAssistant(user.id)) MsgType.AGENT_CHAT else MsgType.CHAT
+
+    Chat.send(payload, type, user.id.toString(), 1) { success, resp ->
         if (success && resp.isNotEmpty()) {
             val lastBytes = resp.last() as? ByteArray
             if (lastBytes != null) {
                 val unwrap = parseProtoResponse(lastBytes)
-                if (unwrap.success) message.isSent.value = true
+                if (!unwrap.hasEnvelope || unwrap.success) message.isSent.value = true
             }
         }
     }
@@ -163,7 +209,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
                     UserList { user ->
                         selectedUser = user
                         selectedUser = user
-                        if (user.id > 0) {
+                        if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                             // build CHECK wrapper via builder
                             val payload = buildCheckPayload(user.id.toString())
 
@@ -196,7 +242,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
             if (selectedUser == null) {
                 UserList { user ->
                     selectedUser = user
-                    if (user.id > 0) {
+                    if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                         val payload = buildCheckPayload(user.id.toString())
                         Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
                             if (success && resp.isNotEmpty()) {
