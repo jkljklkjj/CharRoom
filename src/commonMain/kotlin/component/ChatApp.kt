@@ -10,11 +10,26 @@ import model.GroupMessage
 import model.messages
 import model.users
 import Util
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -238,6 +253,36 @@ fun ChatApp(
         showDialog = true
     }
 
+    val animatedChatTransition = @Composable {
+        AnimatedContent(
+            targetState = selectedUser?.id,
+            transitionSpec = {
+                (slideInHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ) { fullWidth -> fullWidth / 3 } + fadeIn() + scaleIn(initialScale = 0.96f)).togetherWith(
+                    slideOutHorizontally { fullWidth -> -fullWidth / 6 } + fadeOut()
+                ).using(SizeTransform(clip = false))
+            },
+            label = "chat-pane-transition"
+        ) { targetId ->
+            val targetUser = selectedUser?.takeIf { it.id == targetId }
+            if (targetUser == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "从左侧选择会话，开始沉浸聊天",
+                        style = MaterialTheme.typography.subtitle1,
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.72f)
+                    )
+                }
+            } else {
+                if (targetUser.id < 0) GroupChatScreen(targetUser) else ChatScreen(targetUser)
+            }
+        }
+    }
+
     // 拉取离线消息
     LaunchedEffect(Unit) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -254,10 +299,100 @@ fun ChatApp(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(brush = immersiveBackgroundBrush(isDarkMode))
+    ) {
+        Box(modifier = Modifier.matchParentSize()) {
+            Box(
+                modifier = Modifier
+                    .size(260.dp)
+                    .offset(x = (-110).dp, y = (-100).dp)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                MaterialTheme.colors.secondary.copy(alpha = 0.26f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .size(280.dp)
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 100.dp, y = 110.dp)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                MaterialTheme.colors.primary.copy(alpha = 0.24f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+        }
+
         if (windowSize.width > windowSize.height) {
-            Row(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxSize().padding(12.dp)) {
+                Surface(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.52f else 0.72f),
+                    shape = RoundedCornerShape(22.dp),
+                    elevation = 8.dp
+                ) {
+                    Box(Modifier.fillMaxSize()) {
+                        UserList(
+                            selectedUserId = selectedUser?.id,
+                            onOpenSearch = { openSearchDialog() },
+                            onOpenSettings = { showSettings = true }
+                        ) { user ->
+                            selectedUser = user
+                            if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
+                                val payload = buildCheckPayload(user.id.toString())
+
+                                Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
+                                    if (success && resp.isNotEmpty()) {
+                                        val lastBytes = resp.last() as? ByteArray
+                                        if (lastBytes != null) {
+                                            val unwrap = parseProtoResponse(lastBytes)
+                                            val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
+                                            val map = Util.jsonToMap(dataStr)
+                                            val online = map["online"] as? Boolean ?: false
+                                            updateUserOnlineStatus(user.id, online)
+                                            if (selectedUser?.id == user.id) {
+                                                selectedUser = selectedUser?.copy(online = online)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Surface(
+                    modifier = Modifier.weight(2f).fillMaxHeight(),
+                    color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.5f else 0.66f),
+                    shape = RoundedCornerShape(22.dp),
+                    elevation = 8.dp
+                ) {
+                    animatedChatTransition()
+                }
+            }
+        } else {
+            if (selectedUser == null) {
+                Surface(
+                    modifier = Modifier.fillMaxSize().padding(12.dp),
+                    color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.54f else 0.74f),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = 6.dp
+                ) {
                     UserList(
                         selectedUserId = selectedUser?.id,
                         onOpenSearch = { openSearchDialog() },
@@ -265,9 +400,7 @@ fun ChatApp(
                     ) { user ->
                         selectedUser = user
                         if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
-                            // build CHECK wrapper via builder
                             val payload = buildCheckPayload(user.id.toString())
-
                             Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
                                 if (success && resp.isNotEmpty()) {
                                     val lastBytes = resp.last() as? ByteArray
@@ -286,39 +419,15 @@ fun ChatApp(
                         }
                     }
                 }
-                Box(Modifier.weight(2f)) {
-                    selectedUser?.let { u -> if (u.id < 0) GroupChatScreen(u) else ChatScreen(u) }
-                }
-            }
-        } else {
-            if (selectedUser == null) {
-                UserList(
-                    selectedUserId = selectedUser?.id,
-                    onOpenSearch = { openSearchDialog() },
-                    onOpenSettings = { showSettings = true }
-                ) { user ->
-                    selectedUser = user
-                    if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
-                        val payload = buildCheckPayload(user.id.toString())
-                        Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
-                            if (success && resp.isNotEmpty()) {
-                                val lastBytes = resp.last() as? ByteArray
-                                if (lastBytes != null) {
-                                    val unwrap = parseProtoResponse(lastBytes)
-                                    val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
-                                    val map = Util.jsonToMap(dataStr)
-                                    val online = map["online"] as? Boolean ?: false
-                                    updateUserOnlineStatus(user.id, online)
-                                    if (selectedUser?.id == user.id) {
-                                        selectedUser = selectedUser?.copy(online = online)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             } else {
-                selectedUser?.let { u -> if (u.id < 0) GroupChatScreen(u) else ChatScreen(u) }
+                Surface(
+                    modifier = Modifier.fillMaxSize().padding(12.dp),
+                    color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.5f else 0.66f),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = 6.dp
+                ) {
+                    animatedChatTransition()
+                }
             }
         }
 

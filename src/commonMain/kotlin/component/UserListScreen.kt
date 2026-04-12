@@ -1,29 +1,53 @@
 package component
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.*
+import androidx.compose.material.Icon
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import core.Action
+import core.ActionLogger
+import core.ActionType
 import core.ServerConfig
 import model.User
 import model.groupMessages
 import model.messages
 import model.updateList
 import model.users
-import core.Action
-import core.ActionType
-import core.ActionLogger
 
 /**
  * 左侧用户和群组列表边栏
@@ -36,57 +60,103 @@ fun UserList(
     onUserClick: (User) -> Unit
 ) {
     val userListState = users
+    val onlineCount = userListState.count { it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
 
     // 首次进入时拉取列表，写回 users（在 updateList 内部）
     LaunchedEffect(Unit) {
         updateList()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colors.surface.copy(alpha = 0.18f),
+            shape = MaterialTheme.shapes.large,
+            elevation = 0.dp
         ) {
-            Text(
-                text = "会话",
-                style = MaterialTheme.typography.subtitle1,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onOpenSearch) {
-                Icon(Icons.Default.Search, contentDescription = "搜索")
-            }
-            IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Default.Settings, contentDescription = "设置")
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(sidebarHeaderBrush(!MaterialTheme.colors.isLight))
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "聊天室",
+                            style = MaterialTheme.typography.h6,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "在线 $onlineCount 人 · 共 ${userListState.size} 个会话",
+                            style = MaterialTheme.typography.caption,
+                            color = Color.White.copy(alpha = 0.86f)
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ElasticHeaderAction(
+                            icon = Icons.Default.Search,
+                            contentDescription = "搜索",
+                            onClick = onOpenSearch
+                        )
+                        ElasticHeaderAction(
+                            icon = Icons.Default.Settings,
+                            contentDescription = "设置",
+                            onClick = onOpenSettings
+                        )
+                    }
+                }
             }
         }
 
-        Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
-            items(userListState.size) { index ->
-                val user = userListState[index]
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(
+                items = userListState,
+                key = { it.id }
+            ) { user ->
                 val displayName = buildDisplayName(user)
                 val subtitle = buildSubtitle(user)
                 val selected = selectedUserId == user.id
+                val cardColor by animateColorAsState(
+                    targetValue = if (selected) {
+                        MaterialTheme.colors.primary.copy(alpha = if (MaterialTheme.colors.isLight) 0.16f else 0.34f)
+                    } else {
+                        MaterialTheme.colors.surface.copy(alpha = if (MaterialTheme.colors.isLight) 0.78f else 0.6f)
+                    }
+                )
+                val borderColor = if (selected) {
+                    MaterialTheme.colors.secondary.copy(alpha = 0.45f)
+                } else {
+                    MaterialTheme.colors.onSurface.copy(alpha = 0.08f)
+                }
 
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 2.dp, vertical = 4.dp)
                         .clickable {
-                            // log action
                             try {
-                                ActionLogger.log(Action(type = ActionType.OPEN_CHAT, targetId = user.id.toString(), metadata = mapOf("username" to user.username)))
+                                ActionLogger.log(
+                                    Action(
+                                        type = ActionType.OPEN_CHAT,
+                                        targetId = user.id.toString(),
+                                        metadata = mapOf("username" to user.username)
+                                    )
+                                )
                             } catch (_: Exception) {
                             }
                             onUserClick(user)
                         },
-                    color = if (selected) MaterialTheme.colors.primary.copy(alpha = 0.12f) else MaterialTheme.colors.surface,
+                    color = cardColor,
                     shape = MaterialTheme.shapes.medium,
-                    elevation = if (selected) 2.dp else 0.dp
+                    border = BorderStroke(1.dp, borderColor),
+                    elevation = if (selected) 4.dp else 0.dp
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(10.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (showOnlineDot(user)) {
@@ -134,6 +204,37 @@ fun UserList(
     }
 }
 
+@Composable
+private fun ElasticHeaderAction(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val scale = rememberElasticScale(interactionSource, pressedScale = 0.86f)
+
+    Surface(
+        modifier = Modifier
+            .size(34.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        color = Color.White.copy(alpha = 0.2f),
+        shape = CircleShape,
+        elevation = 0.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = contentDescription, tint = Color.White)
+        }
+    }
+}
+
 private fun buildDisplayName(user: User): String {
     if (user.id < 0 || ServerConfig.isAgentAssistant(user.id)) {
         return user.username
@@ -151,7 +252,7 @@ private fun showOnlineDot(user: User): Boolean {
 
 private fun buildSubtitle(user: User): String {
     if (ServerConfig.isAgentAssistant(user.id)) {
-        return "智能问答助手，支持上下文对话"
+        return "智能灵感助手，来点有趣的话题"
     }
 
     if (user.id < 0) {

@@ -4,7 +4,7 @@ plugins {
     kotlin("multiplatform") version "2.2.20"
     id("org.jetbrains.kotlin.plugin.compose") version "2.2.20"
     kotlin("plugin.serialization") version "2.2.20"
-    id("org.jetbrains.compose") version "1.7.0"
+    id("org.jetbrains.compose") version "1.9.0"
     // Add the Java plugin so the protobuf plugin can be applied (it requires Java or Android plugin)
     // id("java")
     // Android plugin is applied conditionally below; do not apply by default so desktop-only builds don't configure Android tasks
@@ -38,6 +38,7 @@ kotlin {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material)
+                implementation(compose.materialIconsExtended)
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.glassfish.jaxb:jaxb-runtime:4.0.5")
                 implementation("com.konghq:unirest-java:3.14.5")
