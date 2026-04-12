@@ -29,6 +29,9 @@ import core.buildChatPayload
 import core.buildGroupChatPayload
 import core.buildCheckPayload
 import core.parseProtoResponse
+import core.Action
+import core.ActionLogger
+import core.ActionType
 
 var lastMessageTime = 0L
 
@@ -45,6 +48,9 @@ fun sendMessage(user: User, messageText: String) {
                 isSent = mutableStateOf(true)
             )
             messages += localCopy
+
+            // log send action
+            try { ActionLogger.log(Action(type = ActionType.SEND_MESSAGE, targetId = user.id.toString(), metadata = mapOf("text" to messageText.take(64)))) } catch (_: Exception) {}
 
             // build protobuf ChatMessage via platform builder
             val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
@@ -75,6 +81,10 @@ fun sendMessage(user: User, messageText: String) {
                 timestamp = currentTime,
                 isSent = mutableStateOf(true)
             )
+
+            // log send action for group
+            try { ActionLogger.log(Action(type = ActionType.SEND_MESSAGE, targetId = user.id.toString(), metadata = mapOf("text" to messageText.take(64), "group" to "true"))) } catch (_: Exception) {}
+
             // build protobuf GroupChatMessage via platform builder
             val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
             val payload = buildGroupChatPayload(user.id.toString(), messageText, userIdInt)
@@ -213,7 +223,11 @@ fun ChatApp(windowSize: DpSize, token: String) {
             }
         }
 
-        IconButton(onClick = { showDialog = true }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+        IconButton(onClick = {
+            // log search action
+            try { ActionLogger.log(Action(type = ActionType.SEARCH, metadata = mapOf("ui" to "top_search"))) } catch (_: Exception) {}
+            showDialog = true
+        }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
             Icon(Icons.Default.Search, contentDescription = "Search")
         }
         if (showDialog) {

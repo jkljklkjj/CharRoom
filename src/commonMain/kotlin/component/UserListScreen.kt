@@ -12,6 +12,9 @@ import model.Message
 import model.messages
 import model.updateList
 import model.users
+import core.Action
+import core.ActionType
+import core.ActionLogger
 
 /**
  * 左侧用户和群组列表边栏
@@ -34,7 +37,13 @@ fun UserList(onUserClick: (User) -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp)
-                        .clickable { onUserClick(user) }
+                        .clickable {
+                            // log action
+                            try {
+                                ActionLogger.log(Action(type = ActionType.OPEN_CHAT, targetId = user.id.toString(), metadata = mapOf("username" to user.username)))
+                            } catch (_: Exception) {}
+                            onUserClick(user)
+                        }
                 ) {
                     Text(text = user.username, style = MaterialTheme.typography.h6)
                 }

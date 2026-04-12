@@ -167,6 +167,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                 isSent = mutableStateOf(true),
                 messageId = messageId ?: ""
             )
+            try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = senderId.toString(), metadata = mapOf("text" to text.take(64)))) } catch (_: Exception) {}
         } catch (E: Exception) {
             println("Error handling incoming message: ${E.message}")
             E.printStackTrace()
@@ -197,6 +198,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         timestamp = System.currentTimeMillis(),
                         isSent = mutableStateOf(true)
                     )
+                    try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = userId.toString(), metadata = mapOf("text" to messageContent.take(64)))) } catch (_: Exception) {}
                 }
                 "groupChat" -> {
                     val groupId = json.get("groupId")?.asInt() ?: throw IllegalArgumentException("Missing groupId")
@@ -209,6 +211,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         timestamp = System.currentTimeMillis(),
                         isSent = mutableStateOf(true)
                     )
+                    try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = groupId.toString(), metadata = mapOf("text" to messageContent.take(64), "group" to "true"))) } catch (_: Exception) {}
                 }
                 else -> {
                     println("Unknown message type: $messageType")
