@@ -6,7 +6,11 @@ import core.ApiService
 import core.ServerConfig
 
 @Serializable
-data class User(val id: Int, var username: String)
+data class User(
+    val id: Int,
+    var username: String,
+    var online: Boolean? = null
+)
 @Serializable
 data class Message(
     val senderId: Int,                // 消息的发送用户

@@ -8,6 +8,7 @@ import model.User
 import model.Message
 import model.GroupMessage
 import model.messages
+import model.users
 import Util
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
@@ -34,117 +35,155 @@ import core.Action
 import core.ActionLogger
 import core.ActionType
 
-var lastMessageTime = 0L
+private fun updateUserOnlineStatus(userId: Int, online: Boolean) {
+    users = users.map { user ->
+        if (user.id == userId) user.copy(online = online) else user
+    }
+}
 
-fun sendMessage(user: User, messageText: String) {
+fun sendMessage(
+    user: User,
+    messageText: String,
+    onDone: (Boolean) -> Unit = {}
+) {
+    val normalizedMessage = messageText.trim()
+    if (normalizedMessage.isEmpty()) {
+        onDone(false)
+        return
+    }
+
     val currentTime = System.currentTimeMillis()
-    if (currentTime - lastMessageTime >= 2000) {
-        lastMessageTime = currentTime
-        if (ServerConfig.isAgentAssistant(user.id)) {
-            val localCopy = Message(
-                senderId = user.id,
-                message = messageText,
-                sender = true,
-                timestamp = currentTime,
-                isSent = mutableStateOf(true)
-            )
-            messages += localCopy
 
-            try {
-                ActionLogger.log(
-                    Action(
-                        type = ActionType.SEND_MESSAGE,
-                        targetId = user.id.toString(),
-                        metadata = mapOf("text" to messageText.take(64), "agent" to "true")
-                    )
+    if (ServerConfig.isAgentAssistant(user.id)) {
+        val localCopy = Message(
+            senderId = user.id,
+            message = normalizedMessage,
+            sender = true,
+            timestamp = currentTime,
+            isSent = mutableStateOf(true)
+        )
+        messages += localCopy
+
+        try {
+            ActionLogger.log(
+                Action(
+                    type = ActionType.SEND_MESSAGE,
+                    targetId = user.id.toString(),
+                    metadata = mapOf("text" to normalizedMessage.take(64), "agent" to "true")
                 )
-            } catch (_: Exception) {
-            }
-
-            val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
-            val payload = buildAgentChatPayload(user.id.toString(), messageText, userIdInt, currentTime)
-
-            Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, resp ->
-                if (!(success && resp.isNotEmpty())) {
-                    localCopy.isSent.value = false
-                } else {
-                    val lastBytes = resp.last() as? ByteArray
-                    if (lastBytes != null) {
-                        val unwrap = parseProtoResponse(lastBytes)
-                        if (unwrap.hasEnvelope && !unwrap.success) {
-                            localCopy.isSent.value = false
-                        }
-                    } else {
-                        localCopy.isSent.value = false
-                    }
-                }
-            }
-        } else if (user.id > 0) {
-            val localCopy = Message(
-                senderId = user.id,
-                message = messageText,
-                sender = true,
-                timestamp = currentTime,
-                isSent = mutableStateOf(true)
             )
-            messages += localCopy
+        } catch (_: Exception) {
+        }
 
-            // log send action
-            try { ActionLogger.log(Action(type = ActionType.SEND_MESSAGE, targetId = user.id.toString(), metadata = mapOf("text" to messageText.take(64)))) } catch (_: Exception) {}
+        val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
+        val payload = buildAgentChatPayload(user.id.toString(), normalizedMessage, userIdInt, currentTime)
 
-            // build protobuf ChatMessage via platform builder
-            val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
-            val payload = buildChatPayload(user.id.toString(), messageText, userIdInt, currentTime)
-
-            Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
-                if (!(success && resp.isNotEmpty())) {
-                    localCopy.isSent.value = false
+        Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, resp ->
+            val delivered = if (!(success && resp.isNotEmpty())) {
+                false
+            } else {
+                val lastBytes = resp.last() as? ByteArray
+                if (lastBytes != null) {
+                    val unwrap = parseProtoResponse(lastBytes)
+                    !unwrap.hasEnvelope || unwrap.success
                 } else {
-                    // parse proto response
-                    val lastBytes = resp.last() as? ByteArray
-                    if (lastBytes != null) {
-                        val unwrap = parseProtoResponse(lastBytes)
-                        if (!(unwrap.success)) {
-                            localCopy.isSent.value = false
-                        }
-                    } else {
-                        localCopy.isSent.value = false
-                    }
+                    false
                 }
             }
+
+            if (!delivered) {
+                localCopy.isSent.value = false
+            }
+            onDone(delivered)
+        }
+        return
+    }
+
+    if (user.id > 0) {
+        val localCopy = Message(
+            senderId = user.id,
+            message = normalizedMessage,
+            sender = true,
+            timestamp = currentTime,
+            isSent = mutableStateOf(true)
+        )
+        messages += localCopy
+
+        try {
+            ActionLogger.log(
+                Action(
+                    type = ActionType.SEND_MESSAGE,
+                    targetId = user.id.toString(),
+                    metadata = mapOf("text" to normalizedMessage.take(64))
+                )
+            )
+        } catch (_: Exception) {
+        }
+
+        val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
+        val payload = buildChatPayload(user.id.toString(), normalizedMessage, userIdInt, currentTime)
+
+        Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
+            val delivered = if (!(success && resp.isNotEmpty())) {
+                false
+            } else {
+                val lastBytes = resp.last() as? ByteArray
+                if (lastBytes != null) {
+                    val unwrap = parseProtoResponse(lastBytes)
+                    !unwrap.hasEnvelope || unwrap.success
+                } else {
+                    false
+                }
+            }
+
+            if (!delivered) {
+                localCopy.isSent.value = false
+            }
+            onDone(delivered)
+        }
+        return
+    }
+
+    val outbound = GroupMessage(
+        groupId = user.id,
+        senderId = Integer.valueOf(ServerConfig.id),
+        text = normalizedMessage,
+        senderName = "",
+        timestamp = currentTime,
+        isSent = mutableStateOf(true)
+    )
+
+    try {
+        ActionLogger.log(
+            Action(
+                type = ActionType.SEND_MESSAGE,
+                targetId = user.id.toString(),
+                metadata = mapOf("text" to normalizedMessage.take(64), "group" to "true")
+            )
+        )
+    } catch (_: Exception) {
+    }
+
+    val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
+    val payload = buildGroupChatPayload(user.id.toString(), normalizedMessage, userIdInt)
+
+    Chat.send(payload, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
+        val delivered = if (!(success && resp.isNotEmpty())) {
+            false
         } else {
-            val outbound = GroupMessage(
-                groupId = user.id,
-                senderId = Integer.valueOf(ServerConfig.id),
-                text = messageText,
-                senderName = "",
-                timestamp = currentTime,
-                isSent = mutableStateOf(true)
-            )
-
-            // log send action for group
-            try { ActionLogger.log(Action(type = ActionType.SEND_MESSAGE, targetId = user.id.toString(), metadata = mapOf("text" to messageText.take(64), "group" to "true"))) } catch (_: Exception) {}
-
-            // build protobuf GroupChatMessage via platform builder
-            val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
-            val payload = buildGroupChatPayload(user.id.toString(), messageText, userIdInt)
-
-            Chat.send(payload, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
-                if (!(success && resp.isNotEmpty())) {
-                    outbound.isSent.value = false
-                } else {
-                    val lastBytes = resp.last() as? ByteArray
-                    if (lastBytes != null) {
-                        val unwrap = parseProtoResponse(lastBytes)
-                        if (!(unwrap.success)) {
-                            outbound.isSent.value = false
-                        }
-                    } else {
-                        outbound.isSent.value = false
-                    }
-                }
+            val lastBytes = resp.last() as? ByteArray
+            if (lastBytes != null) {
+                val unwrap = parseProtoResponse(lastBytes)
+                !unwrap.hasEnvelope || unwrap.success
+            } else {
+                false
             }
         }
+
+        if (!delivered) {
+            outbound.isSent.value = false
+        }
+        onDone(delivered)
     }
 }
 
@@ -208,7 +247,6 @@ fun ChatApp(windowSize: DpSize, token: String) {
                 Box(Modifier.weight(1f)) {
                     UserList { user ->
                         selectedUser = user
-                        selectedUser = user
                         if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                             // build CHECK wrapper via builder
                             val payload = buildCheckPayload(user.id.toString())
@@ -221,13 +259,10 @@ fun ChatApp(windowSize: DpSize, token: String) {
                                         val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
                                         val map = Util.jsonToMap(dataStr)
                                         val online = map["online"] as? Boolean ?: false
-                                        selectedUser = selectedUser?.copy(
-                                            username = if (online) {
-                                                selectedUser!!.username.replace(" (offline)", "")
-                                            } else if (!selectedUser!!.username.contains(" (offline)")) {
-                                                selectedUser!!.username + " (offline)"
-                                            } else selectedUser!!.username
-                                        )
+                                        updateUserOnlineStatus(user.id, online)
+                                        if (selectedUser?.id == user.id) {
+                                            selectedUser = selectedUser?.copy(online = online)
+                                        }
                                     }
                                 }
                             }
@@ -252,13 +287,10 @@ fun ChatApp(windowSize: DpSize, token: String) {
                                     val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
                                     val map = Util.jsonToMap(dataStr)
                                     val online = map["online"] as? Boolean ?: false
-                                    selectedUser = selectedUser?.copy(
-                                        username = if (online) {
-                                            selectedUser!!.username.replace(" (offline)", "")
-                                        } else if (!selectedUser!!.username.contains(" (offline)")) {
-                                            selectedUser!!.username + " (offline)"
-                                        } else selectedUser!!.username
-                                    )
+                                    updateUserOnlineStatus(user.id, online)
+                                    if (selectedUser?.id == user.id) {
+                                        selectedUser = selectedUser?.copy(online = online)
+                                    }
                                 }
                             }
                         }
@@ -274,7 +306,7 @@ fun ChatApp(windowSize: DpSize, token: String) {
             try { ActionLogger.log(Action(type = ActionType.SEARCH, metadata = mapOf("ui" to "top_search"))) } catch (_: Exception) {}
             showDialog = true
         }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
-            Icon(Icons.Default.Search, contentDescription = "Search")
+            Icon(Icons.Default.Search, contentDescription = "搜索")
         }
         if (showDialog) {
             AddUserOrGroupDialog { showDialog = false }

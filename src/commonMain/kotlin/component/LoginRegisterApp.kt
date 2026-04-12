@@ -11,10 +11,6 @@ import androidx.compose.ui.unit.dp
 import java.io.File
 import core.ServerConfig
 import core.ApiService
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-
-private val logger: Logger = LoggerFactory.getLogger("component.LoginRegisterApp")
 
 /**
  * 登录或注册界面
@@ -41,15 +37,15 @@ fun LoginRegisterApp() {
             if (saved.size == 2) {
                 account = saved[0]
                 password = saved[1]
-                message = "Retrieving login history..."
+                message = "正在尝试自动登录..."
                 val tk = ApiService.login(account, password)
                 if (tk.isNotEmpty()) {
                     token = tk
                     ServerConfig.id = account // 写回全局
-                    message = "Login successful!"
+                    message = "登录成功"
                     isLoggedIn = true
                 } else {
-                    message = "Please login again"
+                    message = "自动登录失效，请重新登录"
                 }
             }
             triedAutoLogin = true
@@ -84,7 +80,7 @@ fun LoginRegisterApp() {
             if (isLogin) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
-                    Text(text = "Remember me")
+                    Text(text = "记住我")
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -95,13 +91,13 @@ fun LoginRegisterApp() {
                     token = tk
                     if (tk.isNotEmpty()) {
                         ServerConfig.id = account
-                        message = "Login successful"
+                        message = "登录成功"
                         isLoggedIn = true
                         if (rememberMe) {
                             credentialsFile.writeText("$account\n$password")
                         }
                     } else {
-                        message = "Login failed"
+                        message = "登录失败"
                     }
                 } else {
                     res = ApiService.register(username, password)
@@ -112,13 +108,13 @@ fun LoginRegisterApp() {
                         isLogin = true
                         // 不立即写 ServerConfig.id，等用户用该账号真正登录后写入
                     } else {
-                        message = "Registration failed"
+                        message = "注册失败"
                     }
                 }
-            }) { Text(text = if (isLogin) "Login" else "Register") }
+            }) { Text(text = if (isLogin) "登录" else "注册") }
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(onClick = { isLogin = !isLogin }) {
-                Text(text = if (isLogin) "Switch to Register" else "Switch to Login")
+                Text(text = if (isLogin) "切换到注册" else "切换到登录")
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = message)

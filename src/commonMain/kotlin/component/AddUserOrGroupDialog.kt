@@ -26,13 +26,13 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
-        title = { Text("Add User or Group") },
+        title = { Text("添加好友或群组") },
         text = {
             Column {
                 TextField(
                     value = account,
                     onValueChange = { account = it },
-                    label = { Text("Account") },
+                    label = { Text("账号/群号") },
                     singleLine = true,
                     enabled = !isSubmitting
                 )
@@ -42,13 +42,13 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
                         selected = isUser,
                         onClick = { if (!isSubmitting) isUser = true }
                     )
-                    Text("User")
+                    Text("用户")
                     Spacer(modifier = Modifier.width(16.dp))
                     RadioButton(
                         selected = !isUser,
                         onClick = { if (!isSubmitting) isUser = false }
                     )
-                    Text("Group")
+                    Text("群组")
                 }
                 responseMessage?.let {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -68,6 +68,10 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
                 onClick = {
                     if (account.isBlank()) {
                         responseMessage = "账号不能为空"
+                        return@Button
+                    }
+                    if (!account.all { it.isDigit() }) {
+                        responseMessage = "请输入数字账号或群号"
                         return@Button
                     }
                     scope.launch {
@@ -100,10 +104,10 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
                         isSubmitting = false
                     }
                 }
-            ) { Text(if (isSubmitting) "Adding..." else "Add") }
+            ) { Text(if (isSubmitting) "添加中..." else "添加") }
         },
         dismissButton = {
-            Button(onClick = { if (!isSubmitting) onDismiss() }, enabled = !isSubmitting) { Text("Cancel") }
+            Button(onClick = { if (!isSubmitting) onDismiss() }, enabled = !isSubmitting) { Text("取消") }
         }
     )
 }

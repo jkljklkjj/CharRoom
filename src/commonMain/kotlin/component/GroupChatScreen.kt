@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import core.ServerConfig
+import kotlinx.coroutines.launch
 import model.User
 import model.groupMessages
 
@@ -26,6 +27,21 @@ fun GroupChatScreen(group: User) {
     val filteredGroupMessages = groupMessages.filter { it.groupId == -group.id }
     var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    fun submitMessage() {
+        val text = messageText.trim()
+        if (text.isEmpty() || isSending) {
+            return
+        }
+        isSending = true
+        messageText = ""
+        sendMessage(group, text) {
+            scope.launch {
+                isSending = false
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(text = group.username, style = MaterialTheme.typography.h4)
@@ -51,7 +67,7 @@ fun GroupChatScreen(group: User) {
                         if (message.senderId == Integer.valueOf(ServerConfig.id) && !message.isSent.value) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Resend",
+                                contentDescription = "重发",
                                 tint = Color.Red,
                                 modifier = Modifier
                                     .size(24.dp)
@@ -84,17 +100,13 @@ fun GroupChatScreen(group: User) {
                 value = messageText,
                 onValueChange = { messageText = it },
                 modifier = Modifier.weight(1f),
-                label = { Text("Type a message") }
+                label = { Text("输入消息") }
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = {
-                if (!isSending) {
-                    isSending = true
-                    sendMessage(group, messageText)
-                    messageText = ""
-                    isSending = false
-                }
-            }) { Text("Send") }
+            Button(
+                onClick = { submitMessage() },
+                enabled = !isSending && messageText.isNotBlank()
+            ) { Text(if (isSending) "发送中..." else "发送") }
         }
     }
 }

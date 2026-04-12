@@ -7,9 +7,8 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import core.ServerConfig
 import model.User
-import model.Message
-import model.messages
 import model.updateList
 import model.users
 import core.Action
@@ -28,11 +27,11 @@ fun UserList(onUserClick: (User) -> Unit) {
         updateList()
     }
 
-    println("User list: $userListState")
     Column {
-        LazyColumn {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(userListState.size) { index ->
                 val user = userListState[index]
+                val displayName = buildDisplayName(user)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -41,27 +40,25 @@ fun UserList(onUserClick: (User) -> Unit) {
                             // log action
                             try {
                                 ActionLogger.log(Action(type = ActionType.OPEN_CHAT, targetId = user.id.toString(), metadata = mapOf("username" to user.username)))
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) {
+                            }
                             onUserClick(user)
                         }
                 ) {
-                    Text(text = user.username, style = MaterialTheme.typography.h6)
+                    Text(text = displayName, style = MaterialTheme.typography.h6)
                 }
             }
         }
-        Button(onClick = {
-            val newMessage = Message(
-                senderId = 4,
-                message = "This is a test message",
-                sender = false,
-                timestamp = System.currentTimeMillis(),
-                isSent = mutableStateOf(true)
-            )
-            messages += newMessage
-//            println(messages.joinToString(separator = "\n") { it.toString() })
-            println("测试消息已添加: $newMessage")
-        }) {
-            Text("Add Test Message")
-        }
+    }
+}
+
+private fun buildDisplayName(user: User): String {
+    if (user.id < 0 || ServerConfig.isAgentAssistant(user.id)) {
+        return user.username
+    }
+    return when (user.online) {
+        true -> "${user.username} · 在线"
+        false -> "${user.username} · 离线"
+        null -> user.username
     }
 }
