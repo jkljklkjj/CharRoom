@@ -17,10 +17,16 @@ group = "com.example"
 version = "1.0-SNAPSHOT"
 
 repositories {
-    maven { url = uri("https://maven.aliyun.com/repository/public") }
     mavenCentral()
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
     google()
+    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
+    maven("https://maven.aliyun.com/repository/public") {
+        content {
+            // Compose MPP variants are sensitive to metadata; avoid mirror drift for these groups.
+            excludeGroupByRegex("org\\.jetbrains\\.compose(\\..*)?")
+            excludeGroup("org.jetbrains.skiko")
+        }
+    }
 }
 
 kotlin {

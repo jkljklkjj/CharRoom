@@ -1,10 +1,16 @@
 pluginManagement {
     repositories {
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-        maven("https://maven.aliyun.com/repository/public")
-        google()
         gradlePluginPortal()
         mavenCentral()
+        google()
+        maven("https://maven.aliyun.com/repository/public") {
+            content {
+                // Keep mirror as fallback, but don't source compose plugin artifacts from it.
+                excludeGroupByRegex("org\\.jetbrains\\.compose(\\..*)?")
+                excludeGroupByRegex("org\\.jetbrains\\.kotlin(\\..*)?")
+            }
+        }
     }
 
     plugins {
