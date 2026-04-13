@@ -29,6 +29,7 @@ object ApiEndpoints {
     const val GROUP_DETAIL = "/group/getDetail"  // ?id=xxx
     const val OFFLINE = "/message/getOfflineMessage"
     const val AGENT_NL = "/agent/nl"
+    const val AGENT_NL_STREAM = "/agent/nl/stream"
 
     fun url(path: String): String = BASE + path
 }
@@ -57,7 +58,7 @@ private fun sendRequest(
 
     // Record outbound API calls for agent context, but skip /agent/nl itself.
     try {
-        if (path != ApiEndpoints.AGENT_NL) {
+        if (path != ApiEndpoints.AGENT_NL && path != ApiEndpoints.AGENT_NL_STREAM) {
             ActionLogger.log(
                 Action(
                     type = ActionType.OTHER,
@@ -124,6 +125,22 @@ class ApiClient(
         .connectTimeout(Duration.ofSeconds(10))
         .build()
 ) {
+    private fun buildAgentRequestBody(input: String): String {
+        val actions = ActionLogger.getSnapshot().map { a ->
+            AgentActionDto(
+                id = a.id,
+                timestamp = a.timestamp,
+                type = a.type.name,
+                targetId = a.targetId,
+                metadata = a.metadata
+            )
+        }
+        return json.encodeToString(
+            AgentRequestBody.serializer(),
+            AgentRequestBody(input, if (actions.isEmpty()) null else actions)
+        )
+    }
+
     /** 登录，成功返回 token，否则空串 */
     fun login(id: String, password: String): String {
         val bodyJson = json.encodeToString(LoginBody.serializer(), LoginBody(id, password))
@@ -231,17 +248,7 @@ class ApiClient(
     /** 调用 agent/nl，发送 JSON body，可以包含可选的 clientActions */
     fun callAgent(input: String, token: String = ServerConfig.Token): String {
         return try {
-            // 将 ActionLogger 的 snapshot 转换为 DTO 列表（但不包含过多文本）
-            val actions = ActionLogger.getSnapshot().map { a ->
-                AgentActionDto(
-                    id = a.id,
-                    timestamp = a.timestamp,
-                    type = a.type.name,
-                    targetId = a.targetId,
-                    metadata = a.metadata
-                )
-            }
-            val bodyJson = json.encodeToString(AgentRequestBody.serializer(), AgentRequestBody(input, if (actions.isEmpty()) null else actions))
+            val bodyJson = buildAgentRequestBody(input)
             val respBody = sendRequest(ApiEndpoints.AGENT_NL, method = "POST", body = bodyJson, token = token, timeoutSeconds = 30)
             // ApiResponse 包装解析（复用 parseToken 风格）
             val root = json.parseToJsonElement(respBody).jsonObject
@@ -251,6 +258,94 @@ class ApiClient(
         } catch (e: Exception) {
             println("callAgent error: ${e.message}")
             ""
+        }
+    }
+
+    /**
+     * 调用 agent/nl/stream（SSE），按 token 回调并返回完整拼接结果。
+     */
+    fun callAgentStream(
+        input: String,
+        token: String = ServerConfig.Token,
+        onToken: ((String) -> Unit)? = null
+    ): String {
+        val collected = StringBuilder()
+        try {
+            val bodyJson = buildAgentRequestBody(input)
+            val builder = HttpRequest.newBuilder()
+                .uri(URI.create(ApiEndpoints.url(ApiEndpoints.AGENT_NL_STREAM)))
+                .timeout(Duration.ofSeconds(60))
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream")
+
+            if (token.isNotEmpty()) {
+                builder.header("Authorization", "Bearer $token")
+            }
+
+            val request = builder
+                .POST(HttpRequest.BodyPublishers.ofString(bodyJson))
+                .build()
+
+            val response = http.send(request, HttpResponse.BodyHandlers.ofLines())
+            var currentEvent = "message"
+            val pendingData = StringBuilder()
+
+            fun flushEvent(): Boolean {
+                if (pendingData.isEmpty()) {
+                    return false
+                }
+                val data = pendingData.toString()
+                pendingData.clear()
+
+                if (currentEvent == "error") {
+                    return true
+                }
+
+                if (currentEvent == "done" || data == "[DONE]") {
+                    return true
+                }
+
+                if (currentEvent == "token" || currentEvent == "message") {
+                    if (data.isNotEmpty()) {
+                        collected.append(data)
+                        onToken?.invoke(data)
+                    }
+                }
+                return false
+            }
+
+            response.body().use { lines ->
+                val iterator = lines.iterator()
+                loop@ while (iterator.hasNext()) {
+                    val line = iterator.next()
+                    when {
+                        line.startsWith("event:") -> {
+                            currentEvent = line.removePrefix("event:").trim().ifEmpty { "message" }
+                        }
+
+                        line.startsWith("data:") -> {
+                            if (pendingData.isNotEmpty()) {
+                                pendingData.append('\n')
+                            }
+                            pendingData.append(line.removePrefix("data:").trimStart())
+                        }
+
+                        line.isBlank() -> {
+                            if (flushEvent()) {
+                                break@loop
+                            }
+                            currentEvent = "message"
+                        }
+                    }
+                }
+
+                flushEvent()
+            }
+
+            return collected.toString()
+        } catch (e: Exception) {
+            println("callAgentStream error: ${e.message}")
+            return collected.toString()
         }
     }
 
@@ -346,4 +441,6 @@ object ApiService {
     fun getGroupDetail(groupId: String, token: String = ServerConfig.Token) = client.getGroupDetail(groupId, token)
     fun getOfflineMessages(token: String = ServerConfig.Token) = client.getOfflineMessages(token)
     fun callAgent(input: String, token: String = ServerConfig.Token) = client.callAgent(input, token)
+    fun callAgentStream(input: String, token: String = ServerConfig.Token, onToken: ((String) -> Unit)? = null) =
+        client.callAgentStream(input, token, onToken)
 }
