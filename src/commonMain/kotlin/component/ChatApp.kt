@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -37,7 +38,11 @@ import androidx.compose.ui.window.application
 import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.mutableStateOf
 import core.buildChatPayload
 import core.buildGroupChatPayload
@@ -46,6 +51,8 @@ import core.parseProtoResponse
 import core.Action
 import core.ActionLogger
 import core.ActionType
+import core.LocalChatHistoryStore
+import model.groupMessages
 
 private fun updateUserOnlineStatus(userId: Int, online: Boolean) {
     users = users.map { user ->
@@ -278,6 +285,7 @@ fun resendMessage(user: User, groupMessage: GroupMessage) {
 }
 
 @Composable
+@OptIn(FlowPreview::class)
 fun ChatApp(
     windowSize: DpSize,
     token: String,
@@ -289,6 +297,7 @@ fun ChatApp(
     var selectedUser by remember { mutableStateOf<User?>(null) }
     var showDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var clearHistoryHint by remember { mutableStateOf("") }
 
     fun openSearchDialog() {
         try {
@@ -328,19 +337,42 @@ fun ChatApp(
         }
     }
 
-    // 拉取离线消息
-    LaunchedEffect(Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            launch {
-                while (true) {
-                    val resp = ApiService.getOfflineMessages()
-                    if (resp.isEmpty()) break
-                    messages += resp
+    // 启动时先恢复本地历史，再并发启动自动保存、离线拉取和长连接
+    LaunchedEffect(ServerConfig.id) {
+        val accountId = ServerConfig.id
+        val restored = withContext(Dispatchers.IO) { LocalChatHistoryStore.restore(accountId) }
+        messages.clear()
+        messages += restored.privateMessages
+        groupMessages.clear()
+        groupMessages += restored.groupMessages
+
+        launch {
+            snapshotFlow {
+                LocalChatHistoryStore.capture(messages, groupMessages)
+            }
+                .distinctUntilChanged()
+                .debounce(350)
+                .collect { snapshot ->
+                    if (ServerConfig.Token.isNotBlank()) {
+                        withContext(Dispatchers.IO) {
+                            LocalChatHistoryStore.save(accountId, snapshot)
+                        }
+                    }
                 }
+        }
+
+        launch(Dispatchers.IO) {
+            while (true) {
+                val resp = ApiService.getOfflineMessages()
+                if (resp.isEmpty()) {
+                    break
+                }
+                messages += resp
             }
-            launch { // 启动 Chat
-                Chat.start()
-            }
+        }
+
+        launch(Dispatchers.IO) {
+            Chat.start()
         }
     }
 
@@ -501,7 +533,37 @@ fun ChatApp(
 
                         OutlinedButton(
                             onClick = {
+                                messages.clear()
+                                groupMessages.clear()
+                                selectedUser = null
+
+                                val cleared = LocalChatHistoryStore.clear(ServerConfig.id)
+                                clearHistoryHint = if (cleared) "聊天历史已清空" else "清空失败，请稍后重试"
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colors.secondary)
+                        ) {
+                            Text("清空聊天历史")
+                        }
+
+                        if (clearHistoryHint.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = clearHistoryHint,
+                                style = MaterialTheme.typography.caption,
+                                color = if (clearHistoryHint.contains("失败")) MaterialTheme.colors.error else MaterialTheme.colors.secondary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
                                 showSettings = false
+                                runCatching {
+                                    val snapshot = LocalChatHistoryStore.capture(messages, groupMessages)
+                                    LocalChatHistoryStore.save(ServerConfig.id, snapshot)
+                                }
                                 Chat.logoutAndDisconnect()
                                 onLogout()
                             },
