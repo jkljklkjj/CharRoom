@@ -40,7 +40,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
 import core.buildChatPayload
-import core.buildAgentChatPayload
 import core.buildGroupChatPayload
 import core.buildCheckPayload
 import core.parseProtoResponse
@@ -88,26 +87,27 @@ fun sendMessage(
         } catch (_: Exception) {
         }
 
-        val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
-        val payload = buildAgentChatPayload(user.id.toString(), normalizedMessage, userIdInt, currentTime)
-
-        Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, resp ->
-            val delivered = if (!(success && resp.isNotEmpty())) {
-                false
-            } else {
-                val lastBytes = resp.last() as? ByteArray
-                if (lastBytes != null) {
-                    val unwrap = parseProtoResponse(lastBytes)
-                    !unwrap.hasEnvelope || unwrap.success
-                } else {
-                    false
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val reply = ApiService.callAgent(normalizedMessage)
+                if (reply.isBlank()) {
+                    localCopy.isSent.value = false
+                    onDone(false)
+                    return@launch
                 }
-            }
 
-            if (!delivered) {
+                messages += Message(
+                    senderId = user.id,
+                    message = reply,
+                    sender = false,
+                    timestamp = System.currentTimeMillis(),
+                    isSent = mutableStateOf(true)
+                )
+                onDone(true)
+            } catch (_: Exception) {
                 localCopy.isSent.value = false
+                onDone(false)
             }
-            onDone(delivered)
         }
         return
     }
@@ -201,14 +201,29 @@ fun sendMessage(
 }
 
 fun resendMessage(user: User, message: Message) {
-    val payload = if (ServerConfig.isAgentAssistant(user.id)) {
-        buildAgentChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
-    } else {
-        buildChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
+    if (ServerConfig.isAgentAssistant(user.id)) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val reply = ApiService.callAgent(message.message)
+                if (reply.isNotBlank()) {
+                    message.isSent.value = true
+                    messages += Message(
+                        senderId = user.id,
+                        message = reply,
+                        sender = false,
+                        timestamp = System.currentTimeMillis(),
+                        isSent = mutableStateOf(true)
+                    )
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return
     }
-    val type = if (ServerConfig.isAgentAssistant(user.id)) MsgType.AGENT_CHAT else MsgType.CHAT
 
-    Chat.send(payload, type, user.id.toString(), 1) { success, resp ->
+    val payload = buildChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
+
+    Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
         if (success && resp.isNotEmpty()) {
             val lastBytes = resp.last() as? ByteArray
             if (lastBytes != null) {
