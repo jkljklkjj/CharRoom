@@ -41,6 +41,10 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                // Ktor HTTP client for multiplatform streaming (SSE) support
+                implementation("io.ktor:ktor-client-core:2.3.4")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.4")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.4")
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material)
@@ -72,6 +76,8 @@ kotlin {
         }
         val desktopMain by getting {
             dependencies {
+                // Ktor JVM engine for desktop
+                implementation("io.ktor:ktor-client-cio:2.3.4")
                 implementation(compose.desktop.currentOs)
                 // Depend on proto subproject that produces generated proto classes
                 implementation(project(":proto"))

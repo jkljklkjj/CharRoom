@@ -1,6 +1,12 @@
 package core
 
 import androidx.compose.runtime.mutableStateOf
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
+import java.time.Duration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.*
@@ -8,12 +14,6 @@ import model.Group
 import model.Message
 import model.User
 import model.convertMessages
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
-import java.util.Base64
 
 // 接口路径常量集中管理
 object ApiEndpoints {
@@ -94,7 +94,8 @@ private fun sendRequest(
 
     val request = builder.build()
     return try {
-        apiHttp.send(request, HttpResponse.BodyHandlers.ofString()).body()
+        // Explicitly decode response body as UTF-8 to avoid replacement of non-ASCII characters with '?'
+        apiHttp.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)).body()
     } catch (e: Exception) {
         // swallow and return empty string to preserve existing callers' behavior
         ""
@@ -110,7 +111,7 @@ private data class AddFriendBody(val friendId: String)
 @Serializable
 private data class AddGroupBody(val groupId: String)
 @Serializable
-private data class AgentActionDto(
+internal data class AgentActionDto(
     val id: String,
     val timestamp: Long,
     val type: String,
@@ -118,7 +119,7 @@ private data class AgentActionDto(
     val metadata: Map<String, String> = emptyMap()
 )
 @Serializable
-private data class AgentRequestBody(val input: String, val clientActions: List<AgentActionDto>? = null)
+internal data class AgentRequestBody(val input: String, val clientActions: List<AgentActionDto>? = null)
 
 // 统一 Spring的API 客户端封装
 class ApiClient(
@@ -287,7 +288,9 @@ class ApiClient(
                 .POST(HttpRequest.BodyPublishers.ofString(bodyJson))
                 .build()
 
-            val response = http.send(request, HttpResponse.BodyHandlers.ofLines())
+            // Read the response InputStream and decode explicitly with UTF-8 to avoid character replacement
+            val response = http.send(request, HttpResponse.BodyHandlers.ofInputStream())
+            val inputStream = response.body()
             var currentEvent = "message"
             val pendingData = StringBuilder()
 
@@ -315,34 +318,83 @@ class ApiClient(
                 return false
             }
 
-            response.body().use { lines ->
-                val iterator = lines.iterator()
-                loop@ while (iterator.hasNext()) {
-                    val line = iterator.next()
-                    when {
-                        line.startsWith("event:") -> {
-                            currentEvent = line.removePrefix("event:").trim().ifEmpty { "message" }
-                        }
+            inputStream.use { ins ->
+                // Incremental UTF-8 decoding using a single CharsetDecoder to correctly handle multi-byte characters
+                val decoder = StandardCharsets.UTF_8.newDecoder()
+                val pendingBytes = java.io.ByteArrayOutputStream()
+                val textPending = StringBuilder()
+                val buf = ByteArray(8192)
 
-                        line.startsWith("data:") -> {
-                            if (pendingData.isNotEmpty()) {
-                                pendingData.append('\n')
-                            }
-                            pendingData.append(line.removePrefix("data:").trimStart())
-                        }
+                fun processDecodedText() {
+                    // extract full lines and handle SSE parsing
+                    while (true) {
+                        val idx = textPending.indexOf("\n")
+                        if (idx < 0) break
+                        var line = textPending.substring(0, idx)
+                        if (line.endsWith("\r")) line = line.substring(0, line.length - 1)
+                        textPending.delete(0, idx + 1)
 
-                        line.isBlank() -> {
-                            if (flushEvent()) {
-                                break@loop
-                            }
-                            currentEvent = "message"
-                        }
+//                        try { println("SSE decoded line: $line") } catch (_: Exception) {}
+//                        if (line.startsWith("event:")) {
+//                            currentEvent = line.removePrefix("event:").trim().ifEmpty { "message" }
+//                        } else if (line.startsWith("data:")) {
+//                            val payload = line.removePrefix("data:").trimStart()
+//                            if (pendingData.isNotEmpty()) pendingData.append('\n')
+//                            pendingData.append(payload)
+//                        } else if (line.isBlank()) {
+//                            val shouldStop = (currentEvent == "done" || pendingData.toString() == "[DONE]")
+//                            if (flushEvent() && shouldStop) return
+//                            currentEvent = "message"
+//                        }
                     }
                 }
 
+                // read loop: append bytes, decode incrementally, keep undecoded bytes in pendingBytes
+                loop@ while (true) {
+                    val read = ins.read(buf)
+                    if (read == -1) break
+
+                    // append new bytes
+                    pendingBytes.write(buf, 0, read)
+                    val bytes = pendingBytes.toByteArray()
+                    val bb = java.nio.ByteBuffer.wrap(bytes)
+                    val cb = java.nio.CharBuffer.allocate(bytes.size)
+
+                    // decode as much as possible without finishing
+                    decoder.decode(bb, cb, false)
+                    cb.flip()
+                    if (cb.hasRemaining()) textPending.append(cb.toString())
+
+                    // remove consumed bytes from pendingBytes (bb.position() bytes consumed)
+                    val consumed = bb.position()
+                    if (consumed > 0) {
+                        val remaining = if (consumed < bytes.size) bytes.copyOfRange(consumed, bytes.size) else ByteArray(0)
+                        pendingBytes.reset()
+                        if (remaining.isNotEmpty()) pendingBytes.write(remaining)
+                    }
+
+                    // process any full decoded lines
+                    processDecodedText()
+                }
+
+                // EOF: finalize decoding
+                val finalBytes = pendingBytes.toByteArray()
+                val finalBb = java.nio.ByteBuffer.wrap(finalBytes)
+                val finalCb = java.nio.CharBuffer.allocate(finalBytes.size + 64)
+                try {
+                    decoder.decode(finalBb, finalCb, true)
+                    decoder.flush(finalCb)
+                } catch (_: Exception) {}
+                finalCb.flip()
+                if (finalCb.hasRemaining()) textPending.append(finalCb.toString())
+                if (pendingBytes.size() > 0) pendingBytes.reset()
+
+                // process any remaining text
+                processDecodedText()
+                // if anything remains as data, flush
                 flushEvent()
             }
-
+            // return collected result on normal completion
             return collected.toString()
         } catch (e: Exception) {
             println("callAgentStream error: ${e.message}")
@@ -350,7 +402,7 @@ class ApiClient(
         }
     }
 
-    // 辅助：解析 Date 字符串为毫秒
+    // 辅助：解析 Date 字符串��毫秒
     private fun parseDateToMillis(dateStr: String): Long {
         return try {
             java.time.OffsetDateTime.parse(dateStr).toInstant().toEpochMilli()
@@ -444,4 +496,6 @@ object ApiService {
     fun callAgent(input: String, token: String = ServerConfig.Token) = client.callAgent(input, token)
     fun callAgentStream(input: String, token: String = ServerConfig.Token, onToken: ((String) -> Unit)? = null) =
         client.callAgentStream(input, token, onToken)
+    suspend fun callAgentStreamKtor(input: String, token: String = ServerConfig.Token, onToken: ((String) -> Unit)? = null) =
+        core.callAgentStreamKtor(input, token, onToken)
 }
