@@ -329,7 +329,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
 object Chat {
     private lateinit var channel: Channel
     private var host = ServerConfig.SERVER_IP
-    private var port = ServerConfig.NETTY_SERVER_PORT
+    // default to 80 as requested by change: no explicit port in URIs, connect to port 80
+    private var port = 80
     private lateinit var responseHandler: CustomWebSocketHandler
     private val sendLock = Any()
 
@@ -337,9 +338,19 @@ object Chat {
     private var heartbeatJob: Job? = null
     private val heartbeatIntervalMillis = 10000L // 10秒
 
-    fun start(newHost: String = host, newPort: Int = port) {
+    // helper: strip explicit port from host string if present (simple IPv4/hostname handling)
+    private fun hostWithoutPort(rawHost: String?): String {
+        if (rawHost.isNullOrBlank()) return ""
+        // handle cases like "hostname:8080" -> "hostname"; IPv6 with [] is uncommon here
+        return rawHost.substringBefore(':')
+    }
+
+    fun start(newHost: String = host, newPort: Int = 80) {
+        // normalize host to remove any provided ":port" suffix and force port 80 per request
         host = newHost
-        port = newPort
+        port = 80 // always use 80 for both HTTP and WS as requested
+        val effectiveHost = hostWithoutPort(host)
+
         // 注册关闭钩子
         Runtime.getRuntime().addShutdownHook(Thread {
             shutdown()
@@ -357,23 +368,25 @@ object Chat {
                         pipeline.addLast(HttpObjectAggregator(8192))
                         // Use WebSocketClientProtocolHandler to handle handshake and install frame encoders/decoders
                         val uidQuery = try {
-                            val uid = ServerConfig.id
-                            if (uid.isNotBlank()) "?uid=" + java.net.URLEncoder.encode(uid, "UTF-8") else ""
+                            val idVal = ServerConfig.id
+                            if (!idVal.isNullOrBlank()) "?clientId=${idVal}" else ""
                         } catch (_: Exception) {
                             ""
                         }
-                        val wsUri = URI("ws://$host:$port/ws$uidQuery")
+                        // Typical server expects /ws or /ws?clientId=...; use that form
+                        val wsUri = URI("ws://$effectiveHost/ws")
+
                         // create explicit handshaker and install protocol handler (this ensures correct encoders/decoders)
                         val headers = DefaultHttpHeaders()
                         // include Authorization header if token available (many servers require JWT in upgrade request)
-                        try {
-                            val token = ServerConfig.Token
-                            if (!token.isNullOrBlank()) {
-                                headers.add("Authorization", "Bearer $token")
-                            }
-                        } catch (_: Exception) {}
+                        val tokenForHandshake = try { ServerConfig.Token } catch (_: Exception) { "" }
+                        if (!tokenForHandshake.isNullOrBlank()) {
+                            headers.set("Authorization", "Bearer $tokenForHandshake")
+                        }
+                        // set Host header explicitly (some servers validate Host during upgrade)
+                        try { headers.set(HttpHeaderNames.HOST.toString(), effectiveHost) } catch (_: Exception) {}
                         // set a sensible Origin to avoid some servers rejecting cross-origin upgrades
-                        try { headers.add("Origin", "http://$host") } catch (_: Exception) {}
+                        try { headers.set("Origin", "http://$effectiveHost") } catch (_: Exception) {}
 
                         val handshaker = WebSocketClientHandshakerFactory.newHandshaker(
                             wsUri,
@@ -396,49 +409,75 @@ object Chat {
             // Quick HTTP probe to see if server returns an HTTP error at the WS endpoint
             try {
                 val probeClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
-                val probeUidQuery = try {
-                    val uid = ServerConfig.id
-                    if (uid.isNotBlank()) "?uid=" + java.net.URLEncoder.encode(uid, "UTF-8") else ""
-                } catch (_: Exception) {
-                    ""
-                }
-                val probeUri = URI.create("http://$host:$port/ws$probeUidQuery")
-                val probeReq = HttpRequest.newBuilder().uri(probeUri).timeout(Duration.ofSeconds(2)).GET().build()
+                val probeUidQuery = try { ServerConfig.id } catch (_: Exception) { "" }
+                // build probe URI without explicit port number (no client id/query)
+                val probeUri = URI.create("http://$effectiveHost/ws")
+                val probeBuilder = HttpRequest.newBuilder().uri(probeUri).timeout(Duration.ofSeconds(2)).GET()
+                val tokenForProbe = try { ServerConfig.Token } catch (_: Exception) { "" }
+                if (!tokenForProbe.isNullOrBlank()) probeBuilder.header("Authorization", "Bearer $tokenForProbe")
+                val probeReq = probeBuilder.build()
                 val probeResp = probeClient.send(probeReq, HttpResponse.BodyHandlers.ofString())
-                println("HTTP probe to $probeUri returned: ${probeResp.statusCode()}")
-                if (probeResp.body() != null && probeResp.body().isNotBlank()) println("Probe body: ${probeResp.body()}")
+                 println("HTTP probe to $probeUri returned: ${probeResp.statusCode()}")
+                 if (probeResp.body() != null && probeResp.body().isNotBlank()) println("Probe body: ${probeResp.body()}")
             } catch (e: Exception) {
                 println("HTTP probe failed: ${e.message}")
             }
 
-            val channelFuture: ChannelFuture = b.connect(host, port)
-            channelFuture.addListener {
-                if (it.isSuccess) {
-                    println("Connected to $host:$port, channel active=${channelFuture.channel().isActive}")
-                } else {
-                    println("Connection failed: ${it.cause()}")
+            // connect + handshake with a small retry loop to tolerate transient early-close during handshake
+            val maxAttempts = 3
+            var attempt = 0
+            var connectedAndHandshaked = false
+            while (attempt < maxAttempts && !connectedAndHandshaked) {
+                attempt++
+                println("Attempt #$attempt to connect to $effectiveHost:$port")
+                val f: ChannelFuture? = try {
+                    val cf = b.connect(effectiveHost, port)
+                    cf.addListener {
+                        if (it.isSuccess) {
+                            println("Connected to $effectiveHost:$port, channel active=${cf.channel().isActive}")
+                        } else {
+                            println("Connection failed on attempt $attempt: ${it.cause()}")
+                        }
+                    }
+                    cf.sync()
+                    cf
+                } catch (e: Exception) {
+                    println("Connect failed on attempt $attempt: ${e.message}")
+                    null
+                }
+
+                if (f == null) {
+                    if (attempt < maxAttempts) Thread.sleep(1000)
+                    continue
+                }
+
+                channel = f.channel()
+
+                // wait for websocket handshake to complete (installed in pipeline)
+                try {
+                    val handshakeWaitSeconds = 10L
+                    println("Waiting up to ${handshakeWaitSeconds}s for websocket handshake...")
+                    responseHandler.handshakeFuture.get(handshakeWaitSeconds, TimeUnit.SECONDS)
+                    println("WebSocket握手完成")
+                     // print pipeline for debugging
+                     try {
+                         println("Pipeline after handshake: ${channel.pipeline().toString()}")
+                     } catch (_: Exception) {}
+                     connectedAndHandshaked = true
+                 } catch (e: java.util.concurrent.TimeoutException) {
+                    println("WebSocket 握手超时 on attempt $attempt (${e.message}), dumping pipeline and closing channel")
+                    try { println("Pipeline at timeout: ${channel.pipeline().toString()}") } catch (_: Exception) {}
+                    try { channel.close().sync() } catch (_: Exception) {}
+                    if (attempt < maxAttempts) Thread.sleep(1000)
+                } catch (e: Exception) {
+                    println("WebSocket 握手失败或超时 on attempt $attempt: ${e.message}")
+                    try { channel.close().sync() } catch (_: Exception) {}
+                    if (attempt < maxAttempts) Thread.sleep(1000)
                 }
             }
-            channelFuture.sync()
-            channel = channelFuture.channel()
 
-            // wait for websocket handshake to complete (installed in pipeline)
-            try {
-                val handshakeWaitSeconds = 10L
-                println("Waiting up to ${handshakeWaitSeconds}s for websocket handshake...")
-                responseHandler.handshakeFuture.get(handshakeWaitSeconds, TimeUnit.SECONDS)
-                println("WebSocket握手完成")
-                // print pipeline for debugging
-                try {
-                    println("Pipeline after handshake: ${channel.pipeline().toString()}")
-                } catch (_: Exception) {}
-            } catch (e: java.util.concurrent.TimeoutException) {
-                println("WebSocket 握手超时 (${e.message}), dumping pipeline and closing channel")
-                try { println("Pipeline at timeout: ${channel.pipeline().toString()}") } catch (_: Exception) {}
-                throw e
-            } catch (e: Exception) {
-                println("WebSocket 握手失败或超时: ${e.message}")
-                throw e
+            if (!::channel.isInitialized || !connectedAndHandshaked) {
+                throw Exception("Failed to establish and handshake WebSocket after $maxAttempts attempts")
             }
 
             // 发送登录消息
@@ -506,6 +545,39 @@ object Chat {
         callback: (Boolean, List<Any>) -> Unit
     ) {
         AppLog.d{"正在发送WebSocket消息"}
+        // 如果握手尚未完成，延后发送以避免 WebSocket 编码器在 state=0 时接收到帧
+        try {
+            if (!this::responseHandler.isInitialized || !responseHandler.handshakeFuture.isDone) {
+                println("Handshake 未完成，稍后发送消息")
+                try {
+                    if (this::responseHandler.isInitialized) {
+                        responseHandler.handshakeFuture.whenComplete { _, ex ->
+                            if (ex == null) {
+                                try {
+                                    send(payload, type, targetClientId, expectedResponses, callback)
+                                } catch (e: Exception) {
+                                    println("握手完成后发送失败: ${e.message}")
+                                    callback(false, emptyList())
+                                }
+                            } else {
+                                println("握手失败，无法发送消息: ${ex.message}")
+                                callback(false, emptyList())
+                            }
+                        }
+                        return
+                    } else {
+                        println("responseHandler 未初始化，无法排队发送")
+                        callback(false, emptyList())
+                        return
+                    }
+                } catch (e: Exception) {
+                    println("排队发送时出错: ${e.message}")
+                    callback(false, emptyList())
+                    return
+                }
+            }
+        } catch (_: Exception) {}
+
         if (::channel.isInitialized && channel.isActive) {
             // 发送二进制WebSocket帧
             responseHandler.setExpectedResponses(expectedResponses)

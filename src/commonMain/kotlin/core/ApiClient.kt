@@ -17,7 +17,8 @@ import java.util.Base64
 
 // 接口路径常量集中管理
 object ApiEndpoints {
-    private val BASE = "http://${ServerConfig.SERVER_IP}:${ServerConfig.SPRING_SERVER_PORT}" // 运行期读取 ServerConfig
+    // Do not include explicit port in URLs; default HTTP port 80 is implied by scheme.
+    private val BASE = "http://${ServerConfig.SERVER_IP}" // 运行期读取 ServerConfig
     const val LOGIN = "/user/login"
     const val REGISTER = "/user/register"
     const val VALIDATE_TOKEN = "/user/validateToken"

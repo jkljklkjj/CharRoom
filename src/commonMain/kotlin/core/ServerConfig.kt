@@ -38,7 +38,7 @@ object ServerConfig {
     // Nginx WebSocket入口端口
     const val NETTY_SERVER_PORT = 80
     // 后端Spring服务地址
-    const val SPRING_SERVER_PORT = 8088
+    const val SPRING_SERVER_PORT = 80
     // 缓存的token
     var Token: String = ""
     // 登陆的用户账号
