@@ -1,0 +1,60 @@
+<template>
+  <div class="chat-wrap">
+    <header class="chat-top"># 会话</header>
+    <div class="messages" ref="msgList">
+      <div v-for="(m,i) in store.state.messages" :key="i" class="msg" :class="{me: m.user==='you'}">
+        <div class="meta">{{ m.user }} · {{ time(m.time) }}</div>
+        <div class="text">{{ m.text }}</div>
+      </div>
+    </div>
+    <form class="composer" @submit.prevent="send">
+      <input v-model="text" placeholder="输入消息并回车发送..." />
+      <button class="send">发送</button>
+    </form>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useStore } from '../store'
+import chatSocket from '../services/chatSocket'
+import proto from '../proto'
+
+const store = useStore()
+const text = ref('')
+const msgList = ref(null)
+
+function time(t){ if(!t) return '' ; const d = new Date(t); return d.toLocaleTimeString() }
+
+function send(){
+  if(!text.value.trim()) return
+  const m = { user: 'you', text: text.value, time: new Date().toISOString() }
+  store.addMessage(m)
+  // 发送给选中的联系人
+  const to = store.state.selectedChatId || ''
+  const wrapper = {
+    type: 'chat',
+    chat: { targetClientId: to, content: m.text, userId: store.state.accountId || 'web', timestamp: m.time }
+  }
+  chatSocket.sendWrapper(wrapper).catch(()=>{})
+  text.value = ''
+  // 简单本地发送 - 后续可用 chatSocket.sendWrapper 发送 protobuf
+  setTimeout(()=>{ if (msgList.value) msgList.value.scrollTop = msgList.value.scrollHeight },50)
+}
+
+onMounted(()=>{
+  // 可在此连接 websocket 并处理 incoming messages
+})
+</script>
+
+<style scoped>
+.chat-wrap{display:flex;flex-direction:column;height:100%}
+.chat-top{padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.04)}
+.messages{flex:1;overflow:auto;padding:16px;background:#fff}
+.msg{margin-bottom:12px;padding:8px;border-radius:8px;background:rgba(0,0,0,0.02)}
+.msg.me{background:linear-gradient(90deg,rgba(255,154,102,0.12),rgba(255,122,51,0.12));align-self:flex-end}
+.meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+.composer{display:flex;padding:12px;border-top:1px solid rgba(0,0,0,0.04)}
+.composer input{flex:1;padding:10px;border-radius:8px;border:1px solid #eee;margin-right:8px}
+.composer .send{background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff;border:0;padding:10px 14px;border-radius:8px}
+</style>

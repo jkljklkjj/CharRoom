@@ -1,0 +1,23 @@
+:root{
+  --bg:#fff8f5;
+  --panel:#ffffff;
+  --accent-1:#ff9966; /* 冷橙 */
+  --accent-2:#ff7a33;
+  --muted:#666;
+  --surface-border: rgba(0,0,0,0.04);
+}
+body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,\"Noto Sans CJK SC\",sans-serif;background:var(--bg);color:#222;margin:0}
+.container{max-width:1000px;margin:0 auto;padding:20px}
+.site-header{display:flex;justify-content:space-between;align-items:center;padding:12px 0}
+.logo{font-weight:700}
+.site-header nav a{margin-left:12px;color:var(--muted);text-decoration:none}
+.hero h2{margin:8px 0}
+.cta .btn{display:inline-block;padding:8px 12px;border-radius:6px;text-decoration:none;border:1px solid rgba(0,0,0,0.06)}
+.cta .primary{background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff}
+.features ul{padding-left:18px}
+.site-footer{padding:20px;text-align:center;color:#888}
+
+/* App layout helpers */
+html,body,#app{height:100%}
+.app-main{display:flex;height:100%}
+

@@ -18,7 +18,7 @@ import model.convertMessages
 // 接口路径常量集中管理
 object ApiEndpoints {
     // Do not include explicit port in URLs; default HTTP port 80 is implied by scheme.
-    private val BASE = "http://${ServerConfig.SERVER_IP}" // 运行期读取 ServerConfig
+    private val BASE = "http://${ServerConfig.SERVER_IP}/api" // 运行期读取 ServerConfig
     const val LOGIN = "/user/login"
     const val REGISTER = "/user/register"
     const val VALIDATE_TOKEN = "/user/validateToken"
@@ -103,7 +103,7 @@ private fun sendRequest(
 }
 
 @Serializable
-private data class LoginBody(val id: String, val password: String)
+private data class LoginBody(val account: String, val password: String)
 @Serializable
 private data class RegisterBody(val username: String, val password: String)
 @Serializable
@@ -144,8 +144,8 @@ class ApiClient(
     }
 
     /** 登录，成功返回 token，否则空串 */
-    fun login(id: String, password: String): String {
-        val bodyJson = json.encodeToString(LoginBody.serializer(), LoginBody(id, password))
+    fun login(account: String, password: String): String {
+        val bodyJson = json.encodeToString(LoginBody.serializer(), LoginBody(account, password))
         val resp = sendRequest(ApiEndpoints.LOGIN, method = "POST", body = bodyJson, timeoutSeconds = 10)
         return try {
             parseToken(resp)
