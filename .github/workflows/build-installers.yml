@@ -136,10 +136,9 @@ jobs:
             fi
           fi
 
-      - name: Build installers
-        - name: Make gradlew executable
-          run: chmod +x gradlew
-          shell: bash
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+        shell: bash
 
       - name: Build installers
         run: ./gradlew clean buildInstallers
