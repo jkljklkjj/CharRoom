@@ -11,6 +11,32 @@ plugins {
     // id("com.android.application") version "8.11.2"
 }
 
+// Best-effort: 注入项目级的 proguard 规则文件到任何由插件创建的 ProGuard 任务
+// 目的：在 CI 上消除常见的未解析引用警告，先做保守性处理；后续可基于 CI 日志精细化规则
+val proguardRulesFile = project.file("proguard-rules.pro")
+tasks.matching { it.name.contains("proguard", ignoreCase = true) }.configureEach {
+    doFirst {
+        try {
+            val proguardFile = proguardRulesFile
+            val methods = this.javaClass.methods.filter { it.name.contains("configuration", ignoreCase = true) || it.name.contains("configurationFiles", ignoreCase = true) }
+            for (m in methods) {
+                try {
+                    val res = m.invoke(this)
+                    if (res is org.gradle.api.file.ConfigurableFileCollection) {
+                        res.from(proguardFile)
+                        println("[gradle] Added proguard-rules.pro to ${'$'}{this.name} via ${'$'}{m.name}")
+                        break
+                    }
+                } catch (ignored: Throwable) {
+                }
+            }
+        } catch (t: Throwable) {
+            // best-effort only; 不要阻塞构建配置
+        }
+    }
+}
+
+
 // Protobuf Gradle plugin removed for multiplatform root; rely on pre-generated sources in src/desktopMain/java
 
 group = "com.example"
