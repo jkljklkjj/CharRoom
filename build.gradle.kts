@@ -93,7 +93,7 @@ compose.desktop {
             proguard {
                 isEnabled = true
                 obfuscate = false      // 关键：不混淆，避免 unresolved references
-                optimize = true        // 保留优化，稍微减小体积
+                optimize = false        // 保留优化，稍微减小体积
                 configurationFiles.from(project.file("proguard-rules.pro"))
             }
         }
