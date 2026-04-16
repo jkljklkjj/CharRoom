@@ -277,16 +277,22 @@ onMounted(() => {
 </script>
 
 <style>
+.logo {
+  display: flex;
+  align-items: center;      /* 垂直居中 */
+  gap: 8px;                 /* 图标和文字之间的间距，按需调整 */
+}
+
 .brand-logo {
   width: 40px;
   height: 40px;
-  display: block
+  display: block;
 }
 
 .brand-text {
   font-weight: 800;
   font-size: 20px;
-  line-height: 1
+  line-height: 1;
 }
 
 .site-header .nav a {
@@ -349,7 +355,8 @@ onMounted(() => {
 }
 
 .hero-left {
-  flex: 1
+  flex: 1;
+  padding-top: 30px;
 }
 
 .eyebrow {
@@ -428,9 +435,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  color: var(--accent-2);
-  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.06)
+  font-size: 24px;        /* 稍微加大，视觉更饱满 */
+  line-height: 1;          /* 杀死默认行高带来的上下空隙 */
+  color: #ffffff;          /* 让图标更亮，与深色背景拉开层次 */
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .h-body {

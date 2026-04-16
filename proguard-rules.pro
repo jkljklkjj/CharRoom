@@ -53,3 +53,26 @@
 -dontwarn io.netty.**
 
 # 如果仍有少量警告，后续再精细化规则代替广泛的 -dontwarn
+
+## 自动追加（基于 build/compose/logs/proguardReleaseJars 日志）
+# 覆盖在本次构建中频繁出现的可选/平台相关实现类警告
+-dontwarn jakarta.servlet.**
+-dontwarn jakarta.mail.**
+-dontwarn org.tukaani.xz.**
+-dontwarn org.codehaus.janino.**
+-dontwarn org.codehaus.commons.compiler.**
+-dontwarn com.aayushatharva.brotli4j.**
+-dontwarn net.jpountz.lz4.**
+-dontwarn com.jcraft.jzlib.**
+-dontwarn com.ning.compress.**
+-dontwarn com.barchart.udt.**
+-dontwarn gnu.io.**
+-dontwarn org.eclipse.jetty.alpn.**
+-dontwarn reactor.blockhound.**
+-dontwarn org.graalvm.nativeimage.hosted.**
+
+# 保留 Kotlin 元数据，避免混淆移除导致运行时问题
+-keep class kotlin.Metadata { *; }
+
+# 若后续还有警告，请把对应最小包路径加入到此文件中，而不是全盘 -dontwarn
+-dontwarn **

@@ -9,7 +9,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.google.protobuf:protobuf-java:3.21.12")
+    compileOnly("com.google.protobuf:protobuf-java:3.21.12")
 }
 
 java {
@@ -42,7 +42,10 @@ sourceSets {
 // Package generated proto classes into a jar so other modules can depend on it
 tasks.register<Jar>("protoJar") {
     archiveBaseName.set("proto-generated")
-    from(sourceSets.main.get().output)
+    from(sourceSets.main.get().output) {
+        exclude("com/google/protobuf/**")
+    }
+    exclude("com/google/protobuf/**")
     dependsOn(tasks.named("classes"))
 }
 
