@@ -21,6 +21,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import core.loadImageBitmapFromUrl
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -170,6 +176,37 @@ fun UserList(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
+
+                        // Avatar image (lazy load)
+                        val avatarUrl = user.avatarUrl
+                        var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+                        LaunchedEffect(avatarUrl, user.avatarKey) {
+                            if (!avatarUrl.isNullOrBlank()) {
+                                avatarBitmap = loadImageBitmapFromUrl(avatarUrl, user.avatarKey)
+                            } else {
+                                avatarBitmap = null
+                            }
+                        }
+
+                        if (avatarBitmap != null) {
+                            Image(
+                                bitmap = avatarBitmap!!,
+                                contentDescription = "avatar",
+                                modifier = Modifier.size(40.dp).clip(CircleShape)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.size(40.dp).background(
+                                    brush = sidebarHeaderBrush(!MaterialTheme.colors.isLight),
+                                    shape = CircleShape
+                                ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = user.username.firstOrNull()?.toString() ?: "U", color = Color.White)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(

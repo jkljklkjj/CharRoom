@@ -66,6 +66,20 @@ export async function addFriend(account) {
   return ok
 }
 
+export async function getFriendRequests() {
+  const { ok, body } = await safeFetch(`${API_BASE}/friend/requests`, { method: 'GET' })
+  if (!ok) return []
+  // 支持 ApiResponse 包装或直接返回数组
+  return body?.data || body || []
+}
+
+export async function acceptFriend(requesterId) {
+  const { ok } = await safeFetch(`${API_BASE}/friend/accept`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendId: requesterId })
+  })
+  return ok
+}
+
 export async function addGroup(groupId) {
   const { ok } = await safeFetch(`${API_BASE}/group/add`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groupId })

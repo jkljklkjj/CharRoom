@@ -131,13 +131,58 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 compose.desktop {
     application {
         mainClass = "MainKt"
-
         nativeDistributions {
+            // Produce macOS DMG and Windows MSI installers by default (Deb also available on Linux hosts)
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "CharRoom"
             packageVersion = "1.0.0"
+
+            // Basic metadata
+            vendor = "轻聊"
+            description = "轻聊 — 轻量、安全、跨平台的实时聊天"
+            copyright = "© ${java.time.Year.now()} 轻聊"
+            // Optional: add a LICENSE.txt at project root to include in installers
+            val license = project.layout.projectDirectory.file("LICENSE.txt")
+            if (license.asFile.exists()) {
+                licenseFile.set(license)
+            }
+
+            // Platform-specific metadata and icons. Place your icons under packaging/icons/
+            // - Windows: .ico file (recommended 256x256)
+            // - macOS: .icns file
+            // - Linux: .png (256x256)
+            val iconsDir = project.file("packaging/icons")
+            windows {
+                // menu group shown in Start Menu
+                menuGroup = "CharRoom"
+                // set your .ico here (fallback if exists)
+                val ico = file("${iconsDir.path}/app.ico")
+                if (ico.exists()) iconFile.set(ico)
+            }
+            macOS {
+                // bundle identifier for macOS
+                bundleID = "com.example.charroom"
+                val icns = file("${iconsDir.path}/app.icns")
+                if (icns.exists()) iconFile.set(icns)
+            }
+            linux {
+                val png = file("${iconsDir.path}/app.png")
+                if (png.exists()) iconFile.set(png)
+            }
+
+            // Ensure packaging tasks run after assemble
+            // (compose plugin already wires tasks, this is a harmless extra safeguard)
+            // You can run `./gradlew package` or use the helper task below.
         }
     }
+}
+
+// Helper aggregate task to build native installers (runs any 'package*' or 'jpackage*' tasks present)
+tasks.register("buildInstallers") {
+    group = "distribution"
+    description = "Build native installers (DMG / MSI / DEB) using compose.nativeDistributions"
+    // depend on any package/jpackage tasks the plugin creates
+    dependsOn(tasks.matching { it.name.startsWith("package") || it.name.startsWith("jpackage") })
 }
 
 tasks.register<Jar>("customJar") {

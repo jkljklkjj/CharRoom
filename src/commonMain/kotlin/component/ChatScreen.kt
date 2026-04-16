@@ -61,6 +61,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import model.User
 import model.messages
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import core.loadImageBitmapFromUrl
 
 /**
  * 好友聊天界面
@@ -176,7 +179,7 @@ fun ChatScreen(user: User) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = if (message.sender) Arrangement.End else Arrangement.Start
                         ) {
-                            Row(verticalAlignment = Alignment.Bottom) {
+                                    Row(verticalAlignment = Alignment.Bottom) {
                                 if (message.sender && !message.isSent.value) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Send,
@@ -187,6 +190,18 @@ fun ChatScreen(user: User) {
                                             .clickable { resendMessage(user, message) }
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
+                                }
+
+                                // If message is from the other user, show their avatar on the left
+                                if (!message.sender) {
+                                    var partnerAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
+                                    LaunchedEffect(user.avatarUrl, user.avatarKey) {
+                                        partnerAvatar = if (!user.avatarUrl.isNullOrBlank()) loadImageBitmapFromUrl(user.avatarUrl!!, user.avatarKey) else null
+                                    }
+                                    if (partnerAvatar != null) {
+                                        Image(bitmap = partnerAvatar!!, contentDescription = "avatar", modifier = Modifier.size(32.dp).clip(CircleShape))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
                                 }
 
                                 Box(

@@ -6,7 +6,8 @@
     </div>
     <ul class="users-list">
       <li v-for="u in store.state.users" :key="u.id" @click="select(u)" :class="{active: selected === u.id}">
-        <div class="avatar">{{ initials(u.name || u.account) }}</div>
+        <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="avatar" /></div>
+        <div v-else class="avatar">{{ initials(u.name || u.account) }}</div>
         <div class="meta">
           <div class="name">{{ u.name || u.account }}</div>
           <div class="sub">{{ u.status || '在线' }}</div>
@@ -22,6 +23,12 @@ import { useStore } from '../store'
 import api from '../api'
 
 const store = useStore()
+
+function avatarSrc(u) {
+  if (!u || !u.avatarUrl) return null
+  const v = u.avatarKey
+  return v ? (u.avatarUrl + (u.avatarUrl.includes('?') ? '&v=' : '?v=') + encodeURIComponent(v)) : u.avatarUrl
+}
 
 function initials(name) {
   if (!name) return 'U'
@@ -45,7 +52,8 @@ function onAdd() {
 .users-list{list-style:none;padding:0;margin:0;overflow:auto}
 .users-list li{display:flex;align-items:center;padding:10px 12px;cursor:pointer}
 .users-list li.active{background:rgba(255,122,51,0.08)}
-.avatar{width:40px;height:40px;border-radius:8px;background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px}
+.avatar{width:40px;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px}
+.avatar img{width:100%;height:100%;object-fit:cover}
 .meta .name{font-weight:600}
 .meta .sub{font-size:12px;color:var(--muted)}
 .add{background:transparent;border:0;font-size:18px}

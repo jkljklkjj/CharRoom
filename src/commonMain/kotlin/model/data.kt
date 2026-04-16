@@ -9,6 +9,8 @@ import core.ServerConfig
 data class User(
     val id: Int,
     var username: String,
+    var avatarUrl: String? = null,
+    var avatarKey: String? = null,
     var online: Boolean? = null
 )
 @Serializable

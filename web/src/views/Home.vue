@@ -9,6 +9,13 @@
         <router-link to="/">简介</router-link>
         <router-link to="/app">Web 体验</router-link>
       </nav>
+      <div class="header-actions">
+        <button class="btn" @click="showRequests = true" style="position:relative">
+          👥
+          <span v-if="friendRequests.length > 0" class="req-dot"></span>
+        </button>
+        <button class="btn reward" @click="showReward = true">打赏</button>
+      </div>
     </header>
 
     <section class="hero">
@@ -179,7 +186,7 @@
         <div class="footer-copyright">© 2025 轻聊 · 陈振业</div>
         <div class="footer-icp">
           <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">
-            粤ICP备2025156789号
+            {{ siteConfig.ICP_NUMBER }}
           </a>
         </div>
         <div class="footer-links">
@@ -187,33 +194,89 @@
         </div>
       </div>
     </footer>
+
+    <!-- reward modal -->
+    <div v-if="showReward" class="reward-modal">
+      <div class="reward-mask" @click="closeReward"></div>
+      <div class="reward-box">
+        <button class="reward-close" @click="closeReward">✕</button>
+        <h3 style="margin:0 0 8px">打赏作者</h3>
+        <p class="author-email">作者邮箱：<span>{{ authorEmail }}</span>
+          <button class="copy-btn" @click="copyEmail" :disabled="copyStatus === 'copied'">
+            {{ copyStatus === 'copied' ? '已复制' : copyStatus === 'failed' ? '复制失败' : '复制' }}
+          </button>
+        </p>
+
+        <div class="payment-grid">
+          <div class="payment-item" :class="{active: selectedMethod === 'alipay'}" @click="selectMethod('alipay')">
+            <img :src="siteConfig.PAYMENT_QRCODES.alipay" alt="支付宝" class="payment-img" />
+            <div class="payment-label">支付宝</div>
+          </div>
+          <div class="payment-item" :class="{active: selectedMethod === 'wechat'}" @click="selectMethod('wechat')">
+            <img :src="siteConfig.PAYMENT_QRCODES.wechat" alt="微信" class="payment-img" />
+            <div class="payment-label">微信</div>
+          </div>
+        </div>
+
+        <div class="reward-note">感谢您的支持，您的支持是我不断优化软件的动力！</div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+import siteConfig from '../siteConfig'
+import { getFriendRequests, acceptFriend } from '../api'
+
 const downloadRoot = '../target/'
+const showReward = ref(false)
+const selectedMethod = ref('alipay')
+const authorEmail = ref(siteConfig.AUTHOR_EMAIL)
+const copyStatus = ref(null) // null | 'copied' | 'failed'
+
+const showRequests = ref(false)
+const friendRequests = ref([]) // array of user objects
+
+function closeReward() { showReward.value = false }
+function selectMethod(method) { selectedMethod.value = method }
+
+async function copyEmail() {
+  try {
+    await navigator.clipboard.writeText(authorEmail.value)
+    copyStatus.value = 'copied'
+  } catch (e) {
+    copyStatus.value = 'failed'
+  }
+  setTimeout(() => { copyStatus.value = null }, 3000)
+}
+
+async function loadFriendRequests() {
+  try {
+    const list = await getFriendRequests()
+    friendRequests.value = Array.isArray(list) ? list : []
+  } catch (e) {
+    friendRequests.value = []
+  }
+}
+
+async function handleAccept(requesterId, idx) {
+  const ok = await acceptFriend(requesterId)
+  if (ok) {
+    // remove from list
+    friendRequests.value.splice(idx, 1)
+  } else {
+    alert('接受失败')
+  }
+}
+
+onMounted(() => {
+  loadFriendRequests()
+})
 </script>
 
-<style scoped>
-.container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 20px
-}
-
-.site-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 0
-}
-
-.site-header .logo {
-  display: flex;
-  align-items: center;
-  gap: 12px
-}
-
+<style>
 .brand-logo {
   width: 40px;
   height: 40px;
@@ -237,6 +300,18 @@ const downloadRoot = '../target/'
 .site-header .nav a.router-link-active {
   background: rgba(255, 122, 51, 0.08);
   color: var(--accent-2)
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn.reward {
+  background: transparent;
+  border: 1px solid rgba(51, 65, 85, 0.08);
+  color: var(--muted);
 }
 
 .top-ribbon {
@@ -270,7 +345,7 @@ const downloadRoot = '../target/'
 .hero-inner {
   display: flex;
   gap: 28px;
-  align-items: center
+  align-items: flex-start;
 }
 
 .hero-left {
@@ -672,13 +747,14 @@ const downloadRoot = '../target/'
 }
 
 .site-footer {
-  background: #f1f5f9;
-  border-top: 1px solid #e2e8f0;
-  padding: 28px 20px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f7fafc 100%);
+  border-top: 1px solid rgba(226,232,240,0.9);
+  padding: 30px 20px;
   margin-top: 48px;
   font-size: 13px;
-  color: #475569;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.02);
+  color: #334155;
+  box-shadow: 0 -8px 28px rgba(2,6,23,0.03);
+  transition: background .18s ease, color .18s ease;
 }
 
 .footer-inner {
@@ -688,7 +764,104 @@ const downloadRoot = '../target/'
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
+}
+
+/* reward modal styles */
+.reward-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+.reward-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+}
+.reward-box {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  max-width: 90vw;
+  max-height: 90vh;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  z-index: 1201;
+}
+.reward-img {
+  display: block;
+  max-width: 80vw;
+  max-height: 70vh;
+  border-radius: 8px;
+}
+.reward-close {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.req-dot {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  background: #ff3b30;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255,59,48,0.12);
+}
+
+.author-email {
+  margin: 6px 0 12px;
+  color: #334155;
+  font-size: 14px;
+}
+.author-email .copy-btn {
+  margin-left: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+}
+
+.payment-grid {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.payment-item {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #eef2f7;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.payment-item.active {
+  box-shadow: 0 8px 24px rgba(17,24,39,0.08);
+  transform: translateY(-4px);
+  border-color: rgba(255,122,51,0.14);
+}
+.payment-img {
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto 8px;
+}
+.payment-label {
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .footer-copyright {
@@ -699,29 +872,46 @@ const downloadRoot = '../target/'
 .footer-icp a {
   color: #475569;
   text-decoration: none;
-  transition: color 0.2s;
-  border-bottom: 1px dashed #cbd5e1;
+  transition: color 0.18s ease, border-color 0.18s ease;
+  border-bottom: 1px dashed rgba(203,213,225,0.9);
+  padding-bottom: 2px;
 }
 
 .footer-icp a:hover {
   color: #ff7a33;
-  border-bottom-color: #ff7a33;
+  border-bottom-color: rgba(255,122,51,0.8);
 }
 
 .footer-links {
   display: flex;
-  gap: 20px;
+  gap: 16px;
+  align-items: center;
 }
 
 .footer-text {
   color: #64748b;
+  font-size: 12.5px;
 }
 
-@media (max-width: 640px) {
+/* 可选的脚注文本样式，若需额外说明可在模板中加入 .footer-note */
+.footer-note {
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
   .footer-inner {
     flex-direction: column;
     text-align: center;
-    gap: 10px;
+    gap: 8px;
+  }
+  .footer-icp,
+  .footer-links {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

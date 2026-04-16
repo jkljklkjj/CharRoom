@@ -25,6 +25,8 @@ object ApiEndpoints {
     const val FRIEND_GET = "/friend/get"
     const val GROUP_GET = "/group/get"
     const val FRIEND_ADD = "/friend/add"
+    const val FRIEND_REQUESTS = "/friend/requests"
+    const val FRIEND_ACCEPT = "/friend/accept"
     const val GROUP_ADD = "/user/addgroup"
     const val USER_DETAIL = "/user/get"          // ?id=xxx
     const val GROUP_DETAIL = "/group/getDetail"  // ?id=xxx
@@ -199,6 +201,21 @@ class ApiClient(
     fun addFriend(friendId: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(friendId))
         val resp = sendRequest(ApiEndpoints.FRIEND_ADD, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        return interpretBooleanResponse(resp)
+    }
+
+    /** 获取收到的好友请求（返回 User 列表） */
+    fun fetchFriendRequests(token: String = ServerConfig.Token): List<User> = try {
+        val body = sendRequest(ApiEndpoints.FRIEND_REQUESTS, method = "GET", token = token)
+        parseUserList(body)
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    /** 接受好友请求，requesterId 为请求发起者 */
+    fun acceptFriend(requesterId: String, token: String = ServerConfig.Token): Boolean {
+        val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(requesterId))
+        val resp = sendRequest(ApiEndpoints.FRIEND_ACCEPT, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
 
