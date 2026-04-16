@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URI
 import java.net.URL
+import org.jetbrains.skiko.toComposeImageBitmap
 
 // JVM / Desktop implementation: download bytes, optionally cache to local disk by cacheKey, and decode via Skia
 actual suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?): ImageBitmap? = withContext(Dispatchers.IO) {

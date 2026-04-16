@@ -140,7 +140,7 @@ compose.desktop {
             // Basic metadata
             vendor = "轻聊"
             description = "轻聊 — 轻量、安全、跨平台的实时聊天"
-            copyright = "© ${java.time.Year.now()} 轻聊"
+            copyright = "© 2026 轻聊"
             // Optional: add a LICENSE.txt at project root to include in installers
             val license = project.layout.projectDirectory.file("LICENSE.txt")
             if (license.asFile.exists()) {
