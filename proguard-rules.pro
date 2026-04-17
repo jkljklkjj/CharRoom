@@ -3,6 +3,8 @@
 # 适用于 Compose Desktop 打包
 # ============================================
 
+# -ignorewarnings
+
 # ============================================
 # 一、保留规则 (Keep Rules)
 # 防止反射/SPI/动态加载导致的运行时崩溃
@@ -99,6 +101,40 @@
 -dontwarn com.jcraft.jzlib.**
 -dontwarn com.ning.compress.**
 -dontwarn org.tukaani.xz.**
+
+# --- Netty 可选依赖和平台适配 ---
+-dontwarn io.netty.**
+-dontwarn org.eclipse.jetty.npn.**
+-dontwarn net.jpountz.**
+-dontwarn lzma.sdk.lzma.**
+-dontwarn com.github.luben.zstd.**
+-dontwarn com.google.protobuf.nano.**
+-dontwarn com.fasterxml.aalto.**
+
+# --- Kotlin/Reflection / JVM 内部 API ---
+-dontwarn kotlin.jvm.internal.EnhancedNullability
+-dontwarn kotlin.concurrent.atomics.**
+-dontwarn org.jetbrains.kotlin.**
+-dontwarn com.fasterxml.jackson.module.kotlin.**
+-dontwarn org.apache.logging.log4j.spi.**
+-dontwarn java.lang.invoke.MethodHandle
+
+# --- 可选日志与兼容适配 ---
+-dontwarn org.apache.commons.logging.**
+-dontwarn org.apache.log.**
+-dontwarn org.apache.avalon.framework.**
+-dontwarn org.jboss.modules.**
+-dontwarn org.jboss.marshalling.**
+-dontwarn org.eclipse.jetty.npn.**
+-dontwarn com.google.protobuf.nano.**
+
+# --- Netty 可选传输和编解码 ---
+-dontwarn io.netty.handler.codec.compression.**
+-dontwarn io.netty.handler.codec.protobuf.**
+-dontwarn io.netty.handler.codec.xml.**
+-dontwarn io.netty.handler.ssl.**
+-dontwarn io.netty.util.internal.svm.**
+-dontwarn io.netty.util.NetUtilSubstitutions
 
 # --- 可选加密提供者 (桌面环境通常用 JDK 自带) ---
 -dontwarn org.bouncycastle.**

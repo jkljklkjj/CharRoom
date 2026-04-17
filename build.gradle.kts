@@ -92,8 +92,8 @@ compose.desktop {
         buildTypes.release {
             proguard {
                 isEnabled = true
-                obfuscate = false      // 关键：不混淆，避免 unresolved references
-                optimize = false        // 保留优化，稍微减小体积
+                obfuscate = false
+                optimize = false
                 configurationFiles.from(project.file("proguard-rules.pro"))
             }
         }
