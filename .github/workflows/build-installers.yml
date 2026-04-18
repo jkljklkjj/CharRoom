@@ -287,12 +287,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
+          set -euo pipefail
           upload_url=${{ steps.create_release.outputs.upload_url }}
           upload_url="${upload_url%\{*}"
           echo "Upload URL: $upload_url"
-          find artifacts -type f -maxdepth 4 | while read -r file; do
-            name=$(basename "$file")
-            echo "Uploading $name"
-            curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$file" "$upload_url?name=$name"
+          find artifacts -type f -maxdepth 4 -print0 | while IFS= read -r -d '' file; do
+            relpath=${file#artifacts/}
+            name=${relpath//\//_}
+            echo "Uploading $file as $name"
+            response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$file" "$upload_url?name=$name" -w "\nHTTP_CODE:%{http_code}")
+            http_code=$(printf '%s' "$response" | tail -n1 | cut -d':' -f2)
+            body=$(printf '%s' "$response" | sed '$d')
+            if [ "$http_code" != "201" ] && [ "$http_code" != "200" ]; then
+              echo "Upload failed ($http_code):"
+              echo "$body"
+              exit 1
+            fi
           done
