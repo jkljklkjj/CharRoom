@@ -291,9 +291,9 @@ jobs:
           upload_url=${{ steps.create_release.outputs.upload_url }}
           upload_url="${upload_url%\{*}"
           echo "Upload URL: $upload_url"
-          echo "Discovered files:"
-          find artifacts -type f | sort
-          find artifacts -type f -print0 | while IFS= read -r -d '' file; do
+          echo "Found package files:"
+          find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' \) | sort
+          find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' \) -print0 | while IFS= read -r -d '' file; do
             relpath=${file#artifacts/}
             name=${relpath//\//_}
             echo "Uploading $file as $name"
