@@ -1,6 +1,6 @@
 package core
 
-import com.example.proto.MessageProtos
+import com.chatlite.proto.MessageProtos
 import java.nio.charset.StandardCharsets
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode

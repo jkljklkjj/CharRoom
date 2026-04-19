@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package com.example.proto;
+package com.chatlite.proto;
 
-option java_package = "com.example.proto";
+option java_package = "com.chatlite.proto";
 option java_outer_classname = "MessageProtos";
 option java_multiple_files = false;
 

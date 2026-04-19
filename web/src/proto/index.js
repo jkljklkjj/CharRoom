@@ -11,7 +11,7 @@ export function loadProto() {
 
 export async function encodeMessage(wrapperObj) {
   const root = await loadProto()
-  const Wrapper = root.lookupType('com.example.proto.MessageWrapper')
+  const Wrapper = root.lookupType('com.chatlite.proto.MessageWrapper')
   const err = Wrapper.verify(wrapperObj)
   if (err) throw Error(err)
   const message = Wrapper.create(wrapperObj)
@@ -21,7 +21,7 @@ export async function encodeMessage(wrapperObj) {
 
 export async function decodeMessage(arrayBuffer) {
   const root = await loadProto()
-  const Wrapper = root.lookupType('com.example.proto.MessageWrapper')
+  const Wrapper = root.lookupType('com.chatlite.proto.MessageWrapper')
   const uint8 = new Uint8Array(arrayBuffer)
   const msg = Wrapper.decode(uint8)
   const obj = Wrapper.toObject(msg, { longs: String, enums: String, defaults: true })
@@ -29,3 +29,4 @@ export async function decodeMessage(arrayBuffer) {
 }
 
 export default { loadProto, encodeMessage, decodeMessage }
+

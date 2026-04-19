@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.compose") version "1.9.0"
 }
 
-group = "com.example"
+group = "com.chatlite"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -23,11 +23,11 @@ repositories {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 
     jvm("desktop") {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
 
@@ -80,7 +80,7 @@ if (project.findProperty("includeAndroid") == "true") {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
 
@@ -113,7 +113,7 @@ compose.desktop {
                 if (ico.exists()) iconFile.set(ico)
             }
             macOS {
-                bundleID = "com.example.charroom"
+                bundleID = "com.chatlite.charroom"
                 val icns = file("${iconsDir.path}/app.icns")
                 if (icns.exists()) iconFile.set(icns)
             }

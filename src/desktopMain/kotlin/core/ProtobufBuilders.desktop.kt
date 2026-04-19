@@ -1,6 +1,6 @@
 package core
 
-import com.example.proto.MessageProtos
+import com.chatlite.proto.MessageProtos
 
 actual fun buildLoginPayload(token: String?): ByteArray {
     val login = MessageProtos.LoginMessage.newBuilder()

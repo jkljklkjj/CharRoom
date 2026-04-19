@@ -3,10 +3,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.charroom"
+    namespace = "com.chatlite.charroom"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.charroom"
+        applicationId = "com.chatlite.charroom"
         minSdk = 26
         targetSdk = 34
         versionCode = 2

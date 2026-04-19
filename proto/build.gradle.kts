@@ -13,9 +13,9 @@ dependencies {
 }
 
 java {
-    // use Java 17 for compiled proto classes
+    // use Java 21 for compiled proto classes
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
