@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
     kotlin("multiplatform") version "2.3.20"
@@ -22,10 +23,10 @@ repositories {
     }
 }
 
-// Apply Android build script early so kotlin { android() } is available when includeAndroid=true
-if (project.findProperty("includeAndroid") == "true") {
-    apply(from = "android.gradle.kts")
-}
+// Optional Android configuration: enable when includeAndroid=true
+val includeAndroid = project.findProperty("includeAndroid") == "true"
+
+// Android app is provided as a separate module (:androidApp). Do not apply Android plugin in the root project.
 
 kotlin {
     jvmToolchain(21)
@@ -36,13 +37,9 @@ kotlin {
         }
     }
 
-    // Android configuration is handled by the separate Android project/script when enabled
-
-    jvm("desktop") {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
-    }
+    // Android target is intentionally not registered inside kotlin{} to avoid extension name conflicts.
+    // The Android application plugin will be configured via `android.gradle.kts` (applied above) and
+    // its source sets are hooked into the existing `src/androidMain` layout so Android code builds.
 
     sourceSets {
         val commonMain by getting {
@@ -72,6 +69,15 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
             }
+        }
+        if (includeAndroid) {
+            val androidMain by getting {
+                dependencies {
+                    implementation("androidx.activity:activity-compose:1.8.0")
+                    implementation("androidx.core:core-ktx:1.10.1")
+                }
+            }
+            val androidTest by getting
         }
         // androidMain will be configured when the Android build is enabled (kept out of common MPP setup)
 

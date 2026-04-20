@@ -1,0 +1,60 @@
+// Ensure AGP is resolved via the plugins DSL in the plugin classloader so
+// the Kotlin Gradle plugin (which may be loaded at the root) can see AGP
+// internals. Apply the Kotlin Android plugin without a version to avoid
+// re-resolving a different Kotlin plugin into a separate classloader.
+plugins {
+    // Let pluginManagement (settings.gradle.kts) supply the versions so both
+    // AGP and the Kotlin Android plugin are resolved consistently into the
+    // plugin classloader.
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Keep the Android block as before
+android {
+    namespace 'com.chatlite.charroom'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.chatlite.charroom'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.activity:activity-compose:1.8.0'
+    implementation 'androidx.compose.ui:ui:1.4.3'
+    implementation 'androidx.compose.material:material:1.4.3'
+    implementation 'androidx.compose.ui:ui-tooling-preview:1.4.3'
+    implementation 'androidx.compose.material3:material3:1.1.0'
+    // AppCompat is required by the styles in androidApp/src/main/res/values/styles.xml
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    // Material components (optional) — keep for themes and widgets
+    implementation 'com.google.android.material:material:1.9.0'
+    // Reuse protobuf-generated classes from the root :proto module
+    implementation project(':proto')
+}
+
+
+

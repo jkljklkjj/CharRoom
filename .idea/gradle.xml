@@ -8,10 +8,14 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/androidApp" />
             <option value="$PROJECT_DIR$/main" />
             <option value="$PROJECT_DIR$/proto" />
           </set>
         </option>
+      </GradleProjectSettings>
+      <GradleProjectSettings>
+        <option name="externalProjectPath" value="$PROJECT_DIR$/src/androidMain" />
       </GradleProjectSettings>
     </option>
   </component>
