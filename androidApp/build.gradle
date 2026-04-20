@@ -8,7 +8,11 @@ plugins {
     // plugin classloader.
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
 }
+
+def composeVersion = project.findProperty("compose.lib.version") ?: '1.10.6'
+def activityComposeVersion = '1.13.0'
 
 // Keep the Android block as before
 android {
@@ -27,6 +31,25 @@ android {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
+    kotlinOptions {
+        jvmTarget = "21"
+    }
+
+    // Enable Compose in this module and set the Kotlin compiler extension version
+    buildFeatures {
+        compose true
+    }
+    composeOptions {
+        // Keep this aligned with the Compose UI/Material versions used below.
+        kotlinCompilerExtensionVersion = composeVersion
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += project.file('../shared/kotlin')
+            resources.srcDirs += project.file('../src/commonMain/resources')
+        }
+    }
 
     buildTypes {
         release {
@@ -42,18 +65,21 @@ repositories {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.15.0'
-    implementation 'androidx.activity:activity-compose:1.8.0'
-    implementation 'androidx.compose.ui:ui:1.9.0'
-    implementation 'androidx.compose.material:material:1.9.0'
-    implementation 'androidx.compose.ui:ui-tooling-preview:1.9.0'
-    implementation 'androidx.compose.material3:material3:1.1.0'
+    implementation 'androidx.core:core-ktx:1.18.0'
+    implementation "androidx.activity:activity-compose:$activityComposeVersion"
+    implementation "androidx.compose.ui:ui:$composeVersion"
+    implementation "androidx.compose.material:material:$composeVersion"
+    implementation "androidx.compose.ui:ui-tooling-preview:$composeVersion"
+    debugImplementation "androidx.compose.ui:ui-tooling:$composeVersion"
     // AppCompat is required by the styles in androidApp/src/main/res/values/styles.xml
-    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
     // Material components (optional) — keep for themes and widgets
-    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'com.google.android.material:material:1.13.0'
     // Reuse protobuf-generated classes from the root :proto module
     implementation project(':proto')
+    implementation 'io.netty:netty-all:4.1.68.Final'
+    implementation 'com.google.protobuf:protobuf-java:4.34.1'
+    implementation 'com.google.protobuf:protobuf-kotlin:4.34.1'
 }
 
 

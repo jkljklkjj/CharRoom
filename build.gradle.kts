@@ -43,6 +43,7 @@ kotlin {
 
     sourceSets {
         val commonMain by getting {
+            kotlin.srcDir("shared/kotlin")
             dependencies {
                 implementation("io.ktor:ktor-client-core:3.4.2")
                 implementation("io.ktor:ktor-client-content-negotiation:3.4.2")
@@ -50,7 +51,7 @@ kotlin {
                 implementation("org.jetbrains.compose.runtime:runtime:1.10.3")
                 implementation("org.jetbrains.compose.foundation:foundation:1.10.3")
                 implementation("org.jetbrains.compose.material:material:1.10.3")
-                implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
+                implementation("org.jetbrains.compose.material:material-icons-extended:1.10.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 implementation("org.glassfish.jaxb:jaxb-runtime:4.0.7")
                 implementation("com.konghq:unirest-java:3.14.5")
@@ -73,7 +74,7 @@ kotlin {
         if (includeAndroid) {
             val androidMain by getting {
                 dependencies {
-                    implementation("androidx.activity:activity-compose:1.8.0")
+                    implementation("androidx.activity:activity-compose:1.13.0")
                     implementation("androidx.core:core-ktx:1.10.1")
                 }
             }

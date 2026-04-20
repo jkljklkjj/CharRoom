@@ -9,56 +9,19 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="构建安卓客户端">
-      <change beforePath="$PROJECT_DIR$/.idea.bak/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/AndroidProjectSystem.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/ApifoxUploaderProjectSetting.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/CodeEpiphany/challenges.db" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/artifacts/CharRoom_desktop_1_0_SNAPSHOT.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/codeStyles/Project.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/codeStyles/codeStyleConfig.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/compiler.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.agent.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.ask.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.ask2agent.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.edit.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/dataSources.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/db-forest-config.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/deploymentTargetSelector.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/gradle.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/inspectionProfiles/Project_Default.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/jarRepositories.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/qaplug_profiles.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/runConfigurations.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea.bak/vcs.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/AndroidProjectSystem.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/ApifoxUploaderProjectSetting.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/CodeEpiphany/challenges.db" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/artifacts/CharRoom_desktop_1_0_SNAPSHOT.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/codeStyles/Project.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/codeStyles/codeStyleConfig.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.agent.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.ask.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.ask2agent.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.edit.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/db-forest-config.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/deviceManager.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/qaplug_profiles.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="完成app基本构建">
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/runConfigurations.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/androidApp/androidApp.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/androidApp.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/proto/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/proto/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -173,54 +136,57 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Android App.CharRoom.executor": "Run",
-    "Android App.androidApp.executor": "Run",
-    "Gradle.CharRoom [:androidApp:build].executor": "Run",
-    "Gradle.CharRoom [build].executor": "Run",
-    "Gradle.CharRoom [checkRuntime].executor": "Run",
-    "Gradle.CharRoom [customJar].executor": "Run",
-    "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
-    "Gradle.CharRoom [package].executor": "Run",
-    "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
-    "Gradle.desktop.executor": "Run",
-    "Gradle.下载源代码.executor": "Run",
-    "Gradle.升级 Gradle 包装器.executor": "Run",
-    "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
-    "JAR 应用程序.在线聊天App-1.0.0.jar.executor": "Run",
-    "Kotlin.ChatKt.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.go.formatter.settings.were.checked": "true",
-    "RunOnceActivity.go.migrated.go.modules.settings": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "master",
-    "go.import.settings.migrated": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/lora/qingliao/CharRoom",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Facet",
-    "project.structure.proportion": "0.17",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "preferences.sourceCode.XML",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Android App.CharRoom.executor&quot;: &quot;Run&quot;,
+    &quot;Android App.androidApp.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [checkRuntime].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customJar].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [dependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [packageReleaseMsi].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [package].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [proguardReleaseJars].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.desktop.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.下载源代码.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.升级 Gradle 包装器.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.在线聊天App-1.0.0.jar.executor&quot;: &quot;Run&quot;,
+    &quot;Kotlin.ChatKt.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;external.system.has.shared.sources&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/lora/qingliao/CharRoom&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Facet&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.sourceCode.XML&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "mongo",
-      "mysql",
-      "redis"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;mongo&quot;,
+      &quot;mysql&quot;,
+      &quot;redis&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
       <recent name="core" />
@@ -359,7 +325,7 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration name="CharRoom [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+    <configuration name="CharRoom [customJar]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -370,7 +336,7 @@
         </option>
         <option name="taskNames">
           <list>
-            <option value="build" />
+            <option value="customJar" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -384,7 +350,7 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration name="CharRoom [customJar]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+    <configuration name="CharRoom [dependencies]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -395,7 +361,7 @@
         </option>
         <option name="taskNames">
           <list>
-            <option value="customJar" />
+            <option value="dependencies" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -422,18 +388,18 @@
       <item itemvalue="Android App.CharRoom" />
       <item itemvalue="Gradle.desktop" />
       <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
-      <item itemvalue="Gradle.CharRoom [build]" />
+      <item itemvalue="Gradle.CharRoom [dependencies]" />
       <item itemvalue="Gradle.CharRoom [customJar]" />
       <item itemvalue="JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar" />
       <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.CharRoom [dependencies]" />
         <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
         <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
         <item itemvalue="Gradle.CharRoom [customJar]" />
         <item itemvalue="JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar" />
-        <item itemvalue="Gradle.CharRoom [build]" />
       </list>
     </recent_temporary>
   </component>
@@ -641,7 +607,9 @@
       <workItem from="1776672246026" duration="5245000" />
       <workItem from="1776678847721" duration="1018000" />
       <workItem from="1776679900533" duration="214000" />
-      <workItem from="1776680278616" duration="4736000" />
+      <workItem from="1776680278616" duration="9976000" />
+      <workItem from="1776690620536" duration="1410000" />
+      <workItem from="1776699038629" duration="112000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -923,7 +891,15 @@
       <option name="project" value="LOCAL" />
       <updated>1776673422207</updated>
     </task>
-    <option name="localTasksCounter" value="36" />
+    <task id="LOCAL-00036" summary="完成安卓客户端基本框架">
+      <option name="closed" value="true" />
+      <created>1776685225841</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1776685225842</updated>
+    </task>
+    <option name="localTasksCounter" value="37" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -978,7 +954,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="修正" />
     <MESSAGE value="修正重发功能" />
     <MESSAGE value="Merge remote-tracking branch 'origin/master'" />
     <MESSAGE value="完成发送逻辑&#10;修正重发图标逻辑" />
@@ -1003,7 +978,8 @@
     <MESSAGE value="修复日志框架引入" />
     <MESSAGE value="更新kotlin版本到2.3" />
     <MESSAGE value="构建安卓客户端" />
-    <option name="LAST_COMMIT_MESSAGE" value="构建安卓客户端" />
+    <MESSAGE value="完成安卓客户端基本框架" />
+    <option name="LAST_COMMIT_MESSAGE" value="完成安卓客户端基本框架" />
   </component>
   <component name="VgoProject">
     <integration-enabled>false</integration-enabled>

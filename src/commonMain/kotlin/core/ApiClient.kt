@@ -15,28 +15,6 @@ import model.Message
 import model.User
 import model.convertMessages
 
-// 接口路径常量集中管理
-object ApiEndpoints {
-    // Do not include explicit port in URLs; default HTTP port 80 is implied by scheme.
-    private val BASE = "http://${ServerConfig.SERVER_IP}/api" // 运行期读取 ServerConfig
-    const val LOGIN = "/user/login"
-    const val REGISTER = "/user/register"
-    const val VALIDATE_TOKEN = "/user/validateToken"
-    const val FRIEND_GET = "/friend/get"
-    const val GROUP_GET = "/group/get"
-    const val FRIEND_ADD = "/friend/add"
-    const val FRIEND_REQUESTS = "/friend/requests"
-    const val FRIEND_ACCEPT = "/friend/accept"
-    const val GROUP_ADD = "/user/addgroup"
-    const val USER_DETAIL = "/user/get"          // ?id=xxx
-    const val GROUP_DETAIL = "/group/getDetail"  // ?id=xxx
-    const val OFFLINE = "/message/getOfflineMessage"
-    const val AGENT_NL = "/agent/nl"
-    const val AGENT_NL_STREAM = "/agent/nl/stream"
-
-    fun url(path: String): String = BASE + path
-}
-
 // 简单 Json 工具（忽略未知字段）
 private val json = Json { ignoreUnknownKeys = true }
 private val apiHttp = HttpClient.newBuilder()

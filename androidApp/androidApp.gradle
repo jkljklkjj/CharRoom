@@ -4,8 +4,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.11.2'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.20'
+        classpath 'com.android.tools.build:gradle:8.13.2'  // Make sure your AGP version is compatible
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.20'  // Kotlin version 2.3.20
     }
 }
 
@@ -35,6 +35,17 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
+    // Enable Jetpack Compose for this module
+    buildFeatures {
+        compose true
+    }
+
+    composeOptions {
+        // Use a compiler extension version that matches your Compose libraries.
+        // Keeping this in sync may require manual adjustment when upgrading Compose.
+        kotlinCompilerExtensionVersion = '1.4.8'  // Match Compose and Kotlin versions carefully
+    }
 }
 
 repositories {
@@ -43,10 +54,23 @@ repositories {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.10.1'
-    implementation 'androidx.activity:activity-compose:1.8.0'
-    implementation 'androidx.compose.ui:ui:1.4.3'
-    implementation 'androidx.compose.material:material:1.4.3'
-    implementation 'androidx.compose.ui:ui-tooling-preview:1.4.3'
-}
+    // Core dependencies
+    implementation 'androidx.core:core-ktx:1.18.0'
+    implementation 'androidx.activity:activity-compose:1.13.0'
 
+    // Jetpack Compose libraries
+    implementation 'androidx.compose.ui:ui:1.10.6'  // Match Compose version with Kotlin setup
+    implementation 'androidx.compose.material:material:1.10.6'
+    implementation 'androidx.compose.ui:ui-tooling-preview:1.10.6'
+
+    // Additional Compose artifacts
+    implementation 'androidx.compose.runtime:runtime:1.10.6'
+    implementation 'androidx.compose.material:material-icons-extended:1.9.0'
+    debugImplementation 'androidx.compose.ui:ui-tooling:1.10.6'
+
+    // Netty WebSocket client
+    implementation 'io.netty:netty-all:4.1.68.Final'
+
+    // Kotlin stdlib that matches your Kotlin version
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"  // Kotlin 2.3.20
+}
