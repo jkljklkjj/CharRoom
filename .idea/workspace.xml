@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AndroidLayouts">
+    <shared>
+      <config />
+    </shared>
+  </component>
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="构建安卓客户端">
+      <change beforePath="$PROJECT_DIR$/.idea.bak/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/AndroidProjectSystem.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/ApifoxUploaderProjectSetting.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/CodeEpiphany/challenges.db" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/artifacts/CharRoom_desktop_1_0_SNAPSHOT.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/codeStyles/Project.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/codeStyles/codeStyleConfig.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/compiler.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.ask.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.ask2agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/copilot.data.migration.edit.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/dataSources.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/db-forest-config.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/deploymentTargetSelector.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/gradle.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/inspectionProfiles/Project_Default.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/jarRepositories.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/qaplug_profiles.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/runConfigurations.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea.bak/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/AndroidProjectSystem.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/ApifoxUploaderProjectSetting.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/CodeEpiphany/challenges.db" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/artifacts/CharRoom_desktop_1_0_SNAPSHOT.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/codeStyles/Project.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/codeStyles/codeStyleConfig.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.ask.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.ask2agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.edit.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/db-forest-config.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/deviceManager.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/qaplug_profiles.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/androidApp.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/androidApp.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/proto/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/proto/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_D:/lora/qingliao/CharRoom" value="2oLK4o2hrK45ztJxJ2LpKcyzSJU" />
+    </persistenceIdMap>
+  </component>
+  <component name="CopilotUserSelectedChatMode">
+    <option name="chatModeId" value="Agent" />
+  </component>
+  <component name="CopilotUserSelectedModel">
+    <selectedModels>
+      <entry key="agent-panel" value="GPT-5 mini" />
+      <entry key="chat-panel" value="GPT-5 mini" />
+    </selectedModels>
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=10AD5U25FA000YT)]" />
+  <component name="ExternalProjectsData">
+    <projectState path="$PROJECT_DIR$">
+      <ProjectState />
+    </projectState>
+  </component>
+  <component name="ExternalProjectsManager">
+    <system id="GRADLE">
+      <state>
+        <task path="$PROJECT_DIR$">
+          <activation />
+        </task>
+        <task path="$PROJECT_DIR$/main">
+          <activation />
+        </task>
+        <projects_view>
+          <tree_state>
+            <expand>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="CharRoom" type="f1a62948:ProjectNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="CharRoom" type="f1a62948:ProjectNode" />
+                <item name="androidApp" type="2d1252cf:ModuleNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="CharRoom" type="f1a62948:ProjectNode" />
+                <item name="androidApp" type="2d1252cf:ModuleNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="CharRoom" type="f1a62948:ProjectNode" />
+                <item name="androidApp" type="2d1252cf:ModuleNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+            </expand>
+            <select />
+          </tree_state>
+        </projects_view>
+      </state>
+    </system>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Kotlin Class" />
+        <option value="Kotlin Object" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="RESET_MODE" value="HARD" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;jkljklkjj&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/jkljklkjj/CharRoom.git&quot;,
+    &quot;accountId&quot;: &quot;90a0154a-c723-470f-98d0-316353c606e9&quot;
+  }
+}</component>
+  <component name="GoLibraries">
+    <option name="indexEntireGoPath" value="true" />
+  </component>
+  <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$" gradleHome="C:\Users\Jastin Pepeo\.gradle\wrapper\dists\gradle-8.13-bin\ap7pdhvhnjtc6mxtzz89gkh0c\gradle-8.13" javaHome="C:\Users\Jastin Pepeo\.jdks\corretto-17.0.14" gradleVersion="8.13" />
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="ProjectErrors" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="2oLK4o2hrK45ztJxJ2LpKcyzSJU" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Android App.CharRoom.executor": "Run",
+    "Android App.androidApp.executor": "Run",
+    "Gradle.CharRoom [:androidApp:build].executor": "Run",
+    "Gradle.CharRoom [build].executor": "Run",
+    "Gradle.CharRoom [checkRuntime].executor": "Run",
+    "Gradle.CharRoom [customJar].executor": "Run",
+    "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
+    "Gradle.CharRoom [package].executor": "Run",
+    "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
+    "Gradle.desktop.executor": "Run",
+    "Gradle.下载源代码.executor": "Run",
+    "Gradle.升级 Gradle 包装器.executor": "Run",
+    "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
+    "JAR 应用程序.在线聊天App-1.0.0.jar.executor": "Run",
+    "Kotlin.ChatKt.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "master",
+    "go.import.settings.migrated": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/lora/qingliao/CharRoom",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Facet",
+    "project.structure.proportion": "0.17",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "preferences.sourceCode.XML",
+    "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "mongo",
+      "mysql",
+      "redis"
+    ]
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
+      <recent name="core" />
+      <recent name="model" />
+      <recent name="component" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Android App.CharRoom">
+    <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
+      <module name="CharRoom" />
+      <working_directory value="$PROJECT_DIR$" />
+      <go_parameters value="-i" />
+      <kind value="FILE" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="GoTestRunConfiguration" factoryName="Go Test">
+      <module name="CharRoom" />
+      <working_directory value="$PROJECT_DIR$" />
+      <go_parameters value="-i" />
+      <kind value="DIRECTORY" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <method v="2" />
+    </configuration>
+    <configuration name="CharRoom" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
+      <module name="CharRoom.androidApp" />
+      <option name="ANDROID_RUN_CONFIGURATION_SCHEMA_VERSION" value="1" />
+      <option name="DEPLOY" value="true" />
+      <option name="DEPLOY_APK_FROM_BUNDLE" value="false" />
+      <option name="DEPLOY_AS_INSTANT" value="false" />
+      <option name="ARTIFACT_NAME" value="" />
+      <option name="PM_INSTALL_OPTIONS" value="" />
+      <option name="ALL_USERS" value="false" />
+      <option name="ALWAYS_INSTALL_WITH_PM" value="false" />
+      <option name="ALLOW_ASSUME_VERIFIED" value="false" />
+      <option name="CLEAR_APP_STORAGE" value="false" />
+      <option name="DYNAMIC_FEATURES_DISABLED_LIST" value="" />
+      <option name="ACTIVITY_EXTRA_FLAGS" value="" />
+      <option name="MODE" value="default_activity" />
+      <option name="RESTORE_ENABLED" value="false" />
+      <option name="RESTORE_FILE" value="" />
+      <option name="RESTORE_FRESH_INSTALL_ONLY" value="false" />
+      <option name="CLEAR_LOGCAT" value="false" />
+      <option name="SHOW_LOGCAT_AUTOMATICALLY" value="false" />
+      <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT_COMBO_BOX" />
+      <option name="DEBUGGER_TYPE" value="Java" />
+      <Java>
+        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+        <option name="DEBUG_SANDBOX_SDK" value="false" />
+      </Java>
+      <Profilers>
+        <option name="ADVANCED_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_CONFIGURATION_NAME" value="Java/Kotlin Method Sample (legacy)" />
+        <option name="STARTUP_NATIVE_MEMORY_PROFILING_ENABLED" value="false" />
+        <option name="NATIVE_MEMORY_SAMPLE_RATE_BYTES" value="2048" />
+      </Profilers>
+      <option name="DEEP_LINK" value="" />
+      <option name="ACTIVITY" value="" />
+      <option name="ACTIVITY_CLASS" value="" />
+      <option name="SEARCH_ACTIVITY_IN_GLOBAL_SCOPE" value="false" />
+      <option name="SKIP_ACTIVITY_VALIDATION" value="false" />
+      <method v="2">
+        <option name="Android.Gradle.BeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="androidApp" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
+      <module name="CharRoom.androidApp" />
+      <option name="ANDROID_RUN_CONFIGURATION_SCHEMA_VERSION" value="1" />
+      <option name="DEPLOY" value="true" />
+      <option name="DEPLOY_APK_FROM_BUNDLE" value="false" />
+      <option name="DEPLOY_AS_INSTANT" value="false" />
+      <option name="ARTIFACT_NAME" value="" />
+      <option name="PM_INSTALL_OPTIONS" value="" />
+      <option name="ALL_USERS" value="false" />
+      <option name="ALWAYS_INSTALL_WITH_PM" value="false" />
+      <option name="ALLOW_ASSUME_VERIFIED" value="false" />
+      <option name="CLEAR_APP_STORAGE" value="false" />
+      <option name="DYNAMIC_FEATURES_DISABLED_LIST" value="" />
+      <option name="ACTIVITY_EXTRA_FLAGS" value="" />
+      <option name="MODE" value="default_activity" />
+      <option name="RESTORE_ENABLED" value="false" />
+      <option name="RESTORE_FILE" value="" />
+      <option name="RESTORE_FRESH_INSTALL_ONLY" value="false" />
+      <option name="CLEAR_LOGCAT" value="false" />
+      <option name="SHOW_LOGCAT_AUTOMATICALLY" value="false" />
+      <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT_COMBO_BOX" />
+      <option name="DEBUGGER_TYPE" value="Java" />
+      <Java>
+        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+        <option name="DEBUG_SANDBOX_SDK" value="false" />
+      </Java>
+      <Profilers>
+        <option name="ADVANCED_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_CONFIGURATION_NAME" value="Java/Kotlin Method Sample (legacy)" />
+        <option name="STARTUP_NATIVE_MEMORY_PROFILING_ENABLED" value="false" />
+        <option name="NATIVE_MEMORY_SAMPLE_RATE_BYTES" value="2048" />
+      </Profilers>
+      <option name="DEEP_LINK" value="" />
+      <option name="ACTIVITY" value="" />
+      <option name="ACTIVITY_CLASS" value="" />
+      <option name="SEARCH_ACTIVITY_IN_GLOBAL_SCOPE" value="false" />
+      <option name="SKIP_ACTIVITY_VALIDATION" value="false" />
+      <method v="2">
+        <option name="Android.Gradle.BeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="CharRoom [:androidApp:build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value=":androidApp:build" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
+      <method v="2" />
+    </configuration>
+    <configuration name="CharRoom [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="build" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
+      <method v="2" />
+    </configuration>
+    <configuration name="CharRoom [customJar]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="customJar" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
+      <method v="2" />
+    </configuration>
+    <configuration name="在线聊天App-1.0.0.jar" type="JarApplication" temporary="true">
+      <option name="JAR_PATH" value="$PROJECT_DIR$/build/libs/在线聊天App-1.0.0.jar" />
+      <method v="2" />
+    </configuration>
+    <configuration name="CharRoom-desktop-1.0-SNAPSHOT.jar" type="JarApplication" temporary="true">
+      <option name="JAR_PATH" value="$PROJECT_DIR$/build/libs/CharRoom-desktop-1.0-SNAPSHOT.jar" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Android App.androidApp" />
+      <item itemvalue="Android App.CharRoom" />
+      <item itemvalue="Gradle.desktop" />
+      <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
+      <item itemvalue="Gradle.CharRoom [build]" />
+      <item itemvalue="Gradle.CharRoom [customJar]" />
+      <item itemvalue="JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar" />
+      <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
+        <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
+        <item itemvalue="Gradle.CharRoom [customJar]" />
+        <item itemvalue="JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar" />
+        <item itemvalue="Gradle.CharRoom [build]" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="" />
+      <created>1730643227065</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1730643227065</updated>
+      <workItem from="1730643229597" duration="2716000" />
+      <workItem from="1730645989441" duration="969000" />
+      <workItem from="1730647071935" duration="592000" />
+      <workItem from="1730680135013" duration="184000" />
+      <workItem from="1730680343197" duration="234000" />
+      <workItem from="1730680672718" duration="11000" />
+      <workItem from="1730680968948" duration="1078000" />
+      <workItem from="1730694762384" duration="28000" />
+      <workItem from="1730712266176" duration="160000" />
+      <workItem from="1730712449760" duration="1185000" />
+      <workItem from="1730713690766" duration="1647000" />
+      <workItem from="1730725321933" duration="4000" />
+      <workItem from="1730725357389" duration="7000" />
+      <workItem from="1730725562978" duration="3054000" />
+      <workItem from="1730731968986" duration="3000" />
+      <workItem from="1730895932145" duration="680000" />
+      <workItem from="1730896818956" duration="1917000" />
+      <workItem from="1730898787680" duration="184000" />
+      <workItem from="1730900185549" duration="749000" />
+      <workItem from="1730901095216" duration="24000" />
+      <workItem from="1730902978570" duration="87000" />
+      <workItem from="1730903877469" duration="580000" />
+      <workItem from="1730904891224" duration="482000" />
+      <workItem from="1730906019501" duration="902000" />
+      <workItem from="1730976846300" duration="2294000" />
+      <workItem from="1730990432728" duration="128000" />
+      <workItem from="1730990573874" duration="497000" />
+      <workItem from="1730991091569" duration="1083000" />
+      <workItem from="1731068040460" duration="1197000" />
+      <workItem from="1731069907620" duration="3419000" />
+      <workItem from="1731073411075" duration="1453000" />
+      <workItem from="1731074898481" duration="1902000" />
+      <workItem from="1731076840132" duration="997000" />
+      <workItem from="1731077868130" duration="1630000" />
+      <workItem from="1731114210206" duration="142000" />
+      <workItem from="1731114506394" duration="3806000" />
+      <workItem from="1731118391270" duration="1401000" />
+      <workItem from="1731135292266" duration="2217000" />
+      <workItem from="1731137559997" duration="713000" />
+      <workItem from="1731138302392" duration="1159000" />
+      <workItem from="1731139493897" duration="290000" />
+      <workItem from="1731139814645" duration="2261000" />
+      <workItem from="1731142139207" duration="2165000" />
+      <workItem from="1731144600834" duration="994000" />
+      <workItem from="1731148767029" duration="3528000" />
+      <workItem from="1731152394971" duration="696000" />
+      <workItem from="1731154027581" duration="490000" />
+      <workItem from="1731154553060" duration="47000" />
+      <workItem from="1731154744175" duration="177000" />
+      <workItem from="1731154949018" duration="491000" />
+      <workItem from="1731155658275" duration="2541000" />
+      <workItem from="1731158312011" duration="281000" />
+      <workItem from="1731158655893" duration="1002000" />
+      <workItem from="1731160003932" duration="558000" />
+      <workItem from="1731160956184" duration="18000" />
+      <workItem from="1731161777343" duration="10000" />
+      <workItem from="1731166097157" duration="744000" />
+      <workItem from="1731469612177" duration="214000" />
+      <workItem from="1736157596354" duration="875000" />
+      <workItem from="1736158528089" duration="88000" />
+      <workItem from="1736431918244" duration="15000" />
+      <workItem from="1741613497487" duration="3560000" />
+      <workItem from="1741619115796" duration="85000" />
+      <workItem from="1744643164488" duration="5000" />
+      <workItem from="1744983719881" duration="1200000" />
+      <workItem from="1745069733791" duration="44000" />
+      <workItem from="1745196413270" duration="8000" />
+      <workItem from="1745196818007" duration="3000" />
+      <workItem from="1745197659181" duration="1132000" />
+      <workItem from="1745198908580" duration="2000" />
+      <workItem from="1745198947762" duration="4000" />
+      <workItem from="1745198970029" duration="4000" />
+      <workItem from="1745199010029" duration="2000" />
+      <workItem from="1745200436114" duration="122000" />
+      <workItem from="1745200825606" duration="1363000" />
+      <workItem from="1745407967867" duration="9724000" />
+      <workItem from="1745493524279" duration="10293000" />
+      <workItem from="1745504083767" duration="3693000" />
+      <workItem from="1745507874838" duration="6000" />
+      <workItem from="1745588332442" duration="6360000" />
+      <workItem from="1745632402304" duration="2141000" />
+      <workItem from="1745642518773" duration="3127000" />
+      <workItem from="1745646037397" duration="1184000" />
+      <workItem from="1745647269498" duration="3938000" />
+      <workItem from="1745659415326" duration="10000" />
+      <workItem from="1745716256120" duration="2022000" />
+      <workItem from="1745720820642" duration="13000" />
+      <workItem from="1745720873457" duration="915000" />
+      <workItem from="1745725470619" duration="157000" />
+      <workItem from="1745745372207" duration="1006000" />
+      <workItem from="1745746658268" duration="206000" />
+      <workItem from="1745851559762" duration="88000" />
+      <workItem from="1745852322868" duration="2040000" />
+      <workItem from="1745938589356" duration="458000" />
+      <workItem from="1745940642934" duration="16000" />
+      <workItem from="1746371287912" duration="97000" />
+      <workItem from="1746525663088" duration="11000" />
+      <workItem from="1758111643226" duration="24000" />
+      <workItem from="1758115852479" duration="138000" />
+      <workItem from="1758116299351" duration="4000" />
+      <workItem from="1758116702605" duration="2652000" />
+      <workItem from="1758119399757" duration="901000" />
+      <workItem from="1758120623923" duration="144000" />
+      <workItem from="1758156262536" duration="1246000" />
+      <workItem from="1758158491473" duration="817000" />
+      <workItem from="1758159376224" duration="1389000" />
+      <workItem from="1758160792129" duration="853000" />
+      <workItem from="1758161664413" duration="2319000" />
+      <workItem from="1758202824947" duration="1178000" />
+      <workItem from="1758241023895" duration="3107000" />
+      <workItem from="1758245670638" duration="160000" />
+      <workItem from="1758245847643" duration="17000" />
+      <workItem from="1758292975924" duration="2512000" />
+      <workItem from="1758295623512" duration="112000" />
+      <workItem from="1758334110995" duration="521000" />
+      <workItem from="1758334644115" duration="2315000" />
+      <workItem from="1758337006229" duration="101000" />
+      <workItem from="1758337818629" duration="3730000" />
+      <workItem from="1758365283423" duration="10876000" />
+      <workItem from="1758381186039" duration="757000" />
+      <workItem from="1758418867092" duration="3415000" />
+      <workItem from="1758423715191" duration="108000" />
+      <workItem from="1758423844651" duration="19000" />
+      <workItem from="1758436616273" duration="3429000" />
+      <workItem from="1758452296301" duration="760000" />
+      <workItem from="1758514213355" duration="444000" />
+      <workItem from="1758532079990" duration="594000" />
+      <workItem from="1758627412219" duration="1241000" />
+      <workItem from="1758629667055" duration="1702000" />
+      <workItem from="1758631385616" duration="51000" />
+      <workItem from="1758672848859" duration="1920000" />
+      <workItem from="1758759919412" duration="681000" />
+      <workItem from="1758761616160" duration="8000" />
+      <workItem from="1758802647511" duration="1077000" />
+      <workItem from="1758808655948" duration="670000" />
+      <workItem from="1758845884136" duration="1065000" />
+      <workItem from="1758847005547" duration="44000" />
+      <workItem from="1758847487344" duration="1340000" />
+      <workItem from="1758848976138" duration="71000" />
+      <workItem from="1758980963324" duration="1856000" />
+      <workItem from="1758983029856" duration="253000" />
+      <workItem from="1758983568530" duration="1113000" />
+      <workItem from="1758984692254" duration="510000" />
+      <workItem from="1758985498785" duration="1768000" />
+      <workItem from="1759043595816" duration="12000" />
+      <workItem from="1759063342223" duration="61000" />
+      <workItem from="1759066907174" duration="3536000" />
+      <workItem from="1759071716059" duration="208000" />
+      <workItem from="1759107369600" duration="768000" />
+      <workItem from="1759161363365" duration="53000" />
+      <workItem from="1766574264660" duration="5017000" />
+      <workItem from="1766585106054" duration="4122000" />
+      <workItem from="1766626880726" duration="3182000" />
+      <workItem from="1766633344372" duration="1672000" />
+      <workItem from="1766668372730" duration="624000" />
+      <workItem from="1766671155014" duration="315000" />
+      <workItem from="1766671940444" duration="3161000" />
+      <workItem from="1766714100791" duration="744000" />
+      <workItem from="1766733033024" duration="406000" />
+      <workItem from="1766733462302" duration="1915000" />
+      <workItem from="1766739067204" duration="1208000" />
+      <workItem from="1766757771147" duration="1027000" />
+      <workItem from="1766760801807" duration="16000" />
+      <workItem from="1766799580849" duration="1581000" />
+      <workItem from="1766801912839" duration="10000" />
+      <workItem from="1766817934965" duration="1173000" />
+      <workItem from="1766819229938" duration="102000" />
+      <workItem from="1766831330427" duration="706000" />
+      <workItem from="1766848102847" duration="1823000" />
+      <workItem from="1766850120285" duration="1309000" />
+      <workItem from="1766885378318" duration="1821000" />
+      <workItem from="1766887463658" duration="95000" />
+      <workItem from="1772534694570" duration="2757000" />
+      <workItem from="1772538319258" duration="1817000" />
+      <workItem from="1772803642263" duration="1000" />
+      <workItem from="1775201562952" duration="9000" />
+      <workItem from="1775998099876" duration="2796000" />
+      <workItem from="1776049194144" duration="31000" />
+      <workItem from="1776095886898" duration="3323000" />
+      <workItem from="1776149526282" duration="9712000" />
+      <workItem from="1776166978490" duration="594000" />
+      <workItem from="1776246602399" duration="29000" />
+      <workItem from="1776357045275" duration="14000" />
+      <workItem from="1776511270217" duration="389000" />
+      <workItem from="1776512993888" duration="2150000" />
+      <workItem from="1776617183128" duration="114000" />
+      <workItem from="1776617320954" duration="49000" />
+      <workItem from="1776635781091" duration="1728000" />
+      <workItem from="1776637659156" duration="6429000" />
+      <workItem from="1776644284072" duration="1338000" />
+      <workItem from="1776645647761" duration="953000" />
+      <workItem from="1776646788287" duration="9305000" />
+      <workItem from="1776669673353" duration="2274000" />
+      <workItem from="1776672246026" duration="5245000" />
+      <workItem from="1776678847721" duration="1018000" />
+      <workItem from="1776679900533" duration="214000" />
+      <workItem from="1776680278616" duration="4736000" />
+    </task>
+    <task id="LOCAL-00001" summary="配置">
+      <option name="closed" value="true" />
+      <created>1745198188669</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1745198188670</updated>
+    </task>
+    <task id="LOCAL-00002" summary="配置logger">
+      <option name="closed" value="true" />
+      <created>1745408483180</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1745408483180</updated>
+    </task>
+    <task id="LOCAL-00003" summary="配置logger">
+      <option name="closed" value="true" />
+      <created>1745408652419</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1745408652419</updated>
+    </task>
+    <task id="LOCAL-00004" summary="修正调用逻辑">
+      <option name="closed" value="true" />
+      <created>1745495068927</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1745495068927</updated>
+    </task>
+    <task id="LOCAL-00005" summary="修正调用逻辑">
+      <option name="closed" value="true" />
+      <created>1745495798594</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1745495798594</updated>
+    </task>
+    <task id="LOCAL-00006" summary="修正调用逻辑">
+      <option name="closed" value="true" />
+      <created>1745495983341</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1745495983341</updated>
+    </task>
+    <task id="LOCAL-00007" summary="修正调用逻辑">
+      <option name="closed" value="true" />
+      <created>1745502426576</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1745502426576</updated>
+    </task>
+    <task id="LOCAL-00008" summary="修正">
+      <option name="closed" value="true" />
+      <created>1745505125167</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1745505125167</updated>
+    </task>
+    <task id="LOCAL-00009" summary="修正重发功能">
+      <option name="closed" value="true" />
+      <created>1745644818046</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1745644818046</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Merge remote-tracking branch 'origin/master'">
+      <option name="closed" value="true" />
+      <created>1745645198019</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1745645198019</updated>
+    </task>
+    <task id="LOCAL-00011" summary="完成发送逻辑&#10;修正重发图标逻辑">
+      <option name="closed" value="true" />
+      <created>1745646475621</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1745646475621</updated>
+    </task>
+    <task id="LOCAL-00012" summary="实现自动滚动到底部">
+      <option name="closed" value="true" />
+      <created>1745746285511</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1745746285511</updated>
+    </task>
+    <task id="LOCAL-00013" summary="版本修改">
+      <option name="closed" value="true" />
+      <created>1758336162413</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1758336162413</updated>
+    </task>
+    <task id="LOCAL-00014" summary="分多文件">
+      <option name="closed" value="true" />
+      <created>1758340187360</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1758340187360</updated>
+    </task>
+    <task id="LOCAL-00015" summary="分多文件">
+      <option name="closed" value="true" />
+      <created>1758340515532</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1758340515532</updated>
+    </task>
+    <task id="LOCAL-00016" summary="分多文件">
+      <option name="closed" value="true" />
+      <created>1758341237740</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1758341237740</updated>
+    </task>
+    <task id="LOCAL-00017" summary="分多文件">
+      <option name="closed" value="true" />
+      <created>1758341344484</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1758341344484</updated>
+    </task>
+    <task id="LOCAL-00018" summary="请求调用封装&#10;进行分包整理">
+      <option name="closed" value="true" />
+      <created>1758373532660</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1758373532660</updated>
+    </task>
+    <task id="LOCAL-00019" summary="分包整理优化">
+      <option name="closed" value="true" />
+      <created>1758379180660</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1758379180660</updated>
+    </task>
+    <task id="LOCAL-00020" summary="新增拉取离线消息操作">
+      <option name="closed" value="true" />
+      <created>1758982206265</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1758982206265</updated>
+    </task>
+    <task id="LOCAL-00021" summary="修复了因为Chat阻塞软件不能动的bug">
+      <option name="closed" value="true" />
+      <created>1758987270195</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1758987270195</updated>
+    </task>
+    <task id="LOCAL-00022" summary="修改群聊的消息体部分字段名">
+      <option name="closed" value="true" />
+      <created>1759071155760</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1759071155760</updated>
+    </task>
+    <task id="LOCAL-00023" summary="新增心跳信息方法">
+      <option name="closed" value="true" />
+      <created>1759161407471</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1759161407471</updated>
+    </task>
+    <task id="LOCAL-00024" summary="优化接口调用逻辑">
+      <option name="closed" value="true" />
+      <created>1766714768705</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1766714768705</updated>
+    </task>
+    <task id="LOCAL-00025" summary="新增读取私有服务器地址的功能">
+      <option name="closed" value="true" />
+      <created>1766819288411</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1766819288411</updated>
+    </task>
+    <task id="LOCAL-00026" summary="修复离线消息拉取字段不匹配问题">
+      <option name="closed" value="true" />
+      <created>1766887111516</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1766887111516</updated>
+    </task>
+    <task id="LOCAL-00027" summary="修正ws握手逻辑">
+      <option name="closed" value="true" />
+      <created>1776153151591</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1776153151591</updated>
+    </task>
+    <task id="LOCAL-00028" summary="优化图像展示器">
+      <option name="closed" value="true" />
+      <created>1776617362361</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1776617362362</updated>
+    </task>
+    <task id="LOCAL-00029" summary="统一后端处理逻辑，并增加统一提示组件">
+      <option name="closed" value="true" />
+      <created>1776637192637</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1776637192637</updated>
+    </task>
+    <task id="LOCAL-00030" summary="修复gradle逻辑">
+      <option name="closed" value="true" />
+      <created>1776639541029</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1776639541029</updated>
+    </task>
+    <task id="LOCAL-00031" summary="修复日志框架引入">
+      <option name="closed" value="true" />
+      <created>1776640144549</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1776640144549</updated>
+    </task>
+    <task id="LOCAL-00032" summary="更新kotlin版本到2.3">
+      <option name="closed" value="true" />
+      <created>1776665795007</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1776665795007</updated>
+    </task>
+    <task id="LOCAL-00033" summary="更新kotlin版本到2.3">
+      <option name="closed" value="true" />
+      <created>1776665912151</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1776665912151</updated>
+    </task>
+    <task id="LOCAL-00034" summary="构建安卓客户端">
+      <option name="closed" value="true" />
+      <created>1776672809593</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1776672809593</updated>
+    </task>
+    <task id="LOCAL-00035" summary="构建安卓客户端">
+      <option name="closed" value="true" />
+      <created>1776673422207</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1776673422207</updated>
+    </task>
+    <option name="localTasksCounter" value="36" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="master" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="HEAD" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="origin/master" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="master" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="修正" />
+    <MESSAGE value="修正重发功能" />
+    <MESSAGE value="Merge remote-tracking branch 'origin/master'" />
+    <MESSAGE value="完成发送逻辑&#10;修正重发图标逻辑" />
+    <MESSAGE value="实现自动滚动到底部" />
+    <MESSAGE value="版本修改" />
+    <MESSAGE value="分多文件" />
+    <MESSAGE value="请求调用封装" />
+    <MESSAGE value="请求调用封装&#10;进行分包整理" />
+    <MESSAGE value="分包整理优化" />
+    <MESSAGE value="新增拉取离线消息操作" />
+    <MESSAGE value="修复了因为Chat阻塞软件不能动的bug" />
+    <MESSAGE value="修改群聊的消息体部分字段名" />
+    <MESSAGE value="新增心跳信息方法" />
+    <MESSAGE value="优化接口调用逻辑" />
+    <MESSAGE value="新增读取私有服务器地址的功能" />
+    <MESSAGE value="修复离线消息拉取字段不匹配问题" />
+    <MESSAGE value="修正ws握手逻辑" />
+    <MESSAGE value="更新版本到java" />
+    <MESSAGE value="优化图像展示器" />
+    <MESSAGE value="统一后端处理逻辑，并增加统一提示组件" />
+    <MESSAGE value="修复gradle逻辑" />
+    <MESSAGE value="修复日志框架引入" />
+    <MESSAGE value="更新kotlin版本到2.3" />
+    <MESSAGE value="构建安卓客户端" />
+    <option name="LAST_COMMIT_MESSAGE" value="构建安卓客户端" />
+  </component>
+  <component name="VgoProject">
+    <integration-enabled>false</integration-enabled>
+    <settings-migrated>true</settings-migrated>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
+          <line>155</line>
+          <option name="timeStamp" value="4" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
+          <line>107</line>
+          <properties>
+            <option name="lambda-ordinal" value="-1" />
+          </properties>
+          <option name="timeStamp" value="14" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufResponseParser.desktop.kt</url>
+          <line>74</line>
+          <option name="timeStamp" value="15" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
+  </component>
+</project>

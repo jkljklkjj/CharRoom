@@ -1,6 +1,6 @@
 plugins {
     `java-library`
-    id("com.google.protobuf") version "0.9.4"
+    id("com.google.protobuf") version "0.10.0"
 }
 
 repositories {
@@ -9,7 +9,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.google.protobuf:protobuf-java:3.21.12")
+    compileOnly("com.google.protobuf:protobuf-java:4.34.1")
 }
 
 java {
