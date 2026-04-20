@@ -12,7 +12,8 @@ class MainActivity : AppCompatActivity() {
         // Simple non-Compose fallback for the Android sample activity. This
         // avoids Compose/Kotlin/AGP version mismatches in the minimal build.
         val tv = TextView(this).apply {
-            text = "CharRoom Android App"
+            // Use a string resource to satisfy Android lint (avoid hardcoded text)
+            text = getString(R.string.app_name)
             textSize = 20f
             gravity = Gravity.CENTER
         }

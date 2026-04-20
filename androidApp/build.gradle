@@ -42,16 +42,16 @@ repositories {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'androidx.activity:activity-compose:1.8.0'
-    implementation 'androidx.compose.ui:ui:1.4.3'
-    implementation 'androidx.compose.material:material:1.4.3'
-    implementation 'androidx.compose.ui:ui-tooling-preview:1.4.3'
+    implementation 'androidx.compose.ui:ui:1.9.0'
+    implementation 'androidx.compose.material:material:1.9.0'
+    implementation 'androidx.compose.ui:ui-tooling-preview:1.9.0'
     implementation 'androidx.compose.material3:material3:1.1.0'
     // AppCompat is required by the styles in androidApp/src/main/res/values/styles.xml
-    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
     // Material components (optional) — keep for themes and widgets
-    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'com.google.android.material:material:1.10.0'
     // Reuse protobuf-generated classes from the root :proto module
     implementation project(':proto')
 }

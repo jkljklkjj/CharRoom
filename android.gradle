@@ -1,0 +1,32 @@
+// The Android Gradle Plugin is declared in the root `plugins {}` block with
+// an explicit version (apply false). We simply apply it here so the Groovy
+// script provides the Android configuration when requested via
+// -PincludeAndroid=true.
+apply plugin: 'com.android.application'
+
+android {
+    namespace = 'com.chatlite.charroom'
+    compileSdk = 36
+    defaultConfig {
+        applicationId = 'com.chatlite.charroom'
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 2
+        versionName = '1.1'
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-pal:22.1.0'
+}
+

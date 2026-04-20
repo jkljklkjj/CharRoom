@@ -5,7 +5,7 @@ plugins {
     kotlin("multiplatform") version "2.3.20"
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
-    id("org.jetbrains.compose") version "1.9.0"
+    id("org.jetbrains.compose") version "1.10.3"
 }
 
 group = "com.chatlite"
@@ -44,25 +44,25 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-core:2.3.4")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.4")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.4")
+                implementation("io.ktor:ktor-client-core:3.4.2")
+                implementation("io.ktor:ktor-client-content-negotiation:3.4.2")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.2")
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material)
                 implementation(compose.materialIconsExtended)
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("org.glassfish.jaxb:jaxb-runtime:4.0.5")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                implementation("org.glassfish.jaxb:jaxb-runtime:4.0.7")
                 implementation("com.konghq:unirest-java:3.14.5")
                 implementation("io.netty:netty-all:4.1.68.Final")
-                implementation("org.jboss.marshalling:jboss-marshalling:2.0.10.Final")
-                implementation("org.jboss.marshalling:jboss-marshalling-river:2.0.10.Final")
+                implementation("org.jboss.marshalling:jboss-marshalling:2.3.0")
+                implementation("org.jboss.marshalling:jboss-marshalling-river:2.3.0")
                 implementation("org.slf4j:slf4j-api:2.0.17")
-                implementation("ch.qos.logback:logback-classic:1.5.18")
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.20.0")
-                implementation("co.touchlab:kermit:1.2.2")
-                implementation("com.google.protobuf:protobuf-java:3.21.12")
-                implementation("com.google.protobuf:protobuf-kotlin:3.21.12")
+                implementation("ch.qos.logback:logback-classic:1.5.32")
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.2")
+                implementation("co.touchlab:kermit:2.1.0")
+                implementation("com.google.protobuf:protobuf-java:4.34.1")
+                implementation("com.google.protobuf:protobuf-kotlin:4.34.1")
             }
         }
         val commonTest by getting {
