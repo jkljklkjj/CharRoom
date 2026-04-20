@@ -1,9 +1,9 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("multiplatform") version "2.2.20"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.20"
-    kotlin("plugin.serialization") version "2.2.20"
+    kotlin("multiplatform") version "2.3.20"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
+    kotlin("plugin.serialization") version "2.3.20"
     id("org.jetbrains.compose") version "1.9.0"
 }
 
@@ -22,8 +22,21 @@ repositories {
     }
 }
 
+// Apply Android build script early so kotlin { android() } is available when includeAndroid=true
+if (project.findProperty("includeAndroid") == "true") {
+    apply(from = "android.gradle.kts")
+}
+
 kotlin {
     jvmToolchain(21)
+
+    jvm("desktop") {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        }
+    }
+
+    // Android configuration is handled by the separate Android project/script when enabled
 
     jvm("desktop") {
         compilerOptions {
@@ -60,6 +73,8 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
+        // androidMain will be configured when the Android build is enabled (kept out of common MPP setup)
+
         val desktopMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-cio:2.3.4")
@@ -73,10 +88,7 @@ kotlin {
     }
 }
 
-// 可选：按需加载 Android 配置
-if (project.findProperty("includeAndroid") == "true") {
-    apply(from = "android.gradle.kts")
-}
+// Android Gradle script is applied above when includeAndroid=true
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
