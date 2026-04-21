@@ -83,14 +83,33 @@ class NetworkRepository {
         parseChatMessages(response)
     }
 
-    suspend fun connectWebSocket(token: String, ownUserId: Int, onMessage: (ChatMessage) -> Unit): Boolean = withContext(Dispatchers.IO) {
-        wsClient.connect(token, ownUserId) { incoming ->
-            onMessage(incoming)
-        }
+    suspend fun connectWebSocket(
+        token: String,
+        ownUserId: Int,
+        onMessage: (ChatMessage) -> Unit,
+        onStatusUpdate: (clientId: String, online: Boolean) -> Unit
+    ): Boolean = withContext(Dispatchers.IO) {
+        wsClient.connect(token, ownUserId, onMessage, onStatusUpdate)
     }
 
     fun sendChatMessage(targetId: Int, content: String, senderId: Int = 0): Boolean {
         return wsClient.sendChatText(targetId, content, senderId)
+    }
+
+    fun sendAgentMessage(targetId: Int, content: String, senderId: Int = 0): Boolean {
+        return wsClient.sendAgentText(targetId, content, senderId)
+    }
+
+    fun sendGroupMessage(targetId: Int, content: String, senderId: Int = 0): Boolean {
+        return wsClient.sendGroupText(targetId, content, senderId)
+    }
+
+    fun sendCheck(targetId: Int): Boolean {
+        return wsClient.sendCheck(targetId)
+    }
+
+    fun sendLogout(userId: String): Boolean {
+        return wsClient.sendLogout(userId)
     }
 
     fun disconnectWebSocket() {

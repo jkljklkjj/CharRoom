@@ -8,9 +8,14 @@ pluginManagement {
         // Keep compose dev mirror as a fallback for compose artifacts. Restrict
         // it to only serve org.jetbrains.compose artifacts so core Gradle/AGP
         // artifacts are resolved from Google/MavenCentral instead.
+        maven("https://cache-redirector.jetbrains.com/maven.pkg.jetbrains.space/public/p/compose/dev") {
+            content {
+                includeGroupByRegex("""org\.jetbrains\.compose(\..*)?""")
+            }
+        }
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") {
             content {
-                includeGroupByRegex("org\\.jetbrains\\.compose(\\..*)?")
+                includeGroupByRegex("""org\.jetbrains\.compose(\..*)?""")
             }
         }
         maven("https://maven.aliyun.com/repository/public") {
@@ -67,9 +72,14 @@ dependencyResolutionManagement {
         gradlePluginPortal()
         // Keep compose dev after the main repos so it won't be used for AGP.
         // Restrict it to org.jetbrains.compose to avoid serving AGP artifacts.
+        maven("https://cache-redirector.jetbrains.com/maven.pkg.jetbrains.space/public/p/compose/dev") {
+            content {
+                includeGroupByRegex("""org\.jetbrains\.compose(\..*)?""")
+            }
+        }
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") {
             content {
-                includeGroupByRegex("org\\.jetbrains\\.compose(\\..*)?")
+                includeGroupByRegex("""org\.jetbrains\.compose(\..*)?"""")
             }
         }
         maven("https://maven.aliyun.com/repository/public") {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -27,6 +28,12 @@ class MainActivity : ComponentActivity() {
 fun ChatApp() {
     val appState = remember { ChatAppState(NetworkRepository()) }
     val scope = rememberCoroutineScope()
+
+    DisposableEffect(appState) {
+        onDispose {
+            appState.logout()
+        }
+    }
 
     Surface(color = MaterialTheme.colors.background, modifier = Modifier.fillMaxSize()) {
         when (val screen = appState.screen) {

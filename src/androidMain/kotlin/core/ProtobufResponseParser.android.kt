@@ -54,6 +54,16 @@ actual fun parseProtoResponse(bytes: ByteArray): ApiUnwrap {
                 payload.put("userId", v.userId)
                 node.set<ObjectNode>("payload", payload)
             }
+            MessageProtos.MessageWrapper.PayloadCase.AGENTSTREAM -> {
+                val v = wrapper.agentStream
+                val payload = mapper.createObjectNode()
+                payload.put("chunk", v.chunk)
+                payload.put("done", v.done)
+                payload.put("error", v.error)
+                payload.put("message", v.message)
+                payload.put("messageId", v.messageId)
+                node.set<ObjectNode>("payload", payload)
+            }
             MessageProtos.MessageWrapper.PayloadCase.PAYLOAD_NOT_SET, null -> {
                 // nothing
             }
@@ -70,10 +80,14 @@ actual fun parseProtoResponse(bytes: ByteArray): ApiUnwrap {
     // 2) Try ResponseMessage
     try {
         val resp = MessageProtos.ResponseMessage.parseFrom(bytes)
-        val success = resp.success
-        val dataJson: String? = if (resp.message.isBlank()) null else resp.message
-        val message = if (!success) resp.message else null
-        return ApiUnwrap(hasEnvelope = true, success = success, dataJson = dataJson, message = message)
+        val node = mapper.createObjectNode()
+        node.put("success", resp.success)
+        node.put("message", resp.message)
+        node.put("clientId", resp.clientId)
+        node.put("online", resp.online)
+        val dataJson = mapper.writeValueAsString(node)
+        val message = if (!resp.success) resp.message else null
+        return ApiUnwrap(hasEnvelope = true, success = resp.success, dataJson = dataJson, message = message)
     } catch (_: Exception) {
         // fall through
     }

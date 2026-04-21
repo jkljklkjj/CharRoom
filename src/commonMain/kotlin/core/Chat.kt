@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlinx.coroutines.*
+import component.appendAgentChunk
 
 
 // 定义发送类型枚举，统一管理后端协议中的字符串
@@ -32,6 +33,7 @@ enum class MsgType(val wire: String) {
     LOGOUT("logout"),
     CHAT("chat"),
     AGENT_CHAT("agentChat"),
+    AGENT_CHAT_STREAM("agentChatStream"),
     GROUP_CHAT("groupChat"),
     CHECK("check"),
     HEARTBEAT("heartbeat");
@@ -230,6 +232,33 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                             )
                         )
                     } catch (_: Exception) {
+                    }
+                }
+
+                MsgType.AGENT_CHAT_STREAM.wire -> {
+                    val messageId = payload.get("messageId")?.asText() ?: return
+                    val chunk = payload.get("chunk")?.asText() ?: ""
+                    val error = payload.get("error")?.asBoolean() ?: false
+                    val done = payload.get("done")?.asBoolean() ?: false
+                    val messageText = if (error && payload.has("message")) {
+                        payload.get("message")?.asText() ?: chunk
+                    } else {
+                        chunk
+                    }
+                    if (messageText.isBlank() && !error) return
+
+                    appendAgentChunk(messageId, messageText)
+                    if (done && error) {
+                        try {
+                            ActionLogger.log(
+                                Action(
+                                    type = ActionType.RECEIVE_MESSAGE,
+                                    targetId = messageId,
+                                    metadata = mapOf("error" to "true", "source" to "proto")
+                                )
+                            )
+                        } catch (_: Exception) {
+                        }
                     }
                 }
 

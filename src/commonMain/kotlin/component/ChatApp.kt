@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.mutableStateOf
+import core.buildAgentChatPayload
 import core.buildChatPayload
 import core.buildGroupChatPayload
 import core.buildCheckPayload
@@ -60,12 +61,21 @@ private fun updateUserOnlineStatus(userId: Int, online: Boolean) {
     }
 }
 
-private fun appendAgentChunk(messageId: String, chunk: String) {
+fun appendAgentChunk(messageId: String, chunk: String) {
     if (chunk.isEmpty()) {
         return
     }
     val idx = messages.indexOfFirst { it.messageId == messageId }
     if (idx < 0) {
+        messages += Message(
+            senderId = ServerConfig.AGENT_ASSISTANT_ID,
+            message = chunk,
+            sender = false,
+            receiverId = ServerConfig.AGENT_ASSISTANT_ID,
+            timestamp = System.currentTimeMillis(),
+            isSent = mutableStateOf(true),
+            messageId = messageId
+        )
         return
     }
     val target = messages[idx]
@@ -95,7 +105,8 @@ fun sendMessage(
         )
         messages += localCopy
 
-        val streamMessageId = "agent-stream-${currentTime}-${System.nanoTime()}"
+        val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
+        val streamMessageId = currentTime.toString()
         messages += Message(
             senderId = user.id,
             message = "",
@@ -116,35 +127,16 @@ fun sendMessage(
         } catch (_: Exception) {
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val reply = ApiService.callAgentStream(normalizedMessage) { tokenChunk ->
-                    appendAgentChunk(streamMessageId, tokenChunk)
-                }
-                if (reply.isBlank()) {
-                    localCopy.isSent.value = false
-                    val idx = messages.indexOfFirst { it.messageId == streamMessageId }
-                    if (idx >= 0 && messages[idx].message.isBlank()) {
-                        messages.removeAt(idx)
-                    }
-                    onDone(false)
-                    return@launch
-                }
-
-                val idx = messages.indexOfFirst { it.messageId == streamMessageId }
-                if (idx >= 0 && messages[idx].message != reply) {
-                    val target = messages[idx]
-                    messages[idx] = target.copy(message = reply)
-                }
-                onDone(true)
-            } catch (_: Exception) {
+        val payload = buildAgentChatPayload(user.id.toString(), normalizedMessage, userIdInt, streamMessageId.toLongOrNull() ?: currentTime)
+        Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, resp ->
+            if (!success) {
                 localCopy.isSent.value = false
                 val idx = messages.indexOfFirst { it.messageId == streamMessageId }
                 if (idx >= 0 && messages[idx].message.isBlank()) {
                     messages.removeAt(idx)
                 }
-                onDone(false)
             }
+            onDone(success)
         }
         return
     }
@@ -239,20 +231,28 @@ fun sendMessage(
 
 fun resendMessage(user: User, message: Message) {
     if (ServerConfig.isAgentAssistant(user.id)) {
+        val streamMessageId = message.timestamp.toString()
+        messages += Message(
+            senderId = user.id,
+            message = "",
+            sender = false,
+            timestamp = System.currentTimeMillis(),
+            isSent = mutableStateOf(true),
+            messageId = streamMessageId
+        )
+
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val reply = ApiService.callAgentStream(message.message)
-                if (reply.isNotBlank()) {
+            val payload = buildAgentChatPayload(user.id.toString(), message.message, message.senderId, streamMessageId.toLongOrNull() ?: message.timestamp)
+            Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, _ ->
+                if (success) {
                     message.isSent.value = true
-                    messages += Message(
-                        senderId = user.id,
-                        message = reply,
-                        sender = false,
-                        timestamp = System.currentTimeMillis(),
-                        isSent = mutableStateOf(true)
-                    )
+                } else {
+                    message.isSent.value = false
+                    val idx = messages.indexOfFirst { it.messageId == streamMessageId }
+                    if (idx >= 0 && messages[idx].message.isBlank()) {
+                        messages.removeAt(idx)
+                    }
                 }
-            } catch (_: Exception) {
             }
         }
         return

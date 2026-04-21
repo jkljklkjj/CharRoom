@@ -7,6 +7,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import core.Action
+import core.ActionLogger
+import core.ActionType
 import core.ApiService
 import model.users
 import kotlinx.coroutines.launch
@@ -75,6 +78,19 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
                         return@Button
                     }
                     scope.launch {
+                        try {
+                            ActionLogger.log(
+                                Action(
+                                    type = if (isUser) ActionType.ADD_FRIEND else ActionType.ADD_GROUP,
+                                    targetId = account,
+                                    metadata = mapOf(
+                                        "ui" to "add_user_or_group_dialog",
+                                        "entity" to if (isUser) "user" else "group"
+                                    )
+                                )
+                            )
+                        } catch (_: Exception) {
+                        }
                         isSubmitting = true
                         responseMessage = null
                         val success = withContext(Dispatchers.IO) {

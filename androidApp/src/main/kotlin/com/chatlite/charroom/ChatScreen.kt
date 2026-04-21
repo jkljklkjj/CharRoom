@@ -13,12 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 class ChatSession(
-    user: LocalUser,
+    private val user: LocalUser,
     private val onSendNetwork: (String) -> Unit = {}
 ) {
     val messages: SnapshotStateList<ChatMessage> = mutableStateListOf(
         ChatMessage(
             senderId = user.id,
+            receiverId = user.id,
             content = "你好，我是${user.username}，你想了解什么？",
             isMe = false,
             timestamp = System.currentTimeMillis() - 600_000
@@ -43,6 +44,7 @@ class ChatSession(
         messages.add(
             ChatMessage(
                 senderId = 0,
+                receiverId = user.id,
                 content = trimmed,
                 isMe = true,
                 timestamp = System.currentTimeMillis()
@@ -52,7 +54,16 @@ class ChatSession(
     }
 
     fun receiveMessage(message: ChatMessage) {
-        if (messages.any { it.messageId == message.messageId }) return
+        if (message.messageId.isBlank()) {
+            messages.add(message)
+            return
+        }
+        val idx = messages.indexOfFirst { it.messageId == message.messageId }
+        if (idx >= 0) {
+            val target = messages[idx]
+            messages[idx] = target.copy(content = target.content + message.content)
+            return
+        }
         messages.add(message)
     }
 }
@@ -63,7 +74,12 @@ fun ChatScreen(user: LocalUser, appState: ChatAppState, onBack: () -> Unit, onSe
 
     DisposableEffect(chatSession, user) {
         val receiver: (ChatMessage) -> Unit = { message ->
-            if (message.senderId == user.id && !message.isMe) {
+            val shouldReceive = if (user.id < 0) {
+                message.receiverId == user.id && !message.isMe
+            } else {
+                message.senderId == user.id && !message.isMe
+            }
+            if (shouldReceive) {
                 chatSession.receiveMessage(message)
             }
         }
@@ -153,9 +169,10 @@ fun ChatMessageItem(message: ChatMessage) {
     }
 }
 
-class ChatMessage(
+data class ChatMessage(
     val senderId: Int,
-    val content: String,
+    val receiverId: Int = 0,
+    var content: String,
     val isMe: Boolean,
     val timestamp: Long,
     val messageId: String = "msg-${senderId}-${timestamp}-${content.hashCode()}"

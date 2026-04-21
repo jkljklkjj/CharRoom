@@ -15,6 +15,7 @@ class ChatAppState(private val repository: NetworkRepository) {
     var wsConnecting by mutableStateOf(false)
     var wsConnected by mutableStateOf(false)
     var errorMessage by mutableStateOf("")
+    var currentUserId by mutableStateOf(0)
     private var accountId by mutableStateOf(0)
 
     suspend fun login(account: String, password: String) {
@@ -27,6 +28,7 @@ class ChatAppState(private val repository: NetworkRepository) {
         if (tokenResult.isNotBlank()) {
             token = tokenResult
             accountId = account.toIntOrNull() ?: 0
+            currentUserId = accountId
             loadUserList(token)
             connectWebSocket()
         } else {
@@ -57,7 +59,11 @@ class ChatAppState(private val repository: NetworkRepository) {
             return
         }
         withContext(Dispatchers.IO) {
-            val success = repository.sendChatMessage(targetId, message, accountId)
+            val success = when {
+                targetId < 0 -> repository.sendGroupMessage(-targetId, message, accountId)
+                core.ServerConfig.isAgentAssistant(targetId) -> repository.sendAgentMessage(targetId, message, accountId)
+                else -> repository.sendChatMessage(targetId, message, accountId)
+            }
             if (!success) {
                 errorMessage = "消息发送失败，请重试"
             }
@@ -85,18 +91,39 @@ class ChatAppState(private val repository: NetworkRepository) {
     private suspend fun connectWebSocket() {
         wsConnecting = true
         wsConnected = withContext(Dispatchers.IO) {
-            repository.connectWebSocket(token, accountId) { message ->
+            repository.connectWebSocket(token, accountId, { message ->
                 handleIncomingMessage(message)
-            }
+            }, { clientId, online ->
+                handleStatusUpdate(clientId, online)
+            })
         }
         wsConnecting = false
         if (!wsConnected) {
             errorMessage = "WebSocket 连接失败，聊天功能可能受限"
+        } else {
+            refreshFriendStatus() // trigger status checks after successful connection
         }
     }
 
     private fun handleIncomingMessage(message: ChatMessage) {
         currentChatReceiver?.invoke(message)
+    }
+
+    private fun handleStatusUpdate(clientId: String, online: Boolean) {
+        val userId = clientId.toIntOrNull() ?: return
+        val updated = users.map { user ->
+            if (user.id == userId) user.copy(online = online) else user
+        }
+        if (updated != users) {
+            users = updated
+        }
+    }
+
+    private suspend fun refreshFriendStatus() {
+        val friendIds = users.filter { it.id > 0 && !core.ServerConfig.isAgentAssistant(it.id) }.map { it.id }
+        withContext(Dispatchers.IO) {
+            friendIds.forEach { repository.sendCheck(it) }
+        }
     }
 
     private var currentChatReceiver: ((ChatMessage) -> Unit)? = null
@@ -110,11 +137,16 @@ class ChatAppState(private val repository: NetworkRepository) {
     }
 
     fun logout() {
+        if (wsConnected) {
+            repository.sendLogout(accountId.toString())
+        }
         repository.disconnectWebSocket()
         wsConnected = false
         token = ""
         users = emptyList()
         screen = Screen.Login
+        currentUserId = 0
+        accountId = 0
     }
 
     fun resetError() {

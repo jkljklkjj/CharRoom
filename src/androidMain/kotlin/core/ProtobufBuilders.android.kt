@@ -50,15 +50,27 @@ actual fun buildChatPayload(targetClientId: String, content: String, userId: Int
 }
 
 actual fun buildAgentChatPayload(targetClientId: String, content: String, userId: Int, timestamp: Long): ByteArray {
-    val chat = MessageProtos.ChatMessage.newBuilder()
+    val actionBuilder = MessageProtos.ChatMessage.newBuilder()
         .setTargetClientId(targetClientId)
         .setContent(content)
         .setUserId(userId.toString())
         .setTimestamp(timestamp.toString())
-        .build()
+
+    val actions = ActionLogger.getSnapshot()
+    for (action in actions) {
+        val actionProto = MessageProtos.ClientAction.newBuilder()
+            .setId(action.id)
+            .setTimestamp(action.timestamp)
+            .setType(action.type.name)
+            .setTargetId(action.targetId ?: "")
+            .putAllMetadata(action.metadata)
+            .build()
+        actionBuilder.addClientActions(actionProto)
+    }
+
     return MessageProtos.MessageWrapper.newBuilder()
         .setType(MsgType.AGENT_CHAT.wire)
-        .setChat(chat)
+        .setChat(actionBuilder.build())
         .build()
         .toByteArray()
 }

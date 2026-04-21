@@ -17,6 +17,7 @@ message ChatMessage {
     string content = 2;       // 消息内容
     string userId = 3;        // 发送者用户ID
     string timestamp = 4;      // 时间戳
+    repeated ClientAction clientActions = 5; // 可选的行为序列
 }
 
 // 群聊消息
@@ -24,6 +25,33 @@ message GroupChatMessage {
     string targetClientId = 1;  // 群组ID
     string content = 2;       // 消息内容
     string userId = 3;        // 发送者用户ID
+}
+
+// 客户端行为描述
+message ClientAction {
+    string id = 1;
+    int64 timestamp = 2;
+    string type = 3;
+    string targetId = 4;
+    map<string, string> metadata = 5;
+}
+
+// Agent 聊天消息
+message AgentChatMessage {
+    string targetClientId = 1;  // 目标客户端ID
+    string content = 2;       // 消息内容
+    string userId = 3;        // 发送者用户ID
+    string timestamp = 4;      // 时间戳
+    repeated ClientAction clientActions = 5; // 可选的行为序列
+}
+
+// Agent 流式消息
+message AgentStreamMessage {
+    string chunk = 1;         // 流式输出片段
+    bool done = 2;            // 是否为流结束标记
+    bool error = 3;           // 是否为错误消息
+    string message = 4;       // 错误或结束说明
+    string messageId = 5;     // 可选的客户端调用关联ID
 }
 
 // 检查在线状态消息
@@ -44,11 +72,13 @@ message LogoutMessage {
 
 // 通用消息包装器
 message MessageWrapper {
-    string type = 1;  // 消息类型: login, chat, groupChat, check, heartbeat, logout
+    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout
     
     oneof payload {
         LoginMessage login = 2;
         ChatMessage chat = 3;
+        AgentChatMessage agentChat = 8;
+        AgentStreamMessage agentStream = 9;
         GroupChatMessage groupChat = 4;
         CheckMessage check = 5;
         HeartbeatMessage heartbeat = 6;

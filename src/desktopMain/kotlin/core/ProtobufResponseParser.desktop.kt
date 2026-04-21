@@ -56,6 +56,16 @@ actual fun parseProtoResponse(bytes: ByteArray): ApiUnwrap {
                 payload.put("userId", v.userId)
                 node.set<ObjectNode>("payload", payload)
             }
+            MessageProtos.MessageWrapper.PayloadCase.AGENTSTREAM -> {
+                val v = wrapper.agentStream
+                val payload = mapper.createObjectNode()
+                payload.put("chunk", v.chunk)
+                payload.put("done", v.done)
+                payload.put("error", v.error)
+                payload.put("message", v.message)
+                payload.put("messageId", v.messageId)
+                node.set<ObjectNode>("payload", payload)
+            }
             MessageProtos.MessageWrapper.PayloadCase.PAYLOAD_NOT_SET, null -> {
                 // no payload
             }

@@ -29,7 +29,7 @@ suspend fun callAgentStreamKtor(
 ): String = withContext(Dispatchers.IO) {
     val collected = StringBuilder()
     try {
-        val bodyJson = Json.encodeToString(core.AgentRequestBody.serializer(), core.AgentRequestBody(input, null))
+        val bodyJson = buildAgentRequestBody(input)
         val resp: HttpResponse = ktorClient.request {
             url(ApiEndpoints.url(ApiEndpoints.AGENT_NL_STREAM))
             method = HttpMethod.Post
@@ -58,5 +58,21 @@ suspend fun callAgentStreamKtor(
         println("callAgentStreamKtor error: ${e.message}")
     }
     collected.toString()
+}
+
+private fun buildAgentRequestBody(input: String): String {
+    val actions = ActionLogger.getSnapshot().map { a ->
+        AgentActionDto(
+            id = a.id,
+            timestamp = a.timestamp,
+            type = a.type.name,
+            targetId = a.targetId,
+            metadata = a.metadata
+        )
+    }
+    return Json.encodeToString(
+        core.AgentRequestBody.serializer(),
+        core.AgentRequestBody(input, if (actions.isEmpty()) null else actions)
+    )
 }
 
