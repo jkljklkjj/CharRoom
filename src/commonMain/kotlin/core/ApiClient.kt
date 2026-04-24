@@ -91,6 +91,8 @@ private data class AddFriendBody(val friendId: String)
 @Serializable
 private data class AddGroupBody(val groupId: String)
 @Serializable
+private data class GroupApplicationActionBody(val groupId: String, val userId: String)
+@Serializable
 internal data class AgentActionDto(
     val id: String,
     val timestamp: Long,
@@ -201,6 +203,28 @@ class ApiClient(
     fun addGroup(groupId: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddGroupBody.serializer(), AddGroupBody(groupId))
         val resp = sendRequest(ApiEndpoints.GROUP_ADD, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        return interpretBooleanResponse(resp)
+    }
+
+    /** 获取收到的群聊申请（管理员可用，返回申请用户列表） */
+    fun fetchGroupRequests(token: String = ServerConfig.Token): List<User> = try {
+        val body = sendRequest(ApiEndpoints.GROUP_REQUESTS, method = "GET", token = token)
+        parseUserList(body)
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    /** 同意群聊申请，groupId 为群组ID，userId 为申请者ID */
+    fun acceptGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token): Boolean {
+        val body = json.encodeToString(GroupApplicationActionBody.serializer(), GroupApplicationActionBody(groupId, userId))
+        val resp = sendRequest(ApiEndpoints.GROUP_ACCEPT, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        return interpretBooleanResponse(resp)
+    }
+
+    /** 拒绝群聊申请，groupId 为群组ID，userId 为申请者ID */
+    fun rejectGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token): Boolean {
+        val body = json.encodeToString(GroupApplicationActionBody.serializer(), GroupApplicationActionBody(groupId, userId))
+        val resp = sendRequest(ApiEndpoints.GROUP_REJECT, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
 
@@ -485,6 +509,11 @@ object ApiService {
     fun fetchGroups(token: String = ServerConfig.Token) = client.fetchGroups(token)
     fun addFriend(friendId: String, token: String = ServerConfig.Token) = client.addFriend(friendId, token)
     fun addGroup(groupId: String, token: String = ServerConfig.Token) = client.addGroup(groupId, token)
+    fun fetchFriendRequests(token: String = ServerConfig.Token) = client.fetchFriendRequests(token)
+    fun acceptFriend(requesterId: String, token: String = ServerConfig.Token) = client.acceptFriend(requesterId, token)
+    fun fetchGroupRequests(token: String = ServerConfig.Token) = client.fetchGroupRequests(token)
+    fun acceptGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) = client.acceptGroupApplication(groupId, userId, token)
+    fun rejectGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) = client.rejectGroupApplication(groupId, userId, token)
     fun getUserDetail(userId: String, token: String = ServerConfig.Token) = client.getUserDetail(userId, token)
     fun getGroupDetail(groupId: String, token: String = ServerConfig.Token) = client.getGroupDetail(groupId, token)
     fun getOfflineMessages(token: String = ServerConfig.Token) = client.getOfflineMessages(token)

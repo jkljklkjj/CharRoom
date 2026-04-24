@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -50,16 +51,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import core.LocalChatHistoryStore
 import core.ServerConfig
+import core.loadImageBitmapWithCache
 import kotlinx.coroutines.launch
 import model.User
 import model.groupMessages
+import model.users
 import viewmodel.chatViewModel
 
 /**
@@ -204,6 +209,29 @@ fun GroupChatScreen(group: User) {
                     items = filteredGroupMessages,
                     key = { _, message -> message.messageId }
                 ) { index, message ->
+                    // 显示日期分隔线
+                    if (index == 0 || !isSameDay(filteredGroupMessages[index - 1].timestamp, message.timestamp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(12.dp),
+                                elevation = 0.dp,
+                                modifier = Modifier.shadow(1.dp, RoundedCornerShape(12.dp))
+                            ) {
+                                Text(
+                                    text = formatDate(message.timestamp),
+                                    style = MaterialTheme.typography.caption,
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
                     val self = message.senderId == ServerConfig.id.toIntOrNull()
                     var visible by remember(message.messageId) { mutableStateOf(false) }
                     LaunchedEffect(message.messageId) {
@@ -250,12 +278,65 @@ fun GroupChatScreen(group: User) {
                                     Spacer(modifier = Modifier.width(6.dp))
                                 }
 
+                                // 非自己发送的消息显示发送者头像
+                                if (!self) {
+                                    val sender = remember(message.senderId) { users.find { it.id == message.senderId } }
+                                    var senderAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
+                                    LaunchedEffect(sender?.avatarUrl, sender?.avatarKey) {
+                                        senderAvatar = if (!sender?.avatarUrl.isNullOrBlank()) {
+                                            loadImageBitmapWithCache(sender!!.avatarUrl!!, sender.avatarKey)
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                    if (senderAvatar != null) {
+                                        Image(
+                                            bitmap = senderAvatar!!,
+                                            contentDescription = "avatar",
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .shadow(2.dp, CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    } else {
+                                        // 没有头像时显示首字母
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colors.primary)
+                                                .shadow(2.dp, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = message.senderName.firstOrNull()?.toString() ?: "?",
+                                                color = MaterialTheme.colors.onPrimary,
+                                                style = MaterialTheme.typography.caption
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                }
+
                                 Box(
                                     modifier = Modifier
                                         .widthIn(max = 460.dp)
+                                        .shadow(
+                                            elevation = if (self) 4.dp else 2.dp,
+                                            shape = RoundedCornerShape(18.dp)
+                                        )
                                         .clip(RoundedCornerShape(18.dp))
                                         .background(messageBubbleBrush(self, isDarkMode))
                                         .border(1.dp, bubbleBorderColor, RoundedCornerShape(18.dp))
+                                        .let {
+                                            // 发送中的消息添加半透明效果
+                                            if (self && !message.isSent.value) {
+                                                it.alpha(0.7f)
+                                            } else {
+                                                it
+                                            }
+                                        }
                                         .padding(horizontal = 11.dp, vertical = 9.dp)
                                 ) {
                                     Column {
@@ -333,7 +414,9 @@ fun GroupChatScreen(group: User) {
                         backgroundColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent
-                    )
+                    ),
+                    maxLines = 5, // 最多显示5行，超过后滚动
+                    textStyle = MaterialTheme.typography.body1
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -364,11 +447,52 @@ fun GroupChatScreen(group: User) {
     }
 }
 
+/**
+ * 格式化消息时间
+ */
 private fun formatGroupTime(timestamp: Long): String {
     return try {
         val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
         sdf.format(java.util.Date(timestamp))
     } catch (_: Exception) {
         ""
+    }
+}
+
+/**
+ * 格式化日期
+ */
+private fun formatDate(timestamp: Long): String {
+    return try {
+        val now = System.currentTimeMillis()
+        val msgDate = java.util.Date(timestamp)
+        val nowDate = java.util.Date(now)
+
+        val sdfDay = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        val msgDay = sdfDay.format(msgDate)
+        val nowDay = sdfDay.format(nowDate)
+
+        return when {
+            msgDay == nowDay -> "今天"
+            msgDay == sdfDay.format(java.util.Date(now - 86400000)) -> "昨天"
+            else -> {
+                val sdf = java.text.SimpleDateFormat("yyyy年MM月dd日", java.util.Locale.getDefault())
+                sdf.format(msgDate)
+            }
+        }
+    } catch (_: Exception) {
+        ""
+    }
+}
+
+/**
+ * 判断两个时间戳是否是同一天
+ */
+private fun isSameDay(timestamp1: Long, timestamp2: Long): Boolean {
+    return try {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        sdf.format(java.util.Date(timestamp1)) == sdf.format(java.util.Date(timestamp2))
+    } catch (_: Exception) {
+        false
     }
 }

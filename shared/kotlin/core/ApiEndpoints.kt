@@ -12,6 +12,9 @@ object ApiEndpoints {
     const val FRIEND_REQUESTS = "/friend/requests"
     const val FRIEND_ACCEPT = "/friend/accept"
     const val GROUP_ADD = "/user/addgroup"
+    const val GROUP_REQUESTS = "/group/requests" // 获取群聊申请列表（管理员）
+    const val GROUP_ACCEPT = "/group/accept" // 同意群聊申请
+    const val GROUP_REJECT = "/group/reject" // 拒绝群聊申请
     const val USER_DETAIL = "/user/get"
     const val GROUP_DETAIL = "/group/getDetail"
     const val OFFLINE = "/message/getOfflineMessage"

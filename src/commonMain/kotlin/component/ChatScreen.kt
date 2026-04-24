@@ -213,6 +213,29 @@ fun ChatScreen(user: User) {
                     items = userMessages,
                     key = { _, message -> message.messageId }
                 ) { index, message ->
+                    // 显示日期分隔线
+                    if (index == 0 || !isSameDay(userMessages[index - 1].timestamp, message.timestamp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(12.dp),
+                                elevation = 0.dp,
+                                modifier = Modifier.shadow(1.dp, RoundedCornerShape(12.dp))
+                            ) {
+                                Text(
+                                    text = formatDate(message.timestamp),
+                                    style = MaterialTheme.typography.caption,
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
                     var visible by remember(message.messageId) { mutableStateOf(false) }
                     LaunchedEffect(message.messageId) {
                         visible = true
@@ -273,9 +296,21 @@ fun ChatScreen(user: User) {
                                 Box(
                                     modifier = Modifier
                                         .widthIn(max = 430.dp)
+                                        .shadow(
+                                            elevation = if (message.sender) 4.dp else 2.dp,
+                                            shape = RoundedCornerShape(18.dp)
+                                        )
                                         .clip(RoundedCornerShape(18.dp))
                                         .background(messageBubbleBrush(message.sender, isDarkMode))
                                         .border(1.dp, bubbleBorderColor, RoundedCornerShape(18.dp))
+                                        .let {
+                                            // 发送中的消息添加半透明效果
+                                            if (message.sender && !message.isSent.value) {
+                                                it.alpha(0.7f)
+                                            } else {
+                                                it
+                                            }
+                                        }
                                         .padding(horizontal = 11.dp, vertical = 9.dp)
                                 ) {
                                     Column {
@@ -354,7 +389,9 @@ fun ChatScreen(user: User) {
                         backgroundColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent
-                    )
+                    ),
+                    maxLines = 5, // 最多显示5行，超过后滚动
+                    textStyle = MaterialTheme.typography.body1
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -385,11 +422,52 @@ fun ChatScreen(user: User) {
     }
 }
 
+/**
+ * 格式化消息时间
+ */
 private fun formatTime(timestamp: Long): String {
     return try {
         val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
         sdf.format(java.util.Date(timestamp))
     } catch (_: Exception) {
         ""
+    }
+}
+
+/**
+ * 格式化日期
+ */
+private fun formatDate(timestamp: Long): String {
+    return try {
+        val now = System.currentTimeMillis()
+        val msgDate = java.util.Date(timestamp)
+        val nowDate = java.util.Date(now)
+
+        val sdfDay = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        val msgDay = sdfDay.format(msgDate)
+        val nowDay = sdfDay.format(nowDate)
+
+        return when {
+            msgDay == nowDay -> "今天"
+            msgDay == sdfDay.format(java.util.Date(now - 86400000)) -> "昨天"
+            else -> {
+                val sdf = java.text.SimpleDateFormat("yyyy年MM月dd日", java.util.Locale.getDefault())
+                sdf.format(msgDate)
+            }
+        }
+    } catch (_: Exception) {
+        ""
+    }
+}
+
+/**
+ * 判断两个时间戳是否是同一天
+ */
+private fun isSameDay(timestamp1: Long, timestamp2: Long): Boolean {
+    return try {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        sdf.format(java.util.Date(timestamp1)) == sdf.format(java.util.Date(timestamp2))
+    } catch (_: Exception) {
+        false
     }
 }

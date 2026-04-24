@@ -100,20 +100,42 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
                                 ApiService.addGroup(account)
                             }
                         }
-                        responseMessage = if (success) "添加成功" else "添加失败"
-                        if (success) {
-                            val detailUser = withContext(Dispatchers.IO) {
-                                if (isUser) {
+
+                        if (isUser) {
+                            responseMessage = if (success) "添加成功" else "添加失败"
+                            if (success) {
+                                val detailUser = withContext(Dispatchers.IO) {
                                     ApiService.getUserDetail(account)
-                                } else {
-                                    ApiService.getGroupDetail(account)
+                                }
+                                detailUser?.let { u ->
+                                    // 去重：根据 id 判断是否已存在
+                                    if (users.none { it.id == u.id }) {
+                                        users = users + u
+                                    }
                                 }
                             }
-                            detailUser?.let { u ->
-                                val adjusted = if (isUser) u else u.copy(id = -u.id)
-                                // 去重：根据 id 判断是否已存在
-                                if (users.none { it.id == adjusted.id }) {
-                                    users = users + adjusted
+                        } else {
+                            // 加群处理：区分直接加入和需要审核的情况
+                            when {
+                                success -> {
+                                    responseMessage = "加入群聊成功"
+                                    val detailGroup = withContext(Dispatchers.IO) {
+                                        ApiService.getGroupDetail(account)
+                                    }
+                                    detailGroup?.let { g ->
+                                        val adjusted = g.copy(id = -g.id)
+                                        // 去重：根据 id 判断是否已存在
+                                        if (users.none { it.id == adjusted.id }) {
+                                            users = users + adjusted
+                                        }
+                                    }
+                                }
+                                responseMessage?.contains("审核") == true -> {
+                                    // 服务器返回需要审核的提示
+                                    responseMessage = "申请已发送，等待管理员同意"
+                                }
+                                else -> {
+                                    responseMessage = "加入群聊失败"
                                 }
                             }
                         }

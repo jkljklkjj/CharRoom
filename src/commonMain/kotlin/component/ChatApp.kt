@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -300,6 +302,7 @@ fun ChatApp(
     }
     var showDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showGroupApplications by remember { mutableStateOf(false) } // 群聊申请对话框
     var clearHistoryHint by remember { mutableStateOf("") }
 
     fun openSearchDialog() {
@@ -417,10 +420,16 @@ fun ChatApp(
             )
         }
 
-        if (windowSize.width > windowSize.height) {
+        // 响应式布局判断：宽度大于700dp时使用双栏布局
+        val isWideScreen = windowSize.width > 700.dp
+
+        if (isWideScreen) {
             Row(Modifier.fillMaxSize().padding(12.dp)) {
                 Surface(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    modifier = Modifier
+                        .widthIn(max = 320.dp) // 侧边栏最大宽度限制
+                        .weight(1f)
+                        .fillMaxHeight(),
                     color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.52f else 0.72f),
                     shape = RoundedCornerShape(22.dp),
                     elevation = 8.dp
@@ -429,7 +438,8 @@ fun ChatApp(
                         UserList(
                             selectedUserId = selectedUser?.id,
                             onOpenSearch = { openSearchDialog() },
-                            onOpenSettings = { showSettings = true }
+                            onOpenSettings = { showSettings = true },
+                            onOpenApplications = { showGroupApplications = true }
                         ) { user ->
                             selectedUser = user
                             if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
@@ -458,7 +468,9 @@ fun ChatApp(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Surface(
-                    modifier = Modifier.weight(2f).fillMaxHeight(),
+                    modifier = Modifier
+                        .weight(2f)
+                        .fillMaxHeight(),
                     color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.5f else 0.66f),
                     shape = RoundedCornerShape(22.dp),
                     elevation = 8.dp
@@ -477,7 +489,8 @@ fun ChatApp(
                     UserList(
                         selectedUserId = selectedUser?.id,
                         onOpenSearch = { openSearchDialog() },
-                        onOpenSettings = { showSettings = true }
+                        onOpenSettings = { showSettings = true },
+                        onOpenApplications = { showGroupApplications = true }
                     ) { user ->
                         selectedUser = user
                         if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
@@ -507,13 +520,53 @@ fun ChatApp(
                     shape = RoundedCornerShape(20.dp),
                     elevation = 6.dp
                 ) {
-                    animatedChatTransition()
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // 移动端返回按钮
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                            elevation = 0.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(chatHeaderBrush(isDarkMode))
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowBack,
+                                    contentDescription = "返回",
+                                    tint = MaterialTheme.colors.onBackground,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clickable { selectedUser = null }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "返回会话列表",
+                                    style = MaterialTheme.typography.subtitle2,
+                                    color = MaterialTheme.colors.onBackground
+                                )
+                            }
+                        }
+
+                        // 聊天内容区域
+                        Box(modifier = Modifier.weight(1f)) {
+                            animatedChatTransition()
+                        }
+                    }
                 }
             }
         }
 
         if (showDialog) {
             AddUserOrGroupDialog { showDialog = false }
+        }
+
+        if (showGroupApplications) {
+            GroupApplicationDialog { showGroupApplications = false }
         }
 
         if (showSettings) {

@@ -35,6 +35,8 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,8 +67,23 @@ fun UserList(
     selectedUserId: Int? = null,
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenApplications: () -> Unit = {}, // 打开申请管理界面
     onUserClick: (User) -> Unit
 ) {
+    // 群聊申请状态
+    var hasPendingGroupApplications by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // 定时检查是否有未处理的群聊申请
+    LaunchedEffect(Unit) {
+        scope.launch {
+            while (true) {
+                val requests = ApiService.fetchGroupRequests()
+                hasPendingGroupApplications = requests.isNotEmpty()
+                kotlinx.coroutines.delay(30000) // 每30秒检查一次
+            }
+        }
+    }
     val userListState = users
     val onlineCount = userListState.count { it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
 
@@ -108,6 +125,22 @@ fun UserList(
                             contentDescription = "搜索",
                             onClick = onOpenSearch
                         )
+                        // 群聊申请入口，有未处理申请时显示红点
+                        Box {
+                            ElasticHeaderAction(
+                                icon = Icons.Default.PersonAdd,
+                                contentDescription = "申请管理",
+                                onClick = onOpenApplications
+                            )
+                            if (hasPendingGroupApplications) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .align(Alignment.TopEnd)
+                                        .background(Color(0xFFF44336), CircleShape)
+                                )
+                            }
+                        }
                         ElasticHeaderAction(
                             icon = Icons.Default.Settings,
                             contentDescription = "设置",
