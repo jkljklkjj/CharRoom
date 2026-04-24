@@ -43,6 +43,12 @@ class MainActivity : ComponentActivity() {
         // 请求必要权限
         requestNecessaryPermissions()
 
+        // 注册网络状态回调
+        NetworkChangeReceiver.registerNetworkCallback(this)
+
+        // 处理通知点击意图
+        handleNotificationIntent(intent)
+
         setContent {
             MaterialTheme {
                 App()
@@ -62,12 +68,49 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleNotificationIntent(it) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 应用回到前台，清除所有通知
+        val app = application as ChatApplication
+        app.notificationManager.cancelAllNotifications()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         try {
             ChatForegroundService.stop(this)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    /**
+     * 处理通知点击意图
+     */
+    private fun handleNotificationIntent(intent: Intent) {
+        val notificationType = intent.getStringExtra("NOTIFICATION_TYPE") ?: return
+        val userId = intent.getIntExtra("USER_ID", -1)
+        val groupId = intent.getIntExtra("GROUP_ID", -1)
+
+        // 这里可以根据通知类型跳转到对应的聊天界面
+        // 目前暂时只清除通知，后续可以集成到导航逻辑中
+        val app = application as ChatApplication
+        when (notificationType) {
+            "private" -> {
+                if (userId != -1) {
+                    app.notificationManager.cancelPrivateNotification(userId)
+                }
+            }
+            "group" -> {
+                if (groupId != -1) {
+                    app.notificationManager.cancelGroupNotification(groupId)
+                }
+            }
         }
     }
 }

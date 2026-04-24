@@ -30,6 +30,43 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import component.appendAgentChunk
 
+/**
+ * 全局消息接收回调接口
+ */
+interface MessageReceiveListener {
+    /**
+     * 收到私聊消息
+     */
+    fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long)
+
+    /**
+     * 收到群聊消息
+     */
+    fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long)
+}
+
+// 全局回调列表
+private val messageListeners = mutableListOf<MessageReceiveListener>()
+
+/**
+ * 注册消息接收监听器
+ */
+fun addMessageReceiveListener(listener: MessageReceiveListener) {
+    synchronized(messageListeners) {
+        if (!messageListeners.contains(listener)) {
+            messageListeners.add(listener)
+        }
+    }
+}
+
+/**
+ * 移除消息接收监听器
+ */
+fun removeMessageReceiveListener(listener: MessageReceiveListener) {
+    synchronized(messageListeners) {
+        messageListeners.remove(listener)
+    }
+}
 
 // 定义发送类型枚举，统一管理后端协议中的字符串
 enum class MsgType(val wire: String) {
@@ -192,7 +229,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                 }
             }
 
-            messages += Message(
+            val message = Message(
                 senderId = senderId,
                 message = text,
                 sender = sender,
@@ -200,7 +237,15 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                 isSent = mutableStateOf(true),
                 messageId = messageId ?: ""
             )
+            messages += message
             try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = senderId.toString(), metadata = mapOf("text" to text.take(64)))) } catch (_: Exception) {}
+
+            // 通知消息监听器
+            synchronized(messageListeners) {
+                messageListeners.forEach {
+                    it.onPrivateMessageReceived(senderId, text, timestamp)
+                }
+            }
         } catch (E: Exception) {
             println("Error handling incoming message: ${E.message}")
             E.printStackTrace()
@@ -239,7 +284,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         }
                     }
 
-                    messages += Message(
+                    val message = Message(
                         senderId = senderId,
                         message = text,
                         sender = false,
@@ -247,6 +292,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         isSent = mutableStateOf(true),
                         messageId = messageId
                     )
+                    messages += message
                     try {
                         ActionLogger.log(
                             Action(
@@ -256,6 +302,13 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                             )
                         )
                     } catch (_: Exception) {
+                    }
+
+                    // 通知消息监听器
+                    synchronized(messageListeners) {
+                        messageListeners.forEach {
+                            it.onPrivateMessageReceived(senderId, text, ts)
+                        }
                     }
                 }
 
@@ -286,7 +339,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         }
                     }
 
-                    groupMessages += GroupMessage(
+                    val groupMessage = GroupMessage(
                         groupId = groupId,
                         senderName = senderId.toString(),
                         text = text,
@@ -295,6 +348,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         isSent = mutableStateOf(true),
                         messageId = messageId
                     )
+                    groupMessages += groupMessage
                     try {
                         ActionLogger.log(
                             Action(
@@ -304,6 +358,13 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                             )
                         )
                     } catch (_: Exception) {
+                    }
+
+                    // 通知消息监听器
+                    synchronized(messageListeners) {
+                        messageListeners.forEach {
+                            it.onGroupMessageReceived(groupId, senderId, senderId.toString(), text, groupMessage.timestamp)
+                        }
                     }
                 }
 
@@ -360,27 +421,45 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
             when (messageType) {
                 "chat" -> {
                     println("New private message from $senderName: $messageContent")
-                    messages += Message(
+                    val timestamp = System.currentTimeMillis()
+                    val message = Message(
                         senderId = userId,
                         message = messageContent,
                         sender = false,
-                        timestamp = System.currentTimeMillis(),
+                        timestamp = timestamp,
                         isSent = mutableStateOf(true)
                     )
+                    messages += message
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = userId.toString(), metadata = mapOf("text" to messageContent.take(64)))) } catch (_: Exception) {}
+
+                    // 通知消息监听器
+                    synchronized(messageListeners) {
+                        messageListeners.forEach {
+                            it.onPrivateMessageReceived(userId, messageContent, timestamp)
+                        }
+                    }
                 }
                 "groupChat" -> {
                     val groupId = json.get("groupId")?.asInt() ?: throw IllegalArgumentException("Missing groupId")
                     println("New group message in group $groupId from $senderName: $messageContent")
-                    groupMessages += GroupMessage(
+                    val timestamp = System.currentTimeMillis()
+                    val groupMessage = GroupMessage(
                         groupId = groupId,
                         senderName = senderName,
                         text = messageContent,
                         senderId = userId,
-                        timestamp = System.currentTimeMillis(),
+                        timestamp = timestamp,
                         isSent = mutableStateOf(true)
                     )
+                    groupMessages += groupMessage
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = groupId.toString(), metadata = mapOf("text" to messageContent.take(64), "group" to "true"))) } catch (_: Exception) {}
+
+                    // 通知消息监听器
+                    synchronized(messageListeners) {
+                        messageListeners.forEach {
+                            it.onGroupMessageReceived(groupId, userId, senderName, messageContent, timestamp)
+                        }
+                    }
                 }
                 else -> {
                     println("Unknown message type: $messageType")

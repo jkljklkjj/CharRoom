@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -167,11 +168,12 @@ fun GroupChatScreen(group: User) {
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
-                state = listState
+                state = listState,
+                reverseLayout = false // 正常顺序，最新消息在底部
             ) {
                 // 加载更多提示
                 if (isLoadingMore) {
-                    item {
+                    item(key = "loading_indicator") {
                         Box(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                             contentAlignment = Alignment.Center
@@ -184,7 +186,7 @@ fun GroupChatScreen(group: User) {
                         }
                     }
                 } else if (!hasMoreHistory && filteredGroupMessages.isNotEmpty()) {
-                    item {
+                    item(key = "no_more_messages") {
                         Box(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                             contentAlignment = Alignment.Center
@@ -198,10 +200,10 @@ fun GroupChatScreen(group: User) {
                     }
                 }
 
-                items(
+                itemsIndexed(
                     items = filteredGroupMessages,
-                    key = { it.messageId }
-                ) { message ->
+                    key = { _, message -> message.messageId }
+                ) { index, message ->
                     val self = message.senderId == ServerConfig.id.toIntOrNull()
                     var visible by remember(message.messageId) { mutableStateOf(false) }
                     LaunchedEffect(message.messageId) {

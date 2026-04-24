@@ -10,13 +10,16 @@ import component.CoolOrangeShapes
 import component.LoginRegisterApp
 
 @Composable
-fun App() {
+fun App(menuBar: @Composable (() -> Unit)? = null) {
     var isDarkMode by remember { mutableStateOf(false) }
 
     MaterialTheme(
         colors = if (isDarkMode) CoolOrangeDarkColors else CoolOrangeLightColors,
         shapes = CoolOrangeShapes
     ) {
+        // 桌面端菜单栏
+        menuBar?.invoke()
+
         LoginRegisterApp(
             isDarkMode = isDarkMode,
             onToggleDarkMode = { isDarkMode = !isDarkMode }
