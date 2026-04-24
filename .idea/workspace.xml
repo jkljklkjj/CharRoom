@@ -9,29 +9,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="基本完成app逻辑和界面构建">
+    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="app接入客户端逻辑">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AuthScreens.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AuthScreens.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UiComponents.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UiComponents.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shared/kotlin/core/NetworkConstants.kt" beforeDir="false" afterPath="$PROJECT_DIR$/shared/kotlin/core/NetworkConstants.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/core/ProtobufBuilders.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/androidMain/kotlin/core/ProtobufBuilders.android.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/core/ProtobufResponseParser.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/androidMain/kotlin/core/ProtobufResponseParser.android.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/AgentKtorClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/AgentKtorClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/java/com/chatlite/proto/MessageProtos.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufBuilders.desktop.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufBuilders.desktop.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufResponseParser.desktop.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufResponseParser.desktop.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/proto/message.proto" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/proto/message.proto" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -204,7 +183,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Android App.CharRoom">
+  <component name="RunManager" selected="Gradle.desktop">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -622,6 +601,8 @@
       <workItem from="1776699038629" duration="112000" />
       <workItem from="1776699718495" duration="239000" />
       <workItem from="1776753911089" duration="2033000" />
+      <workItem from="1776761947024" duration="116000" />
+      <workItem from="1776941899642" duration="51000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -919,7 +900,15 @@
       <option name="project" value="LOCAL" />
       <updated>1776699865765</updated>
     </task>
-    <option name="localTasksCounter" value="38" />
+    <task id="LOCAL-00038" summary="app接入客户端逻辑">
+      <option name="closed" value="true" />
+      <created>1776761972817</created>
+      <option name="number" value="00038" />
+      <option name="presentableId" value="LOCAL-00038" />
+      <option name="project" value="LOCAL" />
+      <updated>1776761972817</updated>
+    </task>
+    <option name="localTasksCounter" value="39" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -974,7 +963,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Merge remote-tracking branch 'origin/master'" />
     <MESSAGE value="完成发送逻辑&#10;修正重发图标逻辑" />
     <MESSAGE value="实现自动滚动到底部" />
     <MESSAGE value="版本修改" />
@@ -999,7 +987,8 @@
     <MESSAGE value="构建安卓客户端" />
     <MESSAGE value="完成安卓客户端基本框架" />
     <MESSAGE value="基本完成app逻辑和界面构建" />
-    <option name="LAST_COMMIT_MESSAGE" value="基本完成app逻辑和界面构建" />
+    <MESSAGE value="app接入客户端逻辑" />
+    <option name="LAST_COMMIT_MESSAGE" value="app接入客户端逻辑" />
   </component>
   <component name="VgoProject">
     <integration-enabled>false</integration-enabled>

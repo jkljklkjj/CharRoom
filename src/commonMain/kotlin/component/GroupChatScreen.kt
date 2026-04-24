@@ -63,7 +63,12 @@ import model.groupMessages
 @Composable
 fun GroupChatScreen(group: User) {
     var messageText by remember { mutableStateOf("") }
-    val filteredGroupMessages = groupMessages.filter { it.groupId == -group.id }
+    // 使用derivedStateOf优化群聊消息过滤
+    val filteredGroupMessages by remember(group.id) {
+        derivedStateOf {
+            groupMessages.filter { it.groupId == -group.id }
+        }
+    }
     var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()

@@ -71,7 +71,12 @@ import core.loadImageBitmapFromUrl
 @Composable
 fun ChatScreen(user: User) {
     var messageText by remember { mutableStateOf("") }
-    val userMessages = messages.filter { it.senderId == user.id }
+    // 使用derivedStateOf优化消息过滤，只有messages变化或user变化时才重新计算
+    val userMessages by remember(user.id) {
+        derivedStateOf {
+            messages.filter { it.senderId == user.id }
+        }
+    }
     var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -196,7 +201,7 @@ fun ChatScreen(user: User) {
                                 if (!message.sender) {
                                     var partnerAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
                                     LaunchedEffect(user.avatarUrl, user.avatarKey) {
-                                        partnerAvatar = if (!user.avatarUrl.isNullOrBlank()) loadImageBitmapFromUrl(user.avatarUrl!!, user.avatarKey) else null
+                                        partnerAvatar = if (!user.avatarUrl.isNullOrBlank()) loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) else null
                                     }
                                     if (partnerAvatar != null) {
                                         Image(bitmap = partnerAvatar!!, contentDescription = "avatar", modifier = Modifier.size(32.dp).clip(CircleShape))

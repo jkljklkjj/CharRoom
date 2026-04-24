@@ -21,9 +21,13 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import component.appendAgentChunk
 
 
@@ -165,6 +169,29 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
             val timestamp = json.get("timestamp")?.asLong() ?: throw IllegalArgumentException("Missing timestamp")
             val sender = false
             val text = json.get("message")?.asText() ?: throw IllegalArgumentException("Missing content")
+
+            // 消息去重
+            if (messageId != null && messageId.isNotBlank()) {
+                runBlocking {
+                    Chat.messageCacheMutex.withLock {
+                        if (Chat.receivedMessageIds.contains(messageId)) {
+                            AppLog.d{"收到重复消息，忽略: $messageId"}
+                            return@runBlocking
+                        }
+                        // 添加到去重缓存
+                        Chat.receivedMessageIds.add(messageId)
+                        // 缓存超过大小，移除最旧的
+                        if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
+                            val iterator = Chat.receivedMessageIds.iterator()
+                            if (iterator.hasNext()) {
+                                iterator.next()
+                                iterator.remove()
+                            }
+                        }
+                    }
+                }
+            }
+
             messages += Message(
                 senderId = senderId,
                 message = text,
@@ -190,13 +217,35 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     val senderId = payload.get("userId")?.asText()?.toIntOrNull() ?: return
                     val text = payload.get("content")?.asText() ?: return
                     val ts = payload.get("timestamp")?.asText()?.toLongOrNull() ?: System.currentTimeMillis()
+                    val messageId = payload.get("timestamp")?.asText() ?: ""
+
+                    // 消息去重
+                    if (messageId.isNotBlank()) {
+                        runBlocking {
+                            Chat.messageCacheMutex.withLock {
+                                if (Chat.receivedMessageIds.contains(messageId)) {
+                                    AppLog.d{"收到重复消息，忽略: $messageId"}
+                                    return@runBlocking
+                                }
+                                Chat.receivedMessageIds.add(messageId)
+                                if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
+                                    val iterator = Chat.receivedMessageIds.iterator()
+                                    if (iterator.hasNext()) {
+                                        iterator.next()
+                                        iterator.remove()
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     messages += Message(
                         senderId = senderId,
                         message = text,
                         sender = false,
                         timestamp = ts,
-                        isSent = mutableStateOf(true)
+                        isSent = mutableStateOf(true),
+                        messageId = messageId
                     )
                     try {
                         ActionLogger.log(
@@ -214,6 +263,28 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     val groupId = payload.get("targetClientId")?.asText()?.toIntOrNull() ?: return
                     val senderId = payload.get("userId")?.asText()?.toIntOrNull() ?: return
                     val text = payload.get("content")?.asText() ?: return
+                    val messageId = payload.get("timestamp")?.asText() ?: ""
+
+                    // 消息去重
+                    if (messageId.isNotBlank()) {
+                        runBlocking {
+                            Chat.messageCacheMutex.withLock {
+                                val uniqueId = "group_${groupId}_${senderId}_$messageId"
+                                if (Chat.receivedMessageIds.contains(uniqueId)) {
+                                    AppLog.d{"收到重复群聊消息，忽略: $uniqueId"}
+                                    return@runBlocking
+                                }
+                                Chat.receivedMessageIds.add(uniqueId)
+                                if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
+                                    val iterator = Chat.receivedMessageIds.iterator()
+                                    if (iterator.hasNext()) {
+                                        iterator.next()
+                                        iterator.remove()
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     groupMessages += GroupMessage(
                         groupId = groupId,
@@ -221,7 +292,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         text = text,
                         senderId = senderId,
                         timestamp = System.currentTimeMillis(),
-                        isSent = mutableStateOf(true)
+                        isSent = mutableStateOf(true),
+                        messageId = messageId
                     )
                     try {
                         ActionLogger.log(
@@ -365,7 +437,38 @@ object Chat {
 
     val isServerConnected = mutableStateOf(true)
     private var heartbeatJob: Job? = null
-    private val heartbeatIntervalMillis = 10000L // 10秒
+    private val heartbeatIntervalMillis = 30000L // 30秒心跳
+    private val heartbeatTimeoutMillis = 5000L // 心跳超时5秒
+
+    // 自动重连配置
+    private var reconnectJob: Job? = null
+    private val maxReconnectDelay = 30000L // 最大重连间隔30秒
+    private val initialReconnectDelay = 1000L // 初始重连间隔1秒
+    private var currentReconnectDelay = initialReconnectDelay
+    private val isReconnecting = AtomicBoolean(false)
+    private val stopReconnect = AtomicBoolean(false)
+
+    // 消息队列，网络断开时缓存待发送消息
+    private val messageQueue = ConcurrentLinkedQueue<PendingMessage>()
+    private val queueMutex = Mutex()
+    private val maxQueueSize = 1000 // 最大队列长度，防止内存溢出
+
+    // 消息去重缓存，存储最近收到的消息ID
+    private val receivedMessageIds = mutableSetOf<String>()
+    private val maxMessageCacheSize = 1000 // 最多缓存1000条消息ID
+    private val messageCacheMutex = Mutex()
+
+    // 待发送消息封装
+    private data class PendingMessage(
+        val payload: ByteArray,
+        val type: MsgType,
+        val targetClientId: String,
+        val expectedResponses: Int,
+        val callback: (Boolean, List<Any>) -> Unit,
+        val timestamp: Long = System.currentTimeMillis(),
+        val retryCount: Int = 0,
+        val maxRetries: Int = 3
+    )
 
     // helper: strip explicit port from host string if present (simple IPv4/hostname handling)
     private fun hostWithoutPort(rawHost: String?): String {
@@ -378,179 +481,67 @@ object Chat {
         // normalize host to remove any provided ":port" suffix and force port 80 per request
         host = newHost
         port = 80 // always use 80 for both HTTP and WS as requested
-        val effectiveHost = hostWithoutPort(host)
+        stopReconnect.set(false)
 
         // 注册关闭钩子
         Runtime.getRuntime().addShutdownHook(Thread {
             shutdown()
         })
-        val group = NioEventLoopGroup()
 
         try {
-            val b = Bootstrap()
-            b.group(group)
-                .channel(NioSocketChannel::class.java)
-                .handler(object : ChannelInitializer<Channel>() {
-                    override fun initChannel(ch: Channel) {
-                        val pipeline = ch.pipeline()
-                        pipeline.addLast(HttpClientCodec())
-                        pipeline.addLast(HttpObjectAggregator(8192))
-                        // Use WebSocketClientProtocolHandler to handle handshake and install frame encoders/decoders
-                        val uidQuery = try {
-                            val idVal = ServerConfig.id
-                            if (!idVal.isNullOrBlank()) "?clientId=${idVal}" else ""
-                        } catch (_: Exception) {
-                            ""
-                        }
-                        // Typical server expects /ws or /ws?clientId=...; use that form
-                        val wsUri = URI("ws://$effectiveHost/ws")
+            startInternal()
 
-                        // create explicit handshaker and install protocol handler (this ensures correct encoders/decoders)
-                        val headers = DefaultHttpHeaders()
-                        // include Authorization header if token available (many servers require JWT in upgrade request)
-                        val tokenForHandshake = try { ServerConfig.Token } catch (_: Exception) { "" }
-                        if (!tokenForHandshake.isNullOrBlank()) {
-                            headers.set("Authorization", "Bearer $tokenForHandshake")
-                        }
-                        // set Host header explicitly (some servers validate Host during upgrade)
-                        try { headers.set(HttpHeaderNames.HOST.toString(), effectiveHost) } catch (_: Exception) {}
-                        // set a sensible Origin to avoid some servers rejecting cross-origin upgrades
-                        try { headers.set("Origin", "http://$effectiveHost") } catch (_: Exception) {}
-
-                        val handshaker = WebSocketClientHandshakerFactory.newHandshaker(
-                            wsUri,
-                            WebSocketVersion.V13,
-                            null,
-                            true,
-                            headers,
-                            64 * 1024
-                        )
-                        // add a logging handler to help debug handshake and frames
-//                        pipeline.addLast(LoggingHandler(LogLevel.DEBUG))
-                        // log any HTTP responses during handshake (useful to see 401/403/400)
-//                        pipeline.addLast(HttpResponseLogger())
-                        pipeline.addLast(WebSocketClientProtocolHandler(handshaker, true))
-                        responseHandler = CustomWebSocketHandler()
-                        pipeline.addLast(responseHandler)
-                    }
-                })
-
-            // Quick HTTP probe to see if server returns an HTTP error at the WS endpoint
-            try {
-                val probeClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
-                val probeUidQuery = try { ServerConfig.id } catch (_: Exception) { "" }
-                // build probe URI without explicit port number (no client id/query)
-                val probeUri = URI.create("http://$effectiveHost/ws")
-                val probeBuilder = HttpRequest.newBuilder().uri(probeUri).timeout(Duration.ofSeconds(2)).GET()
-                val tokenForProbe = try { ServerConfig.Token } catch (_: Exception) { "" }
-                if (!tokenForProbe.isNullOrBlank()) probeBuilder.header("Authorization", "Bearer $tokenForProbe")
-                val probeReq = probeBuilder.build()
-                val probeResp = probeClient.send(probeReq, HttpResponse.BodyHandlers.ofString())
-                 println("HTTP probe to $probeUri returned: ${probeResp.statusCode()}")
-                 if (probeResp.body() != null && probeResp.body().isNotBlank()) println("Probe body: ${probeResp.body()}")
-            } catch (e: Exception) {
-                println("HTTP probe failed: ${e.message}")
-            }
-
-            // connect + handshake with a small retry loop to tolerate transient early-close during handshake
-            val maxAttempts = 3
-            var attempt = 0
-            var connectedAndHandshaked = false
-            while (attempt < maxAttempts && !connectedAndHandshaked) {
-                attempt++
-                println("Attempt #$attempt to connect to $effectiveHost:$port")
-                val f: ChannelFuture? = try {
-                    val cf = b.connect(effectiveHost, port)
-                    cf.addListener {
-                        if (it.isSuccess) {
-                            println("Connected to $effectiveHost:$port, channel active=${cf.channel().isActive}")
-                        } else {
-                            println("Connection failed on attempt $attempt: ${it.cause()}")
-                        }
-                    }
-                    cf.sync()
-                    cf
-                } catch (e: Exception) {
-                    println("Connect failed on attempt $attempt: ${e.message}")
-                    null
-                }
-
-                if (f == null) {
-                    if (attempt < maxAttempts) Thread.sleep(1000)
-                    continue
-                }
-
-                channel = f.channel()
-
-                // wait for websocket handshake to complete (installed in pipeline)
-                try {
-                    val handshakeWaitSeconds = 10L
-                    println("Waiting up to ${handshakeWaitSeconds}s for websocket handshake...")
-                    responseHandler.handshakeFuture.get(handshakeWaitSeconds, TimeUnit.SECONDS)
-                    println("WebSocket握手完成")
-                     // print pipeline for debugging
-                     try {
-                         println("Pipeline after handshake: ${channel.pipeline().toString()}")
-                     } catch (_: Exception) {}
-                     connectedAndHandshaked = true
-                 } catch (e: java.util.concurrent.TimeoutException) {
-                    println("WebSocket 握手超时 on attempt $attempt (${e.message}), dumping pipeline and closing channel")
-                    try { println("Pipeline at timeout: ${channel.pipeline().toString()}") } catch (_: Exception) {}
-                    try { channel.close().sync() } catch (_: Exception) {}
-                    if (attempt < maxAttempts) Thread.sleep(1000)
-                } catch (e: Exception) {
-                    println("WebSocket 握手失败或超时 on attempt $attempt: ${e.message}")
-                    try { channel.close().sync() } catch (_: Exception) {}
-                    if (attempt < maxAttempts) Thread.sleep(1000)
-                }
-            }
-
-            if (!::channel.isInitialized || !connectedAndHandshaked) {
-                throw Exception("Failed to establish and handshake WebSocket after $maxAttempts attempts")
-            }
-
-            // 发送登录消息
-            val loginWrapperBytes = buildLoginPayload(ServerConfig.Token)
-            send(loginWrapperBytes, MsgType.LOGIN, ServerConfig.Token, 1) { success, _ ->
-                if (success) {
-                    println("登录成功")
-                } else {
-                    println("登录失败")
-                }
-            }
-            // 启动心跳定时任务
-//            startHeartbeat()
-            channel.closeFuture().addListener(ChannelFutureListener {
-                println("聊天服务器连接已关闭！")
-            })
+            // 阻塞等待连接关闭
             channel.closeFuture().sync()
         } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            shutdown()
-            group.shutdownGracefully()
+            AppLog.e("连接失败: ${e.message}", e)
+            // 连接失败，启动重连
+            if (!stopReconnect.get() && isReconnecting.compareAndSet(false, true)) {
+                currentReconnectDelay = initialReconnectDelay
+                startReconnectLoop()
+            }
         }
     }
 
     private fun startHeartbeat() {
         heartbeatJob?.cancel()
         heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
-            while (true) {
+            while (isActive) {
                 try {
-                    val heartbeatTimeout = 5000L // 5秒超时
+                    if (!isConnected()) {
+                        delay(1000)
+                        continue
+                    }
+
                     val heartbeatResult = CompletableDeferred<Boolean>()
 
                     // 构建心跳消息
                     val wrapperBytes = buildHeartbeatPayload()
 
-                    send(wrapperBytes, MsgType.HEARTBEAT, ServerConfig.Token, 1) { success, _ ->
+                    sendInternal(wrapperBytes, MsgType.HEARTBEAT, ServerConfig.Token, 1) { success, _ ->
                         heartbeatResult.complete(success)
                     }
-                    val ok = withTimeoutOrNull(heartbeatTimeout) { heartbeatResult.await() } ?: false
-                    println(ok)
+
+                    val ok = withTimeoutOrNull(heartbeatTimeoutMillis) {
+                        heartbeatResult.await()
+                    } ?: false
+
                     isServerConnected.value = ok
+
+                    if (!ok) {
+                        AppLog.w("心跳超时，连接可能已断开")
+                        // 心跳失败，关闭连接触发重连
+                        channel.close()
+                        break
+                    }
                 } catch (e: Exception) {
+                    AppLog.e("心跳发送失败: ${e.message}")
                     isServerConnected.value = false
+                    // 关闭连接触发重连
+                    if (::channel.isInitialized && channel.isActive) {
+                        runCatching { channel.close() }
+                    }
+                    break
                 }
                 delay(heartbeatIntervalMillis)
             }
@@ -574,33 +565,71 @@ object Chat {
         callback: (Boolean, List<Any>) -> Unit
     ) {
         AppLog.d{"正在发送WebSocket消息"}
+
+        // 心跳消息不缓存，直接丢弃
+        if (type == MsgType.HEARTBEAT && !isConnected()) {
+            callback(false, emptyList())
+            return
+        }
+
+        // 如果未连接，将消息加入队列
+        if (!isConnected()) {
+            AppLog.d{"连接未建立，消息加入队列: $type -> $targetClientId"}
+            CoroutineScope(Dispatchers.IO).launch {
+                enqueueMessage(
+                    PendingMessage(
+                        payload = payload,
+                        type = type,
+                        targetClientId = targetClientId,
+                        expectedResponses = expectedResponses,
+                        callback = callback
+                    )
+                )
+            }
+            return
+        }
+
+        // 连接已建立，直接发送
+        sendInternal(payload, type, targetClientId, expectedResponses, callback)
+    }
+
+    /**
+     * 内部发送方法，直接发送消息不经过队列
+     */
+    private fun sendInternal(
+        payload: ByteArray,
+        type: MsgType,
+        targetClientId: String,
+        expectedResponses: Int,
+        callback: (Boolean, List<Any>) -> Unit
+    ) {
         // 如果握手尚未完成，延后发送以避免 WebSocket 编码器在 state=0 时接收到帧
         try {
             if (!this::responseHandler.isInitialized || !responseHandler.handshakeFuture.isDone) {
-                println("Handshake 未完成，稍后发送消息")
+                AppLog.d{"Handshake 未完成，稍后发送消息"}
                 try {
                     if (this::responseHandler.isInitialized) {
                         responseHandler.handshakeFuture.whenComplete { _, ex ->
                             if (ex == null) {
                                 try {
-                                    send(payload, type, targetClientId, expectedResponses, callback)
+                                    sendInternal(payload, type, targetClientId, expectedResponses, callback)
                                 } catch (e: Exception) {
-                                    println("握手完成后发送失败: ${e.message}")
+                                    AppLog.d{"握手完成后发送失败: ${e.message}"}
                                     callback(false, emptyList())
                                 }
                             } else {
-                                println("握手失败，无法发送消息: ${ex.message}")
+                                AppLog.d{"握手失败，无法发送消息: ${ex.message}"}
                                 callback(false, emptyList())
                             }
                         }
                         return
                     } else {
-                        println("responseHandler 未初始化，无法排队发送")
+                        AppLog.d{"responseHandler 未初始化，无法发送"}
                         callback(false, emptyList())
                         return
                     }
                 } catch (e: Exception) {
-                    println("排队发送时出错: ${e.message}")
+                    AppLog.d{"发送时出错: ${e.message}"}
                     callback(false, emptyList())
                     return
                 }
@@ -615,11 +644,7 @@ object Chat {
             channel.eventLoop().execute {
                 synchronized(sendLock) {
                     try {
-                        println("Writing frame to channel, frame class: ${BinaryWebSocketFrame::class.java.name}")
-                    } catch (_: Exception) {}
-                    try {
-                        val pipelineNames = channel.pipeline().names()
-                        println("Pipeline before write: $pipelineNames")
+                        AppLog.d{"Writing frame to channel, frame class: ${BinaryWebSocketFrame::class.java.name}"}
                     } catch (_: Exception) {}
                      // allocate buffer from the channel's allocator to match pipeline expectations
                      val buf = channel.alloc().buffer(payload.size)
@@ -627,10 +652,10 @@ object Chat {
                      val outFrame = BinaryWebSocketFrame(buf)
                      channel.writeAndFlush(outFrame).addListener { future ->
                          if (future.isSuccess) {
-                             println("WebSocket消息发送成功")
+                             AppLog.d{"WebSocket消息发送成功"}
                             // 非阻塞等待响应（带超时），避免阻塞 Netty 事件循环线程
                              try {
-                                val timeoutSeconds = 30L // 调试时延长等待时间
+                                val timeoutSeconds = if (type == MsgType.HEARTBEAT) 5L else 30L
                                 val timeoutTask = channel.eventLoop().schedule({
                                     try {
                                         if (!responseHandler.responseFuture.isDone) {
@@ -646,9 +671,9 @@ object Chat {
                                         try { timeoutTask.cancel(false) } catch (_: Exception) {}
                                         if (ex != null) {
                                             if (ex is TimeoutException) {
-                                                println("等待响应超时: ${ex.message}")
+                                                AppLog.d{"等待响应超时: ${ex.message}"}
                                             } else {
-                                                println("等待响应时出现错误: ${ex.message}")
+                                                AppLog.d{"等待响应时出现错误: ${ex.message}"}
                                             }
                                             callback(false, emptyList())
                                         } else {
@@ -660,17 +685,17 @@ object Chat {
                                     }
                                 }
                             } catch (e: Exception) {
-                                println("等待响应时出现错误: ${e.message}")
+                                AppLog.d{"等待响应时出现错误: ${e.message}"}
                                 callback(false, emptyList())
                                 responseHandler.setExpectedResponses(1)
                             }
                          } else {
-                             println("WebSocket消息发送失败: ${future.cause()}")
+                             AppLog.d{"WebSocket消息发送失败: ${future.cause()}"}
                              future.cause()?.let { t ->
                                  try {
                                      if (t is io.netty.handler.codec.EncoderException) {
                                          val names = channel.pipeline().names()
-                                         println("EncoderException - pipeline names: $names")
+                                         AppLog.d{"EncoderException - pipeline names: $names"}
                                      }
                                  } catch (_: Exception) {}
                                  t.printStackTrace()
@@ -682,7 +707,7 @@ object Chat {
                  }
              }
          } else {
-             println("Channel未初始化或已关闭，无法发送消息")
+             AppLog.d{"Channel未初始化或已关闭，无法发送消息"}
              callback(false, emptyList())
          }
      }
@@ -714,8 +739,221 @@ object Chat {
          }
      }
 
+    /**
+     * 检查是否已连接
+     */
+    fun isConnected(): Boolean {
+        return ::channel.isInitialized && channel.isActive && isServerConnected.value
+    }
+
+    /**
+     * 手动重连
+     */
+    fun reconnect() {
+        if (isReconnecting.compareAndSet(false, true)) {
+            stopReconnect.set(false)
+            currentReconnectDelay = initialReconnectDelay
+            startReconnectLoop()
+        }
+    }
+
+    /**
+     * 启动重连循环
+     */
+    private fun startReconnectLoop() {
+        reconnectJob?.cancel()
+        reconnectJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive && !stopReconnect.get() && !isConnected()) {
+                try {
+                    AppLog.i("尝试重连，延迟 ${currentReconnectDelay}ms...")
+                    delay(currentReconnectDelay)
+
+                    // 尝试重新连接
+                    val result = runCatching {
+                        startInternal()
+                    }
+
+                    if (result.isSuccess) {
+                        AppLog.i("重连成功")
+                        isServerConnected.value = true
+                        isReconnecting.set(false)
+                        // 重连成功，发送队列中缓存的消息
+                        flushMessageQueue()
+                        break
+                    } else {
+                        AppLog.e("重连失败: ${result.exceptionOrNull()?.message}")
+                        // 指数退避
+                        currentReconnectDelay = minOf(currentReconnectDelay * 2, maxReconnectDelay)
+                    }
+                } catch (e: Exception) {
+                    AppLog.e("重连过程出错: ${e.message}")
+                    delay(currentReconnectDelay)
+                    currentReconnectDelay = minOf(currentReconnectDelay * 2, maxReconnectDelay)
+                }
+            }
+        }
+    }
+
+    /**
+     * 添加消息到发送队列
+     */
+    private suspend fun enqueueMessage(message: PendingMessage) {
+        queueMutex.withLock {
+            if (messageQueue.size >= maxQueueSize) {
+                // 队列已满，移除最旧的消息
+                messageQueue.poll()
+                AppLog.w("消息队列已满，丢弃最旧消息")
+            }
+            messageQueue.add(message)
+        }
+    }
+
+    /**
+     * 刷新消息队列，发送所有缓存的消息
+     */
+    private suspend fun flushMessageQueue() {
+        queueMutex.withLock {
+            if (messageQueue.isEmpty()) return
+
+            AppLog.i("开始发送队列中的消息，共 ${messageQueue.size} 条")
+            val iterator = messageQueue.iterator()
+            while (iterator.hasNext()) {
+                val pending = iterator.next()
+                iterator.remove()
+
+                if (pending.retryCount >= pending.maxRetries) {
+                    AppLog.w("消息重试次数超过上限，丢弃: ${pending.type} -> ${pending.targetClientId}")
+                    pending.callback(false, emptyList())
+                    continue
+                }
+
+                // 重新发送
+                sendInternal(
+                    payload = pending.payload,
+                    type = pending.type,
+                    targetClientId = pending.targetClientId,
+                    expectedResponses = pending.expectedResponses,
+                    callback = { success, responses ->
+                        if (success) {
+                            pending.callback(true, responses)
+                        } else {
+                            // 发送失败，重新入队
+                            CoroutineScope(Dispatchers.IO).launch {
+                                enqueueMessage(pending.copy(retryCount = pending.retryCount + 1))
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    /**
+     * 内部连接方法，供重连使用
+     */
+    private fun startInternal() {
+        // 先关闭现有连接
+        if (::channel.isInitialized && channel.isActive) {
+            runCatching { channel.close().sync() }
+        }
+
+        val effectiveHost = hostWithoutPort(host)
+        val group = NioEventLoopGroup()
+
+        try {
+            val b = Bootstrap()
+            b.group(group)
+                .channel(NioSocketChannel::class.java)
+                .handler(object : ChannelInitializer<Channel>() {
+                    override fun initChannel(ch: Channel) {
+                        val pipeline = ch.pipeline()
+                        pipeline.addLast(HttpClientCodec())
+                        pipeline.addLast(HttpObjectAggregator(8192))
+
+                        val uidQuery = try {
+                            val idVal = ServerConfig.id
+                            if (!idVal.isNullOrBlank()) "?clientId=${idVal}" else ""
+                        } catch (_: Exception) {
+                            ""
+                        }
+                        val wsUri = URI("ws://$effectiveHost/ws")
+
+                        val headers = DefaultHttpHeaders()
+                        val tokenForHandshake = try { ServerConfig.Token } catch (_: Exception) { "" }
+                        if (!tokenForHandshake.isNullOrBlank()) {
+                            headers.set("Authorization", "Bearer $tokenForHandshake")
+                        }
+                        try { headers.set(HttpHeaderNames.HOST.toString(), effectiveHost) } catch (_: Exception) {}
+                        try { headers.set("Origin", "http://$effectiveHost") } catch (_: Exception) {}
+
+                        val handshaker = WebSocketClientHandshakerFactory.newHandshaker(
+                            wsUri,
+                            WebSocketVersion.V13,
+                            null,
+                            true,
+                            headers,
+                            64 * 1024
+                        )
+
+                        pipeline.addLast(WebSocketClientProtocolHandler(handshaker, true))
+                        responseHandler = CustomWebSocketHandler()
+                        pipeline.addLast(responseHandler)
+                    }
+                })
+
+            // 连接
+            val f = b.connect(effectiveHost, port).sync()
+            channel = f.channel()
+
+            // 等待握手完成
+            responseHandler.handshakeFuture.get(10, TimeUnit.SECONDS)
+            AppLog.i("WebSocket连接成功")
+
+            // 发送登录消息
+            val loginWrapperBytes = buildLoginPayload(ServerConfig.Token)
+            sendInternal(loginWrapperBytes, MsgType.LOGIN, ServerConfig.Token, 1) { success, _ ->
+                if (success) {
+                    AppLog.i("登录成功")
+                } else {
+                    AppLog.e("登录失败")
+                    throw Exception("登录失败")
+                }
+            }
+
+            // 启动心跳
+            startHeartbeat()
+
+            // 监听连接关闭
+            channel.closeFuture().addListener {
+                AppLog.i("连接已关闭")
+                isServerConnected.value = false
+                heartbeatJob?.cancel()
+
+                // 如果不是主动关闭，启动重连
+                if (!stopReconnect.get() && isReconnecting.compareAndSet(false, true)) {
+                    currentReconnectDelay = initialReconnectDelay
+                    startReconnectLoop()
+                }
+            }
+
+        } catch (e: Exception) {
+            group.shutdownGracefully()
+            throw e
+        }
+    }
+
     fun logoutAndDisconnect() {
+        stopReconnect.set(true)
+        reconnectJob?.cancel()
         heartbeatJob?.cancel()
+
+        // 清空消息队列
+        runBlocking {
+            queueMutex.withLock {
+                messageQueue.forEach { it.callback(false, emptyList()) }
+                messageQueue.clear()
+            }
+        }
 
         if (!::channel.isInitialized) {
             return
