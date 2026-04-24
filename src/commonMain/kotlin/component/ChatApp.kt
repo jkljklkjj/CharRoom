@@ -7,6 +7,7 @@ import core.ApiService
 import model.User
 import model.Message
 import model.GroupMessage
+import model.MessageType
 import model.messages
 import model.users
 import Util
@@ -86,10 +87,17 @@ fun appendAgentChunk(messageId: String, chunk: String) {
 fun sendMessage(
     user: User,
     messageText: String,
+    replyToMessageId: String? = null,
+    replyToContent: String? = null,
+    replyToSender: String? = null,
+    messageType: MessageType = MessageType.TEXT,
+    fileUrl: String? = null,
+    fileName: String? = null,
+    fileSize: Long? = null,
     onDone: (Boolean) -> Unit = {}
 ) {
     val normalizedMessage = messageText.trim()
-    if (normalizedMessage.isEmpty()) {
+    if (normalizedMessage.isEmpty() && messageType == MessageType.TEXT) {
         onDone(false)
         return
     }
@@ -102,7 +110,14 @@ fun sendMessage(
             message = normalizedMessage,
             sender = true,
             timestamp = currentTime,
-            isSent = mutableStateOf(true)
+            isSent = mutableStateOf(true),
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
         )
         messages += localCopy
 
@@ -128,7 +143,19 @@ fun sendMessage(
         } catch (_: Exception) {
         }
 
-        val payload = buildAgentChatPayload(user.id.toString(), normalizedMessage, userIdInt, streamMessageId.toLongOrNull() ?: currentTime)
+        val payload = buildAgentChatPayload(
+            targetClientId = user.id.toString(),
+            content = normalizedMessage,
+            userId = userIdInt,
+            timestamp = streamMessageId.toLongOrNull() ?: currentTime,
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType.ordinal,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
+        )
         Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, resp ->
             if (!success) {
                 localCopy.isSent.value = false
@@ -148,7 +175,14 @@ fun sendMessage(
             message = normalizedMessage,
             sender = true,
             timestamp = currentTime,
-            isSent = mutableStateOf(true)
+            isSent = mutableStateOf(true),
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
         )
         messages += localCopy
 
@@ -164,7 +198,19 @@ fun sendMessage(
         }
 
         val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
-        val payload = buildChatPayload(user.id.toString(), normalizedMessage, userIdInt, currentTime)
+        val payload = buildChatPayload(
+            targetClientId = user.id.toString(),
+            content = normalizedMessage,
+            userId = userIdInt,
+            timestamp = currentTime,
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType.ordinal,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
+        )
 
         Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
             val delivered = if (!(success && resp.isNotEmpty())) {
@@ -193,7 +239,14 @@ fun sendMessage(
         text = normalizedMessage,
         senderName = "",
         timestamp = currentTime,
-        isSent = mutableStateOf(true)
+        isSent = mutableStateOf(true),
+        replyToMessageId = replyToMessageId,
+        replyToContent = replyToContent,
+        replyToSender = replyToSender,
+        messageType = messageType,
+        fileUrl = fileUrl,
+        fileName = fileName,
+        fileSize = fileSize
     )
 
     try {
@@ -208,7 +261,18 @@ fun sendMessage(
     }
 
     val userIdInt = ServerConfig.id.toIntOrNull() ?: 0
-    val payload = buildGroupChatPayload(user.id.toString(), normalizedMessage, userIdInt)
+    val payload = buildGroupChatPayload(
+        targetClientId = user.id.toString(),
+        content = normalizedMessage,
+        userId = userIdInt,
+        replyToMessageId = replyToMessageId,
+        replyToContent = replyToContent,
+        replyToSender = replyToSender,
+        messageType = messageType.ordinal,
+        fileUrl = fileUrl,
+        fileName = fileName,
+        fileSize = fileSize
+    )
 
     Chat.send(payload, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
         val delivered = if (!(success && resp.isNotEmpty())) {
@@ -243,7 +307,19 @@ fun resendMessage(user: User, message: Message) {
         )
 
         CoroutineScope(Dispatchers.IO).launch {
-            val payload = buildAgentChatPayload(user.id.toString(), message.message, message.senderId, streamMessageId.toLongOrNull() ?: message.timestamp)
+            val payload = buildAgentChatPayload(
+                targetClientId = user.id.toString(),
+                content = message.message,
+                userId = message.senderId,
+                timestamp = streamMessageId.toLongOrNull() ?: message.timestamp,
+                replyToMessageId = message.replyToMessageId,
+                replyToContent = message.replyToContent,
+                replyToSender = message.replyToSender,
+                messageType = message.messageType.ordinal,
+                fileUrl = message.fileUrl,
+                fileName = message.fileName,
+                fileSize = message.fileSize
+            )
             Chat.send(payload, MsgType.AGENT_CHAT, user.id.toString(), 1) { success, _ ->
                 if (success) {
                     message.isSent.value = true
@@ -259,7 +335,19 @@ fun resendMessage(user: User, message: Message) {
         return
     }
 
-    val payload = buildChatPayload(user.id.toString(), message.message, message.senderId, message.timestamp)
+    val payload = buildChatPayload(
+        targetClientId = user.id.toString(),
+        content = message.message,
+        userId = message.senderId,
+        timestamp = message.timestamp,
+        replyToMessageId = message.replyToMessageId,
+        replyToContent = message.replyToContent,
+        replyToSender = message.replyToSender,
+        messageType = message.messageType.ordinal,
+        fileUrl = message.fileUrl,
+        fileName = message.fileName,
+        fileSize = message.fileSize
+    )
 
     Chat.send(payload, MsgType.CHAT, user.id.toString(), 1) { success, resp ->
         if (success && resp.isNotEmpty()) {
@@ -273,7 +361,18 @@ fun resendMessage(user: User, message: Message) {
 }
 
 fun resendMessage(user: User, groupMessage: GroupMessage) {
-    val payload = buildGroupChatPayload(user.id.toString(), groupMessage.text, groupMessage.senderId)
+    val payload = buildGroupChatPayload(
+        targetClientId = user.id.toString(),
+        content = groupMessage.text,
+        userId = groupMessage.senderId,
+        replyToMessageId = groupMessage.replyToMessageId,
+        replyToContent = groupMessage.replyToContent,
+        replyToSender = groupMessage.replyToSender,
+        messageType = groupMessage.messageType.ordinal,
+        fileUrl = groupMessage.fileUrl,
+        fileName = groupMessage.fileName,
+        fileSize = groupMessage.fileSize
+    )
     Chat.send(payload, MsgType.GROUP_CHAT, user.id.toString(), 1) { success, resp ->
         if (success && resp.isNotEmpty()) {
             val lastBytes = resp.last() as? ByteArray

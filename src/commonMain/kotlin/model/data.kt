@@ -9,6 +9,15 @@ import core.ApiService
 import core.ServerConfig
 import viewmodel.chatViewModel
 
+/**
+ * 消息类型
+ */
+enum class MessageType {
+    TEXT,  // 文本消息
+    IMAGE, // 图片消息
+    FILE   // 文件消息
+}
+
 @Serializable
 data class User(
     val id: Int,
@@ -25,7 +34,14 @@ data class Message(
     val receiverId: Int = -1,      // 目标用户ID
     val timestamp: Long,        // 消息的时间戳
     var isSent: MutableState<Boolean> = mutableStateOf(true),  // 消息是否发送成功
-    var messageId: String = ""// 消息ID
+    var messageId: String = "",// 消息ID
+    val replyToMessageId: String? = null, // 引用的消息ID
+    val replyToContent: String? = null,   // 引用的消息内容预览
+    val replyToSender: String? = null,    // 引用消息的发送者名称
+    val messageType: MessageType = MessageType.TEXT, // 消息类型
+    val fileUrl: String? = null,          // 文件/图片URL
+    val fileName: String? = null,         // 文件名称
+    val fileSize: Long? = null            // 文件大小
 ) {
     init {
         if (messageId.isEmpty()) {
@@ -43,7 +59,14 @@ data class GroupMessage(
     val senderId: Int,            // 发送者ID
     val timestamp: Long,        // 消息的时间戳
     var isSent: MutableState<Boolean>,  // 消息是否发送成功
-    var messageId: String = ""  // 消息ID
+    var messageId: String = "",  // 消息ID
+    val replyToMessageId: String? = null, // 引用的消息ID
+    val replyToContent: String? = null,   // 引用的消息内容预览
+    val replyToSender: String? = null,    // 引用消息的发送者名称
+    val messageType: MessageType = MessageType.TEXT, // 消息类型
+    val fileUrl: String? = null,          // 文件/图片URL
+    val fileName: String? = null,         // 文件名称
+    val fileSize: Long? = null            // 文件大小
 ) {
     init {
         if (messageId.isEmpty()) {

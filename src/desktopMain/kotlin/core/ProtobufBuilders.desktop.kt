@@ -35,13 +35,37 @@ actual fun buildLogoutPayload(userId: String): ByteArray {
         .toByteArray()
 }
 
-actual fun buildChatPayload(targetClientId: String, content: String, userId: Int, timestamp: Long): ByteArray {
-    val chat = MessageProtos.ChatMessage.newBuilder()
+actual fun buildChatPayload(
+    targetClientId: String,
+    content: String,
+    userId: Int,
+    timestamp: Long,
+    replyToMessageId: String?,
+    replyToContent: String?,
+    replyToSender: String?,
+    messageType: Int,
+    fileUrl: String?,
+    fileName: String?,
+    fileSize: Long?
+): ByteArray {
+    val chatBuilder = MessageProtos.ChatMessage.newBuilder()
         .setTargetClientId(targetClientId)
         .setContent(content)
         .setUserId(userId.toString())
         .setTimestamp(timestamp.toString())
-        .build()
+        .setMessageType(MessageProtos.MessageType.forNumber(messageType))
+
+    // 设置引用回复字段
+    replyToMessageId?.let { chatBuilder.setReplyToMessageId(it) }
+    replyToContent?.let { chatBuilder.setReplyToContent(it) }
+    replyToSender?.let { chatBuilder.setReplyToSender(it) }
+
+    // 设置文件字段
+    fileUrl?.let { chatBuilder.setFileUrl(it) }
+    fileName?.let { chatBuilder.setFileName(it) }
+    fileSize?.let { chatBuilder.setFileSize(it) }
+
+    val chat = chatBuilder.build()
     return MessageProtos.MessageWrapper.newBuilder()
         .setType(MsgType.CHAT.wire)
         .setChat(chat)
@@ -49,12 +73,35 @@ actual fun buildChatPayload(targetClientId: String, content: String, userId: Int
         .toByteArray()
 }
 
-actual fun buildAgentChatPayload(targetClientId: String, content: String, userId: Int, timestamp: Long): ByteArray {
+actual fun buildAgentChatPayload(
+    targetClientId: String,
+    content: String,
+    userId: Int,
+    timestamp: Long,
+    replyToMessageId: String?,
+    replyToContent: String?,
+    replyToSender: String?,
+    messageType: Int,
+    fileUrl: String?,
+    fileName: String?,
+    fileSize: Long?
+): ByteArray {
     val actionBuilder = MessageProtos.ChatMessage.newBuilder()
         .setTargetClientId(targetClientId)
         .setContent(content)
         .setUserId(userId.toString())
         .setTimestamp(timestamp.toString())
+        .setMessageType(MessageProtos.MessageType.forNumber(messageType))
+
+    // 设置引用回复字段
+    replyToMessageId?.let { actionBuilder.setReplyToMessageId(it) }
+    replyToContent?.let { actionBuilder.setReplyToContent(it) }
+    replyToSender?.let { actionBuilder.setReplyToSender(it) }
+
+    // 设置文件字段
+    fileUrl?.let { actionBuilder.setFileUrl(it) }
+    fileName?.let { actionBuilder.setFileName(it) }
+    fileSize?.let { actionBuilder.setFileSize(it) }
 
     val actions = ActionLogger.getSnapshot()
     for (action in actions) {
@@ -75,12 +122,35 @@ actual fun buildAgentChatPayload(targetClientId: String, content: String, userId
         .toByteArray()
 }
 
-actual fun buildGroupChatPayload(targetClientId: String, content: String, userId: Int): ByteArray {
-    val gm = MessageProtos.GroupChatMessage.newBuilder()
+actual fun buildGroupChatPayload(
+    targetClientId: String,
+    content: String,
+    userId: Int,
+    replyToMessageId: String?,
+    replyToContent: String?,
+    replyToSender: String?,
+    messageType: Int,
+    fileUrl: String?,
+    fileName: String?,
+    fileSize: Long?
+): ByteArray {
+    val gmBuilder = MessageProtos.GroupChatMessage.newBuilder()
         .setTargetClientId(targetClientId)
         .setContent(content)
         .setUserId(userId.toString())
-        .build()
+        .setMessageType(MessageProtos.MessageType.forNumber(messageType))
+
+    // 设置引用回复字段
+    replyToMessageId?.let { gmBuilder.setReplyToMessageId(it) }
+    replyToContent?.let { gmBuilder.setReplyToContent(it) }
+    replyToSender?.let { gmBuilder.setReplyToSender(it) }
+
+    // 设置文件字段
+    fileUrl?.let { gmBuilder.setFileUrl(it) }
+    fileName?.let { gmBuilder.setFileName(it) }
+    fileSize?.let { gmBuilder.setFileSize(it) }
+
+    val gm = gmBuilder.build()
     return MessageProtos.MessageWrapper.newBuilder()
         .setType(MsgType.GROUP_CHAT.wire)
         .setGroupChat(gm)

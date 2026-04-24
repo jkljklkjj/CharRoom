@@ -5,6 +5,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import model.GroupMessage
 import model.Message
+import model.MessageType
 import java.io.File
 
 private const val MAX_PRIVATE_HISTORY = 5000
@@ -17,7 +18,14 @@ data class LocalPrivateMessageRecord(
     val receiverId: Int,
     val timestamp: Long,
     val isSent: Boolean,
-    val messageId: String
+    val messageId: String,
+    val replyToMessageId: String? = null,
+    val replyToContent: String? = null,
+    val replyToSender: String? = null,
+    val messageType: MessageType = MessageType.TEXT,
+    val fileUrl: String? = null,
+    val fileName: String? = null,
+    val fileSize: Long? = null
 )
 
 data class LocalGroupMessageRecord(
@@ -27,7 +35,14 @@ data class LocalGroupMessageRecord(
     val senderId: Int,
     val timestamp: Long,
     val isSent: Boolean,
-    val messageId: String
+    val messageId: String,
+    val replyToMessageId: String? = null,
+    val replyToContent: String? = null,
+    val replyToSender: String? = null,
+    val messageType: MessageType = MessageType.TEXT,
+    val fileUrl: String? = null,
+    val fileName: String? = null,
+    val fileSize: Long? = null
 )
 
 data class LocalChatHistorySnapshot(
@@ -37,7 +52,7 @@ data class LocalChatHistorySnapshot(
     val savedAt: Long = System.currentTimeMillis()
 ) {
     companion object {
-        const val CURRENT_VERSION = 1 // 当前最新版本
+        const val CURRENT_VERSION = 2 // 当前最新版本
     }
 }
 
@@ -149,12 +164,40 @@ object LocalChatHistoryStore {
 
         println("Migrating chat history from version ${snapshot.version} to ${LocalChatHistorySnapshot.CURRENT_VERSION}")
 
-        // 版本1迁移逻辑（示例，未来版本升级时添加）
-        // if (snapshot.version < 2) {
-        //     执行v1到v2的迁移
-        // }
+        var migrated = snapshot
 
-        return snapshot.copy(version = LocalChatHistorySnapshot.CURRENT_VERSION)
+        // 版本1 -> 版本2：添加引用消息和文件相关字段
+        if (migrated.version < 2) {
+            migrated = migrated.copy(
+                privateMessages = migrated.privateMessages.map { record ->
+                    // 旧版本的记录没有新字段，设置默认值
+                    record.copy(
+                        replyToMessageId = null,
+                        replyToContent = null,
+                        replyToSender = null,
+                        messageType = MessageType.TEXT,
+                        fileUrl = null,
+                        fileName = null,
+                        fileSize = null
+                    )
+                },
+                groupMessages = migrated.groupMessages.map { record ->
+                    // 旧版本的记录没有新字段，设置默认值
+                    record.copy(
+                        replyToMessageId = null,
+                        replyToContent = null,
+                        replyToSender = null,
+                        messageType = MessageType.TEXT,
+                        fileUrl = null,
+                        fileName = null,
+                        fileSize = null
+                    )
+                },
+                version = 2
+            )
+        }
+
+        return migrated
     }
 
     /**
@@ -339,7 +382,14 @@ object LocalChatHistoryStore {
             receiverId = receiverId,
             timestamp = timestamp,
             isSent = isSent.value,
-            messageId = messageId
+            messageId = messageId,
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
         )
     }
 
@@ -351,7 +401,14 @@ object LocalChatHistoryStore {
             senderId = senderId,
             timestamp = timestamp,
             isSent = isSent.value,
-            messageId = messageId
+            messageId = messageId,
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
         )
     }
 
@@ -363,7 +420,14 @@ object LocalChatHistoryStore {
             receiverId = receiverId,
             timestamp = timestamp,
             isSent = mutableStateOf(isSent),
-            messageId = messageId
+            messageId = messageId,
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
         )
     }
 
@@ -375,7 +439,14 @@ object LocalChatHistoryStore {
             senderId = senderId,
             timestamp = timestamp,
             isSent = mutableStateOf(isSent),
-            messageId = messageId
+            messageId = messageId,
+            replyToMessageId = replyToMessageId,
+            replyToContent = replyToContent,
+            replyToSender = replyToSender,
+            messageType = messageType,
+            fileUrl = fileUrl,
+            fileName = fileName,
+            fileSize = fileSize
         )
     }
 

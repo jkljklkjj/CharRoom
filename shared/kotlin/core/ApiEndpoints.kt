@@ -21,6 +21,7 @@ object ApiEndpoints {
     const val OFFLINE = "/message/getOfflineMessage"
     const val AGENT_NL = "/agent/nl"
     const val AGENT_NL_STREAM = "/agent/nl/stream"
+    const val FILE_UPLOAD = "/file/upload" // 文件上传接口
 
     fun url(path: String): String = BASE + path
 }

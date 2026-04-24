@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,8 @@ import androidx.compose.material.TextField
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -55,13 +58,26 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import core.FileUploader
 import core.LocalChatHistoryStore
 import core.ServerConfig
 import core.loadImageBitmapWithCache
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import model.GroupMessage
+import model.MessageType
 import model.User
 import model.groupMessages
 import model.users
@@ -83,11 +99,30 @@ fun GroupChatScreen(group: User) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val isDarkMode = !MaterialTheme.colors.isLight
+    val clipboardManager = LocalClipboardManager.current
+    val currentUserId = ServerConfig.id.toIntOrNull() ?: 0
 
     // 分页加载相关状态
     var currentPage by remember { mutableStateOf(1) } // 第0页已经在启动时加载
     var isLoadingMore by remember { mutableStateOf(false) }
     var hasMoreHistory by remember { mutableStateOf(true) }
+
+    // 长按菜单相关状态
+    var longPressMessage by remember { mutableStateOf<GroupMessage?>(null) }
+    var showLongPressMenu by remember { mutableStateOf(false) }
+
+    // 引用回复相关状态
+    var replyToMessage by remember { mutableStateOf<GroupMessage?>(null) }
+
+    // 表情面板相关状态
+    var showEmojiPanel by remember { mutableStateOf(false) }
+
+    // 文件上传相关状态
+    var isUploading by remember { mutableStateOf(false) }
+
+    // 转发相关状态
+    var showForwardDialog by remember { mutableStateOf(false) }
+    var forwardMessage by remember { mutableStateOf<GroupMessage?>(null) }
 
     fun submitMessage() {
         val text = messageText.trim()
@@ -96,11 +131,99 @@ fun GroupChatScreen(group: User) {
         }
         isSending = true
         messageText = ""
-        sendMessage(group, text) {
+
+        sendMessage(
+            user = group,
+            messageText = text,
+            replyToMessageId = replyToMessage?.messageId,
+            replyToContent = replyToMessage?.text,
+            replyToSender = replyToMessage?.senderName,
+            onDone = {
+                scope.launch {
+                    isSending = false
+                    replyToMessage = null // 发送后清空回复状态
+                }
+            }
+        )
+    }
+
+    /**
+     * 处理表情选择
+     */
+    fun onEmojiSelected(emoji: String) {
+        messageText += emoji
+        showEmojiPanel = false
+    }
+
+    /**
+     * 处理图片选择
+     */
+    fun pickImage() {
+        FilePicker.pickImage { bytes, fileName ->
             scope.launch {
-                isSending = false
+                val maxFileSize = 5 * 1024 * 1024 // 5MB
+                if (bytes.size > maxFileSize) {
+                    // 可以在这里添加错误提示
+                    isUploading = false
+                    return@launch
+                }
+
+                isUploading = true
+                val fileUrl = withContext(Dispatchers.IO) {
+                    FileUploader.uploadImage(bytes, fileName)
+                }
+                if (fileUrl != null) {
+                    // 发送图片消息
+                    sendMessage(
+                        user = group,
+                        messageText = "",
+                        messageType = MessageType.IMAGE,
+                        fileUrl = fileUrl,
+                        fileName = fileName,
+                        fileSize = bytes.size.toLong(),
+                        replyToMessageId = replyToMessage?.messageId,
+                        replyToContent = replyToMessage?.text,
+                        replyToSender = replyToMessage?.senderName,
+                        onDone = {
+                            replyToMessage = null
+                        }
+                    )
+                }
+                isUploading = false
             }
         }
+    }
+
+    /**
+     * 复制消息内容
+     */
+    fun copyMessage(message: GroupMessage) {
+        clipboardManager.setText(AnnotatedString(message.text))
+    }
+
+    /**
+     * 删除消息
+     */
+    fun deleteMessage(message: GroupMessage) {
+        // 仅本地删除
+        val index = groupMessages.indexOfFirst { it.messageId == message.messageId }
+        if (index != -1) {
+            groupMessages.removeAt(index)
+        }
+    }
+
+    /**
+     * 转发消息
+     */
+    fun forwardMessage(message: GroupMessage, targetUser: User) {
+        sendMessage(
+            user = targetUser,
+            messageText = message.text,
+            messageType = message.messageType,
+            fileUrl = message.fileUrl,
+            fileName = message.fileName,
+            fileSize = message.fileSize
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
@@ -329,6 +452,13 @@ fun GroupChatScreen(group: User) {
                                         .clip(RoundedCornerShape(18.dp))
                                         .background(messageBubbleBrush(self, isDarkMode))
                                         .border(1.dp, bubbleBorderColor, RoundedCornerShape(18.dp))
+                                        .combinedClickable(
+                                            onClick = {},
+                                            onLongClick = {
+                                                longPressMessage = message
+                                                showLongPressMenu = true
+                                            }
+                                        )
                                         .let {
                                             // 发送中的消息添加半透明效果
                                             if (self && !message.isSent.value) {
@@ -348,11 +478,103 @@ fun GroupChatScreen(group: User) {
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
                                         }
-                                        Text(
-                                            text = message.text,
-                                            style = MaterialTheme.typography.body1,
-                                            color = bubbleTextColor
-                                        )
+
+                                        // 显示引用的消息
+                                        message.replyToContent?.let { replyContent ->
+                                            Surface(
+                                                color = MaterialTheme.colors.surface.copy(alpha = 0.3f),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(bottom = 6.dp)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "回复 ${message.replyToSender.orEmpty()}",
+                                                        style = MaterialTheme.typography.caption,
+                                                        color = MaterialTheme.colors.primary,
+                                                        maxLines = 1
+                                                    )
+                                                    Text(
+                                                        text = replyContent,
+                                                        style = MaterialTheme.typography.body2,
+                                                        color = bubbleTextColor.copy(alpha = 0.8f),
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // 消息内容
+                                        when (message.messageType) {
+                                            MessageType.TEXT -> {
+                                                Text(
+                                                    text = message.text,
+                                                    style = MaterialTheme.typography.body1,
+                                                    color = bubbleTextColor
+                                                )
+                                            }
+                                            MessageType.IMAGE -> {
+                                                message.fileUrl?.let { url ->
+                                                    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+                                                    LaunchedEffect(url) {
+                                                        imageBitmap = loadImageBitmapWithCache(url, url)
+                                                    }
+                                                    imageBitmap?.let { bitmap ->
+                                                        Image(
+                                                            bitmap = bitmap,
+                                                            contentDescription = "图片",
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .heightIn(max = 200.dp)
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                        )
+                                                    } ?: Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(150.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(24.dp),
+                                                            color = bubbleTextColor
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            MessageType.FILE -> {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.AttachFile,
+                                                        contentDescription = "文件",
+                                                        tint = bubbleTextColor,
+                                                        modifier = Modifier.size(24.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = message.fileName.orEmpty(),
+                                                            style = MaterialTheme.typography.body1,
+                                                            color = bubbleTextColor,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Text(
+                                                            text = formatFileSize(message.fileSize ?: 0),
+                                                            style = MaterialTheme.typography.caption,
+                                                            color = bubbleTextColor.copy(alpha = 0.7f)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -366,6 +588,27 @@ fun GroupChatScreen(group: User) {
                                             )
                                         }
                                     }
+                                }
+
+                                // 长按菜单
+                                if (longPressMessage?.messageId == message.messageId) {
+                                    MessageLongPressMenu(
+                                        expanded = showLongPressMenu,
+                                        onDismiss = { showLongPressMenu = false },
+                                        message = message,
+                                        isSelf = self,
+                                        onCopy = { copyMessage(message) },
+                                        onDelete = { deleteMessage(message) },
+                                        onForward = {
+                                            forwardMessage = message
+                                            showLongPressMenu = false
+                                            showForwardDialog = true
+                                        },
+                                        onReply = {
+                                            replyToMessage = message
+                                            showLongPressMenu = false
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -394,56 +637,134 @@ fun GroupChatScreen(group: User) {
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.36f else 0.8f),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-            elevation = 0.dp
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+        Column {
+            // 引用回复预览栏
+            ReplyPreviewBar(
+                replyToMessage = replyToMessage,
+                senderName = replyToMessage?.senderName ?: "",
+                onCancel = { replyToMessage = null }
+            )
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.36f else 0.8f),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
+                elevation = 0.dp
             ) {
-                TextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("和群友聊点新鲜事...", color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
-                    colors = TextFieldDefaults.textFieldColors(
-                        backgroundColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    maxLines = 5, // 最多显示5行，超过后滚动
-                    textStyle = MaterialTheme.typography.body1
-                )
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 表情按钮
+                        IconButton(
+                            onClick = { showEmojiPanel = !showEmojiPanel },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEmotions,
+                                contentDescription = "表情",
+                                tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                        // 附件按钮
+                        IconButton(
+                            onClick = {
+                                // 弹出选择菜单：图片/文件
+                                // 这里简化处理，先选择图片，后续可以扩展
+                                pickImage()
+                            },
+                            modifier = Modifier.size(40.dp),
+                            enabled = !isUploading && !isSending
+                        ) {
+                            if (isUploading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colors.primary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.AttachFile,
+                                    contentDescription = "附件",
+                                    tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
 
-                val sendInteraction = remember { MutableInteractionSource() }
-                val sendScale = rememberElasticScale(sendInteraction, pressedScale = 0.9f)
-                Button(
-                    onClick = { submitMessage() },
-                    enabled = !isSending && messageText.isNotBlank(),
-                    interactionSource = sendInteraction,
-                    modifier = Modifier
-                        .height(42.dp)
-                        .graphicsLayer {
-                            scaleX = sendScale
-                            scaleY = sendScale
-                        },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = MaterialTheme.colors.primary,
-                        contentColor = MaterialTheme.colors.onPrimary,
-                        disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
-                    )
-                ) {
-                    Text(if (isSending) "发送中..." else "发送")
+                        TextField(
+                            value = messageText,
+                            onValueChange = { messageText = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .onKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyUp && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
+                                        submitMessage()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
+                            placeholder = { Text("和群友聊点新鲜事...", color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
+                            colors = TextFieldDefaults.textFieldColors(
+                                backgroundColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            maxLines = 5, // 最多显示5行，超过后滚动
+                            textStyle = MaterialTheme.typography.body1
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        val sendInteraction = remember { MutableInteractionSource() }
+                        val sendScale = rememberElasticScale(sendInteraction, pressedScale = 0.9f)
+                        Button(
+                            onClick = { submitMessage() },
+                            enabled = !isSending && (messageText.isNotBlank() || replyToMessage != null),
+                            interactionSource = sendInteraction,
+                            modifier = Modifier
+                                .height(42.dp)
+                                .graphicsLayer {
+                                    scaleX = sendScale
+                                    scaleY = sendScale
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = MaterialTheme.colors.primary,
+                                contentColor = MaterialTheme.colors.onPrimary,
+                                disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
+                            )
+                        ) {
+                            Text(if (isSending) "发送中..." else "发送")
+                        }
+                    }
+
+                    // 表情面板
+                    if (showEmojiPanel) {
+                        EmojiPickerPanel(
+                            onEmojiSelected = ::onEmojiSelected,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
+    }
+
+    // 转发选择对话框
+    if (showForwardDialog) {
+        ForwardSelectDialog(
+            onDismiss = { showForwardDialog = false },
+            onForward = { targetUser ->
+                forwardMessage?.let { message ->
+                    forwardMessage(message, targetUser)
+                }
+                showForwardDialog = false
+            }
+        )
     }
 }
 
@@ -494,5 +815,17 @@ private fun isSameDay(timestamp1: Long, timestamp2: Long): Boolean {
         sdf.format(java.util.Date(timestamp1)) == sdf.format(java.util.Date(timestamp2))
     } catch (_: Exception) {
         false
+    }
+}
+
+/**
+ * 格式化文件大小
+ */
+private fun formatFileSize(size: Long): String {
+    return when {
+        size < 1024 -> "$size B"
+        size < 1024 * 1024 -> String.format("%.1f KB", size / 1024.0)
+        size < 1024 * 1024 * 1024 -> String.format("%.1f MB", size / (1024.0 * 1024))
+        else -> String.format("%.1f GB", size / (1024.0 * 1024 * 1024))
     }
 }
