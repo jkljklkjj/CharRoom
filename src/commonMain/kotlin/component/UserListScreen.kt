@@ -67,19 +67,24 @@ fun UserList(
     selectedUserId: Int? = null,
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenApplications: () -> Unit = {}, // 打开申请管理界面
+    onOpenGroupApplications: () -> Unit = {}, // 打开群聊申请管理界面
+    onOpenFriendApplications: () -> Unit = {}, // 打开好友申请管理界面
     onUserClick: (User) -> Unit
 ) {
     // 群聊申请状态
     var hasPendingGroupApplications by remember { mutableStateOf(false) }
+    // 好友申请状态
+    var hasPendingFriendApplications by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // 定时检查是否有未处理的群聊申请
+    // 定时检查是否有未处理的申请
     LaunchedEffect(Unit) {
         scope.launch {
             while (true) {
-                val requests = ApiService.fetchGroupRequests()
-                hasPendingGroupApplications = requests.isNotEmpty()
+                val groupRequests = ApiService.fetchGroupRequests()
+                val friendRequests = ApiService.fetchFriendRequests()
+                hasPendingGroupApplications = groupRequests.isNotEmpty()
+                hasPendingFriendApplications = friendRequests.isNotEmpty()
                 kotlinx.coroutines.delay(30000) // 每30秒检查一次
             }
         }
@@ -125,12 +130,28 @@ fun UserList(
                             contentDescription = "搜索",
                             onClick = onOpenSearch
                         )
-                        // 群聊申请入口，有未处理申请时显示红点
+                        // 好友申请入口，有未处理申请时显示红点
                         Box {
                             ElasticHeaderAction(
                                 icon = Icons.Default.PersonAdd,
-                                contentDescription = "申请管理",
-                                onClick = onOpenApplications
+                                contentDescription = "好友申请",
+                                onClick = onOpenFriendApplications
+                            )
+                            if (hasPendingFriendApplications) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .align(Alignment.TopEnd)
+                                        .background(Color(0xFFF44336), CircleShape)
+                                )
+                            }
+                        }
+                        // 群聊申请入口，有未处理申请时显示红点
+                        Box {
+                            ElasticHeaderAction(
+                                icon = Icons.Default.People,
+                                contentDescription = "群聊申请",
+                                onClick = onOpenGroupApplications
                             )
                             if (hasPendingGroupApplications) {
                                 Box(

@@ -17,24 +17,52 @@ import model.User
 import model.updateList
 
 /**
- * 群聊申请管理对话框
+ * 申请类型
+ */
+enum class ApplicationType {
+    GROUP, // 群聊申请
+    FRIEND // 好友申请
+}
+
+/**
+ * 申请管理对话框，支持群聊申请和好友申请
  */
 @Composable
-fun GroupApplicationDialog(onDismiss: () -> Unit) {
-    var groupApplications by remember { mutableStateOf<List<User>>(emptyList()) }
+fun ApplicationDialog(
+    onDismiss: () -> Unit,
+    type: ApplicationType = ApplicationType.GROUP
+) {
+    var applications by remember { mutableStateOf<List<User>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var processingUserId by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
 
+    // 对话框标题和描述
+    val title = when (type) {
+        ApplicationType.GROUP -> "群聊申请管理"
+        ApplicationType.FRIEND -> "好友申请管理"
+    }
+    val emptyText = when (type) {
+        ApplicationType.GROUP -> "暂无待处理的群聊申请"
+        ApplicationType.FRIEND -> "暂无待处理的好友申请"
+    }
+    val applyDescription = when (type) {
+        ApplicationType.GROUP -> "申请加入群聊"
+        ApplicationType.FRIEND -> "申请添加你为好友"
+    }
+
     // 加载申请列表
-    LaunchedEffect(Unit) {
+    LaunchedEffect(type) {
         loadApplications()
     }
 
     suspend fun loadApplications() {
         isLoading = true
-        groupApplications = withContext(Dispatchers.IO) {
-            ApiService.fetchGroupRequests()
+        applications = withContext(Dispatchers.IO) {
+            when (type) {
+                ApplicationType.GROUP -> ApiService.fetchGroupRequests()
+                ApplicationType.FRIEND -> ApiService.fetchFriendRequests()
+            }
         }
         isLoading = false
     }
@@ -44,16 +72,20 @@ fun GroupApplicationDialog(onDismiss: () -> Unit) {
             processingUserId = userId
             val success = withContext(Dispatchers.IO) {
                 if (accept) {
-                    // TODO: 需要知道对应的群组ID，这里需要后端接口调整
-                    // 暂时使用第一个用户所属的群组ID，实际应该从申请信息中获取
-                    ApiService.acceptGroupApplication("0", userId.toString())
+                    when (type) {
+                        ApplicationType.GROUP -> ApiService.acceptGroupApplication("0", userId.toString())
+                        ApplicationType.FRIEND -> ApiService.acceptFriend(userId.toString())
+                    }
                 } else {
-                    ApiService.rejectGroupApplication("0", userId.toString())
+                    when (type) {
+                        ApplicationType.GROUP -> ApiService.rejectGroupApplication("0", userId.toString())
+                        ApplicationType.FRIEND -> ApiService.rejectFriend(userId.toString())
+                    }
                 }
             }
             if (success) {
                 // 移除已处理的申请
-                groupApplications = groupApplications.filter { it.id != userId }
+                applications = applications.filter { it.id != userId }
                 // 刷新用户列表
                 updateList()
             }
@@ -63,7 +95,7 @@ fun GroupApplicationDialog(onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("群聊申请管理") },
+        title = { Text(title) },
         text = {
             Column {
                 if (isLoading) {
@@ -75,7 +107,7 @@ fun GroupApplicationDialog(onDismiss: () -> Unit) {
                     ) {
                         CircularProgressIndicator()
                     }
-                } else if (groupApplications.isEmpty()) {
+                } else if (applications.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -83,7 +115,7 @@ fun GroupApplicationDialog(onDismiss: () -> Unit) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "暂无待处理的群聊申请",
+                            text = emptyText,
                             color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                         )
                     }
@@ -92,7 +124,7 @@ fun GroupApplicationDialog(onDismiss: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(groupApplications) { user ->
+                        items(applications) { user ->
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = MaterialTheme.shapes.medium,
@@ -111,7 +143,7 @@ fun GroupApplicationDialog(onDismiss: () -> Unit) {
                                             style = MaterialTheme.typography.subtitle1
                                         )
                                         Text(
-                                            text = "申请加入群聊",
+                                            text = applyDescription,
                                             style = MaterialTheme.typography.caption,
                                             color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                         )

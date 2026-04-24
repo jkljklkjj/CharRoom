@@ -199,6 +199,13 @@ class ApiClient(
         return interpretBooleanResponse(resp)
     }
 
+    /** 拒绝好友请求，requesterId 为请求发起者 */
+    fun rejectFriend(requesterId: String, token: String = ServerConfig.Token): Boolean {
+        val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(requesterId))
+        val resp = sendRequest(ApiEndpoints.FRIEND_REJECT, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        return interpretBooleanResponse(resp)
+    }
+
     /** 加入群组 */
     fun addGroup(groupId: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddGroupBody.serializer(), AddGroupBody(groupId))
@@ -511,6 +518,7 @@ object ApiService {
     fun addGroup(groupId: String, token: String = ServerConfig.Token) = client.addGroup(groupId, token)
     fun fetchFriendRequests(token: String = ServerConfig.Token) = client.fetchFriendRequests(token)
     fun acceptFriend(requesterId: String, token: String = ServerConfig.Token) = client.acceptFriend(requesterId, token)
+    fun rejectFriend(requesterId: String, token: String = ServerConfig.Token) = client.rejectFriend(requesterId, token)
     fun fetchGroupRequests(token: String = ServerConfig.Token) = client.fetchGroupRequests(token)
     fun acceptGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) = client.acceptGroupApplication(groupId, userId, token)
     fun rejectGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) = client.rejectGroupApplication(groupId, userId, token)

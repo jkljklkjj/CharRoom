@@ -303,6 +303,7 @@ fun ChatApp(
     var showDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showGroupApplications by remember { mutableStateOf(false) } // 群聊申请对话框
+    var showFriendApplications by remember { mutableStateOf(false) } // 好友申请对话框
     var clearHistoryHint by remember { mutableStateOf("") }
 
     fun openSearchDialog() {
@@ -439,7 +440,8 @@ fun ChatApp(
                             selectedUserId = selectedUser?.id,
                             onOpenSearch = { openSearchDialog() },
                             onOpenSettings = { showSettings = true },
-                            onOpenApplications = { showGroupApplications = true }
+                            onOpenGroupApplications = { showGroupApplications = true },
+                            onOpenFriendApplications = { showFriendApplications = true }
                         ) { user ->
                             selectedUser = user
                             if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
@@ -490,7 +492,8 @@ fun ChatApp(
                         selectedUserId = selectedUser?.id,
                         onOpenSearch = { openSearchDialog() },
                         onOpenSettings = { showSettings = true },
-                        onOpenApplications = { showGroupApplications = true }
+                        onOpenGroupApplications = { showGroupApplications = true },
+                        onOpenFriendApplications = { showFriendApplications = true }
                     ) { user ->
                         selectedUser = user
                         if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
@@ -566,7 +569,17 @@ fun ChatApp(
         }
 
         if (showGroupApplications) {
-            GroupApplicationDialog { showGroupApplications = false }
+            ApplicationDialog(
+                onDismiss = { showGroupApplications = false },
+                type = ApplicationType.GROUP
+            )
+        }
+
+        if (showFriendApplications) {
+            ApplicationDialog(
+                onDismiss = { showFriendApplications = false },
+                type = ApplicationType.FRIEND
+            )
         }
 
         if (showSettings) {
