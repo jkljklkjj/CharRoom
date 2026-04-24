@@ -54,11 +54,10 @@ import core.ActionLogger
 import core.ActionType
 import core.LocalChatHistoryStore
 import model.groupMessages
+import viewmodel.chatViewModel
 
 private fun updateUserOnlineStatus(userId: Int, online: Boolean) {
-    users = users.map { user ->
-        if (user.id == userId) user.copy(online = online) else user
-    }
+    chatViewModel.updateUserOnlineStatus(userId, online)
 }
 
 fun appendAgentChunk(messageId: String, chunk: String) {
@@ -295,6 +294,10 @@ fun ChatApp(
 ) {
     ServerConfig.Token = token
     var selectedUser by remember { mutableStateOf<User?>(null) }
+    // 同步全局状态管理器中的选中用户状态
+    LaunchedEffect(selectedUser) {
+        chatViewModel.selectedUser = selectedUser
+    }
     var showDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var clearHistoryHint by remember { mutableStateOf("") }
@@ -340,7 +343,8 @@ fun ChatApp(
     // 启动时先恢复本地历史，再并发启动自动保存、离线拉取和长连接
     LaunchedEffect(ServerConfig.id) {
         val accountId = ServerConfig.id
-        val restored = withContext(Dispatchers.IO) { LocalChatHistoryStore.restore(accountId) }
+        // 启动时只加载最近100条消息，降低内存占用
+        val restored = withContext(Dispatchers.IO) { LocalChatHistoryStore.restorePage(accountId, page = 0, pageSize = 100) }
         messages.clear()
         messages += restored.privateMessages
         groupMessages.clear()

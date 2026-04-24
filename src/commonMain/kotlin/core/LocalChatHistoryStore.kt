@@ -31,10 +31,15 @@ data class LocalGroupMessageRecord(
 )
 
 data class LocalChatHistorySnapshot(
+    val version: Int = CURRENT_VERSION, // 数据结构版本号
     val privateMessages: List<LocalPrivateMessageRecord> = emptyList(),
     val groupMessages: List<LocalGroupMessageRecord> = emptyList(),
     val savedAt: Long = System.currentTimeMillis()
-)
+) {
+    companion object {
+        const val CURRENT_VERSION = 1 // 当前最新版本
+    }
+}
 
 data class RestoredChatHistory(
     val privateMessages: List<Message> = emptyList(),
@@ -74,6 +79,15 @@ object LocalChatHistoryStore {
     }
 
     fun restore(accountId: String): RestoredChatHistory {
+        return restorePage(accountId, page = 0, pageSize = 100) // 默认只加载最近100条消息
+    }
+
+    /**
+     * 分页加载历史消息
+     * @param page 页码，从0开始，0表示最新的一页
+     * @param pageSize 每页消息数量
+     */
+    fun restorePage(accountId: String, page: Int = 0, pageSize: Int = 50): RestoredChatHistory {
         if (accountId.isBlank()) {
             return RestoredChatHistory()
         }
@@ -85,12 +99,35 @@ object LocalChatHistoryStore {
 
         return runCatching {
             val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
-            val privateMessages = snapshot.privateMessages
+
+            // 版本迁移
+            val migratedSnapshot = migrateSnapshot(snapshot)
+
+            // 分页处理：按时间倒序，取对应页的消息
+            val allPrivate = migratedSnapshot.privateMessages
                 .normalizedBy({ it.privateKey() }, MAX_PRIVATE_HISTORY)
-                .map { it.toModel() }
-            val groupMessages = snapshot.groupMessages
+                .sortedByDescending { it.timestamp }
+
+            val allGroup = migratedSnapshot.groupMessages
                 .normalizedBy({ it.groupKey() }, MAX_GROUP_HISTORY)
-                .map { it.toModel() }
+                .sortedByDescending { it.timestamp }
+
+            val startIndex = page * pageSize
+            val endIndex = minOf(startIndex + pageSize, allPrivate.size)
+
+            val privateMessages = if (startIndex < allPrivate.size) {
+                allPrivate.subList(startIndex, endIndex).map { it.toModel() }.reversed() // 恢复正序
+            } else {
+                emptyList()
+            }
+
+            val groupStartIndex = page * pageSize
+            val groupEndIndex = minOf(groupStartIndex + pageSize, allGroup.size)
+            val groupMessages = if (groupStartIndex < allGroup.size) {
+                allGroup.subList(groupStartIndex, groupEndIndex).map { it.toModel() }.reversed() // 恢复正序
+            } else {
+                emptyList()
+            }
 
             RestoredChatHistory(
                 privateMessages = privateMessages,
@@ -99,6 +136,150 @@ object LocalChatHistoryStore {
         }.getOrElse {
             println("Local history restore failed: ${it.message}")
             RestoredChatHistory()
+        }
+    }
+
+    /**
+     * 版本迁移逻辑
+     */
+    private fun migrateSnapshot(snapshot: LocalChatHistorySnapshot): LocalChatHistorySnapshot {
+        if (snapshot.version == LocalChatHistorySnapshot.CURRENT_VERSION) {
+            return snapshot
+        }
+
+        println("Migrating chat history from version ${snapshot.version} to ${LocalChatHistorySnapshot.CURRENT_VERSION}")
+
+        // 版本1迁移逻辑（示例，未来版本升级时添加）
+        // if (snapshot.version < 2) {
+        //     执行v1到v2的迁移
+        // }
+
+        return snapshot.copy(version = LocalChatHistorySnapshot.CURRENT_VERSION)
+    }
+
+    /**
+     * 按时间范围查询私聊消息
+     */
+    fun getPrivateMessagesByTimeRange(accountId: String, userId: Int, startTime: Long, endTime: Long): List<Message> {
+        if (accountId.isBlank()) {
+            return emptyList()
+        }
+
+        val historyFile = accountHistoryFile(accountId)
+        if (!historyFile.exists()) {
+            return emptyList()
+        }
+
+        return runCatching {
+            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
+            val migratedSnapshot = migrateSnapshot(snapshot)
+
+            migratedSnapshot.privateMessages
+                .filter { it.senderId == userId && it.timestamp in startTime..endTime }
+                .sortedBy { it.timestamp }
+                .map { it.toModel() }
+        }.getOrElse {
+            println("Get private messages by time range failed: ${it.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * 按时间范围查询群聊消息
+     */
+    fun getGroupMessagesByTimeRange(accountId: String, groupId: Int, startTime: Long, endTime: Long): List<GroupMessage> {
+        if (accountId.isBlank()) {
+            return emptyList()
+        }
+
+        val historyFile = accountHistoryFile(accountId)
+        if (!historyFile.exists()) {
+            return emptyList()
+        }
+
+        return runCatching {
+            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
+            val migratedSnapshot = migrateSnapshot(snapshot)
+
+            migratedSnapshot.groupMessages
+                .filter { it.groupId == groupId && it.timestamp in startTime..endTime }
+                .sortedBy { it.timestamp }
+                .map { it.toModel() }
+        }.getOrElse {
+            println("Get group messages by time range failed: ${it.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * 分页查询与指定用户的私聊消息
+     * @param page 页码，从0开始，0表示最新的一页
+     */
+    fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int = 0, pageSize: Int = 50): List<Message> {
+        if (accountId.isBlank()) {
+            return emptyList()
+        }
+
+        val historyFile = accountHistoryFile(accountId)
+        if (!historyFile.exists()) {
+            return emptyList()
+        }
+
+        return runCatching {
+            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
+            val migratedSnapshot = migrateSnapshot(snapshot)
+
+            val allMessages = migratedSnapshot.privateMessages
+                .filter { it.senderId == userId }
+                .sortedByDescending { it.timestamp }
+
+            val startIndex = page * pageSize
+            val endIndex = minOf(startIndex + pageSize, allMessages.size)
+
+            if (startIndex < allMessages.size) {
+                allMessages.subList(startIndex, endIndex).map { it.toModel() }.reversed()
+            } else {
+                emptyList()
+            }
+        }.getOrElse {
+            println("Get private messages page failed: ${it.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * 分页查询指定群组的消息
+     * @param page 页码，从0开始，0表示最新的一页
+     */
+    fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int = 0, pageSize: Int = 50): List<GroupMessage> {
+        if (accountId.isBlank()) {
+            return emptyList()
+        }
+
+        val historyFile = accountHistoryFile(accountId)
+        if (!historyFile.exists()) {
+            return emptyList()
+        }
+
+        return runCatching {
+            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
+            val migratedSnapshot = migrateSnapshot(snapshot)
+
+            val allMessages = migratedSnapshot.groupMessages
+                .filter { it.groupId == groupId }
+                .sortedByDescending { it.timestamp }
+
+            val startIndex = page * pageSize
+            val endIndex = minOf(startIndex + pageSize, allMessages.size)
+
+            if (startIndex < allMessages.size) {
+                allMessages.subList(startIndex, endIndex).map { it.toModel() }.reversed()
+            } else {
+                emptyList()
+            }
+        }.getOrElse {
+            println("Get group messages page failed: ${it.message}")
+            emptyList()
         }
     }
 

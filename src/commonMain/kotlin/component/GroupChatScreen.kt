@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,10 +54,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import core.LocalChatHistoryStore
 import core.ServerConfig
 import kotlinx.coroutines.launch
 import model.User
 import model.groupMessages
+import viewmodel.chatViewModel
 
 /**
  * 群聊界面
@@ -73,6 +77,11 @@ fun GroupChatScreen(group: User) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val isDarkMode = !MaterialTheme.colors.isLight
+
+    // 分页加载相关状态
+    var currentPage by remember { mutableStateOf(1) } // 第0页已经在启动时加载
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var hasMoreHistory by remember { mutableStateOf(true) }
 
     fun submitMessage() {
         val text = messageText.trim()
@@ -136,10 +145,59 @@ fun GroupChatScreen(group: User) {
             border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
             elevation = 0.dp
         ) {
+            // 监听滚动位置，滚动到顶部时加载更多历史
+            LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
+                if (!isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                    isLoadingMore = true
+                    val olderMessages = LocalChatHistoryStore.getGroupMessagesPage(
+                        accountId = ServerConfig.id,
+                        groupId = -group.id,
+                        page = currentPage,
+                        pageSize = 50
+                    )
+                    if (olderMessages.isNotEmpty()) {
+                        chatViewModel.prependGroupMessages(olderMessages)
+                        currentPage++
+                    } else {
+                        hasMoreHistory = false
+                    }
+                    isLoadingMore = false
+                }
+            }
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
                 state = listState
             ) {
+                // 加载更多提示
+                if (isLoadingMore) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colors.primary
+                            )
+                        }
+                    }
+                } else if (!hasMoreHistory && filteredGroupMessages.isNotEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "没有更早的消息了",
+                                style = MaterialTheme.typography.caption,
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+
                 items(
                     items = filteredGroupMessages,
                     key = { it.messageId }

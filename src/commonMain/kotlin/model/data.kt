@@ -1,9 +1,13 @@
 package model
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import core.ApiService
 import core.ServerConfig
+import viewmodel.chatViewModel
 
 @Serializable
 data class User(
