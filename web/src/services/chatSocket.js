@@ -6,21 +6,25 @@ let pendingQueue = []
 let handlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerror: () => {} }
 let reconnectTimer = null
 let heartbeatTimer = null
+let heartbeatTimeoutTimer = null
 let heartbeatInterval = 30000 // 30秒心跳
 let heartbeatTimeout = 5000 // 心跳超时5秒
 let currentReconnectDelay = 1000 // 初始重连间隔1秒
 let maxReconnectDelay = 30000 // 最大重连间隔30秒
 let isReconnecting = false
 let stopReconnect = false
+let currentUserId = null // 当前登录用户ID
 const MAX_QUEUE_SIZE = 1000 // 消息队列最大长度
 const MAX_MESSAGE_CACHE = 1000 // 消息去重缓存最大长度
 const receivedMessageIds = new Set() // 消息去重缓存
+const messageIdQueue = [] // 消息ID队列，维护插入顺序用于LRU淘汰
 
 // Note: browsers cannot set custom headers on WebSocket handshake. We pass token as query `?token=`.
-export function connect(wsUrl, token, { onopen, onmessage, onclose, onerror } = {}) {
+export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, onerror } = {}) {
   if (socket && socket.readyState === WebSocket.OPEN) return socket
 
   stopReconnect = false
+  currentUserId = userId // 保存当前用户ID
   handlers = {
     onopen: onopen || handlers.onopen,
     onmessage: onmessage || handlers.onmessage,
@@ -69,11 +73,19 @@ export function connect(wsUrl, token, { onopen, onmessage, onclose, onerror } = 
       } catch (_) {}
     }
 
-    // 消息去重
+    // 消息去重和ACK确认
     if (processedData && typeof processedData === 'object') {
-      const messageId = processedData.messageId ||
-                       (processedData.payload && processedData.payload.timestamp) ||
-                       (processedData.chat && processedData.chat.timestamp)
+      let messageId = null
+      let isChatOrGroupMessage = false
+
+      // 从不同消息类型中提取messageId
+      if (processedData.chat && processedData.chat.messageId) {
+        messageId = processedData.chat.messageId
+        isChatOrGroupMessage = true
+      } else if (processedData.groupChat && processedData.groupChat.messageId) {
+        messageId = processedData.groupChat.messageId
+        isChatOrGroupMessage = true
+      }
 
       if (messageId) {
         if (receivedMessageIds.has(messageId)) {
@@ -82,10 +94,18 @@ export function connect(wsUrl, token, { onopen, onmessage, onclose, onerror } = 
         }
         // 添加到去重缓存
         receivedMessageIds.add(messageId)
+        messageIdQueue.push(messageId)
         // 缓存超过大小，移除最旧的
         if (receivedMessageIds.size > MAX_MESSAGE_CACHE) {
-          const firstKey = receivedMessageIds.values().next().value
-          receivedMessageIds.delete(firstKey)
+          const oldestId = messageIdQueue.shift()
+          receivedMessageIds.delete(oldestId)
+        }
+
+        // 发送ACK确认
+        if (isChatOrGroupMessage) {
+          sendAck(messageId).catch(err => {
+            console.warn('发送ACK失败:', err)
+          })
         }
       }
     }
@@ -99,7 +119,7 @@ export function connect(wsUrl, token, { onopen, onmessage, onclose, onerror } = 
 
     if (!stopReconnect && !isReconnecting) {
       // 自动重连
-      scheduleReconnect(wsUrl, token)
+      scheduleReconnect(wsUrl, token, currentUserId)
     }
 
     handlers.onclose(e)
@@ -120,13 +140,27 @@ function startHeartbeat() {
   stopHeartbeat()
   heartbeatTimer = setInterval(() => {
     if (socket && socket.readyState === WebSocket.OPEN) {
+      // 启动心跳超时定时器
+      heartbeatTimeoutTimer = setTimeout(() => {
+        console.log('心跳超时，关闭连接触发重连')
+        if (socket) {
+          socket.close()
+        }
+      }, heartbeatTimeout)
+
       // 发送心跳消息
       sendWrapper({
         type: 'heartbeat',
         timestamp: Date.now()
+      }).then(() => {
+        // 心跳发送成功，清除超时
+        clearTimeout(heartbeatTimeoutTimer)
       }).catch(() => {
-        // 心跳发送失败，关闭连接触发重连
-        socket.close()
+        // 心跳发送失败，清除超时并关闭连接
+        clearTimeout(heartbeatTimeoutTimer)
+        if (socket) {
+          socket.close()
+        }
       })
     }
   }, heartbeatInterval)
@@ -140,12 +174,16 @@ function stopHeartbeat() {
     clearInterval(heartbeatTimer)
     heartbeatTimer = null
   }
+  if (heartbeatTimeoutTimer) {
+    clearTimeout(heartbeatTimeoutTimer)
+    heartbeatTimeoutTimer = null
+  }
 }
 
 /**
  * 调度重连
  */
-function scheduleReconnect(wsUrl, token) {
+function scheduleReconnect(wsUrl, token, userId) {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
   }
@@ -155,7 +193,7 @@ function scheduleReconnect(wsUrl, token) {
 
   reconnectTimer = setTimeout(() => {
     if (!stopReconnect) {
-      connect(wsUrl, token, handlers)
+      connect(wsUrl, token, userId, handlers)
       // 指数退避
       currentReconnectDelay = Math.min(currentReconnectDelay * 2, maxReconnectDelay)
     }
@@ -210,6 +248,24 @@ export async function sendWrapper(wrapperObj) {
 }
 
 /**
+ * 发送ACK确认消息
+ * @param {string} messageId 要确认的消息ID
+ */
+export async function sendAck(messageId) {
+  if (!currentUserId || !messageId) {
+    return false
+  }
+
+  return sendWrapper({
+    type: 'ack',
+    ack: {
+      messageId: messageId,
+      userId: currentUserId
+    }
+  })
+}
+
+/**
  * XSS防护，净化消息内容
  */
 export function sanitizeMessage(content) {
@@ -235,9 +291,11 @@ export function close() {
     socket = null
   }
 
-  // 清空队列
+  // 清空状态
   pendingQueue = []
   receivedMessageIds.clear()
+  messageIdQueue.length = 0
+  currentUserId = null
 }
 
 export function readyState() {
@@ -248,4 +306,4 @@ export function isConnected() {
   return socket && socket.readyState === WebSocket.OPEN
 }
 
-export default { connect, sendWrapper, close, readyState, isConnected, sanitizeMessage }
+export default { connect, sendWrapper, sendAck, close, readyState, isConnected, sanitizeMessage }

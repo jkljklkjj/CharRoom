@@ -6,6 +6,13 @@ option java_package = "com.chatlite.proto";
 option java_outer_classname = "MessageProtos";
 option java_multiple_files = false;
 
+// 消息类型枚举
+enum MessageType {
+    TEXT = 0;  // 文本消息
+    IMAGE = 1; // 图片消息
+    FILE = 2;  // 文件消息
+}
+
 // 登录消息
 message LoginMessage {
     string targetClientId = 1;  // 通过token和redis获取的客户端ID
@@ -17,7 +24,19 @@ message ChatMessage {
     string content = 2;       // 消息内容
     string userId = 3;        // 发送者用户ID
     string timestamp = 4;      // 时间戳
-    repeated ClientAction clientActions = 5; // 可选的行为序列
+    string messageId = 5;      // 消息唯一ID（用于ACK确认）
+    repeated ClientAction clientActions = 6; // 可选的行为序列
+
+    // 引用回复相关字段
+    string replyToMessageId = 7;  // 引用的消息ID
+    string replyToContent = 8;    // 引用的消息内容预览
+    string replyToSender = 9;     // 引用消息的发送者名称
+
+    // 文件消息相关字段
+    MessageType messageType = 10;  // 消息类型
+    string fileUrl = 11;          // 文件/图片URL
+    string fileName = 12;         // 文件名称
+    int64 fileSize = 13;          // 文件大小
 }
 
 // 群聊消息
@@ -25,6 +44,18 @@ message GroupChatMessage {
     string targetClientId = 1;  // 群组ID
     string content = 2;       // 消息内容
     string userId = 3;        // 发送者用户ID
+    string messageId = 4;      // 消息唯一ID（用于ACK确认）
+
+    // 引用回复相关字段
+    string replyToMessageId = 5;  // 引用的消息ID
+    string replyToContent = 6;    // 引用的消息内容预览
+    string replyToSender = 7;     // 引用消息的发送者名称
+
+    // 文件消息相关字段
+    MessageType messageType = 8;  // 消息类型
+    string fileUrl = 9;          // 文件/图片URL
+    string fileName = 10;         // 文件名称
+    int64 fileSize = 11;          // 文件大小
 }
 
 // 客户端行为描述
@@ -70,19 +101,26 @@ message LogoutMessage {
     string userId = 1;  // 用户ID
 }
 
+// ACK确认消息
+message AckMessage {
+    string messageId = 1;  // 要确认的消息ID
+    string userId = 2;     // 用户ID
+}
+
 // 通用消息包装器
 message MessageWrapper {
-    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout
-    
+    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout, ack
+
     oneof payload {
         LoginMessage login = 2;
         ChatMessage chat = 3;
-        AgentChatMessage agentChat = 8;
-        AgentStreamMessage agentStream = 9;
+        AgentChatMessage agentChat = 9;
+        AgentStreamMessage agentStream = 8;
         GroupChatMessage groupChat = 4;
         CheckMessage check = 5;
         HeartbeatMessage heartbeat = 6;
         LogoutMessage logout = 7;
+        AckMessage ack = 10;
     }
 }
 
