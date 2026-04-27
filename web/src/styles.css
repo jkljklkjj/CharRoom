@@ -6,8 +6,15 @@
   --muted:#666;
   --surface-border: rgba(0,0,0,0.04);
 }
-body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,\"Noto Sans CJK SC\",sans-serif;background:var(--bg);color:#222;margin:0}
+body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans CJK SC",sans-serif;background:var(--bg);color:#222;margin:0;overflow-x:hidden}
 .container{max-width:1000px;margin:0 auto;padding:20px}
+
+/* 移动端取消容器内边距 */
+@media (max-width: 768px) {
+  .container {
+    padding: 0;
+  }
+}
 .site-header{display:flex;justify-content:space-between;align-items:center;padding:12px 0}
 .logo{font-weight:700}
 .site-header nav a{margin-left:12px;color:var(--muted);text-decoration:none}

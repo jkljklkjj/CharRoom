@@ -23,10 +23,11 @@
           <ul v-else class="request-list">
             <li v-for="req in friendRequests" :key="req.id" class="request-item">
               <div class="request-info">
-                <div class="avatar">{{ initials(req.username || req.account) }}</div>
+                <div v-if="req.avatarUrl" class="avatar"><img :src="req.avatarUrl" alt="avatar" /></div>
+                <div v-else class="avatar">{{ initials(req.username) }}</div>
                 <div class="request-meta">
-                  <div class="name">{{ req.username || req.account }}</div>
-                  <div class="desc">申请添加你为好友</div>
+                  <div class="name">{{ req.username }}</div>
+                  <div class="desc">账号: {{ req.id }} 申请添加你为好友</div>
                 </div>
               </div>
               <div class="request-actions">
@@ -40,11 +41,11 @@
     </div>
 
     <ul class="users-list">
-      <li v-for="u in store.state.users" :key="u.id" @click="select(u)" :class="{active: selected === u.id}">
+      <li v-for="u in store.state.users" :key="u.id" @click="select(u)" :class="{active: store.state.selectedChatId === u.id}">
         <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="avatar" /></div>
-        <div v-else class="avatar">{{ initials(u.name || u.account) }}</div>
+        <div v-else class="avatar">{{ initials(u.name || u.account || u.username) }}</div>
         <div class="meta">
-          <div class="name">{{ u.name || u.account }}</div>
+          <div class="name">{{ u.name || u.account || u.username }}</div>
           <div class="sub">{{ u.status || '在线' }}</div>
         </div>
       </li>
@@ -56,6 +57,8 @@
 import { ref, onMounted } from 'vue'
 import { useStore } from '../store'
 import api from '../api'
+
+const emit = defineEmits(['user-selected'])
 
 const store = useStore()
 const showFriendRequests = ref(false)
@@ -74,6 +77,7 @@ function initials(name) {
 
 function select(u) {
   store.setSelectedChat(u.id)
+  emit('user-selected', u)
 }
 
 function onAdd() {
@@ -92,6 +96,7 @@ function toggleFriendRequests() {
 
 async function loadFriendRequests() {
   const requests = await api.getFriendRequests()
+  console.log('获取到的好友请求原始数据:', requests)
   friendRequests.value = requests
 }
 

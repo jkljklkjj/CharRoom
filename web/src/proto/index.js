@@ -4,7 +4,7 @@ let rootPromise = null
 
 export function loadProto() {
   if (!rootPromise) {
-    rootPromise = protobuf.load('/src/proto/message.proto')
+    rootPromise = protobuf.load('/proto/message.proto')
   }
   return rootPromise
 }

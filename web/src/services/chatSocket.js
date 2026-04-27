@@ -32,9 +32,13 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
     onerror: onerror || handlers.onerror
   }
 
-  // 对token进行简单编码，提高安全性
-  const encodedToken = token ? btoa(encodeURIComponent(token)) : ''
-  const url = encodedToken ? `${wsUrl}?token=${encodedToken}` : wsUrl
+  // 构造带token的WebSocket URL（后端支持从query参数获取token）
+  let url = wsUrl
+  if (token) {
+    // 对token进行编码，避免特殊字符问题
+    const encodedToken = btoa(encodeURIComponent(token))
+    url += (url.includes('?') ? '&' : '?') + 'token=' + encodedToken
+  }
 
   socket = new WebSocket(url)
   socket.binaryType = 'arraybuffer'
@@ -277,6 +281,7 @@ export function sanitizeMessage(content) {
     FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
   })
 }
+
 
 export function close() {
   stopReconnect = true

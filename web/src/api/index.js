@@ -1,8 +1,16 @@
+import store from '../store'
+
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://chatlite.xin/api'
 
-async function safeFetch(url, options) {
+async function safeFetch(url, options = {}) {
   try {
-    const res = await fetch(url, options)
+    // 自动添加Authorization头
+    const headers = { ...options.headers }
+    if (store.state.token && !headers.Authorization) {
+      headers.Authorization = `Bearer ${store.state.token}`
+    }
+
+    const res = await fetch(url, { ...options, headers })
     if (!res.ok) return { ok: false, status: res.status, body: null }
     const text = await res.text()
     try {
@@ -74,16 +82,28 @@ export async function getFriendRequests() {
 }
 
 export async function acceptFriend(requesterId) {
+  console.log('acceptFriend 传入参数:', requesterId, '类型:', typeof requesterId)
+  const friendId = parseInt(requesterId)
+  console.log('acceptFriend 转换后参数:', friendId, '类型:', typeof friendId)
+  const body = JSON.stringify({ friendId })
+  console.log('acceptFriend 请求体:', body)
   const { ok } = await safeFetch(`${API_BASE}/friend/accept`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendId: requesterId })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body
   })
+  console.log('acceptFriend 返回结果:', ok)
   return ok
 }
 
 export async function rejectFriend(requesterId) {
+  console.log('rejectFriend 传入参数:', requesterId, '类型:', typeof requesterId)
+  const friendId = parseInt(requesterId)
+  console.log('rejectFriend 转换后参数:', friendId, '类型:', typeof friendId)
+  const body = JSON.stringify({ friendId })
+  console.log('rejectFriend 请求体:', body)
   const { ok } = await safeFetch(`${API_BASE}/friend/reject`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendId: requesterId })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body
   })
+  console.log('rejectFriend 返回结果:', ok)
   return ok
 }
 

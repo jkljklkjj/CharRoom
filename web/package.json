@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "git -C ../../chat-room show HEAD:src/main/proto/message.proto > public/proto/message.proto && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

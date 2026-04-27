@@ -587,10 +587,175 @@ onMounted(() => {
   line-height: 1.4;
 }
 
-@media (max-width: 760px) {
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  /* Header适配 */
+  .site-header {
+    flex-wrap: wrap;
+    padding: 12px 0;
+  }
+  .site-header .nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  .site-header .nav a {
+    margin: 0 8px;
+  }
+  .header-actions {
+    margin-left: auto;
+  }
+
+  /* Hero区域适配 */
+  .hero {
+    padding: 32px 16px;
+    margin: 0 12px 20px;
+  }
+  .hero-inner {
+    flex-direction: column;
+    gap: 32px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .hero-left {
+    padding-top: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+  .hero-title {
+    font-size: 28px;
+  }
+  .hero-highlights {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .highlight {
+    box-sizing: border-box;
+    margin: 0 auto;
+  }
+  .hero-right {
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+  .demo-card {
+    margin: 0 auto;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 功能区域适配 */
+  .feature-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* 下载区域适配 */
+  .download-grid {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Why选择区域适配 */
   .why-grid {
     grid-template-columns: 1fr;
     gap: 20px;
+  }
+  .why-choose {
+    margin: 20px 16px;
+    padding: 24px 20px;
+  }
+  .why-lead {
+    font-size: 0.95rem;
+  }
+
+  /* CTA按钮适配 */
+  .cta {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .btn {
+    text-align: center;
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  /* 各section在移动端保持左右边距 */
+  .features.container,
+  .downloads.container,
+  .why-choose.container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    margin: 0 12px 16px;
+    padding: 24px 16px;
+  }
+  .hero-title {
+    font-size: 22px;
+  }
+  .hero-lead {
+    font-size: 14px;
+  }
+  .demo-card {
+    max-width: 100%;
+  }
+  .site-header {
+    padding: 12px 16px;
+  }
+  .features.container,
+  .downloads.container {
+    padding: 20px 16px;
+  }
+  .why-choose.container {
+    margin: 20px 12px;
+    padding: 20px 16px;
+  }
+}
+
+/* 超小屏幕适配 */
+@media (max-width: 375px) {
+  .hero-title {
+    font-size: 20px;
+  }
+  .highlight {
+    padding: 12px;
+  }
+  .h-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+  .h-title {
+    font-size: 14px;
+  }
+  .h-sub {
+    font-size: 12px;
+  }
+  .demo-card {
+    transform: scale(0.9);
+    transform-origin: center center;
+    margin: 0 auto;
+  }
+  .demo-messages {
+    min-height: 220px;
+    padding: 16px;
   }
 }
 
@@ -620,18 +785,23 @@ onMounted(() => {
   padding: 16px 20px;
   background: #f8fafc;
   border-bottom: 1px solid #eef2f6;
+  gap: 12px;
 }
 
 .demo-badge {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: clamp(11px, 2.5vw, 13px);
   font-weight: 600;
   background: #eef2ff;
   padding: 5px 12px;
   border-radius: 40px;
   color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .demo-dot {
@@ -655,11 +825,16 @@ onMounted(() => {
 }
 
 .demo-status {
-  font-size: 12px;
+  font-size: clamp(10px, 2vw, 12px);
   color: #475569;
   background: #f1f5f9;
   padding: 4px 10px;
   border-radius: 30px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .demo-messages {
