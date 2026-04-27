@@ -80,6 +80,13 @@ export async function acceptFriend(requesterId) {
   return ok
 }
 
+export async function rejectFriend(requesterId) {
+  const { ok } = await safeFetch(`${API_BASE}/friend/reject`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendId: requesterId })
+  })
+  return ok
+}
+
 export async function addGroup(groupId) {
   const { ok } = await safeFetch(`${API_BASE}/group/add`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groupId })
@@ -91,6 +98,17 @@ export async function getUserDetail(id) {
   const { ok, body } = await safeFetch(`${API_BASE}/friend/get?id=${id}`, { method: 'POST' })
   if (!ok) return null
   return body
+}
+
+export async function getFriends() {
+  const { ok, body } = await safeFetch(`${API_BASE}/friend/get`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  })
+  if (!ok) return []
+  // 支持 ApiResponse 包装或直接返回数组
+  return body?.data || body || []
 }
 
 export async function getGroupDetail(id) {
@@ -127,7 +145,11 @@ export default {
   register,
   getOfflineMessages,
   addFriend,
+  getFriendRequests,
+  acceptFriend,
+  rejectFriend,
   addGroup,
+  getFriends,
   getUserDetail,
   getGroupDetail,
   callAgentStream,

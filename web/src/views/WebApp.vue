@@ -16,13 +16,17 @@ import SidebarUsers from '../components/SidebarUsers.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
+import api from '../api'
 
 const WS_URL = import.meta.env.VITE_WS_URL || (location.origin.replace(/^http/, 'ws') + '/ws')
 
 const store = useStore()
 
-function onLogged(token) {
+async function onLogged(token) {
   store.setToken(token)
+  // 登录后加载好友列表
+  const friends = await api.getFriends()
+  store.setUsers(friends)
   // 登录后立即建立 websocket 连接
   chatSocket.connect(WS_URL, token, {
     onopen: () => console.log('ws open'),

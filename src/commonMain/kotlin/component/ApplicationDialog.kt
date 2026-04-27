@@ -7,7 +7,6 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import core.ApiService
 import kotlinx.coroutines.Dispatchers
@@ -51,11 +50,6 @@ fun ApplicationDialog(
         ApplicationType.FRIEND -> "申请添加你为好友"
     }
 
-    // 加载申请列表
-    LaunchedEffect(type) {
-        loadApplications()
-    }
-
     suspend fun loadApplications() {
         isLoading = true
         applications = withContext(Dispatchers.IO) {
@@ -65,6 +59,11 @@ fun ApplicationDialog(
             }
         }
         isLoading = false
+    }
+
+    // 加载申请列表
+    LaunchedEffect(type) {
+        loadApplications()
     }
 
     fun handleAction(userId: Int, accept: Boolean) {

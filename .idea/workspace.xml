@@ -11,6 +11,7 @@
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="app接入客户端逻辑">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -111,7 +112,7 @@
   &quot;isMigrated&quot;: true
 }</component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="ProjectErrors" />
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
