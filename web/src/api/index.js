@@ -69,7 +69,7 @@ export async function getOfflineMessages() {
 
 export async function addFriend(account) {
   const { ok } = await safeFetch(`${API_BASE}/friend/add`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendId: account })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account })
   })
   return ok
 }
@@ -120,6 +120,12 @@ export async function getUserDetail(id) {
   return body
 }
 
+export async function getCurrentUser() {
+  const { ok, body } = await safeFetch(`${API_BASE}/user/get`, { method: 'GET' })
+  if (!ok) return null
+  return body?.data || body || null
+}
+
 export async function getFriends() {
   const { ok, body } = await safeFetch(`${API_BASE}/friend/get`, {
     method: 'POST',
@@ -163,6 +169,7 @@ export async function callAgentStream(text, onTokenChunk = (chunk) => {}) {
 export default {
   login,
   register,
+  getCurrentUser,
   getOfflineMessages,
   addFriend,
   getFriendRequests,

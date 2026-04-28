@@ -21,7 +21,12 @@ const messageIdQueue = [] // 消息ID队列，维护插入顺序用于LRU淘汰
 
 // Note: browsers cannot set custom headers on WebSocket handshake. We pass token as query `?token=`.
 export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, onerror } = {}) {
-  if (socket && socket.readyState === WebSocket.OPEN) return socket
+  console.log('🔌 尝试建立WebSocket连接:', { wsUrl, hasToken: !!token, userId, existingSocket: !!socket, readyState: socket?.readyState })
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    console.log('✅ 连接已存在，复用现有连接')
+    return socket
+  }
 
   stopReconnect = false
   currentUserId = userId // 保存当前用户ID
@@ -32,25 +37,42 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
     onerror: onerror || handlers.onerror
   }
 
-  // 构造带token的WebSocket URL（后端支持从query参数获取token）
+  // 构造纯净的WebSocket URL，不带任何参数
   let url = wsUrl
-  if (token) {
-    // 对token进行编码，避免特殊字符问题
-    const encodedToken = btoa(encodeURIComponent(token))
-    url += (url.includes('?') ? '&' : '?') + 'token=' + encodedToken
+  console.log('🔗 最终WebSocket URL:', url)
+
+  try {
+    socket = new WebSocket(url)
+    socket.binaryType = 'arraybuffer'
+    console.log('🆕 新WebSocket实例已创建，将通过应用层Login消息认证')
+  } catch (err) {
+    console.error('❌ 创建WebSocket实例失败:', err)
+    throw err
   }
 
-  socket = new WebSocket(url)
-  socket.binaryType = 'arraybuffer'
-
   socket.addEventListener('open', (e) => {
-    console.log('WebSocket连接成功')
+    console.log('✅ WebSocket连接成功，readyState:', socket.readyState)
     isReconnecting = false
     currentReconnectDelay = 1000
 
+    // 发送登录消息完成应用层认证（确保在next tick发送，避免状态未就绪）
+    setTimeout(async () => {
+      if (token && socket.readyState === WebSocket.OPEN) {
+        try {
+          console.log('📤 正在发送登录消息，token长度:', token.length)
+          const result = await sendWrapper({
+            type: 'login',
+            login: { targetClientId: token }
+          })
+          console.log('✅ 登录消息发送结果:', result)
+        } catch (err) {
+          console.error('❌ 发送登录消息失败:', err)
+        }
+      }
+    }, 0)
+
     handlers.onopen(e)
-    // flush queue (buffers)
-    flushQueue()
+    // flush queue (buffers) - 先不flush，等登录完成后再发
     // 启动心跳
     startHeartbeat()
   })
@@ -75,6 +97,18 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
       try {
         processedData = JSON.parse(data)
       } catch (_) {}
+    }
+
+    // 处理登录响应
+    if (processedData && typeof processedData === 'object' && processedData.success !== undefined) {
+      console.log('🔐 收到登录响应:', processedData)
+      if (processedData.success) {
+        console.log('✅ 登录成功，开始发送队列消息')
+        // 登录成功后flush消息队列
+        flushQueue()
+      } else {
+        console.error('❌ 登录失败:', processedData.message)
+      }
     }
 
     // 消息去重和ACK确认
@@ -118,7 +152,7 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
   })
 
   socket.addEventListener('close', (e) => {
-    console.log('WebSocket连接关闭:', e.code, e.reason)
+    console.log('❌ WebSocket连接关闭: code=', e.code, 'reason=', e.reason, 'wasClean=', e.wasClean)
     stopHeartbeat()
 
     if (!stopReconnect && !isReconnecting) {
@@ -130,7 +164,7 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
   })
 
   socket.addEventListener('error', (e) => {
-    console.error('WebSocket错误:', e)
+    console.error('💥 WebSocket错误:', e)
     handlers.onerror(e)
   })
 
@@ -263,8 +297,7 @@ export async function sendAck(messageId) {
   return sendWrapper({
     type: 'ack',
     ack: {
-      messageId: messageId,
-      userId: currentUserId
+      messageId: messageId
     }
   })
 }

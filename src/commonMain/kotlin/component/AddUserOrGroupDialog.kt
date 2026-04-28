@@ -73,8 +73,14 @@ fun AddUserOrGroupDialog(onDismiss: () -> Unit) {
                         responseMessage = "账号不能为空"
                         return@Button
                     }
-                    if (!account.all { it.isDigit() }) {
-                        responseMessage = "请输入数字账号或群号"
+                    // 支持数字账号或邮箱格式
+                    val isNumeric = account.all { it.isDigit() }
+                    val isEmail = account.contains("@") && account.contains(".")
+                    if (!isNumeric && !isEmail && isUser) {
+                        responseMessage = "请输入数字账号或邮箱"
+                        return@Button
+                    } else if (!isNumeric && !isUser) {
+                        responseMessage = "请输入数字群号"
                         return@Button
                     }
                     scope.launch {

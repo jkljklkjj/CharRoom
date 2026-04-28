@@ -83,6 +83,11 @@ function backToList() {
 
 async function onLogged(token) {
   store.setToken(token)
+  // 登录后获取当前用户信息并设置accountId
+  const userRes = await api.getCurrentUser()
+  if (userRes && userRes.id) {
+    store.setAccountId(userRes.id)
+  }
   // 登录后加载好友列表
   const friends = await api.getFriends()
   store.setUsers(friends)
@@ -91,16 +96,41 @@ async function onLogged(token) {
     onopen: () => console.log('ws open'),
     onmessage: (msg) => {
       // msg is decoded MessageWrapper object
+      console.log('📩 收到原始消息:', msg)
       try {
         if (msg.type === 'chat' && msg.chat) {
-          const m = { user: msg.chat.userId || 'unknown', text: msg.chat.content, time: msg.chat.timestamp || new Date().toISOString() }
+          console.log('💬 收到聊天消息:', msg.chat)
+          const m = {
+            user: String(msg.chat.userId || 'unknown'), // 确保userId是字符串类型
+            text: msg.chat.content,
+            time: msg.chat.timestamp || new Date().toISOString(),
+            targetId: msg.chat.targetClientId // 保留目标ID用于调试
+          }
+          console.log('📝 构造消息对象:', m)
+          console.log('📍 当前选中的聊天ID:', store.state.selectedChatId)
           store.addMessage(m)
+          console.log('💾 当前消息列表:', store.state.messages)
+
+          // 测试过滤逻辑
+          if (store.state.selectedChatId) {
+            const selectedId = String(store.state.selectedChatId)
+            const shouldShow = String(m.user) === selectedId || String(m.targetId) === selectedId
+            console.log(`🔍 消息是否应该显示: ${shouldShow} (m.user=${m.user}, m.targetId=${m.targetId}, selectedId=${selectedId})`)
+          }
         } else if (msg.type === 'groupChat' && msg.groupChat) {
-          const gm = { user: msg.groupChat.userId, text: msg.groupChat.content, time: new Date().toISOString(), groupId: msg.groupChat.targetClientId }
+          console.log('👥 收到群聊消息:', msg.groupChat)
+          const gm = {
+            user: String(msg.groupChat.userId), // 确保userId是字符串类型
+            text: msg.groupChat.content,
+            time: new Date().toISOString(),
+            groupId: msg.groupChat.targetClientId
+          }
           store.addGroupMessage(gm)
+        } else {
+          console.log('ℹ️ 收到其他类型消息:', msg.type)
         }
       } catch (e) {
-        console.error('处理 incoming 消息失败', e)
+        console.error('❌ 处理 incoming 消息失败', e)
       }
     },
     onclose: () => console.log('ws close'),
@@ -108,18 +138,55 @@ async function onLogged(token) {
   })
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 页面挂载时可做进一步初始化（如尝试恢复 token）
   if (store.state.token) {
+    // 恢复用户信息
+    const userRes = await api.getCurrentUser()
+    if (userRes && userRes.id) {
+      store.setAccountId(userRes.id)
+    }
     // 自动恢复连接
     chatSocket.connect(WS_URL, store.state.token, store.state.accountId, {
       onopen: () => console.log('ws restored'),
       onmessage: (msg) => {
-        if (msg.type === 'chat' && msg.chat) store.addMessage({ user: msg.chat.userId || 'unknown', text: msg.chat.content, time: msg.chat.timestamp || new Date().toISOString() })
-        else if (msg.type === 'groupChat' && msg.groupChat) store.addGroupMessage({ user: msg.groupChat.userId, text: msg.groupChat.content, time: new Date().toISOString(), groupId: msg.groupChat.targetClientId })
+        console.log('📩 恢复连接收到原始消息:', msg)
+        try {
+          if (msg.type === 'chat' && msg.chat) {
+            console.log('💬 恢复连接收到聊天消息:', msg.chat)
+            const m = {
+              user: String(msg.chat.userId || 'unknown'),
+              text: msg.chat.content,
+              time: msg.chat.timestamp || new Date().toISOString(),
+              targetId: msg.chat.targetClientId
+            }
+            console.log('📝 恢复连接构造消息对象:', m)
+            store.addMessage(m)
+            console.log('💾 恢复连接后消息列表:', store.state.messages)
+          } else if (msg.type === 'groupChat' && msg.groupChat) {
+            console.log('👥 恢复连接收到群聊消息:', msg.groupChat)
+            const gm = { user: String(msg.groupChat.userId), text: msg.groupChat.content, time: new Date().toISOString(), groupId: msg.groupChat.targetClientId }
+            store.addGroupMessage(gm)
+          } else {
+            console.log('ℹ️ 恢复连接收到其他类型消息:', msg.type)
+          }
+        } catch (e) {
+          console.error('❌ 恢复连接处理消息失败', e)
+        }
       }
     })
   }
+
+  // 页面关闭时主动发送登出消息
+  window.addEventListener('beforeunload', () => {
+    if (store.state.token) {
+      // 发送登出消息
+      chatSocket.sendWrapper({
+        type: 'logout',
+        logout: { userId: String(store.state.accountId) }
+      }).catch(() => {})
+    }
+  })
 })
 </script>
 

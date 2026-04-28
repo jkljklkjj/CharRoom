@@ -24,19 +24,19 @@ message ChatMessage {
     string content = 2;       // 消息内容
     string userId = 3;        // 发送者用户ID
     string timestamp = 4;      // 时间戳
-    string messageId = 5;      // 消息唯一ID（用于ACK确认）
+    optional string messageId = 5;      // 消息唯一ID（用于ACK确认）
     repeated ClientAction clientActions = 6; // 可选的行为序列
 
     // 引用回复相关字段
-    string replyToMessageId = 7;  // 引用的消息ID
-    string replyToContent = 8;    // 引用的消息内容预览
-    string replyToSender = 9;     // 引用消息的发送者名称
+    optional string replyToMessageId = 7;  // 引用的消息ID
+    optional string replyToContent = 8;    // 引用的消息内容预览
+    optional string replyToSender = 9;     // 引用消息的发送者名称
 
     // 文件消息相关字段
-    MessageType messageType = 10;  // 消息类型
-    string fileUrl = 11;          // 文件/图片URL
-    string fileName = 12;         // 文件名称
-    int64 fileSize = 13;          // 文件大小
+    optional MessageType messageType = 10;  // 消息类型
+    optional string fileUrl = 11;          // 文件/图片URL
+    optional string fileName = 12;         // 文件名称
+    optional int64 fileSize = 13;          // 文件大小
 }
 
 // 群聊消息
@@ -44,18 +44,19 @@ message GroupChatMessage {
     string targetClientId = 1;  // 群组ID
     string content = 2;       // 消息内容
     string userId = 3;        // 发送者用户ID
-    string messageId = 4;      // 消息唯一ID（用于ACK确认）
+    string timestamp = 4;      // 时间戳
+    optional string messageId = 5;      // 消息唯一ID（用于ACK确认）
 
     // 引用回复相关字段
-    string replyToMessageId = 5;  // 引用的消息ID
-    string replyToContent = 6;    // 引用的消息内容预览
-    string replyToSender = 7;     // 引用消息的发送者名称
+    optional string replyToMessageId = 6;  // 引用的消息ID
+    optional string replyToContent = 7;    // 引用的消息内容预览
+    optional string replyToSender = 8;     // 引用消息的发送者名称
 
     // 文件消息相关字段
-    MessageType messageType = 8;  // 消息类型
-    string fileUrl = 9;          // 文件/图片URL
-    string fileName = 10;         // 文件名称
-    int64 fileSize = 11;          // 文件大小
+    optional MessageType messageType = 9;  // 消息类型
+    optional string fileUrl = 10;          // 文件/图片URL
+    optional string fileName = 11;         // 文件名称
+    optional int64 fileSize = 12;          // 文件大小
 }
 
 // 客户端行为描述
@@ -104,7 +105,6 @@ message LogoutMessage {
 // ACK确认消息
 message AckMessage {
     string messageId = 1;  // 要确认的消息ID
-    string userId = 2;     // 用户ID
 }
 
 // 通用消息包装器

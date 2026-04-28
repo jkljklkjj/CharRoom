@@ -86,7 +86,7 @@ const currentMessages = computed(() => {
     // 两种情况属于当前会话：
     // 1. 对方发过来的消息：m.user 等于 选中的用户ID
     // 2. 自己发出去的消息：m.targetId 等于 选中的用户ID
-    return Number(m.user) === selectedId || m.targetId === selectedId
+    return String(m.user) === String(selectedId) || String(m.targetId) === String(selectedId)
   })
 })
 
@@ -102,8 +102,8 @@ watch([currentChatUser, currentMessages], () => {
 function time(t){ if(!t) return '' ; const d = new Date(t); return d.toLocaleTimeString() }
 function getAvatar(userId){
   if(!userId) return null
-  const id = typeof userId === 'string' && userId !== 'you' ? Number(userId) : userId
-  const u = store.state.users.find(x => x.id === id)
+  const id = String(userId)
+  const u = store.state.users.find(x => String(x.id) === id)
   if (!u) return null
   if (!u.avatarUrl) return null
   const v = u.avatarKey
@@ -128,7 +128,7 @@ function send(){
   const to = store.state.selectedChatId
   const wrapper = {
     type: 'chat',
-    chat: { targetClientId: String(to), content: m.text, userId: String(store.state.accountId) || 'web', timestamp: m.time }
+    chat: { targetClientId: String(to), content: m.text, timestamp: m.time }
   }
   chatSocket.sendWrapper(wrapper).catch(()=>{})
   text.value = ''
@@ -144,36 +144,44 @@ onMounted(()=>{
 <style scoped>
 .chat-wrap{display:flex;flex-direction:column;height:100%}
 .chat-top{padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.04);font-weight:600}
-.messages{flex:1;overflow:auto;padding:16px;background:#fff}
-.msg{margin-bottom:12px;display:flex;max-width:70%}
-.msg .row{display:flex;align-items:flex-start;width:100%}
-.msg .avatar-col{width:44px;display:flex;align-items:flex-start;justify-content:center;margin-right:8px}
+.messages{flex:1;overflow:auto;padding:16px;background:#fff;display:flex;flex-direction:column;gap:12px}
+.msg{display:flex;width:100%}
+.msg .row{display:flex;align-items:flex-start;gap:8px}
+.msg .avatar-col{width:44px;display:flex;align-items:flex-start;justify-content:center;flex-shrink:0}
 .msg .msg-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover}
 .msg .avatar-placeholder{width:36px;height:36px;border-radius:50%;background:linear-gradient(180deg,var(--accent-1),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
-.msg .bubble-col{flex:1;min-width:0}
+.msg .bubble-col{
+  max-width: calc(100% - 52px); /* 减去头像宽度和间距 */
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  width: fit-content; /* 宽度随内容自适应 */
+}
 .msg .text{word-wrap:break-word;white-space:pre-wrap}
 
-/* 自己发的消息：在右边，橙色气泡 */
+/* 自己发的消息：在右边，橙色气泡，头像在右侧 */
 .msg.me{
-  align-self: flex-end;
+  justify-content: flex-end;
+}
+.msg.me .row{
+  flex-direction: row-reverse;
 }
 .msg.me .bubble-col{
   background: linear-gradient(135deg, #ff9a66, #ff7a33);
   color: white;
-  border-radius: 18px 18px 4px 18px;
+  border-radius: 18px 18px 18px 4px;
   padding: 10px 14px;
 }
 .msg.me .meta{
   color: rgba(255,255,255,0.8);
 }
 
-/* 对方发的消息：在左边，灰色气泡 */
+/* 对方发的消息：在左边，灰色气泡，头像在左侧 */
 .msg:not(.me){
-  align-self: flex-start;
+  justify-content: flex-start;
 }
 .msg:not(.me) .bubble-col{
   background: #f5f5f5;
-  border-radius: 18px 18px 18px 4px;
+  border-radius: 18px 18px 4px 18px;
   padding: 10px 14px;
 }
 .meta{font-size:12px;color:var(--muted);margin-bottom:6px}

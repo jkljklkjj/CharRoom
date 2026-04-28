@@ -87,7 +87,7 @@ private data class LoginBody(val account: String, val password: String)
 @Serializable
 private data class RegisterBody(val username: String, val password: String)
 @Serializable
-private data class AddFriendBody(val friendId: String)
+private data class AddFriendBody(val account: String)
 @Serializable
 private data class AddGroupBody(val groupId: String)
 @Serializable
@@ -178,8 +178,8 @@ class ApiClient(
     }
 
     /** 添加好友 */
-    fun addFriend(friendId: String, token: String = ServerConfig.Token): Boolean {
-        val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(friendId))
+    fun addFriend(account: String, token: String = ServerConfig.Token): Boolean {
+        val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(account))
         val resp = sendRequest(ApiEndpoints.FRIEND_ADD, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
@@ -514,7 +514,7 @@ object ApiService {
     fun validateToken(token: String = ServerConfig.Token) = client.validateToken(token)
     fun fetchFriends(token: String = ServerConfig.Token) = client.fetchFriends(token)
     fun fetchGroups(token: String = ServerConfig.Token) = client.fetchGroups(token)
-    fun addFriend(friendId: String, token: String = ServerConfig.Token) = client.addFriend(friendId, token)
+    fun addFriend(account: String, token: String = ServerConfig.Token) = client.addFriend(account, token)
     fun addGroup(groupId: String, token: String = ServerConfig.Token) = client.addGroup(groupId, token)
     fun fetchFriendRequests(token: String = ServerConfig.Token) = client.fetchFriendRequests(token)
     fun acceptFriend(requesterId: String, token: String = ServerConfig.Token) = client.acceptFriend(requesterId, token)

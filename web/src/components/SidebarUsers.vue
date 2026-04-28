@@ -81,9 +81,9 @@ function select(u) {
 }
 
 function onAdd() {
-  const id = prompt('输入对方账号以添加为好友')
-  if (!id) return
-  api.addFriend(id).then(ok => { if (ok) alert('已发送好友请求') })
+  const account = prompt('输入对方账号（数字ID或邮箱）以添加为好友')
+  if (!account) return
+  api.addFriend(account).then(ok => { if (ok) alert('已发送好友请求') })
 }
 
 // 好友申请相关功能

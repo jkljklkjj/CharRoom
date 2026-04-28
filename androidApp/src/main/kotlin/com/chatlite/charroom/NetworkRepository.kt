@@ -56,8 +56,8 @@ class NetworkRepository {
         (friends + groups).distinctBy { it.id }
     }
 
-    suspend fun addFriend(friendId: String, token: String): Boolean = withContext(Dispatchers.IO) {
-        val body = JSONObject().apply { put("friendId", friendId) }
+    suspend fun addFriend(account: String, token: String): Boolean = withContext(Dispatchers.IO) {
+        val body = JSONObject().apply { put("account", account) }
         val response = sendRequest(FRIEND_ADD_PATH, "POST", body.toString(), token)
         interpretBoolean(response)
     }
