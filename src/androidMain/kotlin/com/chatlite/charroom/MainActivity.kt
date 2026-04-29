@@ -5,9 +5,14 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.MaterialTheme
+import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import core.initKermit
 
@@ -24,21 +29,37 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // 全局返回键处理状态
+    private var canGoBack = false
+    private var onBackPressedCallback: (() -> Boolean)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 沉浸式状态栏
+        // 沉浸式状态栏，内容延伸到状态栏下
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         initKermit()
 
-        // 启动前台服务保活
-        try {
-            ChatForegroundService.start(this)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // 暂时禁用前台服务，避免权限问题
+        // try {
+        //     ChatForegroundService.start(this)
+        // } catch (e: Exception) {
+        //     e.printStackTrace()
+        // }
+
+        // 注册返回键回调，优先级高于系统默认
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // 先尝试让Compose层处理返回
+                val handled = onBackPressedCallback?.invoke() ?: false
+                if (!handled) {
+                    // 没有处理，执行默认返回（退出应用）
+                    finish()
+                }
+            }
+        })
 
         // 请求必要权限
         requestNecessaryPermissions()
@@ -51,7 +72,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                App()
+                // 使用systemBarsPadding自动适配状态栏和导航栏边距
+                androidx.compose.foundation.Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .systemBarsPadding()
+                ) {
+                    App(
+                        onBackPressed = { callback ->
+                            onBackPressedCallback = callback
+                        }
+                    )
+                }
             }
         }
     }

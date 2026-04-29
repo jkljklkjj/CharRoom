@@ -10,6 +10,7 @@ import model.GroupMessage
 import model.MessageType
 import model.messages
 import model.users
+import model.updateList
 import Util
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -394,9 +395,11 @@ fun ChatApp(
     token: String,
     isDarkMode: Boolean,
     onToggleDarkMode: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onBackPressed: ((() -> Boolean) -> Unit)? = null // 安卓端返回键回调
 ) {
     ServerConfig.Token = token
+    val scope = rememberCoroutineScope()
     var selectedUser by remember { mutableStateOf<User?>(null) }
     // 同步全局状态管理器中的选中用户状态
     LaunchedEffect(selectedUser) {
@@ -404,8 +407,43 @@ fun ChatApp(
     }
     var showDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showProfile by remember { mutableStateOf(false) } // 个人信息页面
     var showApplications by remember { mutableStateOf(false) } // 统一申请管理对话框
+    var showUserDetail: User? by remember { mutableStateOf(null) } // 显示用户详情弹窗
     var clearHistoryHint by remember { mutableStateOf("") }
+
+    // 注册返回键处理逻辑
+    LaunchedEffect(showDialog, showProfile, showSettings, showApplications, showUserDetail, selectedUser) {
+        onBackPressed?.invoke {
+            when {
+                showDialog -> {
+                    showDialog = false
+                    true
+                }
+                showProfile -> {
+                    showProfile = false
+                    true
+                }
+                showSettings -> {
+                    showSettings = false
+                    true
+                }
+                showApplications -> {
+                    showApplications = false
+                    true
+                }
+                showUserDetail != null -> {
+                    showUserDetail = null
+                    true
+                }
+                selectedUser != null -> {
+                    selectedUser = null
+                    true
+                }
+                else -> false // 没有可返回的页面，让系统处理（退出应用）
+            }
+        }
+    }
 
     fun openSearchDialog() {
         try {
@@ -440,7 +478,33 @@ fun ChatApp(
                     )
                 }
             } else {
-                if (targetUser.id < 0) GroupChatScreen(targetUser) else ChatScreen(targetUser)
+                if (targetUser.id < 0) {
+                    GroupChatScreen(
+                        group = targetUser,
+                        onAvatarClick = { user ->
+                            if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
+                                showUserDetail = user
+                            }
+                        },
+                        onMyAvatarClick = {
+                            // 点击自己的头像打开个人信息页面
+                            showProfile = true
+                        }
+                    )
+                } else {
+                    ChatScreen(
+                        user = targetUser,
+                        onAvatarClick = { user ->
+                            if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
+                                showUserDetail = user
+                            }
+                        },
+                        onMyAvatarClick = {
+                            // 点击自己的头像打开个人信息页面
+                            showProfile = true
+                        }
+                    )
+                }
             }
         }
     }
@@ -485,10 +549,7 @@ fun ChatApp(
         }
     }
 
-    // 返回键处理：聊天页面返回用户列表，用户列表页面退出应用
-    BackHandler(enabled = selectedUser != null) {
-        selectedUser = null
-    }
+    // 返回键处理已经移到Activity层面实现，兼容性更好
 
     Box(
         modifier = Modifier
@@ -546,29 +607,36 @@ fun ChatApp(
                             selectedUserId = selectedUser?.id,
                             onOpenSearch = { openSearchDialog() },
                             onOpenSettings = { showSettings = true },
-                            onOpenApplications = { showApplications = true }
-                        ) { user ->
-                            selectedUser = user
-                            if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
-                                val payload = buildCheckPayload(user.id.toString())
+                            onOpenApplications = { showApplications = true },
+                            onOpenProfile = { showProfile = true }, // 打开个人信息页面
+                            onUserClick = { user ->
+                                selectedUser = user
+                                if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
+                                    val payload = buildCheckPayload(user.id.toString())
 
-                                Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
-                                    if (success && resp.isNotEmpty()) {
-                                        val lastBytes = resp.last() as? ByteArray
-                                        if (lastBytes != null) {
-                                            val unwrap = parseProtoResponse(lastBytes)
-                                            val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
-                                            val map = Util.jsonToMap(dataStr)
-                                            val online = map["online"] as? Boolean ?: false
-                                            updateUserOnlineStatus(user.id, online)
-                                            if (selectedUser?.id == user.id) {
-                                                selectedUser = selectedUser?.copy(online = online)
+                                    Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
+                                        if (success && resp.isNotEmpty()) {
+                                            val lastBytes = resp.last() as? ByteArray
+                                            if (lastBytes != null) {
+                                                val unwrap = parseProtoResponse(lastBytes)
+                                                val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
+                                                val map = Util.jsonToMap(dataStr)
+                                                val online = map["online"] as? Boolean ?: false
+                                                updateUserOnlineStatus(user.id, online)
+                                                if (selectedUser?.id == user.id) {
+                                                    selectedUser = selectedUser?.copy(online = online)
+                                                }
                                             }
                                         }
                                     }
                                 }
+                            },
+                            onUserLongClick = { user ->
+                                if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) { // 普通用户才能查看详情
+                                    showUserDetail = user
+                                }
                             }
-                        }
+                        )
                     }
                 }
 
@@ -597,28 +665,35 @@ fun ChatApp(
                         selectedUserId = selectedUser?.id,
                         onOpenSearch = { openSearchDialog() },
                         onOpenSettings = { showSettings = true },
-                        onOpenApplications = { showApplications = true }
-                    ) { user ->
-                        selectedUser = user
-                        if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
-                            val payload = buildCheckPayload(user.id.toString())
-                            Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
-                                if (success && resp.isNotEmpty()) {
-                                    val lastBytes = resp.last() as? ByteArray
-                                    if (lastBytes != null) {
-                                        val unwrap = parseProtoResponse(lastBytes)
-                                        val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
-                                        val map = Util.jsonToMap(dataStr)
-                                        val online = map["online"] as? Boolean ?: false
-                                        updateUserOnlineStatus(user.id, online)
-                                        if (selectedUser?.id == user.id) {
-                                            selectedUser = selectedUser?.copy(online = online)
+                        onOpenApplications = { showApplications = true },
+                        onOpenProfile = { showProfile = true }, // 打开个人信息页面
+                        onUserClick = { user ->
+                            selectedUser = user
+                            if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
+                                val payload = buildCheckPayload(user.id.toString())
+                                Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
+                                    if (success && resp.isNotEmpty()) {
+                                        val lastBytes = resp.last() as? ByteArray
+                                        if (lastBytes != null) {
+                                            val unwrap = parseProtoResponse(lastBytes)
+                                            val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
+                                            val map = Util.jsonToMap(dataStr)
+                                            val online = map["online"] as? Boolean ?: false
+                                            updateUserOnlineStatus(user.id, online)
+                                            if (selectedUser?.id == user.id) {
+                                                selectedUser = selectedUser?.copy(online = online)
+                                            }
                                         }
                                     }
                                 }
                             }
+                        },
+                        onUserLongClick = { user ->
+                            if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) { // 普通用户才能查看详情
+                                showUserDetail = user
+                            }
                         }
-                    }
+                    )
                 }
             } else {
                 Surface(
@@ -699,6 +774,18 @@ fun ChatApp(
 
                         OutlinedButton(
                             onClick = {
+                                showSettings = false
+                                showProfile = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("个人信息")
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
                                 messages.clear()
                                 groupMessages.clear()
                                 selectedUser = null
@@ -744,6 +831,63 @@ fun ChatApp(
                     TextButton(onClick = { showSettings = false }) {
                         Text("关闭")
                     }
+                }
+            )
+        }
+
+        // 个人信息页面
+        if (showProfile) {
+            ProfileScreen(
+                onBack = { showProfile = false },
+                onProfileUpdated = {
+                    // 更新用户信息后刷新好友列表
+                    scope.launch {
+                        updateList()
+                    }
+                }
+            )
+        }
+
+        // 用户详情页面
+        showUserDetail?.let { user ->
+            UserDetailScreen(
+                userId = user.id,
+                onBack = { showUserDetail = null },
+                onAddFriend = {
+                    showUserDetail = null
+                    // 添加好友后刷新列表
+                    scope.launch {
+                        updateList()
+                    }
+                }
+            )
+        }
+
+        // 个人信息页面
+        if (showProfile) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colors.background
+            ) {
+                ProfileScreen(
+                    onBack = { showProfile = false },
+                    onProfileUpdated = {
+                        // 个人信息更新后刷新用户列表
+                        scope.launch {
+                            model.updateList()
+                        }
+                    }
+                )
+            }
+        }
+
+        // 用户详情弹窗
+        showUserDetail?.let { user ->
+            UserDetailDialog(
+                user = user,
+                onDismiss = { showUserDetail = null },
+                onSendMessage = {
+                    selectedUser = user
                 }
             )
         }

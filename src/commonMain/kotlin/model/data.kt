@@ -22,6 +22,9 @@ enum class MessageType {
 data class User(
     val id: Int,
     var username: String,
+    var email: String? = null,
+    var phone: String? = null,
+    var signature: String? = null,
     var avatarUrl: String? = null,
     var avatarKey: String? = null,
     var online: Boolean? = null

@@ -3,7 +3,8 @@ package component
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -60,17 +62,23 @@ import model.users
 /**
  * 左侧用户和群组列表边栏
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun UserList(
     selectedUserId: Int? = null,
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenApplications: () -> Unit = {}, // 打开统一申请管理界面
-    onUserClick: (User) -> Unit
+    onOpenProfile: () -> Unit = {}, // 打开个人信息页面
+    onUserClick: (User) -> Unit,
+    onUserLongClick: ((User) -> Unit)? = null // 长按用户头像回调
 ) {
     // 是否有未处理的申请（好友或群聊）
     var hasPendingApplications by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    // 当前用户信息和头像
+    var currentUser by remember { mutableStateOf<User?>(null) }
+    var currentUserAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
 
     // 定时检查是否有未处理的申请
     LaunchedEffect(Unit) {
@@ -89,6 +97,13 @@ fun UserList(
     // 首次进入时拉取列表，写回 users（在 updateList 内部）
     LaunchedEffect(Unit) {
         updateList()
+        // 获取当前用户信息
+        currentUser = ApiService.getCurrentUserProfile()
+        currentUser?.let { user ->
+            user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                currentUserAvatar = loadImageBitmapFromUrl(url, user.avatarKey)
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
@@ -105,6 +120,33 @@ fun UserList(
                     .padding(horizontal = 12.dp, vertical = 12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 当前用户头像，点击进入个人信息
+                    Surface(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onOpenProfile),
+                        color = Color.White.copy(alpha = 0.2f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (currentUserAvatar != null) {
+                                Image(
+                                    bitmap = currentUserAvatar!!,
+                                    contentDescription = "个人信息",
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Text(
+                                    text = currentUser?.username?.firstOrNull()?.toString() ?: "我",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.subtitle1
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "聊天室",
@@ -121,7 +163,7 @@ fun UserList(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ElasticHeaderAction(
                             icon = Icons.Default.Search,
-                            contentDescription = "搜索",
+                            contentDescription = "搜索/添加好友",
                             onClick = onOpenSearch
                         )
                         // 统一申请管理入口，有任意未处理申请时显示红点
@@ -222,15 +264,30 @@ fun UserList(
                             }
                         }
 
+                        // 头像点击/长按处理
+                        val avatarModifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .combinedClickable(
+                                onClick = {
+                                    // 点击头像也可以查看详情
+                                    onUserLongClick?.invoke(user)
+                                },
+                                onLongClick = {
+                                    // 长按头像查看详情
+                                    onUserLongClick?.invoke(user)
+                                }
+                            )
+
                         if (avatarBitmap != null) {
                             Image(
                                 bitmap = avatarBitmap!!,
                                 contentDescription = "avatar",
-                                modifier = Modifier.size(40.dp).clip(CircleShape)
+                                modifier = avatarModifier
                             )
                         } else {
                             Box(
-                                modifier = Modifier.size(40.dp).background(
+                                modifier = avatarModifier.background(
                                     brush = sidebarHeaderBrush(!MaterialTheme.colors.isLight),
                                     shape = CircleShape
                                 ),

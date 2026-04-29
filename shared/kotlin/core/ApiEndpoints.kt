@@ -22,6 +22,11 @@ object ApiEndpoints {
     const val AGENT_NL = "/agent/nl"
     const val AGENT_NL_STREAM = "/agent/nl/stream"
     const val FILE_UPLOAD = "/file/upload" // 文件上传接口
+    const val USER_PROFILE = "/user/profile" // 获取当前用户信息
+    const val USER_PROFILE_UPDATE = "/user/profile/update" // 更新用户信息
+    const val USER_PROFILE_UPDATE_EMAIL = "/user/profile/updateEmail" // 更新用户邮箱
+    const val SEND_EMAIL_UPDATE_VERIFY_CODE = "/user/sendEmailUpdateVerifyCode" // 发送邮箱修改验证码
+    const val USER_AVATAR_UPLOAD = "/user/avatar/upload" // 上传用户头像
 
     fun url(path: String): String = BASE + path
 }

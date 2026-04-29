@@ -25,7 +25,8 @@ import model.users
 @Composable
 fun LoginRegisterApp(
     isDarkMode: Boolean,
-    onToggleDarkMode: () -> Unit
+    onToggleDarkMode: () -> Unit,
+    onBackPressed: ((() -> Boolean) -> Unit)? = null
 ) {
     var isLogin by remember { mutableStateOf(true) }
     var username by remember { mutableStateOf("") } // 注册模式下用户名
@@ -69,7 +70,8 @@ fun LoginRegisterApp(
                 messages.clear()
                 groupMessages.clear()
                 users = emptyList()
-            }
+            },
+            onBackPressed = onBackPressed
         )
     } else {
         Column(

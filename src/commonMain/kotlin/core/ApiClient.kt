@@ -1,12 +1,6 @@
 package core
 
 import androidx.compose.runtime.mutableStateOf
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.nio.charset.StandardCharsets
-import java.time.Duration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.*
@@ -14,6 +8,12 @@ import model.Group
 import model.Message
 import model.User
 import model.convertMessages
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
+import java.time.Duration
 
 // 简单 Json 工具（忽略未知字段）
 private val json = Json { ignoreUnknownKeys = true }
@@ -69,7 +69,10 @@ private fun sendRequest(
     when (normalizedMethod) {
         "GET" -> builder.GET()
         "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(body ?: "{}"))
-        else -> builder.method(normalizedMethod, if (body != null) HttpRequest.BodyPublishers.ofString(body) else HttpRequest.BodyPublishers.noBody())
+        else -> builder.method(
+            normalizedMethod,
+            if (body != null) HttpRequest.BodyPublishers.ofString(body) else HttpRequest.BodyPublishers.noBody()
+        )
     }
 
     val request = builder.build()
@@ -84,14 +87,43 @@ private fun sendRequest(
 
 @Serializable
 private data class LoginBody(val account: String, val password: String)
+
 @Serializable
 private data class RegisterBody(val username: String, val password: String)
+
 @Serializable
 private data class AddFriendBody(val account: String)
+
 @Serializable
 private data class AddGroupBody(val groupId: String)
+
 @Serializable
 private data class GroupApplicationActionBody(val groupId: String, val userId: String)
+
+@Serializable
+private data class UpdateProfileBody(
+    val username: String? = null,
+    val email: String? = null,
+    val password: String? = null,
+    val phone: String? = null,
+    val signature: String? = null
+)
+
+@Serializable
+private data class SendEmailUpdateVerifyCodeBody(val newEmail: String)
+
+@Serializable
+private data class UpdateEmailBody(val newEmail: String, val verifyCode: String)
+
+@Serializable
+private data class UpdateProfileRequest(
+    val username: String? = null,
+    val email: String? = null,
+    val password: String? = null,
+    val phone: String? = null,
+    val signature: String? = null
+)
+
 @Serializable
 internal data class AgentActionDto(
     val id: String,
@@ -100,6 +132,7 @@ internal data class AgentActionDto(
     val targetId: String? = null,
     val metadata: Map<String, String> = emptyMap()
 )
+
 @Serializable
 internal data class AgentRequestBody(val input: String, val clientActions: List<AgentActionDto>? = null)
 
@@ -180,7 +213,8 @@ class ApiClient(
     /** 添加好友 */
     fun addFriend(account: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(account))
-        val resp = sendRequest(ApiEndpoints.FRIEND_ADD, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        val resp =
+            sendRequest(ApiEndpoints.FRIEND_ADD, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
 
@@ -195,14 +229,16 @@ class ApiClient(
     /** 接受好友请求，requesterId 为请求发起者 */
     fun acceptFriend(requesterId: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(requesterId))
-        val resp = sendRequest(ApiEndpoints.FRIEND_ACCEPT, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        val resp =
+            sendRequest(ApiEndpoints.FRIEND_ACCEPT, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
 
     /** 拒绝好友请求，requesterId 为请求发起者 */
     fun rejectFriend(requesterId: String, token: String = ServerConfig.Token): Boolean {
         val body = json.encodeToString(AddFriendBody.serializer(), AddFriendBody(requesterId))
-        val resp = sendRequest(ApiEndpoints.FRIEND_REJECT, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        val resp =
+            sendRequest(ApiEndpoints.FRIEND_REJECT, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
 
@@ -223,21 +259,26 @@ class ApiClient(
 
     /** 同意群聊申请，groupId 为群组ID，userId 为申请者ID */
     fun acceptGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token): Boolean {
-        val body = json.encodeToString(GroupApplicationActionBody.serializer(), GroupApplicationActionBody(groupId, userId))
-        val resp = sendRequest(ApiEndpoints.GROUP_ACCEPT, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        val body =
+            json.encodeToString(GroupApplicationActionBody.serializer(), GroupApplicationActionBody(groupId, userId))
+        val resp =
+            sendRequest(ApiEndpoints.GROUP_ACCEPT, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
 
     /** 拒绝群聊申请，groupId 为群组ID，userId 为申请者ID */
     fun rejectGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token): Boolean {
-        val body = json.encodeToString(GroupApplicationActionBody.serializer(), GroupApplicationActionBody(groupId, userId))
-        val resp = sendRequest(ApiEndpoints.GROUP_REJECT, method = "POST", body = body, token = token, timeoutSeconds = 10)
+        val body =
+            json.encodeToString(GroupApplicationActionBody.serializer(), GroupApplicationActionBody(groupId, userId))
+        val resp =
+            sendRequest(ApiEndpoints.GROUP_REJECT, method = "POST", body = body, token = token, timeoutSeconds = 10)
         return interpretBooleanResponse(resp)
     }
 
     /** 用户详情 */
     fun getUserDetail(userId: String, token: String = ServerConfig.Token): User? {
-        val resp = sendRequest(ApiEndpoints.USER_DETAIL + "?id=$userId", method = "GET", token = token, timeoutSeconds = 10)
+        val resp =
+            sendRequest(ApiEndpoints.USER_DETAIL + "?id=$userId", method = "GET", token = token, timeoutSeconds = 10)
         return try {
             decodeUserFlexible(resp)
         } catch (_: Exception) {
@@ -245,9 +286,79 @@ class ApiClient(
         }
     }
 
+
+    /** 获取当前用户个人信息 */
+    fun getCurrentUserProfile(token: String = ServerConfig.Token): User? {
+        val resp = sendRequest(ApiEndpoints.USER_PROFILE, method = "GET", token = token, timeoutSeconds = 10)
+        return try {
+            decodeUserFlexible(resp)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** 更新当前用户个人信息 */
+    fun updateUserProfile(
+        username: String? = null,
+        email: String? = null,
+        password: String? = null,
+        phone: String? = null,
+        signature: String? = null,
+        token: String = ServerConfig.Token
+    ): Boolean {
+        val request = UpdateProfileRequest(
+            username = username?.takeIf { it.isNotBlank() },
+            email = email?.takeIf { it.isNotBlank() },
+            password = password?.takeIf { it.isNotBlank() },
+            phone = phone, // 允许为空字符串
+            signature = signature // 允许为空字符串
+        )
+        val bodyJson = json.encodeToString(UpdateProfileRequest.serializer(), request)
+        val resp = sendRequest(
+            ApiEndpoints.USER_PROFILE_UPDATE,
+            method = "POST",
+            body = bodyJson,
+            token = token,
+            timeoutSeconds = 10
+        )
+        return interpretBooleanResponse(resp)
+    }
+
+    /** 发送邮箱修改验证码 */
+    fun sendEmailUpdateVerifyCode(newEmail: String, token: String = ServerConfig.Token): Boolean {
+        val body = json.encodeToString(mapOf("email" to newEmail))
+        val resp = sendRequest(
+            ApiEndpoints.SEND_EMAIL_UPDATE_VERIFY_CODE,
+            method = "POST",
+            body = body,
+            token = token,
+            timeoutSeconds = 10
+        )
+        return interpretBooleanResponse(resp)
+    }
+
+    /** 更新用户邮箱 */
+    fun updateEmail(newEmail: String, verifyCode: String, token: String = ServerConfig.Token): Boolean {
+        val body = json.encodeToString(
+            mapOf(
+                "newEmail" to newEmail,
+                "verifyCode" to verifyCode
+            )
+        )
+        val resp = sendRequest(
+            ApiEndpoints.USER_PROFILE_UPDATE_EMAIL,
+            method = "POST",
+            body = body,
+            token = token,
+            timeoutSeconds = 10
+        )
+        return interpretBooleanResponse(resp)
+    }
+
     /** 群组详情（返回转为 User 供列表复用） */
     fun getGroupDetail(groupId: String, token: String = ServerConfig.Token): User? {
-        val resp = sendRequest(ApiEndpoints.GROUP_DETAIL + "?id=$groupId", method = "GET", token = token, timeoutSeconds = 10)
+        val resp =
+            sendRequest(ApiEndpoints.GROUP_DETAIL + "?id=$groupId", method = "GET", token = token, timeoutSeconds = 10)
         return try {
             decodeUserFlexible(resp)
         } catch (_: Exception) {
@@ -277,7 +388,8 @@ class ApiClient(
     fun callAgent(input: String, token: String = ServerConfig.Token): String {
         return try {
             val bodyJson = buildAgentRequestBody(input)
-            val respBody = sendRequest(ApiEndpoints.AGENT_NL, method = "POST", body = bodyJson, token = token, timeoutSeconds = 30)
+            val respBody =
+                sendRequest(ApiEndpoints.AGENT_NL, method = "POST", body = bodyJson, token = token, timeoutSeconds = 30)
             // ApiResponse 包装解析（复用 parseToken 风格）
             val root = json.parseToJsonElement(respBody).jsonObject
             val code = root["code"]?.jsonPrimitive?.intOrNull ?: -1
@@ -394,7 +506,8 @@ class ApiClient(
                     // remove consumed bytes from pendingBytes (bb.position() bytes consumed)
                     val consumed = bb.position()
                     if (consumed > 0) {
-                        val remaining = if (consumed < bytes.size) bytes.copyOfRange(consumed, bytes.size) else ByteArray(0)
+                        val remaining =
+                            if (consumed < bytes.size) bytes.copyOfRange(consumed, bytes.size) else ByteArray(0)
                         pendingBytes.reset()
                         if (remaining.isNotEmpty()) pendingBytes.write(remaining)
                     }
@@ -410,7 +523,8 @@ class ApiClient(
                 try {
                     decoder.decode(finalBb, finalCb, true)
                     decoder.flush(finalCb)
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
                 finalCb.flip()
                 if (finalCb.hasRemaining()) textPending.append(finalCb.toString())
                 if (pendingBytes.size() > 0) pendingBytes.reset()
@@ -520,14 +634,39 @@ object ApiService {
     fun acceptFriend(requesterId: String, token: String = ServerConfig.Token) = client.acceptFriend(requesterId, token)
     fun rejectFriend(requesterId: String, token: String = ServerConfig.Token) = client.rejectFriend(requesterId, token)
     fun fetchGroupRequests(token: String = ServerConfig.Token) = client.fetchGroupRequests(token)
-    fun acceptGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) = client.acceptGroupApplication(groupId, userId, token)
-    fun rejectGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) = client.rejectGroupApplication(groupId, userId, token)
+    fun acceptGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) =
+        client.acceptGroupApplication(groupId, userId, token)
+
+    fun rejectGroupApplication(groupId: String, userId: String, token: String = ServerConfig.Token) =
+        client.rejectGroupApplication(groupId, userId, token)
+
     fun getUserDetail(userId: String, token: String = ServerConfig.Token) = client.getUserDetail(userId, token)
     fun getGroupDetail(groupId: String, token: String = ServerConfig.Token) = client.getGroupDetail(groupId, token)
+    fun getCurrentUserProfile(token: String = ServerConfig.Token) = client.getCurrentUserProfile(token)
+    fun updateUserProfile(
+        username: String? = null,
+        email: String? = null,
+        password: String? = null,
+        phone: String? = null,
+        signature: String? = null,
+        token: String = ServerConfig.Token
+    ) = client.updateUserProfile(username, email, password, phone, signature, token)
+
+    fun sendEmailUpdateVerifyCode(newEmail: String, token: String = ServerConfig.Token) =
+        client.sendEmailUpdateVerifyCode(newEmail, token)
+
+    fun updateEmail(newEmail: String, verifyCode: String, token: String = ServerConfig.Token) =
+        client.updateEmail(newEmail, verifyCode, token)
+
     fun getOfflineMessages(token: String = ServerConfig.Token) = client.getOfflineMessages(token)
     fun callAgent(input: String, token: String = ServerConfig.Token) = client.callAgent(input, token)
     fun callAgentStream(input: String, token: String = ServerConfig.Token, onToken: ((String) -> Unit)? = null) =
         client.callAgentStream(input, token, onToken)
-    suspend fun callAgentStreamKtor(input: String, token: String = ServerConfig.Token, onToken: ((String) -> Unit)? = null) =
+
+    suspend fun callAgentStreamKtor(
+        input: String,
+        token: String = ServerConfig.Token,
+        onToken: ((String) -> Unit)? = null
+    ) =
         core.callAgentStreamKtor(input, token, onToken)
 }

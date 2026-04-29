@@ -28,10 +28,16 @@ fun main() = application {
 
     // 窗口状态记忆
     val prefs = Preferences.userNodeForPackage(javaClass)
+    // 读取窗口状态，默认使用浮动窗口（避免默认全屏）
+    val savedPlacement = prefs.getInt("window_placement", WindowPlacement.Floating.ordinal)
     val windowState = rememberWindowState(
-        width = prefs.get("window_width", "800")?.toInt()?.dp ?: 800.dp,
-        height = prefs.get("window_height", "600")?.toInt()?.dp ?: 600.dp,
-        placement = WindowPlacement.entries[prefs.getInt("window_placement", WindowPlacement.Floating.ordinal)]
+        width = prefs.get("window_width", "900")?.toInt()?.dp ?: 900.dp,
+        height = prefs.get("window_height", "700")?.toInt()?.dp ?: 700.dp,
+        placement = if (savedPlacement == WindowPlacement.Fullscreen.ordinal) {
+            WindowPlacement.Floating // 禁止默认全屏，首次打开使用浮动窗口
+        } else {
+            WindowPlacement.entries[savedPlacement]
+        }
     )
 
     // 窗口可见状态

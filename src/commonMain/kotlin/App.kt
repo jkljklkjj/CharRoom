@@ -10,7 +10,10 @@ import component.CoolOrangeShapes
 import component.LoginRegisterApp
 
 @Composable
-fun App(menuBar: @Composable (() -> Unit)? = null) {
+fun App(
+    menuBar: @Composable (() -> Unit)? = null,
+    onBackPressed: ((() -> Boolean) -> Unit)? = null
+) {
     var isDarkMode by remember { mutableStateOf(false) }
 
     MaterialTheme(
@@ -22,7 +25,8 @@ fun App(menuBar: @Composable (() -> Unit)? = null) {
 
         LoginRegisterApp(
             isDarkMode = isDarkMode,
-            onToggleDarkMode = { isDarkMode = !isDarkMode }
+            onToggleDarkMode = { isDarkMode = !isDarkMode },
+            onBackPressed = onBackPressed
         )
     }
 }

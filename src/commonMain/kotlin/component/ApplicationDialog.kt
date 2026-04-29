@@ -21,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import model.User
 import model.updateList
-import model.sidebarHeaderBrush
 
 /**
  * 申请类型
@@ -168,7 +167,7 @@ fun ApplicationDialog(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(currentApplications) { user ->

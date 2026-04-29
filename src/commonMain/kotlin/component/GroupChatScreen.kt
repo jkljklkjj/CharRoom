@@ -90,12 +90,22 @@ import viewmodel.chatViewModel
  * 群聊界面
  */
 @Composable
-fun GroupChatScreen(group: User) {
+fun GroupChatScreen(
+    group: User,
+    onAvatarClick: ((User) -> Unit)? = null, // 点击消息头像回调
+    onMyAvatarClick: (() -> Unit)? = null // 点击自己头像回调
+) {
     var messageText by remember { mutableStateOf("") }
     // 使用derivedStateOf优化群聊消息过滤
     val filteredGroupMessages by remember(group.id) {
         derivedStateOf {
             groupMessages.filter { it.groupId == -group.id }
+        }
+    }
+    // 获取当前登录用户信息（自己）
+    val currentUser: User? by remember {
+        derivedStateOf {
+            users.find { user -> user.id == ServerConfig.id.toIntOrNull() } as User?
         }
     }
     var isSending by remember { mutableStateOf(false) }
@@ -415,7 +425,7 @@ fun GroupChatScreen(group: User) {
                                             null
                                         }
                                     }
-                                    if (senderAvatar != null) {
+                                    if (senderAvatar != null && sender != null) {
                                         Image(
                                             bitmap = senderAvatar!!,
                                             contentDescription = "avatar",
@@ -423,14 +433,20 @@ fun GroupChatScreen(group: User) {
                                                 .size(32.dp)
                                                 .clip(CircleShape)
                                                 .shadow(2.dp, CircleShape)
+                                                .clickable {
+                                                    onAvatarClick?.invoke(sender)
+                                                }
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                    } else {
+                                    } else if (sender != null) {
                                         // 没有头像时显示首字母
                                         Box(
                                             modifier = Modifier
                                                 .size(32.dp)
                                                 .clip(CircleShape)
+                                                .clickable {
+                                                    onAvatarClick?.invoke(sender)
+                                                }
                                                 .background(MaterialTheme.colors.primary)
                                                 .shadow(2.dp, CircleShape),
                                             contentAlignment = Alignment.Center
@@ -588,6 +604,51 @@ fun GroupChatScreen(group: User) {
                                                 style = MaterialTheme.typography.caption,
                                                 color = bubbleTextColor.copy(alpha = 0.74f),
                                                 textAlign = TextAlign.End
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // 如果是自己发送的消息，在右侧显示自己的头像
+                                if (self) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    var myAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
+                                    LaunchedEffect(currentUser?.avatarUrl, currentUser?.avatarKey) {
+                                        val user = currentUser
+                                        myAvatar = if (user != null && !user.avatarUrl.isNullOrBlank()) {
+                                            loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                    if (myAvatar != null) {
+                                        Image(
+                                            bitmap = myAvatar!!,
+                                            contentDescription = "我的头像",
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .shadow(2.dp, CircleShape)
+                                                .clickable {
+                                                    onMyAvatarClick?.invoke()
+                                                }
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colors.primary)
+                                                .shadow(2.dp, CircleShape)
+                                                .clickable {
+                                                    onMyAvatarClick?.invoke()
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = currentUser?.username?.firstOrNull()?.toString() ?: "我",
+                                                color = MaterialTheme.colors.onPrimary,
+                                                style = MaterialTheme.typography.caption
                                             )
                                         }
                                     }
