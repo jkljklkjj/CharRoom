@@ -14,18 +14,10 @@ version = "1.0-SNAPSHOT"
 repositories {
     mavenCentral()
     google()
-    maven("https://cache-redirector.jetbrains.com/maven.pkg.jetbrains.space/public/p/compose/dev") {
-        content {
-            includeGroupByRegex("""org\.jetbrains\.compose(\..*)?""")
-        }
-    }
-    maven("https://maven.aliyun.com/repository/public") {
-        content {
-            includeGroup("org.jetbrains.compose")
-            includeGroup("org.jetbrains.skiko")
-        }
-    }
-    maven("https://mirrors.tencent.com/nexus/repository/maven-public/")
+    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+
+    // 2. 阿里云镜像作为后备，移除排除规则
+    maven("https://maven.aliyun.com/repository/public")
 }
 
 // Optional Android configuration: enable when includeAndroid=true
@@ -50,13 +42,19 @@ kotlin {
         val commonMain by getting {
             kotlin.srcDir("shared/kotlin")
             dependencies {
-                implementation("io.ktor:ktor-client-core:3.4.2")
-                implementation("io.ktor:ktor-client-content-negotiation:3.4.2")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.2")
+                implementation("org.jetbrains.compose.ui:ui:1.10.3")
+                implementation("org.jetbrains.kotlin:kotlin-stdlib:2.3.20")
+                implementation("org.jetbrains.compose.runtime:runtime:1.10.3")
+                implementation("org.jetbrains.compose.foundation:foundation:1.10.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                implementation("io.ktor:ktor-client-core:3.4.3")
+                implementation("io.ktor:ktor-client-content-negotiation:3.4.3")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.3")
                 implementation("org.jetbrains.compose.runtime:runtime:1.10.3")
                 implementation("org.jetbrains.compose.foundation:foundation:1.10.3")
                 implementation("org.jetbrains.compose.material:material:1.10.3")
                 implementation("org.jetbrains.compose.material:material-icons-core:1.7.3")
+                implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 implementation("org.glassfish.jaxb:jaxb-runtime:4.0.7")
                 implementation("com.konghq:unirest-java:3.14.5")
@@ -80,7 +78,7 @@ kotlin {
             val androidMain by getting {
                 dependencies {
                     implementation("androidx.activity:activity-compose:1.13.0")
-                    implementation("androidx.core:core-ktx:1.10.1")
+                    implementation("androidx.core:core-ktx:1.18.0")
                 }
             }
             val androidTest by getting
@@ -89,9 +87,10 @@ kotlin {
 
         val desktopMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-cio:2.3.4")
+                implementation("io.ktor:ktor-client-cio:3.4.3")
                 implementation(compose.desktop.currentOs)
                 implementation(project(":proto"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
             }
         }
         val desktopTest by getting {

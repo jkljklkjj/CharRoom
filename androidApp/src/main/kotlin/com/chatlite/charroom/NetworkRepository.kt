@@ -1,7 +1,10 @@
 package com.chatlite.charroom
 
 import core.ApiEndpoints
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -11,8 +14,13 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-class NetworkRepository {
-    private companion object {
+class NetworkRepository private constructor() {
+    // 单例实现和常量定义合并到同一个companion object
+    companion object {
+        @Volatile
+        private var INSTANCE: NetworkRepository? = null
+
+        // API路径常量
         private const val LOGIN_PATH = ApiEndpoints.LOGIN
         private const val REGISTER_PATH = ApiEndpoints.REGISTER
         private const val VALIDATE_TOKEN_PATH = ApiEndpoints.VALIDATE_TOKEN
@@ -23,6 +31,19 @@ class NetworkRepository {
         private const val USER_DETAIL_PATH = ApiEndpoints.USER_DETAIL
         private const val GROUP_DETAIL_PATH = ApiEndpoints.GROUP_DETAIL
         private const val OFFLINE_MESSAGE_PATH = ApiEndpoints.OFFLINE
+
+        fun getInstance(): NetworkRepository {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: NetworkRepository().also { INSTANCE = it }
+            }
+        }
+
+        /**
+         * 初始化方法，推荐在Application中调用
+         */
+        fun init(): NetworkRepository {
+            return getInstance()
+        }
     }
 
     private val wsClient = AndroidWebSocketClient()
@@ -89,7 +110,12 @@ class NetworkRepository {
         onMessage: (ChatMessage) -> Unit,
         onStatusUpdate: (clientId: String, online: Boolean) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
-        wsClient.connect(token, ownUserId, onMessage, onStatusUpdate)
+        val success = wsClient.connect(token, ownUserId, onMessage, onStatusUpdate)
+        if (success) {
+            isConnected = true
+            saveConnectionInfo(token, ownUserId, onMessage, onStatusUpdate)
+        }
+        success
     }
 
     fun sendChatMessage(targetId: Int, content: String, senderId: Int = 0): Boolean {
@@ -114,6 +140,7 @@ class NetworkRepository {
 
     fun disconnectWebSocket() {
         wsClient.disconnect()
+        isConnected = false
     }
 
     private fun fetchList(path: String, token: String, method: String = "GET"): List<LocalUser> {
@@ -249,5 +276,75 @@ class NetworkRepository {
         val responseCode = conn.responseCode
         val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
         return BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+    }
+
+    // -------------------------- 网络状态管理 --------------------------
+
+    private var currentToken: String? = null
+    private var currentUserId: Int = 0
+    private var isConnected = false
+    private var onMessageCallback: ((ChatMessage) -> Unit)? = null
+    private var onStatusCallback: ((clientId: String, online: Boolean) -> Unit)? = null
+
+    /**
+     * 网络恢复时自动重连
+     */
+    @OptIn(DelicateCoroutinesApi::class)
+    fun reconnect() {
+        if (currentToken != null && currentUserId != 0 && !isConnected) {
+            // 使用IO协程重连
+            GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    connectWebSocket(
+                        token = currentToken!!,
+                        ownUserId = currentUserId,
+                        onMessage = onMessageCallback ?: {},
+                        onStatusUpdate = onStatusCallback ?: { _, _ -> }
+                    )
+                } catch (e: Exception) {
+                    // 重连失败，稍后再试
+                }
+            }
+        }
+    }
+
+    /**
+     * 网络断开时通知
+     */
+    fun onNetworkDisconnected() {
+        isConnected = false
+        // 可以通知UI层网络已断开
+    }
+
+    /**
+     * 确保WebSocket连接正常
+     */
+    fun ensureConnected() {
+        if (!isConnected) {
+            reconnect()
+        }
+    }
+
+    /**
+     * 保存连接信息，用于自动重连
+     */
+    fun saveConnectionInfo(token: String, userId: Int,
+                           onMessage: (ChatMessage) -> Unit,
+                           onStatus: (clientId: String, online: Boolean) -> Unit) {
+        currentToken = token
+        currentUserId = userId
+        onMessageCallback = onMessage
+        onStatusCallback = onStatus
+    }
+
+    /**
+     * 清除连接信息（登出时调用）
+     */
+    fun clearConnectionInfo() {
+        currentToken = null
+        currentUserId = 0
+        onMessageCallback = null
+        onStatusCallback = null
+        isConnected = false
     }
 }

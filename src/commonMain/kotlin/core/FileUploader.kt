@@ -2,9 +2,11 @@ package core
 
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import io.ktor.utils.io.core.writeFully
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -33,7 +35,7 @@ object FileUploader {
                     }
                 }
             ) {
-                header("Authorization", "Bearer ${ServerConfig.token}")
+                header("Authorization", "Bearer ${ServerConfig.Token}")
                 timeout {
                     requestTimeoutMillis = 30000 // 30秒超时
                 }

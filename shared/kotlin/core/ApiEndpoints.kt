@@ -1,7 +1,7 @@
 package core
 
 object ApiEndpoints {
-    private val BASE = "http://${ServerConfig.SERVER_IP}/api"
+    private val BASE = "https://${ServerConfig.SERVER_IP}/api"
 
     const val LOGIN = "/user/login"
     const val REGISTER = "/user/register"

@@ -10,7 +10,6 @@ import javax.swing.filechooser.FileNameExtensionFilter
  * Desktop平台文件选择器实现
  */
 actual object FilePicker {
-    @Composable
     actual fun pickImage(onResult: (ByteArray, String) -> Unit) {
         val fileChooser = JFileChooser()
         fileChooser.dialogTitle = "选择图片"
@@ -27,7 +26,6 @@ actual object FilePicker {
         }
     }
 
-    @Composable
     actual fun pickFile(onResult: (ByteArray, String, Long) -> Unit) {
         val fileChooser = JFileChooser()
         fileChooser.dialogTitle = "选择文件"

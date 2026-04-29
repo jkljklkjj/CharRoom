@@ -22,6 +22,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +59,8 @@ import core.ActionType
 import core.LocalChatHistoryStore
 import model.groupMessages
 import viewmodel.chatViewModel
+import kotlin.collections.isNotEmpty
+import kotlin.collections.last
 
 private fun updateUserOnlineStatus(userId: Int, online: Boolean) {
     chatViewModel.updateUserOnlineStatus(userId, online)
@@ -401,8 +404,7 @@ fun ChatApp(
     }
     var showDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
-    var showGroupApplications by remember { mutableStateOf(false) } // 群聊申请对话框
-    var showFriendApplications by remember { mutableStateOf(false) } // 好友申请对话框
+    var showApplications by remember { mutableStateOf(false) } // 统一申请管理对话框
     var clearHistoryHint by remember { mutableStateOf("") }
 
     fun openSearchDialog() {
@@ -483,6 +485,11 @@ fun ChatApp(
         }
     }
 
+    // 返回键处理：聊天页面返回用户列表，用户列表页面退出应用
+    BackHandler(enabled = selectedUser != null) {
+        selectedUser = null
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -539,8 +546,7 @@ fun ChatApp(
                             selectedUserId = selectedUser?.id,
                             onOpenSearch = { openSearchDialog() },
                             onOpenSettings = { showSettings = true },
-                            onOpenGroupApplications = { showGroupApplications = true },
-                            onOpenFriendApplications = { showFriendApplications = true }
+                            onOpenApplications = { showApplications = true }
                         ) { user ->
                             selectedUser = user
                             if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
@@ -591,8 +597,7 @@ fun ChatApp(
                         selectedUserId = selectedUser?.id,
                         onOpenSearch = { openSearchDialog() },
                         onOpenSettings = { showSettings = true },
-                        onOpenGroupApplications = { showGroupApplications = true },
-                        onOpenFriendApplications = { showFriendApplications = true }
+                        onOpenApplications = { showApplications = true }
                     ) { user ->
                         selectedUser = user
                         if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
@@ -667,17 +672,9 @@ fun ChatApp(
             AddUserOrGroupDialog { showDialog = false }
         }
 
-        if (showGroupApplications) {
+        if (showApplications) {
             ApplicationDialog(
-                onDismiss = { showGroupApplications = false },
-                type = ApplicationType.GROUP
-            )
-        }
-
-        if (showFriendApplications) {
-            ApplicationDialog(
-                onDismiss = { showFriendApplications = false },
-                type = ApplicationType.FRIEND
+                onDismiss = { showApplications = false }
             )
         }
 

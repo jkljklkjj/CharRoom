@@ -13,13 +13,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.websocketx.*
-import io.netty.handler.logging.LogLevel
-import io.netty.handler.logging.LoggingHandler
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
@@ -29,6 +23,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import component.appendAgentChunk
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 全局消息接收回调接口
@@ -507,12 +502,12 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
  * Netty构建的功能类
  */
 object Chat {
-    private lateinit var channel: Channel
-    private var host = ServerConfig.SERVER_IP
-    // default to 80 as requested by change: no explicit port in URIs, connect to port 80
-    private var port = 80
-    private lateinit var responseHandler: CustomWebSocketHandler
-    private val sendLock = Any()
+        private lateinit var channel: Channel
+        private var host = ServerConfig.SERVER_IP
+        // 强制使用WSS 443端口，避免301重定向
+        private var port = 443
+        private lateinit var responseHandler: CustomWebSocketHandler
+        private val sendLock = Any()
 
     val isServerConnected = mutableStateOf(true)
     private var heartbeatJob: Job? = null
@@ -533,9 +528,10 @@ object Chat {
     private val maxQueueSize = 1000 // 最大队列长度，防止内存溢出
 
     // 消息去重缓存，存储最近收到的消息ID
-    private val receivedMessageIds = mutableSetOf<String>()
-    private val maxMessageCacheSize = 1000 // 最多缓存1000条消息ID
-    private val messageCacheMutex = Mutex()
+    // Make these visible to other classes in the module (e.g. CustomWebSocketHandler)
+    internal val receivedMessageIds = mutableSetOf<String>()
+    internal val maxMessageCacheSize = 1000 // 最多缓存1000条消息ID
+    internal val messageCacheMutex = Mutex()
 
     // 待发送消息封装
     private data class PendingMessage(
@@ -556,10 +552,11 @@ object Chat {
         return rawHost.substringBefore(':')
     }
 
-    fun start(newHost: String = host, newPort: Int = 80) {
-        // normalize host to remove any provided ":port" suffix and force port 80 per request
+    fun start(newHost: String = host, newPort: Int = if (NetworkConstants.WS_PROTOCOL == "wss") 443 else 80) {
+        // normalize host to remove any provided ":port" suffix
         host = newHost
-        port = 80 // always use 80 for both HTTP and WS as requested
+        // 根据协议自动选择端口：WSS用443，WS用80
+        port = newPort
         stopReconnect.set(false)
 
         // 注册关闭钩子
@@ -573,7 +570,7 @@ object Chat {
             // 阻塞等待连接关闭
             channel.closeFuture().sync()
         } catch (e: Exception) {
-            AppLog.e("连接失败: ${e.message}", e)
+            AppLog.e({ "连接失败: ${e.message}" }, e)
             // 连接失败，启动重连
             if (!stopReconnect.get() && isReconnecting.compareAndSet(false, true)) {
                 currentReconnectDelay = initialReconnectDelay
@@ -588,7 +585,7 @@ object Chat {
             while (isActive) {
                 try {
                     if (!isConnected()) {
-                        delay(1000)
+                        delay(1000.milliseconds)
                         continue
                     }
 
@@ -601,20 +598,20 @@ object Chat {
                         heartbeatResult.complete(success)
                     }
 
-                    val ok = withTimeoutOrNull(heartbeatTimeoutMillis) {
+                    val ok = withTimeoutOrNull(heartbeatTimeoutMillis.milliseconds) {
                         heartbeatResult.await()
                     } ?: false
 
                     isServerConnected.value = ok
 
                     if (!ok) {
-                        AppLog.w("心跳超时，连接可能已断开")
+                        AppLog.w({ "心跳超时，连接可能已断开" })
                         // 心跳失败，关闭连接触发重连
                         channel.close()
                         break
                     }
                 } catch (e: Exception) {
-                    AppLog.e("心跳发送失败: ${e.message}")
+                    AppLog.e({ "心跳发送失败: ${e.message}" })
                     isServerConnected.value = false
                     // 关闭连接触发重连
                     if (::channel.isInitialized && channel.isActive) {
@@ -622,7 +619,7 @@ object Chat {
                     }
                     break
                 }
-                delay(heartbeatIntervalMillis)
+                delay(heartbeatIntervalMillis.milliseconds)
             }
         }
     }
@@ -844,8 +841,8 @@ object Chat {
         reconnectJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && !stopReconnect.get() && !isConnected()) {
                 try {
-                    AppLog.i("尝试重连，延迟 ${currentReconnectDelay}ms...")
-                    delay(currentReconnectDelay)
+                    AppLog.i({ "尝试重连，延迟 ${currentReconnectDelay}ms..." })
+                    delay(currentReconnectDelay.milliseconds)
 
                     // 尝试重新连接
                     val result = runCatching {
@@ -853,20 +850,20 @@ object Chat {
                     }
 
                     if (result.isSuccess) {
-                        AppLog.i("重连成功")
+                        AppLog.i({ "重连成功" })
                         isServerConnected.value = true
                         isReconnecting.set(false)
                         // 重连成功，发送队列中缓存的消息
                         flushMessageQueue()
                         break
                     } else {
-                        AppLog.e("重连失败: ${result.exceptionOrNull()?.message}")
+                        AppLog.e({ "重连失败: ${result.exceptionOrNull()?.message}" })
                         // 指数退避
                         currentReconnectDelay = minOf(currentReconnectDelay * 2, maxReconnectDelay)
                     }
                 } catch (e: Exception) {
-                    AppLog.e("重连过程出错: ${e.message}")
-                    delay(currentReconnectDelay)
+                    AppLog.e({ "重连过程出错: ${e.message}" })
+                    delay(currentReconnectDelay.milliseconds)
                     currentReconnectDelay = minOf(currentReconnectDelay * 2, maxReconnectDelay)
                 }
             }
@@ -881,7 +878,7 @@ object Chat {
             if (messageQueue.size >= maxQueueSize) {
                 // 队列已满，移除最旧的消息
                 messageQueue.poll()
-                AppLog.w("消息队列已满，丢弃最旧消息")
+                AppLog.w({ "消息队列已满，丢弃最旧消息" })
             }
             messageQueue.add(message)
         }
@@ -894,14 +891,14 @@ object Chat {
         queueMutex.withLock {
             if (messageQueue.isEmpty()) return
 
-            AppLog.i("开始发送队列中的消息，共 ${messageQueue.size} 条")
+            AppLog.i({ "开始发送队列中的消息，共 ${messageQueue.size} 条" })
             val iterator = messageQueue.iterator()
             while (iterator.hasNext()) {
                 val pending = iterator.next()
                 iterator.remove()
 
                 if (pending.retryCount >= pending.maxRetries) {
-                    AppLog.w("消息重试次数超过上限，丢弃: ${pending.type} -> ${pending.targetClientId}")
+                    AppLog.w({ "消息重试次数超过上限，丢弃: ${pending.type} -> ${pending.targetClientId}" })
                     pending.callback(false, emptyList())
                     continue
                 }
@@ -946,24 +943,35 @@ object Chat {
                 .handler(object : ChannelInitializer<Channel>() {
                     override fun initChannel(ch: Channel) {
                         val pipeline = ch.pipeline()
+
+                        // WSS协议添加SSL处理器
+                        if (NetworkConstants.WS_PROTOCOL == "wss") {
+                            val sslContext = io.netty.handler.ssl.SslContextBuilder.forClient()
+                                .trustManager(io.netty.handler.ssl.util.InsecureTrustManagerFactory.INSTANCE)
+                                .build()
+                            pipeline.addLast(sslContext.newHandler(ch.alloc(), effectiveHost, port))
+                        }
+
                         pipeline.addLast(HttpClientCodec())
                         pipeline.addLast(HttpObjectAggregator(8192))
 
                         val uidQuery = try {
                             val idVal = ServerConfig.id
-                            if (!idVal.isNullOrBlank()) "?clientId=${idVal}" else ""
+                            if (idVal.isNotBlank()) "?clientId=${idVal}" else ""
                         } catch (_: Exception) {
                             ""
                         }
-                        val wsUri = URI("ws://$effectiveHost/ws")
+                        // 使用配置的WebSocket地址，自动适配WSS/WS协议
+                        val wsUri = URI(NetworkConstants.wsUrl())
+                        val effectiveHost = wsUri.host
 
                         val headers = DefaultHttpHeaders()
                         val tokenForHandshake = try { ServerConfig.Token } catch (_: Exception) { "" }
-                        if (!tokenForHandshake.isNullOrBlank()) {
+                        if (tokenForHandshake.isNotBlank()) {
                             headers.set("Authorization", "Bearer $tokenForHandshake")
                         }
                         try { headers.set(HttpHeaderNames.HOST.toString(), effectiveHost) } catch (_: Exception) {}
-                        try { headers.set("Origin", "http://$effectiveHost") } catch (_: Exception) {}
+                        try { headers.set("Origin", NetworkConstants.wsOrigin()) } catch (_: Exception) {}
 
                         val handshaker = WebSocketClientHandshakerFactory.newHandshaker(
                             wsUri,
@@ -986,15 +994,15 @@ object Chat {
 
             // 等待握手完成
             responseHandler.handshakeFuture.get(10, TimeUnit.SECONDS)
-            AppLog.i("WebSocket连接成功")
+            AppLog.i({ "WebSocket连接成功" })
 
             // 发送登录消息
             val loginWrapperBytes = buildLoginPayload(ServerConfig.Token)
             sendInternal(loginWrapperBytes, MsgType.LOGIN, ServerConfig.Token, 1) { success, _ ->
                 if (success) {
-                    AppLog.i("登录成功")
+                    AppLog.i({ "登录成功" })
                 } else {
-                    AppLog.e("登录失败")
+                    AppLog.e({ "登录失败" })
                     throw Exception("登录失败")
                 }
             }
@@ -1004,7 +1012,7 @@ object Chat {
 
             // 监听连接关闭
             channel.closeFuture().addListener {
-                AppLog.i("连接已关闭")
+                AppLog.i({ "连接已关闭" })
                 isServerConnected.value = false
                 heartbeatJob?.cancel()
 

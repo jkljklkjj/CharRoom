@@ -28,7 +28,7 @@ fun ForwardSelectDialog(
     onForward: (User) -> Unit
 ) {
     var selectedUser by remember { mutableStateOf<User?>(null) }
-    val users by chatViewModel.users.collectAsState()
+    val users by chatViewModel.usersFlow.collectAsState(initial = emptyList())
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -77,7 +77,7 @@ fun ForwardSelectDialog(
                         ) {
                             Column {
                                 Text(
-                                    text = user.nickname ?: "用户${user.id}",
+                                    text = user.username ?: "用户${user.id}",
                                     style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Medium)
                                 )
                                 if (user.id < 0) {
@@ -88,9 +88,9 @@ fun ForwardSelectDialog(
                                     )
                                 } else {
                                     Text(
-                                        text = if (user.online) "在线" else "离线",
+                                        text = if (user.online == true) "在线" else "离线",
                                         style = MaterialTheme.typography.caption,
-                                        color = if (user.online) Color(0xFF4CAF50) else MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                        color = if (user.online == true) Color(0xFF4CAF50) else MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                     )
                                 }
                             }

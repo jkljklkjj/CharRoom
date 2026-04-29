@@ -1,8 +1,6 @@
 package component
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,8 +33,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import core.Action
 import core.ActionLogger
 import core.ActionType
+import core.ApiService
 import core.ServerConfig
 import model.User
 import model.groupMessages
@@ -67,14 +65,11 @@ fun UserList(
     selectedUserId: Int? = null,
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenGroupApplications: () -> Unit = {}, // 打开群聊申请管理界面
-    onOpenFriendApplications: () -> Unit = {}, // 打开好友申请管理界面
+    onOpenApplications: () -> Unit = {}, // 打开统一申请管理界面
     onUserClick: (User) -> Unit
 ) {
-    // 群聊申请状态
-    var hasPendingGroupApplications by remember { mutableStateOf(false) }
-    // 好友申请状态
-    var hasPendingFriendApplications by remember { mutableStateOf(false) }
+    // 是否有未处理的申请（好友或群聊）
+    var hasPendingApplications by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // 定时检查是否有未处理的申请
@@ -83,8 +78,7 @@ fun UserList(
             while (true) {
                 val groupRequests = ApiService.fetchGroupRequests()
                 val friendRequests = ApiService.fetchFriendRequests()
-                hasPendingGroupApplications = groupRequests.isNotEmpty()
-                hasPendingFriendApplications = friendRequests.isNotEmpty()
+                hasPendingApplications = groupRequests.isNotEmpty() || friendRequests.isNotEmpty()
                 kotlinx.coroutines.delay(30000) // 每30秒检查一次
             }
         }
@@ -130,30 +124,14 @@ fun UserList(
                             contentDescription = "搜索",
                             onClick = onOpenSearch
                         )
-                        // 好友申请入口，有未处理申请时显示红点
+                        // 统一申请管理入口，有任意未处理申请时显示红点
                         Box {
                             ElasticHeaderAction(
-                                icon = Icons.Default.PersonAdd,
-                                contentDescription = "好友申请",
-                                onClick = onOpenFriendApplications
+                                icon = Icons.Default.Notifications,
+                                contentDescription = "申请管理",
+                                onClick = onOpenApplications
                             )
-                            if (hasPendingFriendApplications) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .align(Alignment.TopEnd)
-                                        .background(Color(0xFFF44336), CircleShape)
-                                )
-                            }
-                        }
-                        // 群聊申请入口，有未处理申请时显示红点
-                        Box {
-                            ElasticHeaderAction(
-                                icon = Icons.Default.People,
-                                contentDescription = "群聊申请",
-                                onClick = onOpenGroupApplications
-                            )
-                            if (hasPendingGroupApplications) {
+                            if (hasPendingApplications) {
                                 Box(
                                     modifier = Modifier
                                         .size(8.dp)

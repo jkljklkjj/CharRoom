@@ -26,10 +26,7 @@ import java.net.URI
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-class AndroidWebSocketClient(
-    private val host: String = "120.27.151.171",
-    private val port: Int = 80
-) {
+class AndroidWebSocketClient {
     private var group: EventLoopGroup? = null
     private var channel: Channel? = null
     private var connectFuture: CompletableFuture<Boolean>? = null
@@ -67,6 +64,15 @@ class AndroidWebSocketClient(
             .handler(object : ChannelInitializer<Channel>() {
                 override fun initChannel(ch: Channel) {
                     val pipeline = ch.pipeline()
+
+                    // WSS协议添加SSL处理器
+                    if (uri.scheme == "wss") {
+                        val sslContext = io.netty.handler.ssl.SslContextBuilder.forClient()
+                            .trustManager(io.netty.handler.ssl.util.InsecureTrustManagerFactory.INSTANCE)
+                            .build()
+                        pipeline.addLast(sslContext.newHandler(ch.alloc(), uri.host, if (uri.port != -1) uri.port else 443))
+                    }
+
                     pipeline.addLast(HttpClientCodec())
                     pipeline.addLast(HttpObjectAggregator(8192))
                     pipeline.addLast(WebSocketClientProtocolHandler(handshaker, true))
@@ -126,7 +132,11 @@ class AndroidWebSocketClient(
             })
 
         return try {
-            val future: ChannelFuture = bootstrap.connect(host, port).sync()
+            // 从URI中获取正确的host和port
+            val connectHost = uri.host
+            val connectPort = if (uri.port != -1) uri.port else if (uri.scheme == "wss") 443 else 80
+
+            val future: ChannelFuture = bootstrap.connect(connectHost, connectPort).sync()
             channel = future.channel()
             val connected = connectFuture?.get(10, TimeUnit.SECONDS) ?: false
             if (!connected) {

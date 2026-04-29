@@ -10,8 +10,37 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="app接入客户端逻辑">
+      <change afterPath="$PROJECT_DIR$/src/desktopMain/resources/icons/ic_launcher.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/desktopMain/resources/icons/ic_notification.svg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/data_sources_history.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/data_sources_history.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MainActivity.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/androidApp.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/androidApp.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/res/values/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/res/values/strings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/res/values/styles.xml" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/res/values/styles.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/kotlin/core/ApiEndpoints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/shared/kotlin/core/ApiEndpoints.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/kotlin/core/NetworkConstants.kt" beforeDir="false" afterPath="$PROJECT_DIR$/shared/kotlin/core/NetworkConstants.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/EmojiPickerPanel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/EmojiPickerPanel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ForwardSelectDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ForwardSelectDialog.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ReplyPreviewBar.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ReplyPreviewBar.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/FilePicker.desktop.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/FilePicker.desktop.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,7 +61,7 @@
       <entry key="chat-panel" value="GPT-5 mini" />
     </selectedModels>
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=10AD5U25FA000YT)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -57,20 +86,29 @@
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="CharRoom" type="f1a62948:ProjectNode" />
-                <item name="androidApp" type="2d1252cf:ModuleNode" />
-              </path>
-              <path>
-                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="CharRoom" type="f1a62948:ProjectNode" />
-                <item name="androidApp" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="CharRoom" type="f1a62948:ProjectNode" />
-                <item name="androidApp" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="CharRoom" type="f1a62948:ProjectNode" />
+                <item name="main" type="2d1252cf:ModuleNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="CharRoom" type="f1a62948:ProjectNode" />
+                <item name="main" type="2d1252cf:ModuleNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="CharRoom" type="f1a62948:ProjectNode" />
+                <item name="proto" type="2d1252cf:ModuleNode" />
               </path>
             </expand>
             <select />
@@ -131,8 +169,11 @@
     &quot;Android App.CharRoom.executor&quot;: &quot;Run&quot;,
     &quot;Android App.androidApp.executor&quot;: &quot;Run&quot;,
     &quot;Gradle.CharRoom [:androidApp:build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.CharRoom [build].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.CharRoom [checkRuntime].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [clean].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.CharRoom [customJar].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.CharRoom [dependencies].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.CharRoom [packageReleaseMsi].executor&quot;: &quot;Run&quot;,
@@ -157,13 +198,13 @@
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
     &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/lora/qingliao/CharRoom&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Facet&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;模块&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;preferences.sourceCode.XML&quot;,
@@ -178,13 +219,16 @@
   }
 }</component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\lora\qingliao\CharRoom\src\desktopMain\resources\icons" />
+    </key>
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
       <recent name="core" />
       <recent name="model" />
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.desktop">
+  <component name="RunManager" selected="Android App.CharRoom">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -205,7 +249,7 @@
       <method v="2" />
     </configuration>
     <configuration name="CharRoom" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
-      <module name="CharRoom.androidApp" />
+      <module name="qingliao.CharRoom.androidApp" />
       <option name="ANDROID_RUN_CONFIGURATION_SCHEMA_VERSION" value="1" />
       <option name="DEPLOY" value="true" />
       <option name="DEPLOY_APK_FROM_BUNDLE" value="false" />
@@ -290,6 +334,49 @@
         <option name="Android.Gradle.BeforeRunTask" enabled="true" />
       </method>
     </configuration>
+    <configuration name="qingliao.CharRoom.androidApp" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
+      <module name="qingliao.CharRoom.androidApp" />
+      <option name="ANDROID_RUN_CONFIGURATION_SCHEMA_VERSION" value="1" />
+      <option name="DEPLOY" value="true" />
+      <option name="DEPLOY_APK_FROM_BUNDLE" value="false" />
+      <option name="DEPLOY_AS_INSTANT" value="false" />
+      <option name="ARTIFACT_NAME" value="" />
+      <option name="PM_INSTALL_OPTIONS" value="" />
+      <option name="ALL_USERS" value="false" />
+      <option name="ALWAYS_INSTALL_WITH_PM" value="false" />
+      <option name="ALLOW_ASSUME_VERIFIED" value="false" />
+      <option name="CLEAR_APP_STORAGE" value="false" />
+      <option name="DYNAMIC_FEATURES_DISABLED_LIST" value="" />
+      <option name="ACTIVITY_EXTRA_FLAGS" value="" />
+      <option name="MODE" value="default_activity" />
+      <option name="RESTORE_ENABLED" value="false" />
+      <option name="RESTORE_FILE" value="" />
+      <option name="RESTORE_FRESH_INSTALL_ONLY" value="false" />
+      <option name="CLEAR_LOGCAT" value="false" />
+      <option name="SHOW_LOGCAT_AUTOMATICALLY" value="false" />
+      <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT_COMBO_BOX" />
+      <option name="DEBUGGER_TYPE" value="Java" />
+      <Java>
+        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+        <option name="DEBUG_SANDBOX_SDK" value="false" />
+      </Java>
+      <Profilers>
+        <option name="ADVANCED_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_CONFIGURATION_NAME" value="Java/Kotlin Method Sample (legacy)" />
+        <option name="STARTUP_NATIVE_MEMORY_PROFILING_ENABLED" value="false" />
+        <option name="NATIVE_MEMORY_SAMPLE_RATE_BYTES" value="2048" />
+      </Profilers>
+      <option name="DEEP_LINK" value="" />
+      <option name="ACTIVITY" value="" />
+      <option name="ACTIVITY_CLASS" value="" />
+      <option name="SEARCH_ACTIVITY_IN_GLOBAL_SCOPE" value="false" />
+      <option name="SKIP_ACTIVITY_VALIDATION" value="false" />
+      <method v="2">
+        <option name="Android.Gradle.BeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="CharRoom [:androidApp:build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -315,7 +402,7 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration name="CharRoom [customJar]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+    <configuration name="CharRoom [:androidApp:clean]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -326,7 +413,7 @@
         </option>
         <option name="taskNames">
           <list>
-            <option value="customJar" />
+            <option value=":androidApp:clean" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -340,7 +427,7 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration name="CharRoom [dependencies]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+    <configuration name="CharRoom [:androidApp:compileDebugAndroidTestSources]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -351,7 +438,7 @@
         </option>
         <option name="taskNames">
           <list>
-            <option value="dependencies" />
+            <option value=":androidApp:compileDebugAndroidTestSources" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -365,31 +452,74 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration name="在线聊天App-1.0.0.jar" type="JarApplication" temporary="true">
-      <option name="JAR_PATH" value="$PROJECT_DIR$/build/libs/在线聊天App-1.0.0.jar" />
+    <configuration name="CharRoom [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="build" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration name="CharRoom-desktop-1.0-SNAPSHOT.jar" type="JarApplication" temporary="true">
-      <option name="JAR_PATH" value="$PROJECT_DIR$/build/libs/CharRoom-desktop-1.0-SNAPSHOT.jar" />
+    <configuration name="CharRoom [clean]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="clean" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
     <list>
+      <item itemvalue="Android App.qingliao.CharRoom.androidApp" />
       <item itemvalue="Android App.androidApp" />
       <item itemvalue="Android App.CharRoom" />
       <item itemvalue="Gradle.desktop" />
+      <item itemvalue="Gradle.CharRoom [:androidApp:clean]" />
+      <item itemvalue="Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources]" />
+      <item itemvalue="Gradle.CharRoom [build]" />
+      <item itemvalue="Gradle.CharRoom [clean]" />
       <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
-      <item itemvalue="Gradle.CharRoom [dependencies]" />
-      <item itemvalue="Gradle.CharRoom [customJar]" />
-      <item itemvalue="JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar" />
-      <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.CharRoom [dependencies]" />
+        <item itemvalue="Gradle.CharRoom [build]" />
+        <item itemvalue="Gradle.CharRoom [clean]" />
         <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
-        <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
-        <item itemvalue="Gradle.CharRoom [customJar]" />
-        <item itemvalue="JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar" />
+        <item itemvalue="Gradle.CharRoom [:androidApp:clean]" />
+        <item itemvalue="Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources]" />
       </list>
     </recent_temporary>
   </component>
@@ -604,6 +734,17 @@
       <workItem from="1776753911089" duration="2033000" />
       <workItem from="1776761947024" duration="116000" />
       <workItem from="1776941899642" duration="51000" />
+      <workItem from="1777398382603" duration="111000" />
+      <workItem from="1777398568212" duration="26000" />
+      <workItem from="1777398607825" duration="2156000" />
+      <workItem from="1777425564791" duration="720000" />
+      <workItem from="1777426552145" duration="168000" />
+      <workItem from="1777426755617" duration="233000" />
+      <workItem from="1777427645937" duration="1477000" />
+      <workItem from="1777429389484" duration="2078000" />
+      <workItem from="1777432236882" duration="3688000" />
+      <workItem from="1777436636893" duration="64000" />
+      <workItem from="1777436900775" duration="4365000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1000,12 +1141,12 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>157</line>
+          <line>152</line>
           <option name="timeStamp" value="4" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>109</line>
+          <line>104</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>
@@ -1016,8 +1157,18 @@
           <line>84</line>
           <option name="timeStamp" value="15" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt</url>
+          <line>129</line>
+          <option name="timeStamp" value="16" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
+    <pin-to-top-manager>
+      <pinned-members>
+        <PinnedItemInfo parentTag="jdk.internal.net.http.HttpRequestBuilderImpl" memberName="method" />
+      </pinned-members>
+    </pin-to-top-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

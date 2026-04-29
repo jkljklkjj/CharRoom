@@ -124,6 +124,7 @@ fun LoginRegisterApp(
                             val tk = withContext(Dispatchers.IO) { ApiService.login(acc, pwd) }
                             token = tk
                             if (tk.isNotEmpty()) {
+                                ServerConfig.Token = tk
                                 ServerConfig.id = acc
                                 message = "登录成功"
                                 if (rememberMe) {

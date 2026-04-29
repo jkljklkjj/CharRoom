@@ -1,11 +1,9 @@
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.res.painterResource
@@ -15,11 +13,9 @@ import core.MessageReceiveListener
 import core.addMessageReceiveListener
 import core.initKermit
 import model.users
-import java.awt.Desktop
 import java.awt.SystemTray
 import java.awt.Toolkit
 import java.awt.TrayIcon
-import java.io.File
 import java.util.prefs.Preferences
 
 /**
@@ -33,9 +29,9 @@ fun main() = application {
     // 窗口状态记忆
     val prefs = Preferences.userNodeForPackage(javaClass)
     val windowState = rememberWindowState(
-        width = prefs.get("window_width", 800)?.toInt()?.dp ?: 800.dp,
-        height = prefs.get("window_height", 600)?.toInt()?.dp ?: 600.dp,
-        placement = WindowPlacement.values()[prefs.getInt("window_placement", WindowPlacement.Normal.ordinal)]
+        width = prefs.get("window_width", "800")?.toInt()?.dp ?: 800.dp,
+        height = prefs.get("window_height", "600")?.toInt()?.dp ?: 600.dp,
+        placement = WindowPlacement.entries[prefs.getInt("window_placement", WindowPlacement.Floating.ordinal)]
     )
 
     // 窗口可见状态
@@ -53,12 +49,13 @@ fun main() = application {
     // 系统托盘
     Tray(
         state = trayState,
-        icon = painterResource("icons/ic_notification.png"),
+        icon = painterResource("icons/ic_notification.svg"),
+        // AWT Tray Menu does not support keyboard shortcuts; omit `shortcut` here to avoid
+        // UnsupportedOperationException on some JDKs/platforms.
         menu = {
             Item(
                 text = "打开主窗口",
-                onClick = { isWindowVisible = true },
-                shortcut = KeyShortcut(Key.O, ctrl = true)
+                onClick = { isWindowVisible = true }
             )
             Item(
                 text = "新消息通知",
@@ -67,8 +64,7 @@ fun main() = application {
             Separator()
             Item(
                 text = "退出",
-                onClick = ::exitApplication,
-                shortcut = KeyShortcut(Key.Q, ctrl = true)
+                onClick = ::exitApplication
             )
         },
         onAction = {
@@ -91,25 +87,10 @@ fun main() = application {
             },
             title = "轻聊",
             state = windowState,
-            icon = painterResource("icons/ic_launcher.png")
+            icon = painterResource("icons/ic_launcher.svg")
         ) {
-            // 注册全局快捷键
-            val menuBar = MenuBar {
-                Menu("文件", mnemonic = 'F') {
-                    Item("设置", onClick = { /* 打开设置 */ }, shortcut = KeyShortcut(Key.S, ctrl = true))
-                    Separator()
-                    Item("退出", onClick = ::exitApplication, shortcut = KeyShortcut(Key.Q, ctrl = true))
-                }
-                Menu("编辑", mnemonic = 'E') {
-                    Item("复制", onClick = { /* 复制 */ }, shortcut = KeyShortcut(Key.C, ctrl = true))
-                    Item("粘贴", onClick = { /* 粘贴 */ }, shortcut = KeyShortcut(Key.V, ctrl = true))
-                }
-                Menu("帮助", mnemonic = 'H') {
-                    Item("关于", onClick = { /* 打开关于 */ })
-                }
-            }
-
-            App(menuBar = menuBar)
+            // 不显示窗口顶部菜单栏（文件/编辑/帮助）
+            App()
         }
     }
 }
@@ -156,10 +137,7 @@ class DesktopNotificationManager : MessageReceiveListener {
      */
     private fun showNotification(title: String, content: String) {
         try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.NOTIFY)) {
-                // 使用Java AWT的通知API
-                trayIcon?.displayMessage(title, content, TrayIcon.MessageType.INFO)
-            }
+            trayIcon?.displayMessage(title, content, TrayIcon.MessageType.INFO)
         } catch (_: Exception) {
             // 通知不支持，忽略
         }
