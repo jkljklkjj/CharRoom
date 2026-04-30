@@ -6,6 +6,18 @@ import kotlinx.coroutines.sync.withLock
 import java.util.*
 
 /**
+ * 图片加载器接口，由平台实现
+ */
+interface ImageLoaderProvider {
+    suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String? = null): ImageBitmap?
+}
+
+/**
+ * 图片加载器实现实例，由平台注入
+ */
+lateinit var ImageLoaderImpl: ImageLoaderProvider
+
+/**
  * 内存缓存，最多缓存50张图片
  */
 private val imageCache = Collections.synchronizedMap(LinkedHashMap<String, ImageBitmap>(50, 0.75f, true))
@@ -16,7 +28,9 @@ private const val MAX_CACHE_SIZE = 50
  * Platform-implemented image loader that returns an ImageBitmap for a given URL, or null on failure.
  * Desktop JVM implementation lives in `desktopMain`.
  */
-expect suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String? = null): ImageBitmap?
+suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String? = null): ImageBitmap? {
+    return ImageLoaderImpl.loadImageBitmapFromUrl(url, cacheKey)
+}
 
 /**
  * 带缓存的图片加载

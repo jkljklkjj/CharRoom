@@ -9,7 +9,6 @@ import model.Message
 import model.GroupMessage
 import model.MessageType
 import model.messages
-import model.users
 import model.updateList
 import Util
 import androidx.compose.animation.AnimatedContent
@@ -38,8 +37,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
 import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -891,18 +888,5 @@ fun ChatApp(
                 }
             )
         }
-    }
-}
-
-fun main() = application {
-    Window(onCloseRequest = ::exitApplication) {
-        var isDarkMode by remember { mutableStateOf(false) }
-        ChatApp(
-            windowSize = DpSize(800.dp, 600.dp),
-            token = "token",
-            isDarkMode = isDarkMode,
-            onToggleDarkMode = { isDarkMode = !isDarkMode },
-            onLogout = {}
-        )
     }
 }

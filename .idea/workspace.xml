@@ -11,20 +11,58 @@
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="全面可用版本">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/android.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android.gradle.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatForegroundService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatForegroundService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/shared/kotlin/core/ApiEndpoints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/shared/kotlin/core/ApiEndpoints.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/ChatForegroundService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/ChatForegroundService.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/App.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/App.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/MainActivity.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/AppLifecycleObserver.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/ChatApplication.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/ChatForegroundService.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/NetworkChangeReceiver.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/NotificationManager.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/component/BackHandler.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/component/FilePicker.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/core/ImageLoader.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/core/PlatformLogging.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/core/ProtobufBuilders.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/core/ProtobufResponseParser.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/res/values/colors.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/res/values/strings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/res/values/styles.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/BackHandler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/BackHandler.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/FilePicker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/FilePicker.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ProfileScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ProfileScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/AgentKtorClient.kt" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiUnwrap.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiUnwrap.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ImageLoader.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ImageLoader.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/Logging.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufResponseParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufResponseParser.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/BackHandler.desktop.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/FilePicker.desktop.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ImageLoader.desktop.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ImageLoader.desktop.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/PlatformLogging.desktop.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufBuilders.desktop.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufResponseParser.desktop.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jsMain/kotlin/com/chatlite/charroom/main.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jsMain/kotlin/component/BackHandler.js.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jsMain/kotlin/component/FilePicker.js.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jsMain/resources/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jsMain/resources/manifest.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jsMain/resources/sw.js" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,7 +83,7 @@
       <entry key="chat-panel" value="GPT-5 mini" />
     </selectedModels>
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=10AD5U25FA000YT)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -70,13 +108,13 @@
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="CharRoom" type="f1a62948:ProjectNode" />
-                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="androidApp" type="2d1252cf:ModuleNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="CharRoom" type="f1a62948:ProjectNode" />
+                <item name="androidApp" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
-                <item name="build" type="c8890929:TasksNode$1" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
@@ -148,61 +186,61 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Android App.CharRoom.executor": "Run",
-    "Android App.androidApp.executor": "Run",
-    "Android App.qingliao.CharRoom.androidApp.executor": "Run",
-    "Gradle.CharRoom [:androidApp:build].executor": "Run",
-    "Gradle.CharRoom [:androidApp:clean].executor": "Run",
-    "Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor": "Run",
-    "Gradle.CharRoom [build].executor": "Run",
-    "Gradle.CharRoom [checkRuntime].executor": "Run",
-    "Gradle.CharRoom [clean].executor": "Run",
-    "Gradle.CharRoom [customJar].executor": "Run",
-    "Gradle.CharRoom [dependencies].executor": "Run",
-    "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
-    "Gradle.CharRoom [package].executor": "Run",
-    "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
-    "Gradle.desktop.executor": "Run",
-    "Gradle.下载源代码.executor": "Run",
-    "Gradle.升级 Gradle 包装器.executor": "Run",
-    "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
-    "JAR 应用程序.在线聊天App-1.0.0.jar.executor": "Run",
-    "Kotlin.ChatKt.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.go.formatter.settings.were.checked": "true",
-    "RunOnceActivity.go.migrated.go.modules.settings": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "external.system.has.shared.sources": "true",
-    "git-widget-placeholder": "master",
-    "go.import.settings.migrated": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "模块",
-    "project.structure.proportion": "0.17",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "preferences.sourceCode.XML",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Android App.CharRoom.executor&quot;: &quot;Run&quot;,
+    &quot;Android App.androidApp.executor&quot;: &quot;Run&quot;,
+    &quot;Android App.qingliao.CharRoom.androidApp.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [checkRuntime].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customJar].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [dependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [packageReleaseMsi].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [package].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [proguardReleaseJars].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.desktop.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.下载源代码.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.升级 Gradle 包装器.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.在线聊天App-1.0.0.jar.executor&quot;: &quot;Run&quot;,
+    &quot;Kotlin.ChatKt.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;external.system.has.shared.sources&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;项目&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settings.ide.settings.notifications&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "mongo",
-      "mysql",
-      "redis"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;mongo&quot;,
+      &quot;mysql&quot;,
+      &quot;redis&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\lora\qingliao\CharRoom\src\desktopMain\resources\icons" />
@@ -213,7 +251,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Android App.qingliao.CharRoom.androidApp">
+  <component name="RunManager" selected="Gradle.desktop">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -732,6 +770,12 @@
       <workItem from="1777436900775" duration="6170000" />
       <workItem from="1777451105802" duration="3312000" />
       <workItem from="1777454902326" duration="5928000" />
+      <workItem from="1777466497120" duration="993000" />
+      <workItem from="1777468165284" duration="4018000" />
+      <workItem from="1777472384193" duration="50000" />
+      <workItem from="1777472695468" duration="3661000" />
+      <workItem from="1777484485235" duration="1283000" />
+      <workItem from="1777515811770" duration="676000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1136,26 +1180,21 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>152</line>
+          <line>155</line>
           <option name="timeStamp" value="4" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>104</line>
+          <line>107</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>
           <option name="timeStamp" value="14" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/desktopMain/kotlin/core/ProtobufResponseParser.desktop.kt</url>
-          <line>84</line>
-          <option name="timeStamp" value="15" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt</url>
-          <line>160</line>
-          <option name="timeStamp" value="16" />
+          <line>171</line>
+          <option name="timeStamp" value="18" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

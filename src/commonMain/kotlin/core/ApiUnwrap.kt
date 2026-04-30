@@ -7,4 +7,3 @@ data class ApiUnwrap(
     val dataJson: String?,
     val message: String?
 )
-

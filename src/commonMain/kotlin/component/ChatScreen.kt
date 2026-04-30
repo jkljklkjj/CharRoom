@@ -80,6 +80,7 @@ import androidx.compose.material.IconButton
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.ImageBitmap
+import component.FilePicker
 import core.LocalChatHistoryStore
 import core.ServerConfig
 import core.loadImageBitmapWithCache

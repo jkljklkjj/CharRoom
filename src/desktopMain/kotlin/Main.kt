@@ -11,12 +11,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import core.MessageReceiveListener
 import core.addMessageReceiveListener
-import core.initKermit
 import model.users
 import java.awt.SystemTray
 import java.awt.Toolkit
 import java.awt.TrayIcon
 import java.util.prefs.Preferences
+import component.BackHandlerImpl
+import component.DesktopBackHandler
+import component.DesktopFilePicker
+import component.FilePicker
+import core.DesktopImageLoader
+import core.ImageLoaderImpl
 
 /**
  * 桌面端应用入口
@@ -24,7 +29,10 @@ import java.util.prefs.Preferences
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() = application {
-    initKermit()
+    // 初始化跨平台接口实现
+    BackHandlerImpl = DesktopBackHandler
+    FilePicker = DesktopFilePicker
+    ImageLoaderImpl = DesktopImageLoader
 
     // 窗口状态记忆
     val prefs = Preferences.userNodeForPackage(javaClass)
@@ -95,6 +103,9 @@ fun main() = application {
             state = windowState,
             icon = painterResource("icons/ic_launcher.svg")
         ) {
+            // 注册文件选择器
+            FilePicker.Register()
+
             // 不显示窗口顶部菜单栏（文件/编辑/帮助）
             App()
         }

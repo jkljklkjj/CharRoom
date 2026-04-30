@@ -1,23 +1,53 @@
 package core
 
-// Builders to produce serialized protobuf payloads. Actual implementations live in platform-specific source sets.
-expect fun buildLoginPayload(token: String?): ByteArray
-expect fun buildHeartbeatPayload(): ByteArray
-expect fun buildLogoutPayload(userId: String): ByteArray
-expect fun buildChatPayload(
-    targetClientId: String,
-    content: String,
-    userId: Int,
-    timestamp: Long,
-    replyToMessageId: String? = null,
-    replyToContent: String? = null,
-    replyToSender: String? = null,
-    messageType: Int = 0, // 0: TEXT, 1: IMAGE, 2: FILE
-    fileUrl: String? = null,
-    fileName: String? = null,
-    fileSize: Long? = null
-): ByteArray
-expect fun buildAgentChatPayload(
+import com.chatlite.proto.MessageProtos
+
+/**
+ * 构建登录消息
+ */
+fun buildLoginPayload(token: String?): ByteArray {
+    val login = MessageProtos.LoginMessage.newBuilder()
+        .setTargetClientId(token ?: "")
+        .build()
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.LOGIN.wire)
+        .setLogin(login)
+        .build()
+        .toByteArray()
+}
+
+/**
+ * 构建心跳消息
+ */
+fun buildHeartbeatPayload(): ByteArray {
+    val hb = MessageProtos.HeartbeatMessage.newBuilder()
+        .setTimestamp(System.currentTimeMillis())
+        .build()
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.HEARTBEAT.wire)
+        .setHeartbeat(hb)
+        .build()
+        .toByteArray()
+}
+
+/**
+ * 构建登出消息
+ */
+fun buildLogoutPayload(userId: String): ByteArray {
+    val logout = MessageProtos.LogoutMessage.newBuilder()
+        .setUserId(userId)
+        .build()
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.LOGOUT.wire)
+        .setLogout(logout)
+        .build()
+        .toByteArray()
+}
+
+/**
+ * 构建普通聊天消息
+ */
+fun buildChatPayload(
     targetClientId: String,
     content: String,
     userId: Int,
@@ -29,8 +59,88 @@ expect fun buildAgentChatPayload(
     fileUrl: String? = null,
     fileName: String? = null,
     fileSize: Long? = null
-): ByteArray
-expect fun buildGroupChatPayload(
+): ByteArray {
+    val chatBuilder = MessageProtos.ChatMessage.newBuilder()
+        .setTargetClientId(targetClientId)
+        .setContent(content)
+        .setUserId(userId.toString())
+        .setTimestamp(timestamp.toString())
+        .setMessageType(MessageProtos.MessageType.forNumber(messageType))
+
+    // 设置引用回复字段
+    replyToMessageId?.let { chatBuilder.setReplyToMessageId(it) }
+    replyToContent?.let { chatBuilder.setReplyToContent(it) }
+    replyToSender?.let { chatBuilder.setReplyToSender(it) }
+
+    // 设置文件字段
+    fileUrl?.let { chatBuilder.setFileUrl(it) }
+    fileName?.let { chatBuilder.setFileName(it) }
+    fileSize?.let { chatBuilder.setFileSize(it) }
+
+    val chat = chatBuilder.build()
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.CHAT.wire)
+        .setChat(chat)
+        .build()
+        .toByteArray()
+}
+
+/**
+ * 构建AI助手聊天消息
+ */
+fun buildAgentChatPayload(
+    targetClientId: String,
+    content: String,
+    userId: Int,
+    timestamp: Long,
+    replyToMessageId: String? = null,
+    replyToContent: String? = null,
+    replyToSender: String? = null,
+    messageType: Int = 0,
+    fileUrl: String? = null,
+    fileName: String? = null,
+    fileSize: Long? = null
+): ByteArray {
+    val actionBuilder = MessageProtos.ChatMessage.newBuilder()
+        .setTargetClientId(targetClientId)
+        .setContent(content)
+        .setUserId(userId.toString())
+        .setTimestamp(timestamp.toString())
+        .setMessageType(MessageProtos.MessageType.forNumber(messageType))
+
+    // 设置引用回复字段
+    replyToMessageId?.let { actionBuilder.setReplyToMessageId(it) }
+    replyToContent?.let { actionBuilder.setReplyToContent(it) }
+    replyToSender?.let { actionBuilder.setReplyToSender(it) }
+
+    // 设置文件字段
+    fileUrl?.let { actionBuilder.setFileUrl(it) }
+    fileName?.let { actionBuilder.setFileName(it) }
+    fileSize?.let { actionBuilder.setFileSize(it) }
+
+    val actions = ActionLogger.getSnapshot()
+    for (action in actions) {
+        val actionProto = MessageProtos.ClientAction.newBuilder()
+            .setId(action.id)
+            .setTimestamp(action.timestamp)
+            .setType(action.type.name)
+            .setTargetId(action.targetId ?: "")
+            .putAllMetadata(action.metadata)
+            .build()
+        actionBuilder.addClientActions(actionProto)
+    }
+
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.AGENT_CHAT.wire)
+        .setChat(actionBuilder.build())
+        .build()
+        .toByteArray()
+}
+
+/**
+ * 构建群聊消息
+ */
+fun buildGroupChatPayload(
     targetClientId: String,
     content: String,
     userId: Int,
@@ -41,5 +151,41 @@ expect fun buildGroupChatPayload(
     fileUrl: String? = null,
     fileName: String? = null,
     fileSize: Long? = null
-): ByteArray
-expect fun buildCheckPayload(targetClientId: String): ByteArray
+): ByteArray {
+    val gmBuilder = MessageProtos.GroupChatMessage.newBuilder()
+        .setTargetClientId(targetClientId)
+        .setContent(content)
+        .setUserId(userId.toString())
+        .setMessageType(MessageProtos.MessageType.forNumber(messageType))
+
+    // 设置引用回复字段
+    replyToMessageId?.let { gmBuilder.setReplyToMessageId(it) }
+    replyToContent?.let { gmBuilder.setReplyToContent(it) }
+    replyToSender?.let { gmBuilder.setReplyToSender(it) }
+
+    // 设置文件字段
+    fileUrl?.let { gmBuilder.setFileUrl(it) }
+    fileName?.let { gmBuilder.setFileName(it) }
+    fileSize?.let { gmBuilder.setFileSize(it) }
+
+    val gm = gmBuilder.build()
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.GROUP_CHAT.wire)
+        .setGroupChat(gm)
+        .build()
+        .toByteArray()
+}
+
+/**
+ * 构建在线状态检查消息
+ */
+fun buildCheckPayload(targetClientId: String): ByteArray {
+    val check = MessageProtos.CheckMessage.newBuilder()
+        .setTargetClientId(targetClientId)
+        .build()
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.CHECK.wire)
+        .setCheck(check)
+        .build()
+        .toByteArray()
+}

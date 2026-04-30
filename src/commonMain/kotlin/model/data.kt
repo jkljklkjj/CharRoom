@@ -125,17 +125,17 @@ private fun withAgentAssistant(list: List<User>): List<User> {
 /**
  * 获取好友列表（委托 ApiService，使用全局 Token）
  */
-fun fetchFriends(): List<User> = ApiService.fetchFriends()
+suspend fun fetchFriends(): List<User> = ApiService.fetchFriends()
 
 /**
  * 获取群组列表（委托 ApiService，使用全局 Token）
  */
-fun fetchGroups(): List<User> = ApiService.fetchGroups()
+suspend fun fetchGroups(): List<User> = ApiService.fetchGroups()
 
 /**
  * 更新好友列表
  */
-fun updateFriendList(): List<User> {
+suspend fun updateFriendList(): List<User> {
     val tmp = fetchFriends()
     users = withAgentAssistant(users + tmp)
     return tmp
@@ -144,7 +144,7 @@ fun updateFriendList(): List<User> {
 /**
  * 更新群组列表
  */
-fun updateGroupList(): List<User> {
+suspend fun updateGroupList(): List<User> {
     val tmp = fetchGroups()
     users = withAgentAssistant(users + tmp)
     return tmp
@@ -153,7 +153,7 @@ fun updateGroupList(): List<User> {
 /**
  * 更新好友和群组列表：同时写回全局 users 以触发 UI 重组
  */
-fun updateList(): List<User> {
+suspend fun updateList(): List<User> {
     val friends = fetchFriends()
     val groups = fetchGroups()
     val merged = friends + groups

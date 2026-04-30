@@ -17,7 +17,7 @@ object ApiEndpoints {
     const val GROUP_ACCEPT = "/group/accept" // 同意群聊申请
     const val GROUP_REJECT = "/group/reject" // 拒绝群聊申请
     const val USER_DETAIL = "/user/get"
-    const val GROUP_DETAIL = "/group/getDetail"
+    const val GROUP_DETAIL = "/group/get/detail"
     const val OFFLINE = "/message/getOfflineMessage"
     const val AGENT_NL = "/agent/nl"
     const val AGENT_NL_STREAM = "/agent/nl/stream"

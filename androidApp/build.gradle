@@ -9,6 +9,7 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jetbrains.kotlin.plugin.serialization'
 }
 
 def composeVersion = project.findProperty("compose.lib.version") ?: '1.10.6'
@@ -44,9 +45,16 @@ android {
         kotlinCompilerExtensionVersion = composeVersion
     }
 
+    packaging {
+        resources {
+            excludes += "META-INF/DEPENDENCIES"
+        }
+    }
+
     sourceSets {
         main {
             java.srcDirs += project.file('../shared/kotlin')
+            java.srcDirs += project.file('../src/commonMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }
@@ -80,6 +88,34 @@ dependencies {
     implementation 'io.netty:netty-all:4.1.68.Final'
     implementation 'com.google.protobuf:protobuf-java:4.34.1'
     implementation 'com.google.protobuf:protobuf-kotlin:4.34.1'
+
+    // ========== 公共模块依赖 ==========
+    // Kotlin 协程 (Android版本)
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+
+    // Ktor 客户端 (Android版本)
+    implementation 'io.ktor:ktor-client-core:3.4.3'
+    implementation 'io.ktor:ktor-client-android:3.4.3'
+    implementation 'io.ktor:ktor-client-content-negotiation:3.4.3'
+    implementation 'io.ktor:ktor-serialization-kotlinx-json:3.4.3'
+
+    // Kotlin 序列化
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0'
+
+    // Jackson JSON 处理
+    implementation 'com.fasterxml.jackson.module:jackson-module-kotlin:2.21.2'
+
+    // Unirest HTTP 客户端
+    implementation 'com.konghq:unirest-java:3.14.5'
+
+    // 日志
+    implementation 'org.slf4j:slf4j-api:2.0.17'
+    implementation 'com.jakewharton.timber:timber:5.0.1' // Android日志库替代logback
+
+    // Compose 图标扩展
+    implementation "androidx.compose.material:material-icons-core:1.6.8"
+    implementation "androidx.compose.material:material-icons-extended:1.6.8"
 }
 
 

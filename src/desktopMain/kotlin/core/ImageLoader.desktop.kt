@@ -9,8 +9,12 @@ import java.net.URL
 // SKIKO extension `toComposeImageBitmap` may be missing in some CI classpaths.
 // Temporarily avoid calling it so the project can compile in CI.
 
-// JVM / Desktop implementation: download bytes, optionally cache to local disk by cacheKey, and decode via Skia
-actual suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?): ImageBitmap? = withContext(Dispatchers.IO) {
+/**
+ * 桌面端图片加载器实现
+ */
+object DesktopImageLoader : ImageLoaderProvider {
+    // JVM / Desktop implementation: download bytes, optionally cache to local disk by cacheKey, and decode via Skia
+    override suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?): ImageBitmap? = withContext(Dispatchers.IO) {
     try {
         var cacheFile: File? = null
         if (!cacheKey.isNullOrBlank()) {
@@ -54,4 +58,5 @@ actual suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?): Image
     } catch (e: Exception) {
         null
     }
+}
 }

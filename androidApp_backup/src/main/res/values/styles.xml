@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- 应用主色调，和logo颜色一致 -->
+        <item name="colorPrimary">#f98701</item>
+        <item name="colorPrimaryDark">#e67a00</item>
+        <item name="colorAccent">#f98701</item>
+        <!-- 状态栏颜色 -->
+        <item name="android:statusBarColor">#f98701</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <!-- 页面背景 -->
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
+
