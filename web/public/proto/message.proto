@@ -117,7 +117,7 @@ message MessageWrapper {
         AgentChatMessage agentChat = 9;
         GroupChatMessage groupChat = 4;
         CheckMessage check = 5;
-        HeartbeatMessage heartbeat = 6;
+        Heartbeat heartbeat = 6;
         LogoutMessage logout = 7;
         AgentStreamMessage agentStream = 8;
         AckMessage ack = 10;
@@ -131,5 +131,3 @@ message ResponseMessage {
     string clientId = 3;     // 客户端ID (用于CheckMessage响应)
     bool online = 4;        // 是否在线 (用于CheckMessage响应)
 }
-
-
