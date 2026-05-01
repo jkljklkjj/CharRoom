@@ -334,16 +334,22 @@ jobs:
           echo "Upload URL: $upload_url"
           echo "Found package files:"
           find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' -o -iname '*.apk' \) | sort
-          find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' -o -iname '*.apk' \) -print0 | while IFS= read -r -d '' file; do
-            relpath=${file#artifacts/}
-            name=${relpath//\//_}
-            echo "Uploading $file as $name"
-            response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$file" "$upload_url?name=$name" -w "\nHTTP_CODE:%{http_code}")
-            http_code=$(printf '%s' "$response" | tail -n1 | cut -d':' -f2)
-            body=$(printf '%s' "$response" | sed '$d')
-            if [ "$http_code" != "201" ] && [ "$http_code" != "200" ]; then
-              echo "Upload failed ($http_code):"
-              echo "$body"
-              exit 1
+          declare -A assetNames
+          assetNames=( [msi]=windows.msi [dmg]=macos.dmg [deb]=linux.deb [apk]=android.apk )
+          for ext in msi dmg deb apk; do
+            file=$(find artifacts -type f -iname "*.$ext" | head -n 1 || true)
+            if [ -n "$file" ]; then
+              name=${assetNames[$ext]}
+              echo "Uploading $file as $name"
+              response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$file" "$upload_url?name=$name" -w "\nHTTP_CODE:%{http_code}")
+              http_code=$(printf '%s' "$response" | tail -n1 | cut -d':' -f2)
+              body=$(printf '%s' "$response" | sed '$d')
+              if [ "$http_code" != "201" ] && [ "$http_code" != "200" ]; then
+                echo "Upload failed ($http_code):"
+                echo "$body"
+                exit 1
+              fi
+            else
+              echo "No artifact found for *.$ext"
             fi
           done

@@ -26,7 +26,7 @@
           <p class="hero-lead">界面强调信息层次与可读性，优先对话体验，支持离线消息、群聊与智能 Agent 流式集成</p>
 
           <div class="cta">
-            <a class="btn primary" :href="downloadRoot" target="_blank">下载客户端</a>
+            <a class="btn primary" :href="releasePage" target="_blank">下载客户端</a>
             <router-link class="btn ghost" to="/app">在线体验</router-link>
           </div>
 
@@ -120,10 +120,12 @@
     <section class="downloads container">
       <h3 class="section-title">下载</h3>
       <div class="download-grid">
-        <a class="platform" :href="downloadRoot">Windows</a>
-        <a class="platform" :href="downloadRoot">Linux</a>
-        <a class="platform" :href="downloadRoot">macOS</a>
+        <a v-for="item in downloads" :key="item.title" class="platform" :href="item.href" target="_blank" rel="noreferrer">
+          {{ item.title }}
+          <span class="platform-sub">{{ item.label }}</span>
+        </a>
       </div>
+      <p class="download-note">如需查看全部安装包，可前往 <a :href="releasePage" target="_blank" rel="noreferrer">GitHub Release</a></p>
     </section>
 
     <section class="why-choose container">
@@ -230,7 +232,13 @@ import { ref, onMounted } from 'vue'
 import siteConfig from '../siteConfig'
 import { getFriendRequests, acceptFriend } from '../api'
 
-const downloadRoot = '../target/'
+const releasePage = siteConfig.RELEASE_BASE
+const downloads = [
+  { title: 'Windows', href: `${releasePage}/download/windows.msi`, label: 'MSI' },
+  { title: 'Linux', href: `${releasePage}/download/linux.deb`, label: 'DEB' },
+  { title: 'macOS', href: `${releasePage}/download/macos.dmg`, label: 'DMG' },
+  { title: 'Android', href: `${releasePage}/download/android.apk`, label: 'APK' }
+]
 const showReward = ref(false)
 const selectedMethod = ref('alipay')
 const authorEmail = ref(siteConfig.AUTHOR_EMAIL)
