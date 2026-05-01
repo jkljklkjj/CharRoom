@@ -102,7 +102,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "CharRoom"
+            packageName = "chatlite"
             packageVersion = "1.0.0"
             vendor = "QingLiao"
             description = "CharRoom - lightweight secure cross-platform chat"
@@ -110,12 +110,12 @@ compose.desktop {
 
             val iconsDir = project.file("packaging/icons")
             windows {
-                menuGroup = "CharRoom"
+                menuGroup = "chatlite"
                 val ico = file("${iconsDir.path}/app.ico")
                 if (ico.exists()) iconFile.set(ico)
             }
             macOS {
-                bundleID = "com.chatlite.charroom"
+                bundleID = "chatlite.charroom"
                 val icns = file("${iconsDir.path}/app.icns")
                 if (icns.exists()) iconFile.set(icns)
             }
