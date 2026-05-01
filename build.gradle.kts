@@ -5,6 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
     id("org.jetbrains.compose") version "1.10.3"
+    id("com.guardsquare.proguard") version "7.8.0" apply false
 }
 
 group = "com.chatlite"
@@ -82,7 +83,7 @@ compose.desktop {
         // ========== ProGuard 配置（只压缩优化，不混淆） ==========
         buildTypes.release {
             proguard {
-                isEnabled = false
+                isEnabled = true
                 obfuscate = false
                 optimize = false
                 configurationFiles.from(project.file("proguard-rules.pro"))
