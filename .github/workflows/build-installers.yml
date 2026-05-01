@@ -79,12 +79,16 @@ jobs:
             & $signtool sign /fd SHA256 /a /f $pfxPath /p $pw /tr http://timestamp.digicert.com /td SHA256 $_.FullName
           }
 
+      - name: List staged desktop artifacts (Windows)
+        shell: powershell
+        run: |
+          if (Test-Path 'build\release-artifacts\desktop') { Get-ChildItem -Path build\release-artifacts\desktop -Recurse -Force | Select-Object FullName,Length } else { Write-Host 'No staged desktop artifacts found' }
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: windows-installers
-          path: |
-            build/release-artifacts/desktop/chatlite.msi
+          path: build/release-artifacts/desktop/**
 
   build-macos:
     name: Build DMG (macOS)
@@ -188,11 +192,19 @@ jobs:
             echo "No DMG found to notarize"
           fi
 
+      - name: List staged desktop artifacts (macOS)
+        run: |
+          if [ -d "build/release-artifacts/desktop" ]; then
+            ls -la build/release-artifacts/desktop || true
+          else
+            echo "No staged desktop artifacts found"
+          fi
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: macos-installers
-          path: build/release-artifacts/desktop/chatlite.dmg
+          path: build/release-artifacts/desktop/**
 
   build-linux:
     name: Build DEB (Linux)
@@ -245,11 +257,19 @@ jobs:
         run: ./gradlew stageDesktopReleaseArtifacts --no-daemon
         shell: bash
 
+      - name: List staged desktop artifacts (Linux)
+        run: |
+          if [ -d "build/release-artifacts/desktop" ]; then
+            ls -la build/release-artifacts/desktop || true
+          else
+            echo "No staged desktop artifacts found"
+          fi
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: linux-installers
-          path: build/release-artifacts/desktop/chatlite.deb
+          path: build/release-artifacts/desktop/**
 
   build-android:
     name: Build Android APK
@@ -293,7 +313,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: build/release-artifacts/android/chatlite.apk
+          path: build/release-artifacts/android/**
 
   publish-release:
     name: Publish Release
