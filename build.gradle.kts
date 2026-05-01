@@ -91,6 +91,15 @@ compose.desktop {
     application {
         mainClass = "MainKt"
 
+        buildTypes {
+            release {
+                proguard {
+                    version.set("7.8.2")
+                    configurationFiles.from(project.file("proguard-rules.pro"))
+                }
+            }
+        }
+
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "CharRoom"
@@ -200,6 +209,12 @@ tasks.register<proguard.gradle.ProGuardTask>("customProguardReleaseJars") {
     }
     verbose()
     ignorewarnings()
+}
+
+tasks.register("runDesktopProguard") {
+    group = "distribution"
+    description = "Run the local desktop ProGuard step"
+    dependsOn("customProguardReleaseJars")
 }
 
 // Do not run custom ProGuard automatically on every JAR build in CI.
