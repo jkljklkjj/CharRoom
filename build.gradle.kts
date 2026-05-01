@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.Copy
 
 buildscript {
     repositories {
@@ -131,6 +132,46 @@ tasks.register("buildInstallers") {
     group = "distribution"
     description = "Build native installers (DMG / MSI / DEB)"
     dependsOn(tasks.matching { it.name.startsWith("package") || it.name.startsWith("jpackage") })
+}
+
+tasks.register<Copy>("stageDesktopReleaseArtifacts") {
+    group = "distribution"
+    description = "Stage desktop release installers with fixed filenames"
+    dependsOn("buildInstallers")
+    into(layout.buildDirectory.dir("release-artifacts/desktop"))
+
+    from(layout.buildDirectory.dir("compose/binaries")) {
+        include("**/*.msi")
+        rename { "chatlite.msi" }
+    }
+
+    from(layout.buildDirectory.dir("compose/binaries")) {
+        include("**/*.dmg")
+        rename { "chatlite.dmg" }
+    }
+
+    from(layout.buildDirectory.dir("compose/binaries")) {
+        include("**/*.deb")
+        rename { "chatlite.deb" }
+    }
+}
+
+tasks.register<Copy>("stageAndroidReleaseArtifact") {
+    group = "distribution"
+    description = "Stage Android release APK with a fixed filename"
+    dependsOn(":androidApp:assembleRelease")
+    into(layout.buildDirectory.dir("release-artifacts/android"))
+
+    from(project.layout.projectDirectory.dir("androidApp/build/outputs/apk/release")) {
+        include("*.apk")
+        rename { "chatlite.apk" }
+    }
+}
+
+tasks.register("stageReleaseArtifacts") {
+    group = "distribution"
+    description = "Stage all release artifacts with fixed filenames"
+    dependsOn("stageDesktopReleaseArtifacts", "stageAndroidReleaseArtifact")
 }
 
 tasks.register<Jar>("customJar") {

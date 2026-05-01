@@ -57,6 +57,9 @@ jobs:
       - name: Build installers
         run: .\gradlew.bat clean buildInstallers --no-daemon
 
+      - name: Stage release artifacts
+        run: .\gradlew.bat stageDesktopReleaseArtifacts --no-daemon
+
       - name: Optional code signing (Windows)
         shell: powershell
         env:
@@ -81,7 +84,7 @@ jobs:
         with:
           name: windows-installers
           path: |
-            build/compose/binaries/main/**/*.msi
+            build/release-artifacts/desktop/chatlite.msi
 
   build-macos:
     name: Build DMG (macOS)
@@ -145,6 +148,10 @@ jobs:
         run: ./gradlew clean buildInstallers
         shell: bash
 
+      - name: Stage release artifacts
+        run: ./gradlew stageDesktopReleaseArtifacts
+        shell: bash
+
       - name: Optional sign & notarize (macOS)
         shell: bash
         env:
@@ -185,7 +192,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-installers
-          path: build/compose/binaries/main/**/*.dmg
+          path: build/release-artifacts/desktop/chatlite.dmg
 
   build-linux:
     name: Build DEB (Linux)
@@ -234,11 +241,15 @@ jobs:
         run: ./gradlew clean buildInstallers --no-daemon
         shell: bash
 
+      - name: Stage release artifacts
+        run: ./gradlew stageDesktopReleaseArtifacts --no-daemon
+        shell: bash
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: linux-installers
-          path: build/compose/binaries/main/**/*.deb
+          path: build/release-artifacts/desktop/chatlite.deb
 
   build-android:
     name: Build Android APK
@@ -274,11 +285,15 @@ jobs:
         run: ./gradlew :androidApp:clean :androidApp:assembleRelease --no-daemon
         shell: bash
 
+      - name: Stage release artifact
+        run: ./gradlew stageAndroidReleaseArtifact --no-daemon
+        shell: bash
+
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: androidApp/build/outputs/**/*.apk
+          path: build/release-artifacts/android/chatlite.apk
 
   publish-release:
     name: Publish Release
