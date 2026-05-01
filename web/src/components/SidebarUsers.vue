@@ -181,6 +181,32 @@ async function loadFriends() {
 .meta .name{font-weight:600}
 .meta .sub{font-size:12px;color:var(--muted)}
 
+/* 搜索框样式 */
+.search-bar{padding: 0 12px 12px;}
+.search-bar input{
+  width: 100%;
+  padding: 10px 16px 10px 40px;
+  border: 1px solid #e8e8e8;
+  border-radius: 24px;
+  font-size: 14px;
+  background: #fafafa url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>') no-repeat 14px center;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+.search-bar input:focus{
+  outline: none;
+  border-color: #ff7a33;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 122, 51, 0.1);
+}
+.search-bar input:hover{
+  border-color: #d0d0d0;
+  background-color: #fff;
+}
+.search-bar input::placeholder{
+  color: #bbb;
+}
+
 /* 好友申请弹窗 */
 .friend-requests-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
 .modal-content{background:white;border-radius:12px;width:400px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
