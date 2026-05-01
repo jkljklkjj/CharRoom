@@ -370,7 +370,7 @@ jobs:
           echo "Found package files:"
           find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' -o -iname '*.apk' \) | sort
           declare -A assetNames
-          assetNames=( [msi]=windows.msi [dmg]=macos.dmg [deb]=linux.deb [apk]=android.apk )
+          assetNames=( [msi]=chatlite.msi [dmg]=chatlite.dmg [deb]=chatlite.deb [apk]=chatlite.apk )
           for ext in msi dmg deb apk; do
             file=$(find artifacts -type f -iname "*.$ext" | head -n 1 || true)
             if [ -n "$file" ]; then
