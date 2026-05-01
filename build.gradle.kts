@@ -91,16 +91,6 @@ compose.desktop {
     application {
         mainClass = "MainKt"
 
-        // ========== ProGuard 配置（只压缩优化，不混淆） ==========
-        buildTypes.release {
-            proguard {
-                isEnabled = true
-                obfuscate = false
-                optimize = false
-                configurationFiles.from(project.file("proguard-rules.pro"))
-            }
-        }
-
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "CharRoom"
@@ -184,17 +174,33 @@ tasks.register("customApk") {
     dependsOn(tasks.named("customApkRelease"))
 }
 
-tasks.register<proguard.gradle.ProGuardTask>("proguardReleaseJars") {
+tasks.register<proguard.gradle.ProGuardTask>("customProguardReleaseJars") {
     description = "Run ProGuard on the desktop JAR output"
     configuration("proguard-rules.pro")
     injars("build/libs/CharRoom-1.0-SNAPSHOT.jar")
     outjars("build/libs/CharRoom-1.0-SNAPSHOT-obfuscated.jar")
-    libraryjars(configurations.compileClasspath.get().files)
-    libraryjars(kotlin.compiler.classpath)
-    verbose(true)
-    ignorewarnings(false)
+    libraryjars(files(configurations.compileClasspath.get().files + configurations.runtimeClasspath.get().files))
+    val javaHome = System.getProperty("java.home")
+    val modulesFile = file("$javaHome/lib/modules")
+    val jrtFsFile = file("$javaHome/lib/jrt-fs.jar")
+    val jmodsDir = file("$javaHome/jmods")
+    val jdkLibs = mutableListOf<File>()
+    if (modulesFile.exists()) {
+        jdkLibs.add(modulesFile)
+    }
+    if (jrtFsFile.exists()) {
+        jdkLibs.add(jrtFsFile)
+    }
+    if (jmodsDir.exists() && jmodsDir.isDirectory) {
+        jdkLibs.addAll(jmodsDir.listFiles { file -> file.extension == "jmod" }?.toList().orEmpty())
+    }
+    if (jdkLibs.isNotEmpty()) {
+        libraryjars(files(jdkLibs))
+    }
+    verbose()
+    ignorewarnings()
 }
 
 tasks.named<Jar>("jar") {
-    finalizedBy(tasks.named("proguardReleaseJars"))
+    finalizedBy(tasks.named("customProguardReleaseJars"))
 }
