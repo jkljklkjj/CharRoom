@@ -176,6 +176,7 @@ tasks.register("customApk") {
 
 tasks.register<proguard.gradle.ProGuardTask>("customProguardReleaseJars") {
     description = "Run ProGuard on the desktop JAR output"
+    dependsOn(":proto:jar")
     configuration("proguard-rules.pro")
     injars("build/libs/CharRoom-1.0-SNAPSHOT.jar")
     outjars("build/libs/CharRoom-1.0-SNAPSHOT-obfuscated.jar")
