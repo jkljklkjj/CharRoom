@@ -1,4 +1,17 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.Copy
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:7.4.2")
+        classpath("com.guardsquare:proguard-gradle:7.8.2")
+    }
+}
 
 plugins {
     kotlin("jvm") version "2.3.20"
@@ -79,19 +92,18 @@ compose.desktop {
     application {
         mainClass = "MainKt"
 
-        // ========== ProGuard 配置（只压缩优化，不混淆） ==========
-        buildTypes.release {
-            proguard {
-                isEnabled = true
-                obfuscate = false
-                optimize = false
-                configurationFiles.from(project.file("proguard-rules.pro"))
+        buildTypes {
+            release {
+                proguard {
+                    version.set("7.8.2")
+                    configurationFiles.from(project.file("proguard-rules.pro"))
+                }
             }
         }
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "CharRoom"
+            packageName = "chatlite"
             packageVersion = "1.0.0"
             vendor = "QingLiao"
             description = "CharRoom - lightweight secure cross-platform chat"
@@ -99,12 +111,12 @@ compose.desktop {
 
             val iconsDir = project.file("packaging/icons")
             windows {
-                menuGroup = "CharRoom"
+                menuGroup = "chatlite"
                 val ico = file("${iconsDir.path}/app.ico")
                 if (ico.exists()) iconFile.set(ico)
             }
             macOS {
-                bundleID = "com.chatlite.charroom"
+                bundleID = "chatlite.charroom"
                 val icns = file("${iconsDir.path}/app.icns")
                 if (icns.exists()) iconFile.set(icns)
             }
@@ -120,6 +132,46 @@ tasks.register("buildInstallers") {
     group = "distribution"
     description = "Build native installers (DMG / MSI / DEB)"
     dependsOn(tasks.matching { it.name.startsWith("package") || it.name.startsWith("jpackage") })
+}
+
+tasks.register<Copy>("stageDesktopReleaseArtifacts") {
+    group = "distribution"
+    description = "Stage desktop release installers with fixed filenames"
+    dependsOn("buildInstallers")
+    into(layout.buildDirectory.dir("release-artifacts/desktop"))
+
+    from(layout.buildDirectory.dir("compose/binaries")) {
+        include("**/*.msi")
+        rename { "chatlite.msi" }
+    }
+
+    from(layout.buildDirectory.dir("compose/binaries")) {
+        include("**/*.dmg")
+        rename { "chatlite.dmg" }
+    }
+
+    from(layout.buildDirectory.dir("compose/binaries")) {
+        include("**/*.deb")
+        rename { "chatlite.deb" }
+    }
+}
+
+tasks.register<Copy>("stageAndroidReleaseArtifact") {
+    group = "distribution"
+    description = "Stage Android release APK with a fixed filename"
+    dependsOn(":androidApp:assembleRelease")
+    into(layout.buildDirectory.dir("release-artifacts/android"))
+
+    from(project.layout.projectDirectory.dir("androidApp/build/outputs/apk/release")) {
+        include("*.apk")
+        rename { "chatlite.apk" }
+    }
+}
+
+tasks.register("stageReleaseArtifacts") {
+    group = "distribution"
+    description = "Stage all release artifacts with fixed filenames"
+    dependsOn("stageDesktopReleaseArtifacts", "stageAndroidReleaseArtifact")
 }
 
 tasks.register<Jar>("customJar") {
@@ -171,3 +223,43 @@ tasks.register("customApk") {
     description = "Build the default Android release APK for the androidApp module"
     dependsOn(tasks.named("customApkRelease"))
 }
+
+tasks.register<proguard.gradle.ProGuardTask>("customProguardReleaseJars") {
+    description = "Run ProGuard on the desktop JAR output"
+    dependsOn(":proto:jar")
+    configuration("proguard-rules.pro")
+    injars("build/libs/CharRoom-1.0-SNAPSHOT.jar")
+    outjars("build/libs/CharRoom-1.0-SNAPSHOT-obfuscated.jar")
+    libraryjars(files(configurations.compileClasspath.get().files + configurations.runtimeClasspath.get().files))
+    val javaHome = System.getProperty("java.home")
+    val modulesFile = file("$javaHome/lib/modules")
+    val jrtFsFile = file("$javaHome/lib/jrt-fs.jar")
+    val jmodsDir = file("$javaHome/jmods")
+    val jdkLibs = mutableListOf<File>()
+    if (modulesFile.exists()) {
+        jdkLibs.add(modulesFile)
+    }
+    if (jrtFsFile.exists()) {
+        jdkLibs.add(jrtFsFile)
+    }
+    if (jmodsDir.exists() && jmodsDir.isDirectory) {
+        jdkLibs.addAll(jmodsDir.listFiles { file -> file.extension == "jmod" }?.toList().orEmpty())
+    }
+    if (jdkLibs.isNotEmpty()) {
+        libraryjars(files(jdkLibs))
+    }
+    verbose()
+    ignorewarnings()
+}
+
+tasks.register("runDesktopProguard") {
+    group = "distribution"
+    description = "Run the local desktop ProGuard step"
+    dependsOn("customProguardReleaseJars")
+}
+
+// Do not run custom ProGuard automatically on every JAR build in CI.
+// Keep the task available for manual invocation if needed.
+// tasks.named<Jar>("jar") {
+//     finalizedBy(tasks.named("customProguardReleaseJars"))
+// }

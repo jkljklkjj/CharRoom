@@ -57,6 +57,9 @@ jobs:
       - name: Build installers
         run: .\gradlew.bat clean buildInstallers --no-daemon
 
+      - name: Stage release artifacts
+        run: .\gradlew.bat stageDesktopReleaseArtifacts --no-daemon
+
       - name: Optional code signing (Windows)
         shell: powershell
         env:
@@ -76,12 +79,16 @@ jobs:
             & $signtool sign /fd SHA256 /a /f $pfxPath /p $pw /tr http://timestamp.digicert.com /td SHA256 $_.FullName
           }
 
+      - name: List staged desktop artifacts (Windows)
+        shell: powershell
+        run: |
+          if (Test-Path 'build\release-artifacts\desktop') { Get-ChildItem -Path build\release-artifacts\desktop -Recurse -Force | Select-Object FullName,Length } else { Write-Host 'No staged desktop artifacts found' }
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: windows-installers
-          path: |
-            build/compose/binaries/main/**/*.msi
+          path: build/release-artifacts/desktop/**
 
   build-macos:
     name: Build DMG (macOS)
@@ -145,6 +152,10 @@ jobs:
         run: ./gradlew clean buildInstallers
         shell: bash
 
+      - name: Stage release artifacts
+        run: ./gradlew stageDesktopReleaseArtifacts
+        shell: bash
+
       - name: Optional sign & notarize (macOS)
         shell: bash
         env:
@@ -181,11 +192,19 @@ jobs:
             echo "No DMG found to notarize"
           fi
 
+      - name: List staged desktop artifacts (macOS)
+        run: |
+          if [ -d "build/release-artifacts/desktop" ]; then
+            ls -la build/release-artifacts/desktop || true
+          else
+            echo "No staged desktop artifacts found"
+          fi
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: macos-installers
-          path: build/compose/binaries/main/**/*.dmg
+          path: build/release-artifacts/desktop/**
 
   build-linux:
     name: Build DEB (Linux)
@@ -234,11 +253,23 @@ jobs:
         run: ./gradlew clean buildInstallers --no-daemon
         shell: bash
 
+      - name: Stage release artifacts
+        run: ./gradlew stageDesktopReleaseArtifacts --no-daemon
+        shell: bash
+
+      - name: List staged desktop artifacts (Linux)
+        run: |
+          if [ -d "build/release-artifacts/desktop" ]; then
+            ls -la build/release-artifacts/desktop || true
+          else
+            echo "No staged desktop artifacts found"
+          fi
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: linux-installers
-          path: build/compose/binaries/main/**/*.deb
+          path: build/release-artifacts/desktop/**
 
   build-android:
     name: Build Android APK
@@ -274,11 +305,15 @@ jobs:
         run: ./gradlew :androidApp:clean :androidApp:assembleRelease --no-daemon
         shell: bash
 
+      - name: Stage release artifact
+        run: ./gradlew stageAndroidReleaseArtifact --no-daemon
+        shell: bash
+
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: androidApp/build/outputs/**/*.apk
+          path: build/release-artifacts/android/**
 
   publish-release:
     name: Publish Release
@@ -334,16 +369,22 @@ jobs:
           echo "Upload URL: $upload_url"
           echo "Found package files:"
           find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' -o -iname '*.apk' \) | sort
-          find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' -o -iname '*.apk' \) -print0 | while IFS= read -r -d '' file; do
-            relpath=${file#artifacts/}
-            name=${relpath//\//_}
-            echo "Uploading $file as $name"
-            response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$file" "$upload_url?name=$name" -w "\nHTTP_CODE:%{http_code}")
-            http_code=$(printf '%s' "$response" | tail -n1 | cut -d':' -f2)
-            body=$(printf '%s' "$response" | sed '$d')
-            if [ "$http_code" != "201" ] && [ "$http_code" != "200" ]; then
-              echo "Upload failed ($http_code):"
-              echo "$body"
-              exit 1
+          declare -A assetNames
+          assetNames=( [msi]=chatlite.msi [dmg]=chatlite.dmg [deb]=chatlite.deb [apk]=chatlite.apk )
+          for ext in msi dmg deb apk; do
+            file=$(find artifacts -type f -iname "*.$ext" | head -n 1 || true)
+            if [ -n "$file" ]; then
+              name=${assetNames[$ext]}
+              echo "Uploading $file as $name"
+              response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$file" "$upload_url?name=$name" -w "\nHTTP_CODE:%{http_code}")
+              http_code=$(printf '%s' "$response" | tail -n1 | cut -d':' -f2)
+              body=$(printf '%s' "$response" | sed '$d')
+              if [ "$http_code" != "201" ] && [ "$http_code" != "200" ]; then
+                echo "Upload failed ($http_code):"
+                echo "$body"
+                exit 1
+              fi
+            else
+              echo "No artifact found for *.$ext"
             fi
           done

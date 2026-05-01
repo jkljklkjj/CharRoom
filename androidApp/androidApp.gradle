@@ -49,6 +49,14 @@ android {
         // Keeping this in sync may require manual adjustment when upgrading Compose.
         kotlinCompilerExtensionVersion = '1.4.8'  // Match Compose and Kotlin versions carefully
     }
+
+    packagingOptions {
+        exclude 'META-INF/license/LICENSE.jbzip2.txt'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+    }
 }
 
 repositories {
@@ -72,7 +80,9 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling:1.10.6'
 
     // Netty WebSocket client
-    implementation 'io.netty:netty-all:4.1.68.Final'
+    implementation('io.netty:netty-all:4.1.68.Final') {
+        exclude group: 'io.netty', module: 'netty-codec-native-quic'
+    }
 
     // Kotlin stdlib that matches your Kotlin version
     implementation "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"  // Kotlin 2.3.20

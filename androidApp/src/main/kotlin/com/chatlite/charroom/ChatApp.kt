@@ -113,7 +113,11 @@ fun ChatApp(
                 is Screen.Profile -> ProfileScreen(
                     token = appState.token,
                     currentUserId = appState.currentUserId,
-                    onBack = { appState.screen = Screen.Users }
+                    onBack = { appState.screen = Screen.Users },
+                    onLogout = {
+                        AndroidTokenStorage.clear(context)
+                        appState.logout()
+                    }
                 )
                 is Screen.UserDetail -> UserDetailScreen(
                     user = screen.user,

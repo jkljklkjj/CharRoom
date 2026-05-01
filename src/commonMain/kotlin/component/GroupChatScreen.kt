@@ -721,7 +721,7 @@ fun GroupChatScreen(
             }
         }
 
-        LaunchedEffect(filteredGroupMessages.size) {
+        LaunchedEffect(group.id, filteredGroupMessages.size) {
             if (filteredGroupMessages.isNotEmpty()) {
                 listState.animateScrollToItem(filteredGroupMessages.size - 1)
             }
