@@ -19,8 +19,6 @@ plugins {
     id("org.jetbrains.compose") version "1.10.3"
 }
 
-apply(plugin = "com.guardsquare.proguard")
-
 group = "com.chatlite"
 version = "1.0-SNAPSHOT"
 
@@ -184,4 +182,19 @@ tasks.register("customApk") {
     group = "distribution"
     description = "Build the default Android release APK for the androidApp module"
     dependsOn(tasks.named("customApkRelease"))
+}
+
+tasks.register<proguard.gradle.ProGuardTask>("proguardReleaseJars") {
+    description = "Run ProGuard on the desktop JAR output"
+    configuration("proguard-rules.pro")
+    injars("build/libs/CharRoom-1.0-SNAPSHOT.jar")
+    outjars("build/libs/CharRoom-1.0-SNAPSHOT-obfuscated.jar")
+    libraryjars(configurations.compileClasspath.get().files)
+    libraryjars(kotlin.compiler.classpath)
+    verbose(true)
+    ignorewarnings(false)
+}
+
+tasks.named<Jar>("jar") {
+    finalizedBy(tasks.named("proguardReleaseJars"))
 }
