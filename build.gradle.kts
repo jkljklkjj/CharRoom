@@ -82,7 +82,7 @@ compose.desktop {
         // ========== ProGuard 配置（只压缩优化，不混淆） ==========
         buildTypes.release {
             proguard {
-                isEnabled = true
+                isEnabled = false
                 obfuscate = false
                 optimize = false
                 configurationFiles.from(project.file("proguard-rules.pro"))
