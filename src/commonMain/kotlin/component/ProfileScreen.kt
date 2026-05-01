@@ -1,13 +1,9 @@
 package component
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -19,13 +15,13 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import component.FilePicker
 import core.ApiService
 import core.FileUploader
 import core.loadImageBitmapFromUrl
 import kotlinx.coroutines.launch
 import model.User
 import model.users
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 个人信息页面
@@ -222,7 +218,7 @@ fun ProfileScreen(
     // 邮箱验证码倒计时
     LaunchedEffect(emailVerifyCountdown) {
         if (emailVerifyCountdown > 0) {
-            kotlinx.coroutines.delay(1000)
+            kotlinx.coroutines.delay(1000.milliseconds)
             emailVerifyCountdown--
         }
     }
@@ -245,292 +241,305 @@ fun ProfileScreen(
                 CircularProgressIndicator()
             }
         } else {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(padding),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // 操作按钮区域
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 860.dp),
+                    elevation = 8.dp
                 ) {
-                    if (!isEditing) {
-                        Text(
-                            text = "查看模式",
-                            style = MaterialTheme.typography.subtitle2,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                        )
-                        Button(
-                            onClick = {
-                                // 进入编辑模式时保存当前值作为还原基准
-                                initialUsername = username
-                                initialPhone = phone
-                                initialSignature = signature
-                                initialNewEmail = newEmail
-                                isEditing = true
-                            },
-                            modifier = Modifier.height(40.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        // 操作按钮区域
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("编辑")
-                        }
-                    } else {
-                        Text(
-                            text = "编辑模式",
-                            style = MaterialTheme.typography.subtitle2,
-                            color = MaterialTheme.colors.secondary
-                        )
-                        Row {
-                            OutlinedButton(
-                                onClick = {
-                                    resetChanges()
-                                    isEditing = false
-                                },
-                                modifier = Modifier.height(40.dp).padding(end = 8.dp)
-                            ) {
-                                Text("还原")
+                            if (!isEditing) {
+                                Text(
+                                    text = "查看模式",
+                                    style = MaterialTheme.typography.subtitle2,
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                )
+                                Button(
+                                    onClick = {
+                                        // 进入编辑模式时保存当前值作为还原基准
+                                        initialUsername = username
+                                        initialPhone = phone
+                                        initialSignature = signature
+                                        initialNewEmail = newEmail
+                                        isEditing = true
+                                    },
+                                    modifier = Modifier.height(40.dp)
+                                ) {
+                                    Text("编辑")
+                                }
+                            } else {
+                                Text(
+                                    text = "编辑模式",
+                                    style = MaterialTheme.typography.subtitle2,
+                                    color = MaterialTheme.colors.secondary
+                                )
+                                Row {
+                                    OutlinedButton(
+                                        onClick = {
+                                            resetChanges()
+                                            isEditing = false
+                                        },
+                                        modifier = Modifier.height(40.dp).padding(end = 8.dp)
+                                    ) {
+                                        Text("还原")
+                                    }
+                                    Button(
+                                        onClick = {
+                                            scope.launch {
+                                                saveProfile()
+                                            }
+                                        },
+                                        modifier = Modifier.height(40.dp),
+                                        enabled = !isSaving
+                                    ) {
+                                        if (isSaving) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                color = MaterialTheme.colors.onPrimary,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("保存中...")
+                                        } else {
+                                            Text("确认修改")
+                                        }
+                                    }
+                                }
                             }
+                        }
+
+                        // 头像区域
+                        var isUploadingAvatar by remember { mutableStateOf(false) }
+                        Box(
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colors.primary.copy(alpha = 0.1f))
+                                .clickable(enabled = isEditing && !isUploadingAvatar) { // 只有编辑模式才能上传头像
+                                    FilePicker.pickImage { bytes, fileName ->
+                                        scope.launch {
+                                            isUploadingAvatar = true
+                                            errorMessage = ""
+                                            successMessage = ""
+                                            // 上传头像
+                                            val avatarUrl = FileUploader.uploadImage(bytes, fileName)
+                                            if (avatarUrl != null) {
+                                                // 重新加载头像
+                                                avatarBitmap = loadImageBitmapFromUrl(avatarUrl, null)
+                                                successMessage = "头像上传成功"
+                                                // 更新用户信息缓存
+                                                user = user?.copy(avatarUrl = avatarUrl)
+                                            } else {
+                                                errorMessage = "头像上传失败，请重试"
+                                            }
+                                            isUploadingAvatar = false
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isUploadingAvatar) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colors.primary,
+                                    strokeWidth = 3.dp
+                                )
+                            } else if (avatarBitmap != null) {
+                                Image(
+                                    bitmap = avatarBitmap!!,
+                                    contentDescription = "头像",
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Text(
+                                    text = username.firstOrNull()?.toString() ?: "U",
+                                    style = MaterialTheme.typography.h3,
+                                    color = MaterialTheme.colors.primary
+                                )
+                            }
+                        }
+                        Text(
+                            text = "点击更换头像",
+                            style = MaterialTheme.typography.caption,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        // 表单字段
+                        OutlinedTextField(
+                            value = username,
+                            onValueChange = { username = it },
+                            label = { Text("用户名") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = isEditing
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 邮箱修改区域
+                        Text(
+                            text = "邮箱",
+                            style = MaterialTheme.typography.subtitle2,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = newEmail,
+                                onValueChange = { newEmail = it },
+                                label = { Text("新邮箱") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                enabled = isEditing && emailVerifyCountdown == 0 && !isSendingEmailCode
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Button(
                                 onClick = {
                                     scope.launch {
-                                        saveProfile()
+                                        sendEmailVerifyCode()
                                     }
                                 },
-                                modifier = Modifier.height(40.dp),
-                                enabled = !isSaving
+                                enabled = isEditing && newEmail.isNotBlank() && newEmail != email && emailVerifyCountdown == 0 && !isSendingEmailCode,
+                                modifier = Modifier.height(56.dp)
                             ) {
-                                if (isSaving) {
+                                if (isSendingEmailCode) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(20.dp),
                                         color = MaterialTheme.colors.onPrimary,
                                         strokeWidth = 2.dp
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("保存中...")
+                                } else if (emailVerifyCountdown > 0) {
+                                    Text("${emailVerifyCountdown}s")
                                 } else {
-                                    Text("确认修改")
+                                    Text("发送验证码")
                                 }
                             }
                         }
-                    }
-                }
 
-                // 头像区域
-                var isUploadingAvatar by remember { mutableStateOf(false) }
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colors.primary.copy(alpha = 0.1f))
-                        .clickable(enabled = isEditing && !isUploadingAvatar) { // 只有编辑模式才能上传头像
-                            FilePicker.pickImage { bytes, fileName ->
-                                scope.launch {
-                                    isUploadingAvatar = true
-                                    errorMessage = ""
-                                    successMessage = ""
-                                    // 上传头像
-                                    val avatarUrl = FileUploader.uploadImage(bytes, fileName)
-                                    if (avatarUrl != null) {
-                                        // 重新加载头像
-                                        avatarBitmap = loadImageBitmapFromUrl(avatarUrl, null)
-                                        successMessage = "头像上传成功"
-                                        // 更新用户信息缓存
-                                        user = user?.copy(avatarUrl = avatarUrl)
-                                    } else {
-                                        errorMessage = "头像上传失败，请重试"
-                                    }
-                                    isUploadingAvatar = false
-                                }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isUploadingAvatar) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colors.primary,
-                            strokeWidth = 3.dp
-                        )
-                    } else if (avatarBitmap != null) {
-                        Image(
-                            bitmap = avatarBitmap!!,
-                            contentDescription = "头像",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Text(
-                            text = username.firstOrNull()?.toString() ?: "U",
-                            style = MaterialTheme.typography.h3,
-                            color = MaterialTheme.colors.primary
-                        )
-                    }
-                }
-                Text(
-                    text = "点击更换头像",
-                    style = MaterialTheme.typography.caption,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // 表单字段
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("用户名") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = isEditing
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 邮箱修改区域
-                Text(
-                    text = "邮箱",
-                    style = MaterialTheme.typography.subtitle2,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = newEmail,
-                        onValueChange = { newEmail = it },
-                        label = { Text("新邮箱") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        enabled = isEditing && emailVerifyCountdown == 0 && !isSendingEmailCode
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                sendEmailVerifyCode()
-                            }
-                        },
-                        enabled = isEditing && newEmail.isNotBlank() && newEmail != email && emailVerifyCountdown == 0 && !isSendingEmailCode,
-                        modifier = Modifier.height(56.dp)
-                    ) {
-                        if (isSendingEmailCode) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = MaterialTheme.colors.onPrimary,
-                                strokeWidth = 2.dp
+                        if (newEmail != email) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = emailVerifyCode,
+                                onValueChange = { emailVerifyCode = it },
+                                label = { Text("邮箱验证码") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                enabled = isEditing
                             )
-                        } else if (emailVerifyCountdown > 0) {
-                            Text("${emailVerifyCountdown}s")
-                        } else {
-                            Text("发送验证码")
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = phone,
+                            onValueChange = { phone = it },
+                            label = { Text("手机号码") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            enabled = isEditing
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = signature,
+                            onValueChange = { signature = it },
+                            label = { Text("个性签名") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = false,
+                            maxLines = 3,
+                            enabled = isEditing
+                        )
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        Text(
+                            text = "修改密码（不修改请留空）",
+                            style = MaterialTheme.typography.subtitle2,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = currentPassword,
+                            onValueChange = { currentPassword = it },
+                            label = { Text("当前密码") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            enabled = isEditing
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = newPassword,
+                            onValueChange = { newPassword = it },
+                            label = { Text("新密码") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            enabled = isEditing
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = confirmPassword,
+                            onValueChange = { confirmPassword = it },
+                            label = { Text("确认新密码") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            enabled = isEditing
+                        )
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        // 提示信息在底部
+                        // 错误/成功提示
+                        if (errorMessage.isNotBlank()) {
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colors.error,
+                                style = MaterialTheme.typography.caption,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+                        if (successMessage.isNotBlank()) {
+                            Text(
+                                text = successMessage,
+                                color = MaterialTheme.colors.secondary,
+                                style = MaterialTheme.typography.caption,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
                         }
                     }
-                }
-
-                if (newEmail != email) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = emailVerifyCode,
-                        onValueChange = { emailVerifyCode = it },
-                        label = { Text("邮箱验证码") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        enabled = isEditing
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("手机号码") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    enabled = isEditing
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = signature,
-                    onValueChange = { signature = it },
-                    label = { Text("个性签名") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = false,
-                    maxLines = 3,
-                    enabled = isEditing
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                Text(
-                    text = "修改密码（不修改请留空）",
-                    style = MaterialTheme.typography.subtitle2,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = currentPassword,
-                    onValueChange = { currentPassword = it },
-                    label = { Text("当前密码") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    enabled = isEditing
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = newPassword,
-                    onValueChange = { newPassword = it },
-                    label = { Text("新密码") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    enabled = isEditing
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
-                    label = { Text("确认新密码") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    enabled = isEditing
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // 提示信息在底部
-                // 错误/成功提示
-                if (errorMessage.isNotBlank()) {
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colors.error,
-                        style = MaterialTheme.typography.caption,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-                if (successMessage.isNotBlank()) {
-                    Text(
-                        text = successMessage,
-                        color = MaterialTheme.colors.secondary,
-                        style = MaterialTheme.typography.caption,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
                 }
             }
         }

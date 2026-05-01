@@ -2,26 +2,33 @@
   <div class="chat-wrap">
     <!-- 聊天顶部：显示当前选中好友名称（移动端隐藏，由外层提供顶部栏） -->
     <header class="chat-top" v-if="!isMobile">
-      {{ currentChatUser ? (currentChatUser.name || currentChatUser.account || currentChatUser.username || `用户 ${currentChatUser.id}`) : '请选择一个联系人开始聊天' }}
+      {{ currentChatTitle }}
     </header>
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
-    <div class="messages" ref="msgList" v-if="currentChatUser">
-      <div v-for="(m,i) in currentMessages" :key="i" :class="['msg', {me: m.user==='you'}]">
+    <div class="messages" ref="msgList" v-if="currentChatId !== null">
+      <div class="history-search">
+        <input
+          v-model="historyQuery"
+          type="search"
+          placeholder="搜索当前聊天历史，支持消息内容和发送者"
+        />
+      </div>
+      <div v-for="(m,i) in filteredMessages" :key="i" :class="['msg', {me: m.user==='you'}]">
         <div class="row">
           <div class="avatar-col">
             <img v-if="getAvatar(m.user)" :src="getAvatar(m.user)" class="msg-avatar" />
             <div v-else class="avatar-placeholder">{{ initials('' + m.user) }}</div>
           </div>
           <div class="bubble-col">
-            <div class="meta">{{ m.user === 'you' ? '我' : (currentChatUser.name || currentChatUser.username) }} · {{ time(m.time) }}</div>
+            <div class="meta">{{ m.user === 'you' ? '我' : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : '群聊') }} · {{ time(m.time) }}</div>
             <div class="text">{{ m.text }}</div>
           </div>
         </div>
       </div>
       <!-- 没有消息时的提示 -->
-      <div v-if="currentMessages.length === 0" class="empty-chat">
-        暂无消息，开始你们的对话吧~
+      <div v-if="filteredMessages.length === 0" class="empty-chat">
+        未找到匹配消息，换个关键词试试
       </div>
     </div>
 
@@ -30,8 +37,8 @@
       <div class="placeholder-text">👆 请在左侧选择一个联系人开始聊天</div>
     </div>
 
-    <!-- 输入框：只有选中好友时才显示 -->
-    <form class="composer" @submit.prevent="send" v-if="currentChatUser">
+    <!-- 输入框：只要选中会话就显示 -->
+    <form class="composer" @submit.prevent="send" v-if="currentChatId !== null">
       <input v-model="text" placeholder="输入消息并回车发送..." />
       <button class="send">发送</button>
     </form>
@@ -42,10 +49,10 @@
 import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
-import proto from '../proto'
 
 const store = useStore()
 const text = ref('')
+const historyQuery = ref('')
 const msgList = ref(null)
 
 // 监听窗口大小变化
@@ -67,10 +74,28 @@ onUnmounted(() => {
   clearTimeout(resizeTimer)
 })
 
+// 当前选中的聊天 ID
+const currentChatId = computed(() => store.state.selectedChatId)
+
 // 当前选中的聊天用户
 const currentChatUser = computed(() => {
-  if (!store.state.selectedChatId) return null
-  return store.state.users.find(u => u.id === store.state.selectedChatId) || null
+  if (currentChatId.value == null) return null
+  return store.state.users.find(u => u.id === currentChatId.value) || null
+})
+
+// 是否为群聊
+const isGroupChat = computed(() => {
+  return currentChatId.value != null && Number(currentChatId.value) < 0
+})
+
+const currentChatTitle = computed(() => {
+  if (currentChatUser.value) {
+    return currentChatUser.value.name || currentChatUser.value.account || currentChatUser.value.username || `用户 ${currentChatUser.value.id}`
+  }
+  if (isGroupChat.value) {
+    return '群聊'
+  }
+  return '请选择一个联系人开始聊天'
 })
 
 // 判断是否为移动端
@@ -78,15 +103,19 @@ const isMobile = computed(() => {
   return window.innerWidth < 768
 })
 
-// 当前会话的消息过滤
+// 当前会话的消息列表（私聊或群聊）
 const currentMessages = computed(() => {
-  if (!store.state.selectedChatId) return []
-  const selectedId = store.state.selectedChatId
-  return store.state.messages.filter(m => {
-    // 两种情况属于当前会话：
-    // 1. 对方发过来的消息：m.user 等于 选中的用户ID
-    // 2. 自己发出去的消息：m.targetId 等于 选中的用户ID
-    return String(m.user) === String(selectedId) || String(m.targetId) === String(selectedId)
+  if (currentChatId.value == null) return []
+  return isGroupChat.value ? store.state.groupMessages : store.state.messages
+})
+
+const filteredMessages = computed(() => {
+  const keyword = historyQuery.value.trim().toLowerCase()
+  if (!keyword) return currentMessages.value
+  return currentMessages.value.filter(m => {
+    const textValue = String(m.text || m.message || '').toLowerCase()
+    const senderValue = String(m.user || m.senderName || '').toLowerCase()
+    return textValue.includes(keyword) || senderValue.includes(keyword)
   })
 })
 
@@ -116,20 +145,31 @@ function initials(name) {
 }
 
 function send(){
-  if(!text.value.trim() || !store.state.selectedChatId) return
+  if(!text.value.trim() || currentChatId.value == null) return
   const m = {
     user: 'you',
     text: text.value,
     time: new Date().toISOString(),
-    targetId: store.state.selectedChatId // 添加目标用户ID，用于区分会话
+    targetId: currentChatId.value // 添加目标用户ID，用于区分会话
   }
-  store.addMessage(m)
-  // 发送给选中的联系人
-  const to = store.state.selectedChatId
-  const wrapper = {
-    type: 'chat',
-    chat: { targetClientId: String(to), content: m.text, timestamp: m.time }
+
+  const to = currentChatId.value
+  const wrapper = isGroupChat.value
+    ? {
+        type: 'groupChat',
+        groupChat: { targetClientId: String(to), content: m.text, timestamp: m.time }
+      }
+    : {
+        type: 'chat',
+        chat: { targetClientId: String(to), content: m.text, timestamp: m.time }
+      }
+
+  if (isGroupChat.value) {
+    store.addGroupMessage({ ...m, groupId: to })
+  } else {
+    store.addMessage(m)
   }
+
   chatSocket.sendWrapper(wrapper).catch(()=>{})
   text.value = ''
   // 滚动到底部
@@ -189,6 +229,9 @@ onMounted(()=>{
 .composer input{flex:1;padding:10px;border-radius:8px;border:1px solid #eee;margin-right:8px}
 .composer .send{background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff;border:0;padding:10px 14px;border-radius:8px}
 
+.history-search{padding:0 16px 12px}
+.history-search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,0.12);outline:none;transition:border-color .2s}
+.history-search input:focus{border-color:#ff7a33}
 /* 空状态样式 */
 .empty-chat{text-align:center;color:#999;padding:40px 20px;font-size:14px}
 .empty-placeholder{flex:1;display:flex;align-items:center;justify-content:center;background:#fafafa}

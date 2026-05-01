@@ -37,20 +37,68 @@ fun LoginRegisterApp(
     var isLoggedIn by remember { mutableStateOf(false) }
     var token by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
-    // 本地账号输入状态（方式一）
     var account by remember { mutableStateOf(ServerConfig.id) }
     val credentialsFile = remember { File("credentials.txt") }
+    val authFile = remember { File(System.getProperty("user.home"), ".qingliao/auth.txt") }
     var triedAutoLogin by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    fun saveAuth(account: String, token: String) {
+        try {
+            authFile.parentFile?.mkdirs()
+            authFile.writeText("$account\n$token")
+        } catch (_: Exception) {
+        }
+    }
+
+    fun deleteAuth() {
+        try {
+            if (authFile.exists()) authFile.delete()
+        } catch (_: Exception) {
+        }
+    }
+
     // 只在首次组合时尝试自动读取
     LaunchedEffect(Unit) {
-        if (!triedAutoLogin && credentialsFile.exists()) {
-            val saved = runCatching { credentialsFile.readLines() }.getOrElse { emptyList() }
-            if (saved.isNotEmpty()) {
-                account = saved[0]
-                message = "已填充上次使用的账号"
+        if (!triedAutoLogin) {
+            val authLoaded = if (authFile.exists()) {
+                val savedLines = runCatching { authFile.readLines() }.getOrElse { emptyList() }
+                if (savedLines.size >= 2) {
+                    val savedAccount = savedLines[0].trim()
+                    val savedToken = savedLines[1].trim()
+                    if (savedToken.isNotBlank()) {
+                        message = "正在尝试自动登录..."
+                        val validated = withContext(Dispatchers.IO) { ApiService.validateToken(savedToken) }
+                        if (validated) {
+                            account = savedAccount
+                            token = savedToken
+                            ServerConfig.Token = savedToken
+                            ServerConfig.id = savedAccount
+                            message = "已使用保存的令牌自动登录"
+                            isLoggedIn = true
+                        } else {
+                            deleteAuth()
+                            message = "自动登录失败，请重新登录"
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
             }
+
+            if (!authLoaded && credentialsFile.exists()) {
+                val saved = runCatching { credentialsFile.readLines() }.getOrElse { emptyList() }
+                if (saved.isNotEmpty()) {
+                    account = saved[0]
+                    message = "已填充上次使用的账号"
+                }
+            }
+
             triedAutoLogin = true
         }
     }
@@ -67,6 +115,8 @@ fun LoginRegisterApp(
                 isLoggedIn = false
                 password = ""
                 message = "已退出登录"
+                if (credentialsFile.exists() && !rememberMe) credentialsFile.delete()
+                deleteAuth()
                 messages.clear()
                 groupMessages.clear()
                 users = emptyList()
@@ -129,11 +179,8 @@ fun LoginRegisterApp(
                                 ServerConfig.Token = tk
                                 ServerConfig.id = acc
                                 message = "登录成功"
-                                if (rememberMe) {
-                                    credentialsFile.writeText(acc)
-                                } else if (credentialsFile.exists()) {
-                                    credentialsFile.delete()
-                                }
+                                credentialsFile.takeIf { rememberMe }?.writeText(acc)
+                                saveAuth(acc, tk)
                                 isLoggedIn = true
                             } else {
                                 message = "登录失败，请检查账号或密码"

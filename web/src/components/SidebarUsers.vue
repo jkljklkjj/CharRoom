@@ -7,8 +7,17 @@
           📩
           <span v-if="friendRequests.length > 0" class="badge">{{ friendRequests.length }}</span>
         </button>
+        <button class="settings-btn" @click="openSettings">⚙️</button>
         <button class="add" @click="onAdd">＋</button>
       </div>
+    </div>
+
+    <div class="search-bar">
+      <input
+        v-model="searchQuery"
+        type="search"
+        placeholder="搜索好友 / 群聊，支持名称或账号"
+      />
     </div>
 
     <!-- 好友申请弹窗 -->
@@ -41,7 +50,7 @@
     </div>
 
     <ul class="users-list">
-      <li v-for="u in store.state.users" :key="u.id" @click="select(u)" :class="{active: store.state.selectedChatId === u.id}">
+      <li v-for="u in filteredUsers" :key="u.id" @click="select(u)" :class="{active: store.state.selectedChatId === u.id}">
         <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="avatar" /></div>
         <div v-else class="avatar">{{ initials(u.name || u.account || u.username) }}</div>
         <div class="meta">
@@ -54,15 +63,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useStore } from '../store'
 import api from '../api'
 
-const emit = defineEmits(['user-selected'])
+const emit = defineEmits(['user-selected', 'open-settings'])
 
 const store = useStore()
 const showFriendRequests = ref(false)
 const friendRequests = ref([])
+const searchQuery = ref('')
+
+const filteredUsers = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase()
+  if (!keyword) return store.state.users
+  return store.state.users.filter(u => {
+    const username = String(u.name || u.account || u.username || '').toLowerCase()
+    const id = String(u.id || '').toLowerCase()
+    return username.includes(keyword) || id.includes(keyword)
+  })
+})
 
 function avatarSrc(u) {
   if (!u || !u.avatarUrl) return null
@@ -84,6 +104,10 @@ function onAdd() {
   const account = prompt('输入对方账号（数字ID或邮箱）以添加为好友')
   if (!account) return
   api.addFriend(account).then(ok => { if (ok) alert('已发送好友请求') })
+}
+
+function openSettings() {
+  emit('open-settings')
 }
 
 // 好友申请相关功能
@@ -147,8 +171,8 @@ async function loadFriends() {
 .friend-requests-btn:hover{background:rgba(0,0,0,0.05)}
 .friend-requests-btn.hasRequests{color:#ff7a33}
 .badge{position:absolute;top:-2px;right:-2px;background:#ff4757;color:white;font-size:10px;padding:1px 4px;border-radius:8px;min-width:12px;text-align:center}
-.add{background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
-.add:hover{background:rgba(0,0,0,0.05)}
+.settings-btn, .add{background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
+.settings-btn:hover, .add:hover{background:rgba(0,0,0,0.05)}
 .users-list{list-style:none;padding:0;margin:0;overflow:auto;flex:1}
 .users-list li{display:flex;align-items:center;padding:10px 12px;cursor:pointer}
 .users-list li.active{background:rgba(255,122,51,0.08)}

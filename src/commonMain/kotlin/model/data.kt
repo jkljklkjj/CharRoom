@@ -1,13 +1,9 @@
 package model
 
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import core.ApiService
 import core.ServerConfig
-import viewmodel.chatViewModel
 
 /**
  * 消息类型
@@ -88,31 +84,37 @@ fun convertMessages(messages: List<Group>): List<User> {
     }
 }
 
-//var users by mutableStateOf(listOf(
-//    User(1, "Alice"),
-//    User(2, "Bob"),
-//    User(3, "Charlie"),
-//    User(-1, "fucking group")
-//))
-//
-//var messages = mutableStateListOf(
-//    Message(1, "Hello from Alice", false, timestamp = 1698765600000, isSent = mutableStateOf(true)),
-//    Message(2, "Hello from Bob", false, timestamp = 1698765660000, isSent = mutableStateOf(true)),
-//    Message(3, "Hello from Charlie", false, timestamp = 1698765720000, isSent = mutableStateOf(true)),
-//    Message(1, "How are you?", false, timestamp = 1698765780000, isSent = mutableStateOf(true)),
-//    Message(2, "I'm fine, thanks!", false, timestamp = 1698765840000, isSent = mutableStateOf(true)),
-//    Message(1, "I'm fine, thanks!", true, timestamp = 1698765900000, isSent = mutableStateOf(false))
-//)
-//
-//var groupMessages = mutableStateListOf(
-//    GroupMessage(1, "Alice", "Hello from Alice", 1, timestamp = 1698765600000, isSent = mutableStateOf(true)),
-//    GroupMessage(1, "Bob", "Hello from Bob", 2, timestamp = 1698765660000, isSent = mutableStateOf(true)),
-//    GroupMessage(1, "Charlie", "Hello from Charlie", 3, timestamp = 1698765720000, isSent = mutableStateOf(true)),
-//    GroupMessage(1, "Alice", "How are you?", 1, timestamp = 1698765780000, isSent = mutableStateOf(true)),
-//    GroupMessage(1, "Bob", "I'm fine, thanks!", 2, timestamp = 1698765840000, isSent = mutableStateOf(false))
-//)
 var users by mutableStateOf<List<User>>(emptyList())
 var messages = mutableStateListOf<Message>()
+//var messages = mutableStateListOf<Message>(
+//    Message(
+//        senderId = 1,
+//        receiverId = 3, // 假设当前登录账号是3
+//        message = "来自账号1的第一条消息",
+//        sender = false,
+//        timestamp = 1698765600000,
+//        isSent = mutableStateOf(true),
+//        messageId = "msg-1"
+//    ),
+//    Message(
+//        senderId = 1,
+//        receiverId = 1,
+//        message = "我回复账号1",
+//        sender = true,
+//        timestamp = 1698765660000,
+//        isSent = mutableStateOf(true),
+//        messageId = "msg-2"
+//    ),
+//    Message(
+//        senderId = 1,
+//        receiverId = 3,
+//        message = "来自账号1的第二条消息",
+//        sender = false,
+//        timestamp = 1698765720000,
+//        isSent = mutableStateOf(true),
+//        messageId = "msg-3"
+//    )
+//)
 var groupMessages = mutableStateListOf<GroupMessage>()
 
 private fun withAgentAssistant(list: List<User>): List<User> {

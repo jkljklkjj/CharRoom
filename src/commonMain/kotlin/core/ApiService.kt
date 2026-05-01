@@ -36,6 +36,10 @@ object ApiService {
         return core.getUserInfo(ServerConfig.Token)
     }
 
+    suspend fun validateToken(token: String): Boolean {
+        return core.getUserInfo(token) != null
+    }
+
     /**
      * 获取好友列表（对 UI 友好）
      */

@@ -1,18 +1,14 @@
 package component
 
 import android.app.Activity
-import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -23,6 +19,8 @@ import java.io.InputStream
 /**
  * Android平台文件选择器实现
  */
+private const val MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
 object AndroidFilePicker : FilePickerProvider {
     private var pickImageCallback: ((ByteArray, String) -> Unit)? = null
     private var pickFileCallback: ((ByteArray, String, Long) -> Unit)? = null
@@ -42,7 +40,8 @@ object AndroidFilePicker : FilePickerProvider {
                         val bytes = inputStream?.readBytes()
                         inputStream?.close()
                         bytes?.let { data ->
-                            pickImageCallback?.invoke(data, fileName)
+                            val compressed = compressImageIfNeeded(data, fileName)
+                            pickImageCallback?.invoke(compressed, compressedFileName(fileName, data, compressed))
                             pickImageCallback = null
                         }
                     }
@@ -113,6 +112,26 @@ object AndroidFilePicker : FilePickerProvider {
             }
         }
         return size
+    }
+
+    private fun compressedFileName(originalName: String, originalBytes: ByteArray, compressedBytes: ByteArray): String {
+        return if (originalBytes.size > compressedBytes.size && !originalName.endsWith(".jpg", true) && !originalName.endsWith(".jpeg", true)) {
+            val baseName = originalName.substringBeforeLast('.')
+            "$baseName.jpg"
+        } else originalName
+    }
+
+    private fun compressImageIfNeeded(bytes: ByteArray, fileName: String): ByteArray {
+        if (bytes.size <= MAX_AVATAR_BYTES) return bytes
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
+        val output = ByteArrayOutputStream()
+        var quality = 90
+        do {
+            output.reset()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)
+            quality -= 10
+        } while (output.size() > MAX_AVATAR_BYTES && quality >= 10)
+        return output.toByteArray()
     }
 
     private fun InputStream.readBytes(): ByteArray {

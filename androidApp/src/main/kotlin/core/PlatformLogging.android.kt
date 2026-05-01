@@ -1,24 +1,24 @@
-package com.chatlite.charroom.core
+package core
 
-import android.util.Log
+import timber.log.Timber
 
 /**
  * Android platform logging implementation
  */
 object PlatformLogger {
     fun debug(tag: String, message: String) {
-        Log.d(tag, message)
+        Timber.tag(tag).d(message)
     }
 
     fun info(tag: String, message: String) {
-        Log.i(tag, message)
+        Timber.tag(tag).i(message)
     }
 
     fun warn(tag: String, message: String, throwable: Throwable? = null) {
-        Log.w(tag, message, throwable)
+        Timber.tag(tag).w(throwable, message)
     }
 
     fun error(tag: String, message: String, throwable: Throwable? = null) {
-        Log.e(tag, message, throwable)
+        Timber.tag(tag).e(throwable, message)
     }
 }

@@ -58,7 +58,7 @@ dependencies {
 // 源集配置
 sourceSets {
     main {
-        kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin", "shared/kotlin")
+        kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin")
         resources.srcDirs("src/commonMain/resources", "src/desktopMain/resources")
     }
     test {
@@ -123,6 +123,7 @@ tasks.register("buildInstallers") {
 }
 
 tasks.register<Jar>("customJar") {
+    description = "桌面端jar打包"
     archiveBaseName.set("在线聊天App")
     archiveVersion.set("1.0.0")
 
@@ -135,6 +136,14 @@ tasks.register<Jar>("customJar") {
     from("build/classes/java/main") { into("") }
     from("build/extracted-include-protos") { into("extracted-include-protos") }
 
+    // Include all runtime dependencies into the fat JAR so java -jar works
+    from({
+        configurations.runtimeClasspath.get().filter { it.name.endsWith(".jar") }.map { zipTree(it) }
+    }) {
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/*.EC")
+        exclude("META-INF/*.kotlin_module")
+    }
+
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     manifest {
@@ -143,4 +152,22 @@ tasks.register<Jar>("customJar") {
 
     dependsOn("assemble")
     dependsOn(":proto:protoJar")
+}
+
+tasks.register("customApkRelease") {
+    group = "distribution"
+    description = "Build the Android release APK for the androidApp module"
+    dependsOn(":androidApp:assembleRelease")
+}
+
+tasks.register("customApkDebug") {
+    group = "distribution"
+    description = "Build the Android debug APK for the androidApp module"
+    dependsOn(":androidApp:assembleDebug")
+}
+
+tasks.register("customApk") {
+    group = "distribution"
+    description = "Build the default Android release APK for the androidApp module"
+    dependsOn(tasks.named("customApkRelease"))
 }

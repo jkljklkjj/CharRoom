@@ -99,16 +99,22 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
       } catch (_) {}
     }
 
-    // 处理登录响应
+    // 处理登录/心跳等服务器响应
     if (processedData && typeof processedData === 'object' && processedData.success !== undefined) {
-      console.log('🔐 收到登录响应:', processedData)
+      console.log('🔐 收到响应消息:', processedData)
       if (processedData.success) {
-        console.log('✅ 登录成功，开始发送队列消息')
-        // 登录成功后flush消息队列
-        flushQueue()
+        if (processedData.message === 'heartbeat') {
+          // 心跳只是保活，不需要传给页面层
+          console.log('❤️ 收到 heartbeat 响应，忽略')
+        } else {
+          console.log('✅ 登录响应成功，开始发送队列消息')
+          // 登录成功后flush消息队列
+          flushQueue()
+        }
       } else {
-        console.error('❌ 登录失败:', processedData.message)
+        console.error('❌ 响应失败:', processedData.message)
       }
+      return
     }
 
     // 消息去重和ACK确认

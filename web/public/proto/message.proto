@@ -131,3 +131,5 @@ message ResponseMessage {
     string clientId = 3;     // 客户端ID (用于CheckMessage响应)
     bool online = 4;        // 是否在线 (用于CheckMessage响应)
 }
+
+

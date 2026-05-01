@@ -23,23 +23,26 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import core.loadImageBitmapFromUrl
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
+import androidx.compose.material.TextField
+import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,6 +61,7 @@ import model.groupMessages
 import model.messages
 import model.updateList
 import model.users
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 左侧用户和群组列表边栏
@@ -79,6 +83,20 @@ fun UserList(
     // 当前用户信息和头像
     var currentUser by remember { mutableStateOf<User?>(null) }
     var currentUserAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    val userListState = users
+    val filteredUsers by remember(searchQuery, userListState) {
+        derivedStateOf {
+            val keyword = searchQuery.trim().lowercase()
+            if (keyword.isBlank()) return@derivedStateOf userListState
+            userListState.filter { user ->
+                val displayName = buildDisplayName(user).lowercase()
+                val accountId = user.id.toString().lowercase()
+                val extra = (user.username ?: "") + " " + (user.email ?: "")
+                extra.lowercase().contains(keyword) || displayName.contains(keyword) || accountId.contains(keyword)
+            }
+        }
+    }
 
     // 定时检查是否有未处理的申请
     LaunchedEffect(Unit) {
@@ -87,21 +105,23 @@ fun UserList(
                 val groupRequests = ApiService.fetchGroupRequests()
                 val friendRequests = ApiService.fetchFriendRequests()
                 hasPendingApplications = groupRequests.isNotEmpty() || friendRequests.isNotEmpty()
-                kotlinx.coroutines.delay(30000) // 每30秒检查一次
+                kotlinx.coroutines.delay(30000.milliseconds) // 每30秒检查一次
             }
         }
     }
-    val userListState = users
+
     val onlineCount = userListState.count { it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
 
     // 首次进入时拉取列表，写回 users（在 updateList 内部）
     LaunchedEffect(Unit) {
-        updateList()
-        // 获取当前用户信息
-        currentUser = ApiService.getCurrentUserProfile()
-        currentUser?.let { user ->
-            user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                currentUserAvatar = loadImageBitmapFromUrl(url, user.avatarKey)
+        scope.launch {
+            updateList()
+            // 获取当前用户信息
+            currentUser = ApiService.getCurrentUserProfile()
+            currentUser?.let { user ->
+                user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                    currentUserAvatar = loadImageBitmapFromUrl(url, user.avatarKey)
+                }
             }
         }
     }
@@ -194,9 +214,26 @@ fun UserList(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        TextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text(text = "搜索好友 / 群聊，支持名称或账号") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            colors = TextFieldDefaults.textFieldColors(
+                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.15f),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = MaterialTheme.colors.primary
+            )
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(
-                items = userListState,
+                items = filteredUsers,
                 key = { it.id }
             ) { user ->
                 val displayName = buildDisplayName(user)

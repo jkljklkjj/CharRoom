@@ -97,9 +97,20 @@ fun GroupChatScreen(
 ) {
     var messageText by remember { mutableStateOf("") }
     // 使用derivedStateOf优化群聊消息过滤
-    val filteredGroupMessages by remember(group.id) {
+    val groupChatMessages by remember(group.id) {
         derivedStateOf {
             groupMessages.filter { it.groupId == -group.id }
+        }
+    }
+    var historyQuery by remember { mutableStateOf("") }
+    val filteredGroupMessages by remember(group.id, historyQuery) {
+        derivedStateOf {
+            val query = historyQuery.trim().lowercase()
+            groupChatMessages.filter { message ->
+                if (query.isBlank()) return@filter true
+                message.text.lowercase().contains(query) ||
+                    message.senderName.lowercase().contains(query)
+            }
         }
     }
     // 获取当前登录用户信息（自己）
@@ -280,6 +291,23 @@ fun GroupChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        TextField(
+            value = historyQuery,
+            onValueChange = { historyQuery = it },
+            placeholder = { Text(text = "搜索本地群聊历史，支持消息内容和发送者") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            colors = TextFieldDefaults.textFieldColors(
+                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.14f),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = MaterialTheme.colors.primary
+            )
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         Surface(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.3f else 0.6f),
@@ -343,7 +371,7 @@ fun GroupChatScreen(
 
                 itemsIndexed(
                     items = filteredGroupMessages,
-                    key = { _, message -> message.messageId }
+                    key = { index, message -> "${message.messageId}_$index" }
                 ) { index, message ->
                     // 显示日期分隔线
                     if (index == 0 || !isSameDay(filteredGroupMessages[index - 1].timestamp, message.timestamp)) {

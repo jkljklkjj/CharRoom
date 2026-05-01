@@ -3,10 +3,12 @@ package com.chatlite.charroom
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import android.content.Context
 
 class ChatForegroundService : Service() {
     private var isRunning = false
@@ -31,16 +33,18 @@ class ChatForegroundService : Service() {
         )
 
         val notification: Notification = NotificationCompat.Builder(this, ChatApplication.NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("CharRoom")
+            .setContentTitle("chatlite")
             .setContentText("聊天服务正在运行")
-            .setSmallIcon(android.R.drawable.ic_dialog_email) // 临时使用系统图标，后续替换为自定义图标
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFFD78345.toInt())
+            .setColorized(true)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
             .build()
 
-        // 启动前台服务
+        // 启动前台服务，类型由 AndroidManifest 中的 foregroundServiceType 决定
         startForeground(ChatApplication.NOTIFICATION_ID, notification)
 
         // 保持WebSocket连接（功能待实现，需要关联全局WebSocket客户端）
@@ -64,11 +68,7 @@ class ChatForegroundService : Service() {
     companion object {
         fun start(context: Context) {
             val intent = Intent(context, ChatForegroundService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            context.startForegroundService(intent)
         }
 
         fun stop(context: Context) {

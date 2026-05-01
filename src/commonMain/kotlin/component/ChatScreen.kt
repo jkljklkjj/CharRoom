@@ -108,6 +108,22 @@ fun ChatScreen(
             users.find { user -> user.id == ServerConfig.id.toIntOrNull() } as User?
         }
     }
+    var historyQuery by remember { mutableStateOf("") }
+    val filteredMessages by remember(user.id, historyQuery) {
+        derivedStateOf {
+            val query = historyQuery.trim().lowercase()
+            userMessages.filter { message ->
+                if (query.isBlank()) return@filter true
+                val senderName = if (message.sender) {
+                    currentUser?.username ?: "我"
+                } else {
+                    user.username
+                }
+                message.message.lowercase().contains(query) ||
+                    senderName.lowercase().contains(query)
+            }
+        }
+    }
     var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -318,6 +334,23 @@ fun ChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        TextField(
+            value = historyQuery,
+            onValueChange = { historyQuery = it },
+            placeholder = { Text(text = "搜索本地聊天历史，支持消息内容和发送者") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            colors = TextFieldDefaults.textFieldColors(
+                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.14f),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = MaterialTheme.colors.primary
+            )
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         Surface(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.3f else 0.6f),
@@ -380,11 +413,11 @@ fun ChatScreen(
                 }
 
                 itemsIndexed(
-                    items = userMessages,
-                    key = { _, message -> message.messageId }
+                    items = filteredMessages,
+                    key = { index, message -> "${message.messageId}_$index" }
                 ) { index, message ->
                     // 显示日期分隔线
-                    if (index == 0 || !isSameDay(userMessages[index - 1].timestamp, message.timestamp)) {
+                    if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -888,6 +921,7 @@ private fun isSameDay(timestamp1: Long, timestamp2: Long): Boolean {
 /**
  * 格式化文件大小
  */
+@Suppress("DefaultLocale")
 private fun formatFileSize(size: Long): String {
     return when {
         size < 1024 -> "$size B"

@@ -2,6 +2,7 @@ package com.chatlite.charroom
 
 import android.Manifest
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -11,17 +12,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.material.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import component.AndroidBackHandler
 import component.AndroidFilePicker
 import component.BackHandlerImpl
 import component.FilePicker
 import core.ImageLoaderImpl
-import com.chatlite.charroom.core.AndroidImageLoader
+import core.AndroidImageLoader
+import androidx.core.graphics.toColorInt
 
 class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
@@ -45,10 +47,15 @@ class MainActivity : ComponentActivity() {
         // 初始化跨平台接口实现
         BackHandlerImpl = AndroidBackHandler
         FilePicker = AndroidFilePicker
-        ImageLoaderImpl = com.chatlite.charroom.core.AndroidImageLoader
+        ImageLoaderImpl = AndroidImageLoader
 
         // 沉浸式状态栏，内容延伸到状态栏下
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        window.statusBarColor = "#F98701".toColorInt()
+        window.navigationBarColor = "#F98701".toColorInt()
+        WindowCompat.getInsetsController(window, window.decorView)?.isAppearanceLightStatusBars = false
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         // 启动前台服务保活
@@ -84,11 +91,20 @@ class MainActivity : ComponentActivity() {
             FilePicker.Register()
 
             ChatTheme {
+                val context = LocalContext.current
                 val appState = remember { ChatAppState(NetworkRepository.getInstance()) }
+
+                LaunchedEffect(Unit) {
+                    AndroidTokenStorage.load(context)?.let { (savedToken, savedAccountId) ->
+                        val restored = appState.tryRestoreSession(savedToken, savedAccountId)
+                        if (!restored) {
+                            AndroidTokenStorage.clear(context)
+                        }
+                    }
+                }
+
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .systemBarsPadding()
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     ChatApp(
                         appState = appState,

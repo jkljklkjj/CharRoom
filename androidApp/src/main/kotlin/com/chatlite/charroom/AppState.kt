@@ -18,7 +18,7 @@ class ChatAppState(private val repository: NetworkRepository) {
     var currentUserId by mutableStateOf(0)
     private var accountId by mutableStateOf(0)
 
-    suspend fun login(account: String, password: String) {
+    suspend fun login(account: String, password: String, saveToken: ((String, Int) -> Unit)? = null): Boolean {
         errorMessage = ""
         authLoading = true
         val tokenResult = withContext(Dispatchers.IO) {
@@ -31,10 +31,34 @@ class ChatAppState(private val repository: NetworkRepository) {
             currentUserId = accountId
             loadUserList(token)
             connectWebSocket()
+            saveToken?.invoke(token, accountId)
+            authLoading = false
+            return true
         } else {
             authLoading = false
             errorMessage = "登录失败，请检查账号或密码"
+            return false
         }
+    }
+
+    suspend fun tryRestoreSession(token: String, accountId: Int): Boolean {
+        errorMessage = ""
+        authLoading = true
+        val valid = withContext(Dispatchers.IO) {
+            repository.validateToken(token)
+        }
+        if (!valid) {
+            authLoading = false
+            return false
+        }
+
+        this.token = token
+        this.accountId = accountId
+        this.currentUserId = accountId
+        loadUserList(token)
+        connectWebSocket()
+        authLoading = false
+        return wsConnected
     }
 
     suspend fun register(username: String, password: String) {

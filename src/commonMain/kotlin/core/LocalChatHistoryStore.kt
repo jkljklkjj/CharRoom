@@ -1,6 +1,7 @@
 package core
 
 import androidx.compose.runtime.mutableStateOf
+import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import model.GroupMessage
@@ -85,9 +86,24 @@ object LocalChatHistoryStore {
             return
         }
 
-        val historyFile = accountHistoryFile(accountId)
+        val historyDir = accountHistoryDir(accountId)
         runCatching {
-            mapper.writerWithDefaultPrettyPrinter().writeValue(historyFile, snapshot)
+            snapshot.privateMessages
+                .groupBy { it.storagePeerId() }
+                .forEach { (peerId, records) ->
+                    mapper.writerWithDefaultPrettyPrinter().writeValue(privateHistoryFile(accountId, peerId), records)
+                }
+
+            snapshot.groupMessages
+                .groupBy { it.groupId }
+                .forEach { (groupId, records) ->
+                    mapper.writerWithDefaultPrettyPrinter().writeValue(groupHistoryFile(accountId, groupId), records)
+                }
+
+            // 保留旧文件兼容性，不删除旧文件
+            if (!historyDir.exists()) {
+                historyDir.mkdirs()
+            }
         }.onFailure {
             println("Local history save failed: ${it.message}")
         }
@@ -107,15 +123,34 @@ object LocalChatHistoryStore {
             return RestoredChatHistory()
         }
 
-        val historyFile = accountHistoryFile(accountId)
-        if (!historyFile.exists() || historyFile.length() <= 0L) {
-            return RestoredChatHistory()
+        val privateFiles = accountHistoryDir(accountId).listFiles { file -> file.name.startsWith("private-") } ?: emptyArray()
+        val groupFiles = accountHistoryDir(accountId).listFiles { file -> file.name.startsWith("group-") } ?: emptyArray()
+
+        val snapshot = if (privateFiles.isEmpty() && groupFiles.isEmpty()) {
+            val legacyFile = accountHistoryFile(accountId)
+            if (legacyFile.exists() && legacyFile.length() > 0L) {
+                runCatching {
+                    val legacySnapshot: LocalChatHistorySnapshot = mapper.readValue(legacyFile)
+                    val migratedSnapshot = migrateSnapshot(legacySnapshot)
+                    save(accountId, migratedSnapshot)
+                    migratedSnapshot
+                }.getOrElse {
+                    RestoredChatHistory().let { return it }
+                }
+            } else {
+                return RestoredChatHistory()
+            }
+        } else {
+            val privateRecords = privateFiles.flatMap { readPrivateRecords(it) }
+            val groupRecords = groupFiles.flatMap { readGroupRecords(it) }
+            LocalChatHistorySnapshot(
+                privateMessages = privateRecords,
+                groupMessages = groupRecords,
+                savedAt = System.currentTimeMillis()
+            )
         }
 
         return runCatching {
-            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
-
-            // 版本迁移
             val migratedSnapshot = migrateSnapshot(snapshot)
 
             // 分页处理：按时间倒序，取对应页的消息
@@ -131,7 +166,7 @@ object LocalChatHistoryStore {
             val endIndex = minOf(startIndex + pageSize, allPrivate.size)
 
             val privateMessages = if (startIndex < allPrivate.size) {
-                allPrivate.subList(startIndex, endIndex).map { it.toModel() }.reversed() // 恢复正序
+                allPrivate.subList(startIndex, endIndex).map { it.toModel() }.reversed()
             } else {
                 emptyList()
             }
@@ -139,7 +174,7 @@ object LocalChatHistoryStore {
             val groupStartIndex = page * pageSize
             val groupEndIndex = minOf(groupStartIndex + pageSize, allGroup.size)
             val groupMessages = if (groupStartIndex < allGroup.size) {
-                allGroup.subList(groupStartIndex, groupEndIndex).map { it.toModel() }.reversed() // 恢复正序
+                allGroup.subList(groupStartIndex, groupEndIndex).map { it.toModel() }.reversed()
             } else {
                 emptyList()
             }
@@ -208,17 +243,14 @@ object LocalChatHistoryStore {
             return emptyList()
         }
 
-        val historyFile = accountHistoryFile(accountId)
+        val historyFile = privateHistoryFile(accountId, userId)
         if (!historyFile.exists()) {
             return emptyList()
         }
 
         return runCatching {
-            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
-            val migratedSnapshot = migrateSnapshot(snapshot)
-
-            migratedSnapshot.privateMessages
-                .filter { it.senderId == userId && it.timestamp in startTime..endTime }
+            readPrivateRecords(historyFile)
+                .filter { it.timestamp in startTime..endTime }
                 .sortedBy { it.timestamp }
                 .map { it.toModel() }
         }.getOrElse {
@@ -235,17 +267,14 @@ object LocalChatHistoryStore {
             return emptyList()
         }
 
-        val historyFile = accountHistoryFile(accountId)
+        val historyFile = groupHistoryFile(accountId, groupId)
         if (!historyFile.exists()) {
             return emptyList()
         }
 
         return runCatching {
-            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
-            val migratedSnapshot = migrateSnapshot(snapshot)
-
-            migratedSnapshot.groupMessages
-                .filter { it.groupId == groupId && it.timestamp in startTime..endTime }
+            readGroupRecords(historyFile)
+                .filter { it.timestamp in startTime..endTime }
                 .sortedBy { it.timestamp }
                 .map { it.toModel() }
         }.getOrElse {
@@ -263,17 +292,13 @@ object LocalChatHistoryStore {
             return emptyList()
         }
 
-        val historyFile = accountHistoryFile(accountId)
+        val historyFile = privateHistoryFile(accountId, userId)
         if (!historyFile.exists()) {
             return emptyList()
         }
 
         return runCatching {
-            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
-            val migratedSnapshot = migrateSnapshot(snapshot)
-
-            val allMessages = migratedSnapshot.privateMessages
-                .filter { it.senderId == userId }
+            val allMessages = readPrivateRecords(historyFile)
                 .sortedByDescending { it.timestamp }
 
             val startIndex = page * pageSize
@@ -299,17 +324,13 @@ object LocalChatHistoryStore {
             return emptyList()
         }
 
-        val historyFile = accountHistoryFile(accountId)
+        val historyFile = groupHistoryFile(accountId, groupId)
         if (!historyFile.exists()) {
             return emptyList()
         }
 
         return runCatching {
-            val snapshot: LocalChatHistorySnapshot = mapper.readValue(historyFile)
-            val migratedSnapshot = migrateSnapshot(snapshot)
-
-            val allMessages = migratedSnapshot.groupMessages
-                .filter { it.groupId == groupId }
+            val allMessages = readGroupRecords(historyFile)
                 .sortedByDescending { it.timestamp }
 
             val startIndex = page * pageSize
@@ -331,21 +352,16 @@ object LocalChatHistoryStore {
             return false
         }
 
-        val historyFile = accountHistoryFile(accountId)
-        if (!historyFile.exists()) {
-            return true
-        }
-
         return runCatching {
-            if (historyFile.delete()) {
-                true
-            } else {
-                mapper.writerWithDefaultPrettyPrinter().writeValue(
-                    historyFile,
-                    LocalChatHistorySnapshot(privateMessages = emptyList(), groupMessages = emptyList())
-                )
-                true
+            val accountDir = accountHistoryDir(accountId)
+            if (accountDir.exists()) {
+                accountDir.deleteRecursively()
             }
+            val legacyFile = accountHistoryFile(accountId)
+            if (legacyFile.exists()) {
+                legacyFile.delete()
+            }
+            true
         }.getOrElse {
             println("Local history clear failed: ${it.message}")
             false
@@ -360,6 +376,22 @@ object LocalChatHistoryStore {
         return File(folder, "history-${safeAccountId(accountId)}.json")
     }
 
+    private fun accountHistoryDir(accountId: String): File {
+        val folder = File(historyFolder(), safeAccountId(accountId))
+        if (!folder.exists()) {
+            folder.mkdirs()
+        }
+        return folder
+    }
+
+    private fun privateHistoryFile(accountId: String, peerId: Int): File {
+        return File(accountHistoryDir(accountId), "private-$peerId.json")
+    }
+
+    private fun groupHistoryFile(accountId: String, groupId: Int): File {
+        return File(accountHistoryDir(accountId), "group-$groupId.json")
+    }
+
     private fun historyFolder(): File {
         val home = runCatching { System.getProperty("user.home") }.getOrNull().orEmpty()
         return if (home.isBlank()) {
@@ -372,6 +404,28 @@ object LocalChatHistoryStore {
     private fun safeAccountId(accountId: String): String {
         val cleaned = accountId.trim().replace(Regex("[^A-Za-z0-9_-]"), "_")
         return if (cleaned.isBlank()) "default" else cleaned
+    }
+
+    private fun readPrivateRecords(file: File): List<LocalPrivateMessageRecord> {
+        return runCatching {
+            mapper.readValue(file, object : TypeReference<List<LocalPrivateMessageRecord>>() {})
+        }.getOrElse {
+            println("Read private history failed: ${it.message}")
+            emptyList()
+        }
+    }
+
+    private fun readGroupRecords(file: File): List<LocalGroupMessageRecord> {
+        return runCatching {
+            mapper.readValue(file, object : TypeReference<List<LocalGroupMessageRecord>>() {})
+        }.getOrElse {
+            println("Read group history failed: ${it.message}")
+            emptyList()
+        }
+    }
+
+    private fun LocalPrivateMessageRecord.storagePeerId(): Int {
+        return if (sender) receiverId else senderId
     }
 
     private fun Message.toLocalRecord(): LocalPrivateMessageRecord {

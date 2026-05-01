@@ -402,12 +402,28 @@ fun ChatApp(
     LaunchedEffect(selectedUser) {
         chatViewModel.selectedUser = selectedUser
     }
+
     var showDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) } // 个人信息页面
     var showApplications by remember { mutableStateOf(false) } // 统一申请管理对话框
     var showUserDetail: User? by remember { mutableStateOf(null) } // 显示用户详情弹窗
     var clearHistoryHint by remember { mutableStateOf("") }
+
+    fun handleCheckResponse(user: User, success: Boolean, resp: List<Any>) {
+        if (!success || resp.isEmpty()) return
+        scope.launch {
+            val lastBytes = resp.last() as? ByteArray ?: return@launch
+            val unwrap = parseProtoResponse(lastBytes)
+            val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
+            val map = Util.jsonToMap(dataStr)
+            val online = map["online"] as? Boolean ?: false
+            updateUserOnlineStatus(user.id, online)
+            if (selectedUser?.id == user.id) {
+                selectedUser = selectedUser?.copy(online = online)
+            }
+        }
+    }
 
     // 注册返回键处理逻辑
     LaunchedEffect(showDialog, showProfile, showSettings, showApplications, showUserDetail, selectedUser) {
@@ -612,19 +628,7 @@ fun ChatApp(
                                     val payload = buildCheckPayload(user.id.toString())
 
                                     Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
-                                        if (success && resp.isNotEmpty()) {
-                                            val lastBytes = resp.last() as? ByteArray
-                                            if (lastBytes != null) {
-                                                val unwrap = parseProtoResponse(lastBytes)
-                                                val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
-                                                val map = Util.jsonToMap(dataStr)
-                                                val online = map["online"] as? Boolean ?: false
-                                                updateUserOnlineStatus(user.id, online)
-                                                if (selectedUser?.id == user.id) {
-                                                    selectedUser = selectedUser?.copy(online = online)
-                                                }
-                                            }
-                                        }
+                                        handleCheckResponse(user, success, resp)
                                     }
                                 }
                             },
@@ -669,19 +673,7 @@ fun ChatApp(
                             if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                                 val payload = buildCheckPayload(user.id.toString())
                                 Chat.send(payload, MsgType.CHECK, user.id.toString(), 1) { success, resp ->
-                                    if (success && resp.isNotEmpty()) {
-                                        val lastBytes = resp.last() as? ByteArray
-                                        if (lastBytes != null) {
-                                            val unwrap = parseProtoResponse(lastBytes)
-                                            val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
-                                            val map = Util.jsonToMap(dataStr)
-                                            val online = map["online"] as? Boolean ?: false
-                                            updateUserOnlineStatus(user.id, online)
-                                            if (selectedUser?.id == user.id) {
-                                                selectedUser = selectedUser?.copy(online = online)
-                                            }
-                                        }
-                                    }
+                                    handleCheckResponse(user, success, resp)
                                 }
                             }
                         },

@@ -40,29 +40,6 @@ interface MessageReceiveListener {
     fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long)
 }
 
-// 全局回调列表
-private val messageListeners = mutableListOf<MessageReceiveListener>()
-
-/**
- * 注册消息接收监听器
- */
-fun addMessageReceiveListener(listener: MessageReceiveListener) {
-    synchronized(messageListeners) {
-        if (!messageListeners.contains(listener)) {
-            messageListeners.add(listener)
-        }
-    }
-}
-
-/**
- * 移除消息接收监听器
- */
-fun removeMessageReceiveListener(listener: MessageReceiveListener) {
-    synchronized(messageListeners) {
-        messageListeners.remove(listener)
-    }
-}
-
 // 定义发送类型枚举，统一管理后端协议中的字符串
 enum class MsgType(val wire: String) {
     LOGIN("login"),
@@ -72,44 +49,45 @@ enum class MsgType(val wire: String) {
     AGENT_CHAT_STREAM("agentChatStream"),
     GROUP_CHAT("groupChat"),
     CHECK("check"),
-    HEARTBEAT("heartbeat");
+    HEARTBEAT("heartbeat"),
+    ACK("ack");
 }
 
 // ApiUnwrap is defined in core.ApiUnwrap (ApiUnwrap.kt)
-
-private fun unwrapApi(content: String): ApiUnwrap {
-    return try {
-        val trimmed = content.trim()
-        if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-            // 非JSON，按无包裹成功直传
-            ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
-        } else {
-            val mapper = jacksonObjectMapper()
-            val root = mapper.readTree(trimmed)
-            if (root.has("code")) {
-                val code = root.get("code").asInt()
-                val msg = root.get("message")?.asText()
-                val dataNode = root.get("data")
-                val dataStr = dataNode?.let { mapper.writeValueAsString(it) }
-                ApiUnwrap(hasEnvelope = true, success = code == 0, dataJson = dataStr, message = msg)
-            } else {
-                // 旧格式，直接当数据
-                ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
-            }
-        }
-    } catch (_: Exception) {
-        ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
-    }
-}
-
-private fun prompt(msg: String?) {
-    if (!msg.isNullOrBlank()) println("提示: $msg")
-}
 
 /**
  * 处理接收到的WebSocket信息
  */
 class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
+    private fun unwrapApi(content: String): ApiUnwrap {
+        return try {
+            val trimmed = content.trim()
+            if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+                // 非JSON，按无包裹成功直传
+                ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
+            } else {
+                val mapper = jacksonObjectMapper()
+                val root = mapper.readTree(trimmed)
+                if (root.has("code")) {
+                    val code = root.get("code").asInt()
+                    val msg = root.get("message")?.asText()
+                    val dataNode = root.get("data")
+                    val dataStr = dataNode?.let { mapper.writeValueAsString(it) }
+                    ApiUnwrap(hasEnvelope = true, success = code == 0, dataJson = dataStr, message = msg)
+                } else {
+                    // 旧格式，直接当数据
+                    ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
+                }
+            }
+        } catch (_: Exception) {
+            ApiUnwrap(hasEnvelope = false, success = true, dataJson = content, message = null)
+        }
+    }
+
+    private fun prompt(msg: String?) {
+        if (!msg.isNullOrBlank()) println("提示: $msg")
+    }
+
     // store raw binary responses
     private val responses = mutableListOf<ByteArray>()
     private var expectedResponses = 1
@@ -159,24 +137,31 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                 // try to parse as proto wrapper; normal incoming flows use parseProtoResponse
                 try {
                     val unwrap = parseProtoResponse(bodyBytes)
+                    AppLog.d{"Binary unwrap result: hasEnvelope=${unwrap.hasEnvelope}, success=${unwrap.success}, message=${unwrap.message?.take(128)}"}
                     if (unwrap.hasEnvelope && !unwrap.success) {
                         prompt(unwrap.message)
                     } else {
-                        val dataStr = unwrap.dataJson ?: String(bodyBytes, Charsets.UTF_8)
-                        if (dataStr.trim().startsWith("{") && dataStr.trim().endsWith("}")) {
+                        val rawData = unwrap.dataJson ?: String(bodyBytes, Charsets.UTF_8)
+                        val dataStr = rawData.trim().trimStart('\uFEFF', '\uFFFE')
+                        if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                             val json = jacksonObjectMapper().readTree(dataStr)
                             if (json.has("type") && json.has("payload")) {
+                                AppLog.i({"Binary websocket envelope contains proto wrapper: ${json.get("type").asText()}"})
                                 handleIncomingFromProtoWrapper(json)
+                            } else if (json.has("messageId")) {
+                                AppLog.i({"Binary websocket JSON contains messageId, routing to handleIncomingFromJson"})
+                                handleIncomingFromJson(json)
+                            } else if (json.has("clientId") && json.has("online")) {
+                                AppLog.i({"Binary websocket JSON contains CHECK response for clientId=${json.get("clientId").asText()}, callback will process it"})
                             } else {
-                                val messageId = json.get("messageId")?.asText()
-                                if (messageId != null) {
-                                    handleIncomingFromJson(json)
-                                }
+                                AppLog.w({"Binary websocket JSON did not contain expected fields: ${json.toString().take(256)}"})
                             }
+                        } else {
+                            AppLog.d{"Binary message content is not JSON after unwrap: ${dataStr.take(64)}"}
                         }
                     }
                 } catch (e: Exception) {
-                    // ignore parse error here; still keep the raw bytes for callers
+                    AppLog.e({"Binary WebSocket parse error: ${e.message}"}, e)
                 }
 
                 // collect response for callers waiting in send()
@@ -202,27 +187,35 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
             val sender = false
             val text = json.get("message")?.asText() ?: throw IllegalArgumentException("Missing content")
 
+            if (!messageId.isNullOrBlank()) {
+                sendAck(messageId)
+            }
+
             // 消息去重
+            var isDuplicate = false
             if (messageId != null && messageId.isNotBlank()) {
-                runBlocking {
+                isDuplicate = runBlocking {
                     Chat.messageCacheMutex.withLock {
                         if (Chat.receivedMessageIds.contains(messageId)) {
                             AppLog.d{"收到重复消息，忽略: $messageId"}
-                            return@runBlocking
-                        }
-                        // 添加到去重缓存
-                        Chat.receivedMessageIds.add(messageId)
-                        // 缓存超过大小，移除最旧的
-                        if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
-                            val iterator = Chat.receivedMessageIds.iterator()
-                            if (iterator.hasNext()) {
-                                iterator.next()
-                                iterator.remove()
+                            true
+                        } else {
+                            // 添加到去重缓存
+                            Chat.receivedMessageIds.add(messageId)
+                            // 缓存超过大小，移除最旧的
+                            if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
+                                val iterator = Chat.receivedMessageIds.iterator()
+                                if (iterator.hasNext()) {
+                                    iterator.next()
+                                    iterator.remove()
+                                }
                             }
+                            false
                         }
                     }
                 }
             }
+            if (isDuplicate) return
 
             val message = Message(
                 senderId = senderId,
@@ -236,8 +229,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
             try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = senderId.toString(), metadata = mapOf("text" to text.take(64)))) } catch (_: Exception) {}
 
             // 通知消息监听器
-            synchronized(messageListeners) {
-                messageListeners.forEach {
+            synchronized(Chat.messageListeners) {
+                Chat.messageListeners.forEach {
                     it.onPrivateMessageReceived(senderId, text, timestamp)
                 }
             }
@@ -257,27 +250,36 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     val senderId = payload.get("userId")?.asText()?.toIntOrNull() ?: return
                     val text = payload.get("content")?.asText() ?: return
                     val ts = payload.get("timestamp")?.asText()?.toLongOrNull() ?: System.currentTimeMillis()
-                    val messageId = payload.get("timestamp")?.asText() ?: ""
+                    val messageIdField = payload.get("messageId")?.asText()
+                    val messageId = messageIdField?.takeIf { it.isNotBlank() } ?: payload.get("timestamp")?.asText().orEmpty()
+
+                    if (!messageIdField.isNullOrBlank()) {
+                        sendAck(messageIdField)
+                    }
 
                     // 消息去重
+                    var isDuplicate = false
                     if (messageId.isNotBlank()) {
-                        runBlocking {
+                        isDuplicate = runBlocking {
                             Chat.messageCacheMutex.withLock {
                                 if (Chat.receivedMessageIds.contains(messageId)) {
                                     AppLog.d{"收到重复消息，忽略: $messageId"}
-                                    return@runBlocking
-                                }
-                                Chat.receivedMessageIds.add(messageId)
-                                if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
-                                    val iterator = Chat.receivedMessageIds.iterator()
-                                    if (iterator.hasNext()) {
-                                        iterator.next()
-                                        iterator.remove()
+                                    true
+                                } else {
+                                    Chat.receivedMessageIds.add(messageId)
+                                    if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
+                                        val iterator = Chat.receivedMessageIds.iterator()
+                                        if (iterator.hasNext()) {
+                                            iterator.next()
+                                            iterator.remove()
+                                        }
                                     }
+                                    false
                                 }
                             }
                         }
                     }
+                    if (isDuplicate) return
 
                     val message = Message(
                         senderId = senderId,
@@ -300,8 +302,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     }
 
                     // 通知消息监听器
-                    synchronized(messageListeners) {
-                        messageListeners.forEach {
+                    synchronized(Chat.messageListeners) {
+                        Chat.messageListeners.forEach {
                             it.onPrivateMessageReceived(senderId, text, ts)
                         }
                     }
@@ -311,28 +313,37 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     val groupId = payload.get("targetClientId")?.asText()?.toIntOrNull() ?: return
                     val senderId = payload.get("userId")?.asText()?.toIntOrNull() ?: return
                     val text = payload.get("content")?.asText() ?: return
-                    val messageId = payload.get("timestamp")?.asText() ?: ""
+                    val messageIdField = payload.get("messageId")?.asText()
+                    val messageId = messageIdField?.takeIf { it.isNotBlank() } ?: payload.get("timestamp")?.asText().orEmpty()
+
+                    if (!messageIdField.isNullOrBlank()) {
+                        sendAck(messageIdField)
+                    }
 
                     // 消息去重
+                    var isDuplicate = false
                     if (messageId.isNotBlank()) {
-                        runBlocking {
+                        isDuplicate = runBlocking {
                             Chat.messageCacheMutex.withLock {
                                 val uniqueId = "group_${groupId}_${senderId}_$messageId"
                                 if (Chat.receivedMessageIds.contains(uniqueId)) {
                                     AppLog.d{"收到重复群聊消息，忽略: $uniqueId"}
-                                    return@runBlocking
-                                }
-                                Chat.receivedMessageIds.add(uniqueId)
-                                if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
-                                    val iterator = Chat.receivedMessageIds.iterator()
-                                    if (iterator.hasNext()) {
-                                        iterator.next()
-                                        iterator.remove()
+                                    true
+                                } else {
+                                    Chat.receivedMessageIds.add(uniqueId)
+                                    if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
+                                        val iterator = Chat.receivedMessageIds.iterator()
+                                        if (iterator.hasNext()) {
+                                            iterator.next()
+                                            iterator.remove()
+                                        }
                                     }
+                                    false
                                 }
                             }
                         }
                     }
+                    if (isDuplicate) return
 
                     val groupMessage = GroupMessage(
                         groupId = groupId,
@@ -356,8 +367,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     }
 
                     // 通知消息监听器
-                    synchronized(messageListeners) {
-                        messageListeners.forEach {
+                    synchronized(Chat.messageListeners) {
+                        Chat.messageListeners.forEach {
                             it.onGroupMessageReceived(groupId, senderId, senderId.toString(), text, groupMessage.timestamp)
                         }
                     }
@@ -399,6 +410,20 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
         }
     }
 
+    private fun sendAck(messageId: String) {
+        if (messageId.isBlank()) return
+        try {
+            val ackPayload = buildAckPayload(messageId)
+            Chat.send(ackPayload, MsgType.ACK, ServerConfig.Token, 1) { success, _ ->
+                if (!success) {
+                    AppLog.w({"ACK发送失败: $messageId"})
+                }
+            }
+        } catch (e: Exception) {
+            AppLog.e({"ACK发送异常: ${e.message}"}, e)
+        }
+    }
+
     private fun handleIncomingMessage(content: String) {
         try {
             val unwrap = unwrapApi(content)
@@ -428,8 +453,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = userId.toString(), metadata = mapOf("text" to messageContent.take(64)))) } catch (_: Exception) {}
 
                     // 通知消息监听器
-                    synchronized(messageListeners) {
-                        messageListeners.forEach {
+                    synchronized(Chat.messageListeners) {
+                        Chat.messageListeners.forEach {
                             it.onPrivateMessageReceived(userId, messageContent, timestamp)
                         }
                     }
@@ -450,8 +475,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = groupId.toString(), metadata = mapOf("text" to messageContent.take(64), "group" to "true"))) } catch (_: Exception) {}
 
                     // 通知消息监听器
-                    synchronized(messageListeners) {
-                        messageListeners.forEach {
+                    synchronized(Chat.messageListeners) {
+                        Chat.messageListeners.forEach {
                             it.onGroupMessageReceived(groupId, userId, senderName, messageContent, timestamp)
                         }
                     }
@@ -508,6 +533,22 @@ object Chat {
         private var port = 443
         private lateinit var responseHandler: CustomWebSocketHandler
         private val sendLock = Any()
+
+    internal val messageListeners = mutableListOf<MessageReceiveListener>()
+
+    fun addMessageReceiveListener(listener: MessageReceiveListener) {
+        synchronized(messageListeners) {
+            if (!messageListeners.contains(listener)) {
+                messageListeners.add(listener)
+            }
+        }
+    }
+
+    fun removeMessageReceiveListener(listener: MessageReceiveListener) {
+        synchronized(messageListeners) {
+            messageListeners.remove(listener)
+        }
+    }
 
     val isServerConnected = mutableStateOf(true)
     private var heartbeatJob: Job? = null

@@ -94,6 +94,16 @@ class NetworkRepository private constructor() {
         parseUser(response)
     }
 
+    suspend fun updateUserProfile(userId: String, token: String, username: String, phone: String, signature: String?): Boolean = withContext(Dispatchers.IO) {
+        val body = JSONObject().apply {
+            put("username", username)
+            put("phone", phone)
+            put("signature", signature ?: "")
+        }
+        val response = sendRequest(ApiEndpoints.USER_PROFILE_UPDATE, "POST", body.toString(), token)
+        interpretBoolean(response)
+    }
+
     suspend fun getGroupDetail(groupId: String, token: String): LocalUser? = withContext(Dispatchers.IO) {
         val response = sendRequest("$GROUP_DETAIL_PATH?id=$groupId", "GET", null, token)
         parseUser(response)
@@ -206,7 +216,12 @@ class NetworkRepository private constructor() {
                     val id = item.optInt("id", 0)
                     val username = item.optString("username", item.optString("name", "用户$id"))
                     val online = item.optBoolean("online", false)
-                    add(LocalUser(id, username, online))
+                    val avatarUrl = item.optString("avatarUrl").takeIf { it.isNotBlank() && it != "null" }
+                        ?: item.optString("avatar").takeIf { it.isNotBlank() && it != "null" }
+                    val signature = item.optString("signature").takeIf { it.isNotBlank() && it != "null" }
+                    val email = item.optString("email").takeIf { it.isNotBlank() && it != "null" }
+                    val phone = item.optString("phone").takeIf { it.isNotBlank() && it != "null" }
+                    add(LocalUser(id, username, online, avatarUrl, signature, email, phone))
                 }
             }
         } catch (e: Exception) {
@@ -224,7 +239,9 @@ class NetworkRepository private constructor() {
                     val item = data.optJSONObject(i) ?: continue
                     val id = item.optInt("id", 0)
                     val username = item.optString("name", item.optString("groupName", "群组$id"))
-                    add(LocalUser(-id, username, false))
+                    val avatarUrl = item.optString("avatarUrl").takeIf { it.isNotBlank() && it != "null" }
+                        ?: item.optString("avatar").takeIf { it.isNotBlank() && it != "null" }
+                    add(LocalUser(-id, username, false, avatarUrl, null, null, null, isGroup = true))
                 }
             }
         } catch (e: Exception) {
@@ -244,7 +261,12 @@ class NetworkRepository private constructor() {
             obj?.let {
                 val id = it.optInt("id", 0)
                 val username = it.optString("username", it.optString("name", "用户$id"))
-                LocalUser(id, username, it.optBoolean("online", false))
+                val avatarUrl = it.optString("avatarUrl").takeIf { it.isNotBlank() && it != "null" }
+                    ?: it.optString("avatar").takeIf { it.isNotBlank() && it != "null" }
+                val signature = it.optString("signature").takeIf { it.isNotBlank() && it != "null" }
+                val email = it.optString("email").takeIf { it.isNotBlank() && it != "null" }
+                val phone = it.optString("phone").takeIf { it.isNotBlank() && it != "null" }
+                LocalUser(id, username, it.optBoolean("online", false), avatarUrl, signature, email, phone)
             }
         } catch (e: Exception) {
             null

@@ -1,5 +1,6 @@
 package com.chatlite.charroom
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
@@ -11,24 +12,33 @@ import androidx.compose.ui.unit.dp
 object ChatUi {
     @Composable
     fun AuthCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Card(
-                elevation = 8.dp,
-                shape = MaterialTheme.shapes.medium,
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
                 modifier = Modifier
-                    .padding(16.dp)
                     .fillMaxWidth()
-                    .wrapContentHeight()
-            ) {
-                Column(
+                    .height(180.dp)
+                    .background(MaterialTheme.colors.primary)
+            )
+
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Card(
+                    elevation = 8.dp,
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier
-                        .padding(24.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight()
                 ) {
-                    Text(text = title, style = MaterialTheme.typography.h5)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    content()
+                    Column(
+                        modifier = Modifier
+                            .padding(24.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = title, style = MaterialTheme.typography.h5)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        content()
+                    }
                 }
             }
         }
@@ -77,10 +87,15 @@ object ChatUi {
     }
 
     @Composable
-    fun ScreenTopBar(title: String, navigationIcon: (@Composable () -> Unit)? = null) {
+    fun ScreenTopBar(
+        title: String,
+        navigationIcon: (@Composable () -> Unit)? = null,
+        actions: @Composable RowScope.() -> Unit = {}
+    ) {
         TopAppBar(
             title = { Text(title) },
             navigationIcon = navigationIcon,
+            actions = actions,
             backgroundColor = MaterialTheme.colors.primary,
             contentColor = MaterialTheme.colors.onPrimary
         )

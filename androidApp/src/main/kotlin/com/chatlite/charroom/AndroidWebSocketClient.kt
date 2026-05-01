@@ -1,6 +1,7 @@
 package com.chatlite.charroom
 
 import com.chatlite.proto.MessageProtos
+import core.MsgType
 import core.NetworkConstants
 import core.ServerConfig
 import io.netty.bootstrap.Bootstrap
@@ -293,7 +294,7 @@ class AndroidWebSocketClient {
             .setTargetClientId(token ?: "")
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
-            .setType(NetworkConstants.WsMessageType.LOGIN)
+            .setType(MsgType.LOGIN.wire)
             .setLogin(login)
             .build()
             .toByteArray()
@@ -304,7 +305,7 @@ class AndroidWebSocketClient {
             .setTimestamp(System.currentTimeMillis())
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
-            .setType(NetworkConstants.WsMessageType.HEARTBEAT)
+            .setType(MsgType.HEARTBEAT.wire)
             .setHeartbeat(hb)
             .build()
             .toByteArray()
@@ -315,7 +316,7 @@ class AndroidWebSocketClient {
             .setUserId(userId)
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
-            .setType(NetworkConstants.WsMessageType.LOGOUT)
+            .setType(MsgType.LOGOUT.wire)
             .setLogout(logout)
             .build()
             .toByteArray()
@@ -329,7 +330,7 @@ class AndroidWebSocketClient {
             .setTimestamp(timestamp.toString())
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
-            .setType(NetworkConstants.WsMessageType.CHAT)
+            .setType(MsgType.CHAT.wire)
             .setChat(chat)
             .build()
             .toByteArray()
@@ -343,7 +344,7 @@ class AndroidWebSocketClient {
             .setTimestamp(timestamp.toString())
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
-            .setType(NetworkConstants.WsMessageType.AGENT_CHAT)
+            .setType(MsgType.AGENT_CHAT.wire)
             .setChat(chat)
             .build()
             .toByteArray()
@@ -356,7 +357,7 @@ class AndroidWebSocketClient {
             .setUserId(userId.toString())
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
-            .setType(NetworkConstants.WsMessageType.GROUP_CHAT)
+            .setType(MsgType.GROUP_CHAT.wire)
             .setGroupChat(gm)
             .build()
             .toByteArray()
@@ -367,7 +368,7 @@ class AndroidWebSocketClient {
             .setTargetClientId(targetClientId)
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
-            .setType(NetworkConstants.WsMessageType.CHECK)
+            .setType(MsgType.CHECK.wire)
             .setCheck(check)
             .build()
             .toByteArray()

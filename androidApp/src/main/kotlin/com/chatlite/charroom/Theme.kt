@@ -1,10 +1,15 @@
 package com.chatlite.charroom
 
+import android.app.Activity
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 
 private val ChatPrimary = Color(0xFFD78345)
 private val ChatPrimaryVariant = Color(0xFFBA6D35)
@@ -34,6 +39,16 @@ private val ChatShapes = Shapes(
 
 @Composable
 fun ChatTheme(content: @Composable () -> Unit) {
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = ChatLightColors.primary.toArgb()
+            window.navigationBarColor = ChatLightColors.primary.toArgb()
+            WindowCompat.getInsetsController(window, window.decorView)?.isAppearanceLightStatusBars = false
+        }
+    }
+
     MaterialTheme(
         colors = ChatLightColors,
         shapes = ChatShapes,

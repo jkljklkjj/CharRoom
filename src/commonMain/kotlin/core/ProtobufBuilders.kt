@@ -189,3 +189,14 @@ fun buildCheckPayload(targetClientId: String): ByteArray {
         .build()
         .toByteArray()
 }
+
+fun buildAckPayload(messageId: String): ByteArray {
+    val ack = MessageProtos.AckMessage.newBuilder()
+        .setMessageId(messageId)
+        .build()
+    return MessageProtos.MessageWrapper.newBuilder()
+        .setType(MsgType.ACK.wire)
+        .setAck(ack)
+        .build()
+        .toByteArray()
+}

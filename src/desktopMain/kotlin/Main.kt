@@ -4,13 +4,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import core.MessageReceiveListener
-import core.addMessageReceiveListener
+import core.Chat.addMessageReceiveListener
 import model.users
 import java.awt.SystemTray
 import java.awt.Toolkit
@@ -39,8 +37,8 @@ fun main() = application {
     // 读取窗口状态，默认使用浮动窗口（避免默认全屏）
     val savedPlacement = prefs.getInt("window_placement", WindowPlacement.Floating.ordinal)
     val windowState = rememberWindowState(
-        width = prefs.get("window_width", "900")?.toInt()?.dp ?: 900.dp,
-        height = prefs.get("window_height", "700")?.toInt()?.dp ?: 700.dp,
+        width = prefs.get("window_width", "700")?.toInt()?.dp ?: 900.dp,
+        height = prefs.get("window_height", "500")?.toInt()?.dp ?: 700.dp,
         placement = if (savedPlacement == WindowPlacement.Fullscreen.ordinal) {
             WindowPlacement.Floating // 禁止默认全屏，首次打开使用浮动窗口
         } else {
