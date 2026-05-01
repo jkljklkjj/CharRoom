@@ -119,13 +119,17 @@ const filteredMessages = computed(() => {
   })
 })
 
-// 切换会话或新消息到来时滚动到底部
-watch([currentChatUser, currentMessages], () => {
+function scrollToBottom() {
   setTimeout(() => {
     if (msgList.value) {
       msgList.value.scrollTop = msgList.value.scrollHeight
     }
   }, 50)
+}
+
+// 切换会话或新消息到来时滚动到底部
+watch([currentChatId, currentMessages], () => {
+  scrollToBottom()
 }, { deep: true })
 
 function time(t){ if(!t) return '' ; const d = new Date(t); return d.toLocaleTimeString() }

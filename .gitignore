@@ -44,5 +44,8 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+# Android release keystore should not be tracked
+/androidApp/release.keystore
+
 # Local server properties (do not track sensitive runtime config)
 /src/commonMain/resources/server.properties

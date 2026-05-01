@@ -10,88 +10,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="全面实现android和桌面端的互通逻辑，并且修改了聊天历史存储逻辑">
-      <change afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidLocalChatHistoryStore.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidTokenStorage.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ProfileScreen.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UserDetailScreen.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiEndpoints.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/NetworkConstants.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/androidApp.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/androidApp.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppModels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppModels.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatForegroundService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatForegroundService.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/Theme.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/Theme.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UiComponents.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UiComponents.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UserListScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UserListScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/ImageLoader.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/ImageLoader.android.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/PlatformLogging.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/PlatformLogging.android.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/ProtobufBuilders.android.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AndroidFilePicker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AndroidFilePicker.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/androidApp.gradle" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/build.gradle" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/build.gradle.kts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/AndroidManifest.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/AppLifecycleObserver.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/AppModels.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/AppState.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/AuthScreens.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/ChatForegroundService.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/ChatScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/NetworkChangeReceiver.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/NotificationExtensions.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/NotificationManager.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/Theme.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/UiComponents.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/UserListScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/component/BackHandler.android.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/component/FilePicker.android.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/core/ImageLoader.android.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/core/PlatformLogging.android.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/kotlin/com/chatlite/charroom/core/ProtobufBuilders.android.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/res/drawable/ic_launcher.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/res/drawable/ic_notification.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/res/values/colors.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/res/values/strings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp_backup/src/main/res/values/styles.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shared/kotlin/core/ApiEndpoints.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shared/kotlin/core/NetworkConstants.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shared/kotlin/core/ServerConfig.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ProfileScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ProfileScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ProfileScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ProfileScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiService.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/LocalChatHistoryStore.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/LocalChatHistoryStore.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/proto/message.proto" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/public/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/web/public/proto/message.proto" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/src/components/ChatWindow.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/components/ChatWindow.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/services/chatSocket.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/services/chatSocket.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/store/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/store/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/views/WebApp.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/views/WebApp.vue" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -237,12 +167,13 @@
     "Gradle.CharRoom [build].executor": "Run",
     "Gradle.CharRoom [checkRuntime].executor": "Run",
     "Gradle.CharRoom [clean].executor": "Run",
+    "Gradle.CharRoom [customApk].executor": "Run",
     "Gradle.CharRoom [customJar].executor": "Run",
     "Gradle.CharRoom [dependencies].executor": "Run",
     "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
     "Gradle.CharRoom [package].executor": "Run",
     "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
-    "Gradle.desktop.executor": "Debug",
+    "Gradle.desktop.executor": "Run",
     "Gradle.下载源代码.executor": "Run",
     "Gradle.升级 Gradle 包装器.executor": "Run",
     "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
@@ -292,7 +223,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.desktop">
+  <component name="RunManager" selected="Gradle.CharRoom [customApk]">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -466,31 +397,6 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration name="CharRoom [:androidApp:clean]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value=":androidApp:clean" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <GradleProfilingDisabled>false</GradleProfilingDisabled>
-      <GradleCoverageDisabled>false</GradleCoverageDisabled>
-      <method v="2" />
-    </configuration>
     <configuration name="CharRoom [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -541,6 +447,31 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
+    <configuration name="CharRoom [customApk]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="customApk" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
+      <method v="2" />
+    </configuration>
     <configuration name="在线聊天App-1.0.0.jar" type="JarApplication" temporary="true">
       <option name="JAR_PATH" value="$PROJECT_DIR$/build/libs/在线聊天App-1.0.0.jar" />
       <method v="2" />
@@ -550,19 +481,19 @@
       <item itemvalue="Android App.androidApp" />
       <item itemvalue="Android App.qingliao.CharRoom.androidApp" />
       <item itemvalue="Gradle.desktop" />
+      <item itemvalue="Gradle.CharRoom [customApk]" />
       <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
-      <item itemvalue="Gradle.CharRoom [:androidApp:clean]" />
       <item itemvalue="Gradle.CharRoom [build]" />
       <item itemvalue="Gradle.CharRoom [clean]" />
       <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.CharRoom [customApk]" />
         <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
         <item itemvalue="Gradle.CharRoom [build]" />
         <item itemvalue="Gradle.CharRoom [clean]" />
         <item itemvalue="Gradle.CharRoom [:androidApp:build]" />
-        <item itemvalue="Gradle.CharRoom [:androidApp:clean]" />
       </list>
     </recent_temporary>
   </component>
@@ -801,7 +732,8 @@
       <workItem from="1777552807630" duration="1389000" />
       <workItem from="1777562712608" duration="2094000" />
       <workItem from="1777567074746" duration="1910000" />
-      <workItem from="1777601221248" duration="1894000" />
+      <workItem from="1777601221248" duration="2741000" />
+      <workItem from="1777606496168" duration="3621000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1115,7 +1047,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777445011055</updated>
     </task>
-    <option name="localTasksCounter" value="40" />
+    <task id="LOCAL-00040" summary="全面实现android和桌面端的互通逻辑，并且修改了聊天历史存储逻辑">
+      <option name="closed" value="true" />
+      <created>1777603221455</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1777603221455</updated>
+    </task>
+    <option name="localTasksCounter" value="41" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1206,7 +1146,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>125</line>
+          <line>126</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>
@@ -1214,13 +1154,21 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>291</line>
+          <line>323</line>
           <option name="timeStamp" value="24" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt</url>
           <line>171</line>
           <option name="timeStamp" value="25" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/build.gradle.kts</url>
+          <line>168</line>
+          <properties>
+            <option name="lambda-ordinal" value="-1" />
+          </properties>
+          <option name="timeStamp" value="26" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

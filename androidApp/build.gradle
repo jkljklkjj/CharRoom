@@ -48,6 +48,13 @@ android {
     packaging {
         resources {
             excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/license/LICENSE.jbzip2.txt"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/io.netty.versions.properties"
         }
     }
 
@@ -58,10 +65,27 @@ android {
         }
     }
 
+    signingConfigs {
+        debug {
+            // 使用系统默认调试签名，仅用于本地打包测试
+        }
+        release {
+            if (project.file('release.keystore').exists()) {
+                storeFile file('release.keystore')
+                storePassword project.findProperty('RELEASE_STORE_PASSWORD') ?: 'changeit'
+                keyAlias project.findProperty('RELEASE_KEY_ALIAS') ?: 'release_alias'
+                keyPassword project.findProperty('RELEASE_KEY_PASSWORD') ?: 'changeit'
+            } else {
+                initWith(signingConfigs.debug)
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
@@ -84,7 +108,9 @@ dependencies {
     implementation 'com.google.android.material:material:1.13.0'
     // Reuse protobuf-generated classes from the root :proto module
     implementation project(':proto')
-    implementation 'io.netty:netty-all:4.2.5.Final'
+    implementation('io.netty:netty-all:4.2.5.Final') {
+        exclude group: 'io.netty', module: 'netty-codec-native-quic'
+    }
     implementation 'com.google.protobuf:protobuf-java:4.34.1'
     implementation 'com.google.protobuf:protobuf-kotlin:4.34.1'
 

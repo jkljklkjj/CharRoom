@@ -28,7 +28,8 @@ import kotlinx.coroutines.launch
 fun ProfileScreen(
     token: String,
     currentUserId: Int,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onLogout: () -> Unit
 ) {
     var user by remember { mutableStateOf<LocalUser?>(null) }
     var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -293,6 +294,14 @@ fun ProfileScreen(
                                 Text("保存")
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = onLogout,
+                        modifier = Modifier.fillMaxWidth().height(44.dp)
+                    ) {
+                        Text("退出登录")
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

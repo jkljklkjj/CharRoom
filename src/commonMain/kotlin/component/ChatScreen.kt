@@ -729,7 +729,7 @@ fun ChatScreen(
             }
         }
 
-        LaunchedEffect(userMessages.size) {
+        LaunchedEffect(user.id, userMessages.size) {
             if (userMessages.isNotEmpty()) {
                 listState.animateScrollToItem(userMessages.size - 1)
             }

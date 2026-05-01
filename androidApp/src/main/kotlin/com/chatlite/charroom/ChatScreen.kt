@@ -127,12 +127,12 @@ fun ChatScreen(user: LocalUser, appState: ChatAppState, onBack: () -> Unit, onSe
 
     Column(modifier = Modifier.fillMaxSize().imePadding()) {
         ChatUi.ScreenTopBar(title = user.username, navigationIcon = { ChatUi.BackButton(onBack) })
-        ChatBody(messages = chatSession.messages, onSend = { chatSession.sendMessage(it) })
+        ChatBody(userId = user.id, messages = chatSession.messages, onSend = { chatSession.sendMessage(it) })
     }
 }
 
 @Composable
-fun ChatBody(messages: SnapshotStateList<ChatMessage>, onSend: (String) -> Unit) {
+fun ChatBody(userId: Int, messages: SnapshotStateList<ChatMessage>, onSend: (String) -> Unit) {
     val listState = rememberLazyListState()
     var input by remember { mutableStateOf("") }
     var showEmojiPanel by remember { mutableStateOf(false) }
@@ -241,7 +241,7 @@ fun ChatBody(messages: SnapshotStateList<ChatMessage>, onSend: (String) -> Unit)
         }
     }
 
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(userId, messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }

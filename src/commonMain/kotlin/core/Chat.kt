@@ -91,6 +91,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
     // store raw binary responses
     private val responses = mutableListOf<ByteArray>()
     private var expectedResponses = 1
+    private var pendingMsgType: MsgType? = null
     var responseFuture: CompletableFuture<List<ByteArray>> = CompletableFuture()
     // handshake future to notify when WebSocket handshake completes
     val handshakeFuture: CompletableFuture<Unit> = CompletableFuture()
@@ -145,6 +146,15 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                         val dataStr = rawData.trim().trimStart('\uFEFF', '\uFFFE')
                         if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                             val json = jacksonObjectMapper().readTree(dataStr)
+                            val typeText = json.get("type")?.asText()
+                            if (typeText == "heartbeat") {
+                                AppLog.d{"Received heartbeat frame"}
+                                if (pendingMsgType != MsgType.HEARTBEAT) {
+                                    AppLog.d{"Ignoring heartbeat while waiting for ${pendingMsgType?.wire ?: "response"}"}
+                                    return
+                                }
+                                // heartbeat response is expected for heartbeat requests
+                            }
                             if (json.has("type") && json.has("payload")) {
                                 AppLog.i({"Binary websocket envelope contains proto wrapper: ${json.get("type").asText()}"})
                                 handleIncomingFromProtoWrapper(json)
@@ -153,8 +163,11 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                                 handleIncomingFromJson(json)
                             } else if (json.has("clientId") && json.has("online")) {
                                 AppLog.i({"Binary websocket JSON contains CHECK response for clientId=${json.get("clientId").asText()}, callback will process it"})
+                            } else if (typeText == "heartbeat") {
+                                // ignore heartbeat messages that are not direct responses to send()
                             } else {
                                 AppLog.w({"Binary websocket JSON did not contain expected fields: ${json.toString().take(256)}"})
+                                handleIncomingMessage(dataStr)
                             }
                         } else {
                             AppLog.d{"Binary message content is not JSON after unwrap: ${dataStr.take(64)}"}
@@ -165,10 +178,29 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                 }
 
                 // collect response for callers waiting in send()
-                synchronized(this) {
-                    responses.add(bodyBytes)
-                    if (responses.size >= expectedResponses && !responseFuture.isDone) {
-                        responseFuture.complete(responses.toList())
+                val shouldCollectResponse = try {
+                    val dataStr = String(bodyBytes, Charsets.UTF_8).trim().trimStart('\uFEFF', '\uFFFE')
+                    if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
+                        val json = jacksonObjectMapper().readTree(dataStr)
+                        val typeText = json.get("type")?.asText()
+                        if (typeText == "heartbeat" && pendingMsgType != MsgType.HEARTBEAT) {
+                            false
+                        } else {
+                            true
+                        }
+                    } else {
+                        true
+                    }
+                } catch (_: Exception) {
+                    true
+                }
+
+                if (shouldCollectResponse) {
+                    synchronized(this) {
+                        responses.add(bodyBytes)
+                        if (responses.size >= expectedResponses && !responseFuture.isDone) {
+                            responseFuture.complete(responses.toList())
+                        }
                     }
                 }
             }
@@ -439,6 +471,20 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
             val userId = json.get("userId")?.asInt() ?: -1
 
             when (messageType) {
+                "heartbeat" -> {
+                    AppLog.d({"Received heartbeat message"})
+                    return
+                }
+                else -> {
+                    if (messageType.contains("登录失败") || messageType.contains("失败") || messageType.contains("error", ignoreCase = true)) {
+                        AppLog.w({"收到登录/服务端错误: $messageType"})
+                        prompt(messageType)
+                        return
+                    }
+                }
+            }
+
+            when (messageType) {
                 "chat" -> {
                     println("New private message from $senderName: $messageContent")
                     val timestamp = System.currentTimeMillis()
@@ -514,9 +560,10 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
         }
     }
 
-    fun setExpectedResponses(count: Int) {
+    fun setExpectedResponses(count: Int, msgType: MsgType? = null) {
         synchronized(this) {
             expectedResponses = count
+            pendingMsgType = msgType
             responses.clear()
             responseFuture = CompletableFuture()
         }
@@ -755,7 +802,7 @@ object Chat {
 
         if (::channel.isInitialized && channel.isActive) {
             // 发送二进制WebSocket帧
-            responseHandler.setExpectedResponses(expectedResponses)
+            responseHandler.setExpectedResponses(expectedResponses, type)
 
             // ensure write happens on channel event loop
             channel.eventLoop().execute {
@@ -794,7 +841,31 @@ object Chat {
                                             }
                                             callback(false, emptyList())
                                         } else {
-                                            callback(true, responses.map { it as Any })
+                                            val isValid = try {
+                                                responses.all { bytes ->
+                                                    val unwrap = parseProtoResponse(bytes)
+                                                    if (unwrap.hasEnvelope && !unwrap.success) {
+                                                        false
+                                                    } else {
+                                                        val rawData = unwrap.dataJson ?: String(bytes, Charsets.UTF_8)
+                                                        val dataStr = rawData.trim().trimStart('\uFEFF', '\uFFFE')
+                                                        if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
+                                                            val json = jacksonObjectMapper().readTree(dataStr)
+                                                            val typeText = json.get("type")?.asText()
+                                                            if (!typeText.isNullOrBlank() && (typeText.contains("失败") || typeText.contains("error", ignoreCase = true))) {
+                                                                false
+                                                            } else {
+                                                                true
+                                                            }
+                                                        } else {
+                                                            true
+                                                        }
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                true
+                                            }
+                                            callback(isValid, if (isValid) responses.map { it as Any } else emptyList())
                                         }
                                     } finally {
                                         // reset expectation after handling
