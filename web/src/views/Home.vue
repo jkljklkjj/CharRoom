@@ -26,7 +26,8 @@
           <p class="hero-lead">界面强调信息层次与可读性，优先对话体验，支持离线消息、群聊与智能 Agent 流式集成</p>
 
           <div class="cta">
-            <a class="btn primary" :href="releasePage" target="_blank">下载客户端</a>
+            <a class="btn primary" :href="androidDownloadUrl" target="_blank" rel="noreferrer">下载 APK</a>
+            <a class="btn ghost" :href="releasePage" target="_blank" rel="noreferrer">下载客户端</a>
             <router-link class="btn ghost" to="/app">在线体验</router-link>
           </div>
 
@@ -233,12 +234,14 @@ import siteConfig from '../siteConfig'
 import { getFriendRequests, acceptFriend } from '../api'
 
 const releasePage = siteConfig.RELEASE_BASE
+const installerUrls = siteConfig.INSTALLER_URLS
 const downloads = [
-  { title: 'Windows', href: `${releasePage}/download/windows.msi`, label: 'MSI' },
-  { title: 'Linux', href: `${releasePage}/download/linux.deb`, label: 'DEB' },
-  { title: 'macOS', href: `${releasePage}/download/macos.dmg`, label: 'DMG' },
-  { title: 'Android', href: `${releasePage}/download/android.apk`, label: 'APK' }
+  { title: 'Windows', href: installerUrls.windows, label: 'MSI' },
+  { title: 'Linux', href: installerUrls.linux, label: 'DEB' },
+  { title: 'macOS', href: installerUrls.macos, label: 'DMG' },
+  { title: 'Android', href: installerUrls.android, label: 'APK' }
 ]
+const androidDownloadUrl = installerUrls.android
 const showReward = ref(false)
 const selectedMethod = ref('alipay')
 const authorEmail = ref(siteConfig.AUTHOR_EMAIL)
