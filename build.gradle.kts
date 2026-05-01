@@ -1,12 +1,25 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:7.4.2")
+        classpath("com.guardsquare:proguard-gradle:7.8.2")
+    }
+}
+
 plugins {
     kotlin("jvm") version "2.3.20"
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
     id("org.jetbrains.compose") version "1.10.3"
-    id("com.guardsquare.proguard") version "7.8.0" apply false
 }
+
+apply(plugin = "com.guardsquare.proguard")
 
 group = "com.chatlite"
 version = "1.0-SNAPSHOT"
