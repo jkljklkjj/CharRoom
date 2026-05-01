@@ -202,6 +202,8 @@ tasks.register<proguard.gradle.ProGuardTask>("customProguardReleaseJars") {
     ignorewarnings()
 }
 
-tasks.named<Jar>("jar") {
-    finalizedBy(tasks.named("customProguardReleaseJars"))
-}
+// Do not run custom ProGuard automatically on every JAR build in CI.
+// Keep the task available for manual invocation if needed.
+// tasks.named<Jar>("jar") {
+//     finalizedBy(tasks.named("customProguardReleaseJars"))
+// }

@@ -65,9 +65,35 @@ android {
         }
     }
 
+    def debugKeystoreFile = file("${rootProject.projectDir}/.android/debug.keystore")
+
+    tasks.register("createDebugKeystore") {
+        doLast {
+            if (!debugKeystoreFile.exists()) {
+                debugKeystoreFile.parentFile.mkdirs()
+                exec {
+                    commandLine "${System.getenv('JAVA_HOME') ?: System.getProperty('java.home')}/bin/keytool", 
+                            '-genkeypair',
+                            '-v',
+                            '-keystore', debugKeystoreFile.absolutePath,
+                            '-storepass', 'android',
+                            '-keypass', 'android',
+                            '-alias', 'androiddebugkey',
+                            '-keyalg', 'RSA',
+                            '-keysize', '2048',
+                            '-validity', '10000',
+                            '-dname', 'CN=Android Debug,O=Android,C=US'
+                }
+            }
+        }
+    }
+
     signingConfigs {
         debug {
-            // 使用系统默认调试签名，仅用于本地打包测试
+            storeFile debugKeystoreFile
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
         }
         release {
             if (project.file('release.keystore').exists()) {
@@ -78,6 +104,12 @@ android {
             } else {
                 initWith(signingConfigs.debug)
             }
+        }
+    }
+
+    tasks.whenTaskAdded { task ->
+        if (task.name == 'preBuild') {
+            task.dependsOn(tasks.named('createDebugKeystore'))
         }
     }
 
