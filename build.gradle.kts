@@ -92,6 +92,13 @@ compose.desktop {
     application {
         mainClass = "MainKt"
 
+        jvmArgs += listOf(
+            "-Dfile.encoding=UTF-8",
+            "-Dsun.jnu.encoding=UTF-8",
+            "-Duser.language=zh",
+            "-Duser.country=CN"
+        )
+
         buildTypes {
             release {
                 proguard {
