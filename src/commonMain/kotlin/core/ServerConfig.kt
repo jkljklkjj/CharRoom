@@ -24,7 +24,7 @@ object ServerConfig {
         } catch (_: Throwable) {
         }
 
-        "localhost"
+        "chatlite.xin"
     }
 
     const val NETTY_SERVER_PORT = 80

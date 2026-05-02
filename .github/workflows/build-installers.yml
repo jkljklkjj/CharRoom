@@ -301,6 +301,11 @@ jobs:
         run: chmod +x gradlew
         shell: bash
 
+      - name: Create server.properties
+        run: |
+          echo "server.ip=chatlite.xin" > src/commonMain/resources/server.properties
+        shell: bash
+
       - name: Build Android release APK
         run: ./gradlew :androidApp:clean :androidApp:assembleRelease --no-daemon
         shell: bash

@@ -1115,7 +1115,8 @@ object Chat {
                     AppLog.i({ "登录成功" })
                 } else {
                     AppLog.e({ "登录失败" })
-                    throw Exception("登录失败")
+                    // 关闭连接触发重连逻辑，不要抛出异常导致APP崩溃
+                    channel.close()
                 }
             }
 

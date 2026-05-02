@@ -9,7 +9,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="全面实现android和桌面端的互通逻辑，并且修改了聊天历史存储逻辑" />
+    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="全面实现android和桌面端的互通逻辑，并且修改了聊天历史存储逻辑">
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -175,6 +178,7 @@
     "RunOnceActivity.go.migrated.go.modules.settings": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "android.gradle.sync.needed": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "external.system.has.shared.sources": "true",
     "git-widget-placeholder": "master",
@@ -189,7 +193,7 @@
     "project.structure.last.edited": "项目",
     "project.structure.proportion": "0.17",
     "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "reference.settings.ide.settings.notifications",
+    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
     "ts.external.directory.path": "D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external",
     "vue.rearranger.settings.migration": "true"
   },
@@ -211,7 +215,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.CharRoom [customProguardReleaseJars]">
+  <component name="RunManager" selected="Android App.CharRoom">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -724,6 +728,7 @@
       <workItem from="1777606496168" duration="4294000" />
       <workItem from="1777623159927" duration="27000" />
       <workItem from="1777633509154" duration="1869000" />
+      <workItem from="1777681731041" duration="67000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
