@@ -26,7 +26,7 @@
           <p class="hero-lead">界面强调信息层次与可读性，优先对话体验，支持离线消息、群聊与智能 Agent 流式集成</p>
 
           <div class="cta">
-            <a class="btn primary" :href="androidDownloadUrl" target="_blank" rel="noreferrer">下载 APK</a>
+            <a class="btn primary" :href="androidDownloadUrl" @click.prevent="handleDownload(androidDownloadUrl)" target="_blank" rel="noreferrer nofollow">下载 APK</a>
             <a class="btn ghost" :href="releasePage" target="_blank" rel="noreferrer">下载客户端</a>
             <router-link class="btn ghost" to="/app">在线体验</router-link>
           </div>
@@ -121,7 +121,7 @@
     <section class="downloads container">
       <h3 class="section-title">下载</h3>
       <div class="download-grid">
-        <a v-for="item in downloads" :key="item.title" class="platform" :href="item.href" target="_blank" rel="noreferrer">
+        <a v-for="item in downloads" :key="item.title" class="platform" :href="item.href" @click.prevent="handleDownload(item.href)" target="_blank" rel="noreferrer nofollow">
           {{ item.title }}
           <span class="platform-sub">{{ item.label }}</span>
         </a>
@@ -280,6 +280,14 @@ async function handleAccept(requesterId, idx) {
   } else {
     alert('接受失败')
   }
+}
+
+function handleDownload(url) {
+  // 给URL添加随机时间戳参数，防止浏览器缓存重定向结果
+  const timestamp = Date.now()
+  const separator = url.includes('?') ? '&' : '?'
+  const urlWithTimestamp = `${url}${separator}t=${timestamp}`
+  window.open(urlWithTimestamp, '_blank', 'noopener noreferrer')
 }
 
 onMounted(() => {
