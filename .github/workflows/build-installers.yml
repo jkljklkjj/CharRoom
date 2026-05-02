@@ -54,6 +54,12 @@ jobs:
       - name: Install WiX (choco)
         run: choco install wixtoolset -y
 
+      - name: Create server.properties
+        run: |
+          New-Item -ItemType Directory -Force -Path src\commonMain\resources
+          Set-Content -Path src\commonMain\resources\server.properties -Value "server.ip=chatlite.xin"
+        shell: powershell
+
       - name: Build installers
         run: .\gradlew.bat clean buildInstallers --no-daemon
 
@@ -146,6 +152,12 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x gradlew
+        shell: bash
+
+      - name: Create server.properties
+        run: |
+          mkdir -p src/commonMain/resources
+          echo "server.ip=chatlite.xin" > src/commonMain/resources/server.properties
         shell: bash
 
       - name: Build installers
@@ -247,6 +259,12 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x gradlew
+        shell: bash
+
+      - name: Create server.properties
+        run: |
+          mkdir -p src/commonMain/resources
+          echo "server.ip=chatlite.xin" > src/commonMain/resources/server.properties
         shell: bash
 
       - name: Build installers
