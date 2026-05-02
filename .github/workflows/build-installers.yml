@@ -303,6 +303,7 @@ jobs:
 
       - name: Create server.properties
         run: |
+          mkdir -p src/commonMain/resources
           echo "server.ip=chatlite.xin" > src/commonMain/resources/server.properties
         shell: bash
 
