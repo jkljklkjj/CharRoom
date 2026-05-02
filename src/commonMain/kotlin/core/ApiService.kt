@@ -37,7 +37,7 @@ object ApiService {
     }
 
     suspend fun validateToken(token: String): Boolean {
-        return core.getUserInfo(token) != null
+        return core.validateToken(token)
     }
 
     /**

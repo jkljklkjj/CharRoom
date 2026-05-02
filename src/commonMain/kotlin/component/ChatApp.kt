@@ -525,40 +525,60 @@ fun ChatApp(
     // 启动时先恢复本地历史，再并发启动自动保存、离线拉取和长连接
     LaunchedEffect(ServerConfig.id) {
         val accountId = ServerConfig.id
-        // 启动时只加载最近100条消息，降低内存占用
-        val restored = withContext(Dispatchers.IO) { LocalChatHistoryStore.restorePage(accountId, page = 0, pageSize = 100) }
-        messages.clear()
-        messages += restored.privateMessages
-        groupMessages.clear()
-        groupMessages += restored.groupMessages
 
-        launch {
-            snapshotFlow {
-                LocalChatHistoryStore.capture(messages, groupMessages)
+        // 注册登录状态监听器，token失效时自动退出
+        val authListener = Chat.AuthStateListener { reason ->
+            scope.launch(Dispatchers.Main) {
+                // 清除本地保存的无效凭证
+                try {
+                    val authFile = java.io.File(System.getProperty("user.home"), ".qingliao/auth.txt")
+                    if (authFile.exists()) authFile.delete()
+                } catch (_: Exception) {}
+                // 回到登录页面
+                onLogout()
             }
-                .distinctUntilChanged()
-                .debounce(350)
-                .collect { snapshot ->
-                    if (ServerConfig.Token.isNotBlank()) {
-                        withContext(Dispatchers.IO) {
-                            LocalChatHistoryStore.save(accountId, snapshot)
+        }
+        Chat.addAuthStateListener(authListener)
+
+        try {
+            // 启动时只加载最近100条消息，降低内存占用
+            val restored = withContext(Dispatchers.IO) { LocalChatHistoryStore.restorePage(accountId, page = 0, pageSize = 100) }
+            messages.clear()
+            messages += restored.privateMessages
+            groupMessages.clear()
+            groupMessages += restored.groupMessages
+
+            launch {
+                snapshotFlow {
+                    LocalChatHistoryStore.capture(messages, groupMessages)
+                }
+                    .distinctUntilChanged()
+                    .debounce(350)
+                    .collect { snapshot ->
+                        if (ServerConfig.Token.isNotBlank()) {
+                            withContext(Dispatchers.IO) {
+                                LocalChatHistoryStore.save(accountId, snapshot)
+                            }
                         }
                     }
-                }
-        }
-
-        launch(Dispatchers.IO) {
-            while (true) {
-                val resp = ApiService.getOfflineMessages()
-                if (resp.isEmpty()) {
-                    break
-                }
-                messages += resp
             }
-        }
 
-        launch(Dispatchers.IO) {
-            Chat.start()
+            launch(Dispatchers.IO) {
+                while (true) {
+                    val resp = ApiService.getOfflineMessages()
+                    if (resp.isEmpty()) {
+                        break
+                    }
+                    messages += resp
+                }
+            }
+
+            launch(Dispatchers.IO) {
+                Chat.start()
+            }
+        } finally {
+            // 页面销毁时移除监听器
+            Chat.removeAuthStateListener(authListener)
         }
     }
 

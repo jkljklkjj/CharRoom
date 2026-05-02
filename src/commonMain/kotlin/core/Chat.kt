@@ -58,7 +58,7 @@ enum class MsgType(val wire: String) {
 /**
  * 处理接收到的WebSocket信息
  */
-class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
+class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java) {
     private fun unwrapApi(content: String): ApiUnwrap {
         return try {
             val trimmed = content.trim()
@@ -129,7 +129,11 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
             is TextWebSocketFrame -> {
                 val contentStr = msg.text()
                 println("Received WebSocket message: $contentStr")
-                handleIncomingMessage(contentStr)
+                try {
+                    handleIncomingMessage(contentStr)
+                } catch (e: Exception) {
+                    AppLog.e({"处理文本WebSocket消息错误: ${e.message}"}, e)
+                }
             }
             is BinaryWebSocketFrame -> {
                 val bodyBytes = ByteArray(msg.content().readableBytes())
@@ -465,8 +469,11 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
             }
             val dataStr = unwrap.dataJson ?: content
             val json = jacksonObjectMapper().readTree(dataStr)
-            val messageType = json.get("type")?.asText() ?: throw IllegalArgumentException("Missing message type")
-            val messageContent = json.get("content")?.asText() ?: throw IllegalArgumentException("Missing content")
+            val messageType = json.get("type")?.asText() ?: run {
+                AppLog.w({"收到无效消息：缺少type字段，原始内容：$dataStr"})
+                return
+            }
+            val messageContent = json.get("content")?.asText() ?: ""
             val senderName = json.get("sender")?.asText() ?: "Unknown"
             val userId = json.get("userId")?.asInt() ?: -1
 
@@ -476,8 +483,25 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>() {
                     return
                 }
                 else -> {
-                    if (messageType.contains("登录失败") || messageType.contains("失败") || messageType.contains("error", ignoreCase = true)) {
-                        AppLog.w({"收到登录/服务端错误: $messageType"})
+                    if (messageType.contains("登录失败") || messageType.contains("token无效") || messageType.contains("token已过期")) {
+                        AppLog.w({"登录凭证失效: $messageType"})
+                        prompt(messageType)
+                        // 清除无效凭证
+                        ServerConfig.Token = ""
+                        ServerConfig.id = ""
+                        // 通知所有监听器登录状态失效
+                        synchronized(Chat.authStateListeners) {
+                            Chat.authStateListeners.forEach { listener ->
+                                try { listener.onAuthInvalidated(messageType) }
+                                catch (_: Exception) {}
+                            }
+                        }
+                        // 关闭连接，触发重连逻辑
+                        ctx.close()
+                        return
+                    }
+                    if (messageType.contains("失败") || messageType.contains("error", ignoreCase = true)) {
+                        AppLog.w({"收到服务端错误: $messageType"})
                         prompt(messageType)
                         return
                     }
@@ -581,7 +605,13 @@ object Chat {
         private lateinit var responseHandler: CustomWebSocketHandler
         private val sendLock = Any()
 
+    // 登录状态监听器
+    fun interface AuthStateListener {
+        fun onAuthInvalidated(reason: String)
+    }
+
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
+    internal val authStateListeners = mutableListOf<AuthStateListener>()
 
     fun addMessageReceiveListener(listener: MessageReceiveListener) {
         synchronized(messageListeners) {
@@ -594,6 +624,20 @@ object Chat {
     fun removeMessageReceiveListener(listener: MessageReceiveListener) {
         synchronized(messageListeners) {
             messageListeners.remove(listener)
+        }
+    }
+
+    fun addAuthStateListener(listener: AuthStateListener) {
+        synchronized(authStateListeners) {
+            if (!authStateListeners.contains(listener)) {
+                authStateListeners.add(listener)
+            }
+        }
+    }
+
+    fun removeAuthStateListener(listener: AuthStateListener) {
+        synchronized(authStateListeners) {
+            authStateListeners.remove(listener)
         }
     }
 

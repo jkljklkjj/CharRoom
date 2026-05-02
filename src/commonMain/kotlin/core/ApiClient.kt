@@ -174,6 +174,14 @@ suspend fun login(account: String, password: String): String? {
 }
 
 /**
+ * 验证token有效性接口
+ */
+suspend fun validateToken(token: String): Boolean {
+    val response = sendRequest(ApiEndpoints.VALIDATE_TOKEN, "GET", token = token)
+    return isApiSuccess(response)
+}
+
+/**
  * 注册接口
  */
 suspend fun register(username: String, password: String, email: String = ""): Int? {

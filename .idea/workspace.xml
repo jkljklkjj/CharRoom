@@ -10,8 +10,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="全面实现android和桌面端的互通逻辑，并且修改了聊天历史存储逻辑">
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -164,7 +165,7 @@
     "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
     "Gradle.CharRoom [package].executor": "Run",
     "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
-    "Gradle.desktop.executor": "Run",
+    "Gradle.desktop.executor": "Debug",
     "Gradle.下载源代码.executor": "Run",
     "Gradle.升级 Gradle 包装器.executor": "Run",
     "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
@@ -178,7 +179,6 @@
     "RunOnceActivity.go.migrated.go.modules.settings": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "android.gradle.sync.needed": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "external.system.has.shared.sources": "true",
     "git-widget-placeholder": "master",
@@ -215,7 +215,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Android App.CharRoom">
+  <component name="RunManager" selected="Gradle.desktop">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -729,6 +729,8 @@
       <workItem from="1777623159927" duration="27000" />
       <workItem from="1777633509154" duration="1869000" />
       <workItem from="1777681731041" duration="67000" />
+      <workItem from="1777691566225" duration="65000" />
+      <workItem from="1777691689776" duration="1208000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1149,7 +1151,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>323</line>
+          <line>327</line>
           <option name="timeStamp" value="24" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
@@ -1164,6 +1166,11 @@
             <option name="lambda-ordinal" value="-1" />
           </properties>
           <option name="timeStamp" value="26" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
+          <line>173</line>
+          <option name="timeStamp" value="27" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
