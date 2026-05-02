@@ -126,6 +126,12 @@ export async function getCurrentUser() {
   return body?.data || body || null
 }
 
+export async function validateToken() {
+  const { ok, body } = await safeFetch(`${API_BASE}/user/validateToken`, { method: 'GET' })
+  if (!ok) return false
+  return body?.code === 0 || body?.data === true
+}
+
 export async function getFriends() {
   const { ok, body } = await safeFetch(`${API_BASE}/friend/get`, {
     method: 'POST',
@@ -170,6 +176,7 @@ export default {
   login,
   register,
   getCurrentUser,
+  validateToken,
   getOfflineMessages,
   addFriend,
   getFriendRequests,

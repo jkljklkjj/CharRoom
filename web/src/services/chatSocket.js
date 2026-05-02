@@ -20,7 +20,7 @@ const receivedMessageIds = new Set() // 消息去重缓存
 const messageIdQueue = [] // 消息ID队列，维护插入顺序用于LRU淘汰
 
 // Note: browsers cannot set custom headers on WebSocket handshake. We pass token as query `?token=`.
-export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, onerror } = {}) {
+export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed } = {}) {
   console.log('🔌 尝试建立WebSocket连接:', { wsUrl, hasToken: !!token, userId, existingSocket: !!socket, readyState: socket?.readyState })
 
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -34,7 +34,8 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
     onopen: onopen || handlers.onopen,
     onmessage: onmessage || handlers.onmessage,
     onclose: onclose || handlers.onclose,
-    onerror: onerror || handlers.onerror
+    onerror: onerror || handlers.onerror,
+    onAuthFailed: onAuthFailed || (() => {})
   }
 
   // 构造纯净的WebSocket URL，不带任何参数
@@ -113,6 +114,13 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
         }
       } else {
         console.error('❌ 响应失败:', processedData.message)
+        const msg = (processedData.message || '').toLowerCase()
+        // 认证相关错误，通知上层
+        if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
+          console.log('🔑 认证失败，停止重连并通知上层')
+          stopReconnect = true // 停止自动重连
+          handlers.onAuthFailed(processedData.message)
+        }
       }
       return
     }

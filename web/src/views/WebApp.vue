@@ -191,7 +191,12 @@ async function onLogged(token) {
       }
     },
     onclose: () => console.log('ws close'),
-    onerror: (e) => console.error('ws error', e)
+    onerror: (e) => console.error('ws error', e),
+    onAuthFailed: (reason) => {
+      console.log('🔑 认证失败:', reason)
+      // 清除本地凭证并跳回登录页
+      logout()
+    }
   })
 }
 
@@ -205,52 +210,65 @@ onMounted(async () => {
       store.setAccountId(storedAccountId)
     }
 
-    // 恢复用户信息并验证token
-    const userRes = await api.getCurrentUser()
-    if (userRes && userRes.id) {
-      store.setAccountId(userRes.id)
-      try {
-        localStorage.setItem('charroom_token', storedToken)
-        localStorage.setItem('charroom_accountId', String(userRes.id))
-      } catch (_e) {
-        // ignore localStorage failures
-      }
-      // 自动恢复连接
-      chatSocket.connect(WS_URL, storedToken, store.state.accountId, {
-        onopen: () => console.log('ws restored'),
-        onmessage: (msg) => {
-          console.log('📩 恢复连接收到原始消息:', msg)
-          try {
-            if (msg.type === 'chat' && msg.chat) {
-              console.log('💬 恢复连接收到聊天消息:', msg.chat)
-              const m = {
-                user: String(msg.chat.userId || 'unknown'),
-                text: msg.chat.content,
-                time: normalizeTimestamp(msg.chat.timestamp),
-                targetId: msg.chat.targetClientId
-              }
-              console.log('📝 恢复连接构造消息对象:', m)
-              store.addMessage(m)
-              console.log('💾 恢复连接后消息列表:', store.state.messages)
-            } else if (msg.type === 'groupChat' && msg.groupChat) {
-              console.log('👥 恢复连接收到群聊消息:', msg.groupChat)
-              const gm = {
-                user: String(msg.groupChat.userId),
-                text: msg.groupChat.content,
-                time: normalizeTimestamp(msg.groupChat.timestamp),
-                groupId: msg.groupChat.targetClientId
-              }
-              store.addGroupMessage(gm)
-            } else if (msg.type === 'heartbeat') {
-              console.log('❤️ 恢复连接收到 heartbeat 心跳消息，忽略同步展示')
-            } else {
-              console.log('ℹ️ 恢复连接收到其他类型消息:', msg.type)
-            }
-          } catch (e) {
-            console.error('❌ 恢复连接处理消息失败', e)
-          }
+    // 先验证token有效性，再获取用户信息
+    const tokenValid = await api.validateToken()
+    if (tokenValid) {
+      const userRes = await api.getCurrentUser()
+      if (userRes && userRes.id) {
+        store.setAccountId(userRes.id)
+        try {
+          localStorage.setItem('charroom_token', storedToken)
+          localStorage.setItem('charroom_accountId', String(userRes.id))
+        } catch (_e) {
+          // ignore localStorage failures
         }
-      })
+        // 自动恢复连接
+        chatSocket.connect(WS_URL, storedToken, store.state.accountId, {
+          onopen: () => console.log('ws restored'),
+          onmessage: (msg) => {
+            console.log('📩 恢复连接收到原始消息:', msg)
+            try {
+              if (msg.type === 'chat' && msg.chat) {
+                console.log('💬 恢复连接收到聊天消息:', msg.chat)
+                const m = {
+                  user: String(msg.chat.userId || 'unknown'),
+                  text: msg.chat.content,
+                  time: normalizeTimestamp(msg.chat.timestamp),
+                  targetId: msg.chat.targetClientId
+                }
+                console.log('📝 恢复连接构造消息对象:', m)
+                store.addMessage(m)
+                console.log('💾 恢复连接后消息列表:', store.state.messages)
+              } else if (msg.type === 'groupChat' && msg.groupChat) {
+                console.log('👥 恢复连接收到群聊消息:', msg.groupChat)
+                const gm = {
+                  user: String(msg.groupChat.userId),
+                  text: msg.groupChat.content,
+                  time: normalizeTimestamp(msg.groupChat.timestamp),
+                  groupId: msg.groupChat.targetClientId
+                }
+                store.addGroupMessage(gm)
+              } else if (msg.type === 'heartbeat') {
+                console.log('❤️ 恢复连接收到 heartbeat 心跳消息，忽略同步展示')
+              } else {
+                console.log('ℹ️ 恢复连接收到其他类型消息:', msg.type)
+              }
+            } catch (e) {
+              console.error('❌ 恢复连接处理消息失败', e)
+            }
+          },
+          onAuthFailed: (reason) => {
+            console.log('🔑 恢复连接认证失败:', reason)
+            // 清除本地凭证并跳回登录页
+            logout()
+          }
+        })
+      } else {
+        localStorage.removeItem('charroom_token')
+        localStorage.removeItem('charroom_accountId')
+        store.setToken('')
+        store.setAccountId('')
+      }
     } else {
       localStorage.removeItem('charroom_token')
       localStorage.removeItem('charroom_accountId')
