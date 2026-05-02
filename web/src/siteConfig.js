@@ -2,13 +2,13 @@
 const siteConfig = {
 	ICP_NUMBER: '粤ICP备2026049055号',
 	RELEASE_BASE: 'https://github.com/jkljklkjj/CharRoom/releases/latest',
-	RELEASE_VERSION: 'build-25239911453',
+	BUCKET_URL: 'https://dl.chatlite.xin/cloud-disk/',
 	INSTALLER_URLS: {
-		android: 'https://kkgithub.com/jkljklkjj/CharRoom/releases/download/{RELEASE_VERSION}/chatlite.apk',
-		linux: 'https://kkgithub.com/jkljklkjj/CharRoom/releases/download/{RELEASE_VERSION}/chatlite.deb',
-		macos: 'https://kkgithub.com/jkljklkjj/CharRoom/releases/download/{RELEASE_VERSION}/chatlite.dmg',
-		windows: 'https://kkgithub.com/jkljklkjj/CharRoom/releases/download/{RELEASE_VERSION}/chatlite.msi'
-	},
+        android: `https://dl.chatlite.xin/cloud-disk/chatlite.apk`,
+        linux: `https://dl.chatlite.xin/cloud-disk/chatlite.deb`,
+        macos: `https://dl.chatlite.xin/cloud-disk/chatlite.dmg`,
+        windows: `https://dl.chatlite.xin/cloud-disk/chatlite.msi`
+    },
 	// 可配置项：作者邮箱与支付二维码图片路径
 	AUTHOR_EMAIL: '2998568539@qq.com',
 	PAYMENT_QRCODES: {
