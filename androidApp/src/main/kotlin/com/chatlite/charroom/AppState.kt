@@ -59,22 +59,26 @@ class ChatAppState(
         var activeToken = token
         var activeRefreshToken = refreshToken
 
-        var valid = withContext(Dispatchers.IO) {
+        var validBundle = withContext(Dispatchers.IO) {
             repository.validateToken(token)
         }
 
-        if (!valid && refreshToken.isNotBlank()) {
+        if (validBundle != null) {
+            // 验证成功，使用新的token
+            activeToken = validBundle.accessToken
+            activeRefreshToken = validBundle.refreshToken
+        } else if (refreshToken.isNotBlank()) {
             val refreshed = withContext(Dispatchers.IO) {
                 repository.refreshAccessToken(refreshToken)
             }
             if (refreshed != null && refreshed.accessToken.isNotBlank()) {
                 activeToken = refreshed.accessToken
                 activeRefreshToken = refreshed.refreshToken
-                valid = true
+                validBundle = refreshed
             }
         }
 
-        if (!valid) {
+        if (validBundle == null) {
             authLoading = false
             return false
         }
