@@ -46,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
+import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
 
@@ -120,11 +120,20 @@ const filteredMessages = computed(() => {
 })
 
 function scrollToBottom() {
-  setTimeout(() => {
-    if (msgList.value) {
-      msgList.value.scrollTop = msgList.value.scrollHeight
-    }
-  }, 50)
+  nextTick(() => {
+    setTimeout(() => {
+      if (msgList.value) {
+        // 直接设置滚动位置，加上额外的像素偏移确保完全到底
+        msgList.value.scrollTop = msgList.value.scrollHeight + 100
+      }
+      // 再次确认滚动
+      setTimeout(() => {
+        if (msgList.value) {
+          msgList.value.scrollTop = msgList.value.scrollHeight + 100
+        }
+      }, 100)
+    }, 100)
+  })
 }
 
 // 切换会话或新消息到来时滚动到底部
@@ -177,10 +186,12 @@ function send(){
   chatSocket.sendWrapper(wrapper).catch(()=>{})
   text.value = ''
   // 滚动到底部
-  setTimeout(()=>{ if (msgList.value) msgList.value.scrollTop = msgList.value.scrollHeight },50)
+  scrollToBottom()
 }
 
 onMounted(()=>{
+  // 组件挂载时滚动到底部
+  scrollToBottom()
   // 可在此连接 websocket 并处理 incoming messages
 })
 </script>
