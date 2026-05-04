@@ -75,13 +75,16 @@ fun LoginRegisterApp(
                         refreshToken = savedRefreshToken
                         // 后台自动认证本地的token
                         println("[Auth] 自动登录读取到 token，length=${savedToken.length}, tail=${savedToken.takeLast(6)}")
-                        val validated = withContext(Dispatchers.IO) { ApiService.validateToken(savedToken) }
-                        println("[Auth] validateToken 结果=$validated, account=$savedAccount")
-                        if (validated) {
+                        val validatedBundle = withContext(Dispatchers.IO) { ApiService.validateToken(savedToken) }
+                        println("[Auth] validateToken 结果=${validatedBundle != null}, account=$savedAccount")
+                        if (validatedBundle != null) {
                             account = savedAccount
-                            token = savedToken
-                            ServerConfig.Token = savedToken
+                            token = validatedBundle.accessToken
+                            refreshToken = validatedBundle.refreshToken
+                            ServerConfig.Token = validatedBundle.accessToken
                             ServerConfig.id = savedAccount
+                            // 保存新的token对
+                            saveAuth(savedAccount, validatedBundle.accessToken, validatedBundle.refreshToken)
                             println("[Auth] 已写入 ServerConfig.Token，length=${ServerConfig.Token.length}, tail=${ServerConfig.Token.takeLast(6)}")
 
                             // 建立WebSocket连接并完成登录流程

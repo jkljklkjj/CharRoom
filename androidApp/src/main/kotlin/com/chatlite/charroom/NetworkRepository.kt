@@ -80,9 +80,9 @@ class NetworkRepository private constructor() {
         parseIntData(response) ?: -1
     }
 
-    suspend fun validateToken(token: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun validateToken(token: String): TokenBundle? = withContext(Dispatchers.IO) {
         val response = sendRequest(VALIDATE_TOKEN_PATH, "GET", null, token)
-        interpretBoolean(response)
+        parseLoginTokenBundle(response)
     }
 
     suspend fun fetchFriendAndGroupList(token: String): List<LocalUser> = withContext(Dispatchers.IO) {

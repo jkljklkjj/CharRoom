@@ -47,8 +47,10 @@ object ApiService {
         return core.getUserInfo(ServerConfig.Token)
     }
 
-    suspend fun validateToken(token: String): Boolean {
-        return core.validateToken(token)
+    suspend fun validateToken(token: String): LoginTokens? {
+        val bundle = core.validateToken(token) ?: return null
+        if (bundle.accessToken.isBlank()) return null
+        return LoginTokens(bundle.accessToken, bundle.refreshToken)
     }
 
     suspend fun refreshAccessToken(refreshToken: String): String {

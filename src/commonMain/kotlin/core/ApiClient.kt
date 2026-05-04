@@ -215,11 +215,11 @@ suspend fun refreshAccessToken(refreshToken: String): String? {
 }
 
 /**
- * 验证token有效性接口
+ * 验证token有效性接口，验证成功返回新的token对
  */
-suspend fun validateToken(token: String): Boolean {
+suspend fun validateToken(token: String): LoginTokenBundle? {
     val response = sendRequest(ApiEndpoints.VALIDATE_TOKEN, "GET", token = token)
-    return isApiSuccess(response)
+    return parseApiResponseData<LoginTokenBundle>(response)
 }
 
 /**
