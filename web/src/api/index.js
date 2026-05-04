@@ -24,12 +24,42 @@ async function safeFetch(url, options = {}) {
 }
 
 export async function login(account, password) {
-  if (!account || !password) return ''
+  if (!account || !password) return null
   const { ok, body } = await safeFetch(`${API_BASE}/user/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account, password })
   })
-  if (!ok) return ''
-  return body?.data || ''
+  if (!ok) return null
+
+  const data = body?.data
+  // 兼容新后端：data = { accessToken, refreshToken }
+  if (data && typeof data === 'object') {
+    const accessToken = String(data.accessToken || '')
+    const refreshToken = String(data.refreshToken || '')
+    if (accessToken) {
+      return { accessToken, refreshToken }
+    }
+  }
+  // 兼容旧后端：data 直接是 access token
+  if (typeof data === 'string' && data) {
+    return { accessToken: data, refreshToken: '' }
+  }
+  return null
+}
+
+export async function refreshToken(refreshToken) {
+  if (!refreshToken) return null
+  const { ok, body } = await safeFetch(`${API_BASE}/user/refreshToken`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken })
+  })
+  if (!ok) return null
+  const data = body?.data
+  if (!data || typeof data !== 'object') return null
+  const accessToken = String(data.accessToken || '')
+  const nextRefreshToken = String(data.refreshToken || '')
+  if (!accessToken) return null
+  return { accessToken, refreshToken: nextRefreshToken }
 }
 
 export async function register(username, password) {
@@ -189,4 +219,5 @@ export default {
   callAgentStream,
   sendVerifyCode,
   verifyRegister
+  ,refreshToken
 }

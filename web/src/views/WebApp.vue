@@ -123,21 +123,28 @@ function logout() {
   chatSocket.close()
   store.clearAll()
   store.setToken('')
+  store.setRefreshToken('')
   store.setAccountId('')
   store.setSelectedChat(null)
   localStorage.removeItem('charroom_token')
+  localStorage.removeItem('charroom_refreshToken')
   localStorage.removeItem('charroom_accountId')
   showSettings.value = false
 }
 
-async function onLogged(token) {
-  store.setToken(token)
+async function onLogged(tokens) {
+  const accessToken = tokens?.accessToken || ''
+  const refreshToken = tokens?.refreshToken || ''
+  if (!accessToken) return
+  store.setToken(accessToken)
+  store.setRefreshToken(refreshToken)
   // 登录后获取当前用户信息并设置accountId
   const userRes = await api.getCurrentUser()
   if (userRes && userRes.id) {
     store.setAccountId(userRes.id)
     try {
-      localStorage.setItem('charroom_token', token)
+      localStorage.setItem('charroom_token', accessToken)
+      localStorage.setItem('charroom_refreshToken', refreshToken)
       localStorage.setItem('charroom_accountId', String(userRes.id))
     } catch (_e) {
       // ignore localStorage failures
@@ -147,7 +154,7 @@ async function onLogged(token) {
   const friends = await api.getFriends()
   store.setUsers(friends)
   // 登录后立即建立 websocket 连接
-  chatSocket.connect(WS_URL, token, store.state.accountId, {
+  chatSocket.connect(WS_URL, accessToken, store.state.accountId, {
     onopen: () => console.log('ws open'),
     onmessage: (msg) => {
       // msg is decoded MessageWrapper object
@@ -203,27 +210,47 @@ async function onLogged(token) {
 onMounted(async () => {
   // 页面挂载时可做进一步初始化（如尝试恢复 token）
   const storedToken = store.state.token || localStorage.getItem('charroom_token')
+  const storedRefreshToken = store.state.refreshToken || localStorage.getItem('charroom_refreshToken') || ''
   const storedAccountId = localStorage.getItem('charroom_accountId')
   if (storedToken) {
     store.setToken(storedToken)
+    store.setRefreshToken(storedRefreshToken)
     if (storedAccountId) {
       store.setAccountId(storedAccountId)
     }
 
     // 先验证token有效性，再获取用户信息
-    const tokenValid = await api.validateToken()
+    let activeToken = storedToken
+    let tokenValid = await api.validateToken()
+    if (!tokenValid && storedRefreshToken) {
+      const refreshed = await api.refreshToken(storedRefreshToken)
+      if (refreshed && refreshed.accessToken) {
+        activeToken = refreshed.accessToken
+        store.setToken(refreshed.accessToken)
+        store.setRefreshToken(refreshed.refreshToken || '')
+        try {
+          localStorage.setItem('charroom_token', refreshed.accessToken)
+          localStorage.setItem('charroom_refreshToken', refreshed.refreshToken || '')
+        } catch (_e) {
+          // ignore localStorage failures
+        }
+        tokenValid = await api.validateToken()
+      }
+    }
+
     if (tokenValid) {
       const userRes = await api.getCurrentUser()
       if (userRes && userRes.id) {
         store.setAccountId(userRes.id)
         try {
-          localStorage.setItem('charroom_token', storedToken)
+          localStorage.setItem('charroom_token', activeToken)
+          localStorage.setItem('charroom_refreshToken', store.state.refreshToken || '')
           localStorage.setItem('charroom_accountId', String(userRes.id))
         } catch (_e) {
           // ignore localStorage failures
         }
         // 自动恢复连接
-        chatSocket.connect(WS_URL, storedToken, store.state.accountId, {
+        chatSocket.connect(WS_URL, activeToken, store.state.accountId, {
           onopen: () => console.log('ws restored'),
           onmessage: (msg) => {
             console.log('📩 恢复连接收到原始消息:', msg)
@@ -265,14 +292,18 @@ onMounted(async () => {
         })
       } else {
         localStorage.removeItem('charroom_token')
+        localStorage.removeItem('charroom_refreshToken')
         localStorage.removeItem('charroom_accountId')
         store.setToken('')
+        store.setRefreshToken('')
         store.setAccountId('')
       }
     } else {
       localStorage.removeItem('charroom_token')
+      localStorage.removeItem('charroom_refreshToken')
       localStorage.removeItem('charroom_accountId')
       store.setToken('')
+      store.setRefreshToken('')
       store.setAccountId('')
     }
   }

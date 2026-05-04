@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ChatApp(
-    appState: ChatAppState = remember { ChatAppState(NetworkRepository.getInstance()) },
+    appState: ChatAppState,
     onBackPressed: (((() -> Boolean)?) -> Unit)? = null
 ) {
     val scope = rememberCoroutineScope()
@@ -69,8 +69,8 @@ fun ChatApp(
                     errorMessage = appState.errorMessage,
                     onLoginRequest = { account, password ->
                         scope.launch {
-                            appState.login(account, password) { token, accountId ->
-                                AndroidTokenStorage.save(context, token, accountId)
+                            appState.login(account, password) { token, refreshToken, accountId ->
+                                AndroidTokenStorage.save(context, token, accountId, refreshToken)
                             }
                         }
                     },

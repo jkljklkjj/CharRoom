@@ -23,7 +23,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import component.appendAgentChunk
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.milliseconds
+
+val logger = KotlinLogging.logger("Chat")
 
 /**
  * 全局消息接收回调接口
@@ -125,12 +128,13 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
 
     override fun channelRead0(ctx: ChannelHandlerContext, msg: Any) {
         AppLog.i({"Received WebSocket message of type ${msg.javaClass.name}"})
+
         when (msg) {
             is TextWebSocketFrame -> {
                 val contentStr = msg.text()
                 println("Received WebSocket message: $contentStr")
                 try {
-                    handleIncomingMessage(contentStr)
+                    handleIncomingMessage(ctx, contentStr)
                 } catch (e: Exception) {
                     AppLog.e({"处理文本WebSocket消息错误: ${e.message}"}, e)
                 }
@@ -171,7 +175,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                                 // ignore heartbeat messages that are not direct responses to send()
                             } else {
                                 AppLog.w({"Binary websocket JSON did not contain expected fields: ${json.toString().take(256)}"})
-                                handleIncomingMessage(dataStr)
+                                handleIncomingMessage(ctx, dataStr)
                             }
                         } else {
                             AppLog.d{"Binary message content is not JSON after unwrap: ${dataStr.take(64)}"}
@@ -233,7 +237,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                 isDuplicate = runBlocking {
                     Chat.messageCacheMutex.withLock {
                         if (Chat.receivedMessageIds.contains(messageId)) {
-                            AppLog.d{"收到重复消息，忽略: $messageId"}
+//                            AppLog.d{"收到重复消息，忽略: $messageId"}
+                            logger.info { "收到重复消息，忽略: $messageId" }
                             true
                         } else {
                             // 添加到去重缓存
@@ -460,7 +465,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
         }
     }
 
-    private fun handleIncomingMessage(content: String) {
+    private fun handleIncomingMessage(ctx: ChannelHandlerContext, content: String) {
         try {
             val unwrap = unwrapApi(content)
             if (unwrap.hasEnvelope && !unwrap.success) {
@@ -483,20 +488,30 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     return
                 }
                 else -> {
-                    if (messageType.contains("登录失败") || messageType.contains("token无效") || messageType.contains("token已过期")) {
+                    if (messageType.contains("登录失败") || messageType.contains("token无效") || messageType.contains("token已过期") || messageType.contains("token不能为空")) {
+//                        throw IllegalArgumentException("登录失败")
+                        logger.info { "登录失败" }
                         AppLog.w({"登录凭证失效: $messageType"})
                         prompt(messageType)
                         // 清除无效凭证
                         ServerConfig.Token = ""
                         ServerConfig.id = ""
+                        // 标记认证失败，停止自动重连
+                        Chat.authFailed = true
                         // 通知所有监听器登录状态失效
                         synchronized(Chat.authStateListeners) {
-                            Chat.authStateListeners.forEach { listener ->
-                                try { listener.onAuthInvalidated(messageType) }
-                                catch (_: Exception) {}
+                            Chat.authStateListeners.forEachIndexed { index, listener ->
+                                try {
+                                    println("👉 触发第 $index 个监听器")
+                                    listener.onAuthInvalidated(messageType)
+                                    println("✅ 监听器执行完成")
+                                } catch (e: Exception) {
+                                    println("❌ 监听器执行失败: ${e.message}")
+                                    e.printStackTrace()
+                                }
                             }
                         }
-                        // 关闭连接，触发重连逻辑
+                        // 关闭连接
                         ctx.close()
                         return
                     }
@@ -613,6 +628,9 @@ object Chat {
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
 
+    // 认证失败标记，认证失败时不再自动重连
+    var authFailed = false
+
     fun addMessageReceiveListener(listener: MessageReceiveListener) {
         synchronized(messageListeners) {
             if (!messageListeners.contains(listener)) {
@@ -677,6 +695,13 @@ object Chat {
         val maxRetries: Int = 3
     )
 
+    // 防止重复启动连接
+    private val connecting = AtomicBoolean(false)
+
+    // 持有 event loop group，便于在连接关闭时正确释放
+    @Volatile
+    private var eventLoopGroup: EventLoopGroup? = null
+
     // helper: strip explicit port from host string if present (simple IPv4/hostname handling)
     private fun hostWithoutPort(rawHost: String?): String {
         if (rawHost.isNullOrBlank()) return ""
@@ -686,10 +711,22 @@ object Chat {
 
     fun start(newHost: String = host, newPort: Int = if (NetworkConstants.WS_PROTOCOL == "wss") 443 else 80) {
         // normalize host to remove any provided ":port" suffix
+        println("正在接入Netty服务")
         host = newHost
         // 根据协议自动选择端口：WSS用443，WS用80
         port = newPort
         stopReconnect.set(false)
+        Chat.authFailed = false // 重置认证失败标记，允许重新连接
+
+        // 如果已经连接或正在连接，则直接返回，避免重复连接导致的多次握手/登录
+        if (isConnected()) {
+            AppLog.i({ "已经连接，忽略重复 start() 调用" })
+            return
+        }
+        if (!connecting.compareAndSet(false, true)) {
+            AppLog.i({ "正在连接中，忽略重复 start() 调用" })
+            return
+        }
 
         // 注册关闭钩子
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -699,11 +736,37 @@ object Chat {
         try {
             startInternal()
 
-            // 阻塞等待连接关闭
-            channel.closeFuture().sync()
+            // 不在调用线程阻塞等待连接关闭，改为在后台协程中等待并处理后续逻辑
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    channel.closeFuture().sync()
+                    AppLog.i({ "channel.closeFuture completed in background" })
+                } catch (e: Exception) {
+                    AppLog.e({ "等待通道关闭时出错: ${e.message}" }, e)
+                } finally {
+                    // 标记连接断开并触发重连（如果未被显式停止）
+                    isServerConnected.value = false
+                    heartbeatJob?.cancel()
+
+                    // 释放 event loop group
+                    try {
+                        eventLoopGroup?.shutdownGracefully()
+                    } catch (_: Exception) {}
+                    eventLoopGroup = null
+
+                    // 重置连接中标志
+                    connecting.set(false)
+
+                    if (!stopReconnect.get() && isReconnecting.compareAndSet(false, true)) {
+                        currentReconnectDelay = initialReconnectDelay
+                        startReconnectLoop()
+                    }
+                }
+            }
         } catch (e: Exception) {
             AppLog.e({ "连接失败: ${e.message}" }, e)
             // 连接失败，启动重连
+            connecting.set(false)
             if (!stopReconnect.get() && isReconnecting.compareAndSet(false, true)) {
                 currentReconnectDelay = initialReconnectDelay
                 startReconnectLoop()
@@ -714,6 +777,9 @@ object Chat {
     private fun startHeartbeat() {
         heartbeatJob?.cancel()
         heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
+            // 先等一个心跳周期，避免刚建立连接就立刻触发首轮心跳
+            delay(heartbeatIntervalMillis.milliseconds)
+
             while (isActive) {
                 try {
                     if (!isConnected()) {
@@ -994,8 +1060,13 @@ object Chat {
      */
     private fun startReconnectLoop() {
         reconnectJob?.cancel()
+        // 认证失败时不启动重连
+        if (Chat.authFailed) {
+            AppLog.i({"认证失败，停止自动重连，请重新登录"})
+            return
+        }
         reconnectJob = CoroutineScope(Dispatchers.IO).launch {
-            while (isActive && !stopReconnect.get() && !isConnected()) {
+            while (isActive && !stopReconnect.get() && !isConnected() && !Chat.authFailed) {
                 try {
                     AppLog.i({ "尝试重连，延迟 ${currentReconnectDelay}ms..." })
                     delay(currentReconnectDelay.milliseconds)
@@ -1089,8 +1160,16 @@ object Chat {
             runCatching { channel.close().sync() }
         }
 
+        // 如果有旧的 event loop group，尝试释放它，避免资源泄露和重复线程
+        runCatching {
+            eventLoopGroup?.shutdownGracefully()
+        }
+        eventLoopGroup = null
+
         val effectiveHost = hostWithoutPort(host)
         val group = NioEventLoopGroup()
+        // 持有引用以便在外部关闭时能释放
+        eventLoopGroup = group
 
         try {
             val b = Bootstrap()
@@ -1153,13 +1232,41 @@ object Chat {
             AppLog.i({ "WebSocket连接成功" })
 
             // 发送登录消息
-            val loginWrapperBytes = buildLoginPayload(ServerConfig.Token)
-            sendInternal(loginWrapperBytes, MsgType.LOGIN, ServerConfig.Token, 1) { success, _ ->
+            val loginTokenSnapshot = ServerConfig.Token
+            val loginWrapperBytes = buildLoginPayload(loginTokenSnapshot)
+            println("[WS] 准备发送登录包，ServerConfig.id=${ServerConfig.id}, tokenLength=${loginTokenSnapshot.length}, tokenTail=${loginTokenSnapshot.takeLast(6)}, loginPayloadBytes=${loginWrapperBytes.size}")
+            sendInternal(loginWrapperBytes, MsgType.LOGIN, loginTokenSnapshot, 1) { success, resp ->
                 if (success) {
                     AppLog.i({ "登录成功" })
                 } else {
                     AppLog.e({ "登录失败" })
-                    // 关闭连接触发重连逻辑，不要抛出异常导致APP崩溃
+                    println("[WS] 登录失败，响应条数=${resp.size}, tokenLength=${loginTokenSnapshot.length}, tokenTail=${loginTokenSnapshot.takeLast(6)}")
+                    // 尝试从响应中提取错误信息
+                    val errorMsg = try {
+                        val lastBytes = resp.last() as? ByteArray
+                        if (lastBytes != null) {
+                            val unwrap = parseProtoResponse(lastBytes)
+                            unwrap.message ?: "登录失败，token无效或已过期"
+                        } else {
+                            "登录失败，网络错误"
+                        }
+                    } catch (_: Exception) {
+                        "登录失败"
+                    }
+
+                    // 清除无效凭证
+                    ServerConfig.Token = ""
+                    ServerConfig.id = ""
+                    // 标记认证失败，停止自动重连
+                    authFailed = true
+                    // 通知所有监听器登录状态失效
+                    synchronized(authStateListeners) {
+                        authStateListeners.forEach { listener ->
+                            try { listener.onAuthInvalidated(errorMsg) }
+                            catch (_: Exception) {}
+                        }
+                    }
+                    // 关闭连接
                     channel.close()
                 }
             }
@@ -1172,6 +1279,13 @@ object Chat {
                 AppLog.i({ "连接已关闭" })
                 isServerConnected.value = false
                 heartbeatJob?.cancel()
+
+                // 释放 event loop group
+                try { eventLoopGroup?.shutdownGracefully() } catch (_: Exception) {}
+                eventLoopGroup = null
+
+                // 重置连接中标志
+                connecting.set(false)
 
                 // 如果不是主动关闭，启动重连
                 if (!stopReconnect.get() && isReconnecting.compareAndSet(false, true)) {

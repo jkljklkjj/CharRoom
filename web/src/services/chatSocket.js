@@ -23,6 +23,16 @@ const messageIdQueue = [] // 消息ID队列，维护插入顺序用于LRU淘汰
 export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed } = {}) {
   console.log('🔌 尝试建立WebSocket连接:', { wsUrl, hasToken: !!token, userId, existingSocket: !!socket, readyState: socket?.readyState })
 
+  // token为空时不允许连接，防止无限重连
+  if (!token || typeof token !== 'string' || token.trim() === '') {
+    console.error('❌ 连接失败：token为空')
+    stopReconnect = true
+    if (onAuthFailed) {
+      onAuthFailed('token不能为空')
+    }
+    throw new Error('WebSocket连接失败：认证凭证为空')
+  }
+
   if (socket && socket.readyState === WebSocket.OPEN) {
     console.log('✅ 连接已存在，复用现有连接')
     return socket

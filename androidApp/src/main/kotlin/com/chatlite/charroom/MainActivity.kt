@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
@@ -92,13 +93,33 @@ class MainActivity : ComponentActivity() {
 
             ChatTheme {
                 val context = LocalContext.current
-                val appState = remember { ChatAppState(NetworkRepository.getInstance()) }
+                val scope = rememberCoroutineScope()
+                val appState = remember {
+                    ChatAppState(
+                        repository = NetworkRepository.getInstance(),
+                        coroutineScope = scope,
+                        onAuthFailed = {
+                            AndroidTokenStorage.clear(context)
+                        }
+                    )
+                }
 
                 LaunchedEffect(Unit) {
-                    AndroidTokenStorage.load(context)?.let { (savedToken, savedAccountId) ->
-                        val restored = appState.tryRestoreSession(savedToken, savedAccountId)
+                    AndroidTokenStorage.load(context)?.let { stored ->
+                        val restored = appState.tryRestoreSession(
+                            token = stored.token,
+                            accountId = stored.accountId,
+                            refreshToken = stored.refreshToken
+                        )
                         if (!restored) {
                             AndroidTokenStorage.clear(context)
+                        } else {
+                            AndroidTokenStorage.save(
+                                context,
+                                appState.token,
+                                appState.currentUserId,
+                                appState.refreshToken
+                            )
                         }
                     }
                 }

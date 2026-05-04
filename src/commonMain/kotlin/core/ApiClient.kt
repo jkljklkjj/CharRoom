@@ -18,6 +18,12 @@ import model.Message
 import model.MessageType
 import model.User
 
+@Serializable
+data class LoginTokenBundle(
+    val accessToken: String = "",
+    val refreshToken: String = ""
+)
+
 // 简单 Json 工具（忽略未知字段）
 val json = Json { ignoreUnknownKeys = true }
 
@@ -161,7 +167,7 @@ suspend fun uploadFile(
 /**
  * 登录接口
  */
-suspend fun login(account: String, password: String): String? {
+suspend fun loginTokens(account: String, password: String): LoginTokenBundle? {
     val body = json.encodeToString(
         JsonObject.serializer(),
         buildJsonObject {
@@ -170,7 +176,42 @@ suspend fun login(account: String, password: String): String? {
         }
     )
     val response = sendRequest(ApiEndpoints.LOGIN, "POST", body)
-    return parseApiResponseData(response)
+    val bundle = parseApiResponseData<LoginTokenBundle>(response)
+    if (bundle != null && bundle.accessToken.isNotBlank()) {
+        return bundle
+    }
+
+    // 兼容旧后端：data 直接是字符串 token
+    val legacyAccessToken: String? = parseApiResponseData(response)
+    if (!legacyAccessToken.isNullOrBlank()) {
+        return LoginTokenBundle(accessToken = legacyAccessToken, refreshToken = "")
+    }
+    return null
+}
+
+suspend fun login(account: String, password: String): String? {
+    return loginTokens(account, password)?.accessToken
+}
+
+/**
+ * 使用 refresh token 刷新 access token（并轮换 refresh token）
+ */
+suspend fun refreshTokenBundle(refreshToken: String): LoginTokenBundle? {
+    if (refreshToken.isBlank()) return null
+    val body = json.encodeToString(
+        JsonObject.serializer(),
+        buildJsonObject {
+            put("refreshToken", refreshToken)
+        }
+    )
+    val response = sendRequest(ApiEndpoints.REFRESH_TOKEN, "POST", body)
+    val bundle = parseApiResponseData<LoginTokenBundle>(response) ?: return null
+    if (bundle.accessToken.isBlank()) return null
+    return bundle
+}
+
+suspend fun refreshAccessToken(refreshToken: String): String? {
+    return refreshTokenBundle(refreshToken)?.accessToken
 }
 
 /**

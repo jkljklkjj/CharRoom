@@ -10,9 +10,26 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="全面实现android和桌面端的互通逻辑，并且修改了聊天历史存储逻辑">
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/API_DOCUMENTATION.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidTokenStorage.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidTokenStorage.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/PlatformLogging.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hs_err_pid19216.log" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/AppLog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/AppLog.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/services/chatSocket.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/services/chatSocket.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,7 +50,7 @@
       <entry key="chat-panel" value="GPT-5 mini" />
     </selectedModels>
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=10AD5U25FA000YT)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -147,64 +164,64 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Android App.CharRoom.executor": "Run",
-    "Android App.androidApp.executor": "Run",
-    "Android App.qingliao.CharRoom.androidApp.executor": "Run",
-    "Gradle.CharRoom [:androidApp:build].executor": "Run",
-    "Gradle.CharRoom [:androidApp:clean].executor": "Run",
-    "Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor": "Run",
-    "Gradle.CharRoom [build].executor": "Run",
-    "Gradle.CharRoom [checkRuntime].executor": "Run",
-    "Gradle.CharRoom [clean].executor": "Run",
-    "Gradle.CharRoom [customApk].executor": "Run",
-    "Gradle.CharRoom [customJar].executor": "Run",
-    "Gradle.CharRoom [customProguardReleaseJars].executor": "Run",
-    "Gradle.CharRoom [dependencies].executor": "Run",
-    "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
-    "Gradle.CharRoom [package].executor": "Run",
-    "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
-    "Gradle.desktop.executor": "Debug",
-    "Gradle.下载源代码.executor": "Run",
-    "Gradle.升级 Gradle 包装器.executor": "Run",
-    "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
-    "JAR 应用程序.在线聊天App-1.0.0.jar.executor": "Run",
-    "Kotlin.ChatKt.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.go.formatter.settings.were.checked": "true",
-    "RunOnceActivity.go.migrated.go.modules.settings": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "external.system.has.shared.sources": "true",
-    "git-widget-placeholder": "master",
-    "go.import.settings.migrated": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "项目",
-    "project.structure.proportion": "0.17",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
-    "ts.external.directory.path": "D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Android App.CharRoom.executor&quot;: &quot;Run&quot;,
+    &quot;Android App.androidApp.executor&quot;: &quot;Run&quot;,
+    &quot;Android App.qingliao.CharRoom.androidApp.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [checkRuntime].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customApk].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customJar].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customProguardReleaseJars].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [dependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [packageReleaseMsi].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [package].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [proguardReleaseJars].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.desktop.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.下载源代码.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.升级 Gradle 包装器.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.在线聊天App-1.0.0.jar.executor&quot;: &quot;Run&quot;,
+    &quot;Kotlin.ChatKt.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;external.system.has.shared.sources&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;项目&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;File.Encoding&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "mongo",
-      "mysql",
-      "redis"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;mongo&quot;,
+      &quot;mysql&quot;,
+      &quot;redis&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\lora\qingliao\CharRoom\src\desktopMain\resources\icons" />
@@ -481,11 +498,11 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
         <item itemvalue="Gradle.CharRoom [customProguardReleaseJars]" />
         <item itemvalue="Gradle.CharRoom [customApk]" />
-        <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
-        <item itemvalue="Gradle.CharRoom [build]" />
         <item itemvalue="Gradle.CharRoom [clean]" />
+        <item itemvalue="Gradle.CharRoom [build]" />
       </list>
     </recent_temporary>
   </component>
@@ -730,7 +747,17 @@
       <workItem from="1777633509154" duration="1869000" />
       <workItem from="1777681731041" duration="67000" />
       <workItem from="1777691566225" duration="65000" />
-      <workItem from="1777691689776" duration="1208000" />
+      <workItem from="1777691689776" duration="3559000" />
+      <workItem from="1777709619076" duration="7407000" />
+      <workItem from="1777719079873" duration="84000" />
+      <workItem from="1777719632082" duration="20000" />
+      <workItem from="1777719718964" duration="2489000" />
+      <workItem from="1777722523107" duration="846000" />
+      <workItem from="1777732488966" duration="710000" />
+      <workItem from="1777734497574" duration="2171000" />
+      <workItem from="1777738066822" duration="5324000" />
+      <workItem from="1777815042325" duration="1362000" />
+      <workItem from="1777816507832" duration="3736000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1155,13 +1182,8 @@
           <option name="timeStamp" value="24" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt</url>
-          <line>171</line>
-          <option name="timeStamp" value="25" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/build.gradle.kts</url>
-          <line>158</line>
+          <line>159</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>
@@ -1169,8 +1191,52 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
-          <line>173</line>
-          <option name="timeStamp" value="27" />
+          <line>486</line>
+          <properties>
+            <option name="lambda-ordinal" value="-1" />
+          </properties>
+          <option name="timeStamp" value="28" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
+          <line>1225</line>
+          <option name="timeStamp" value="40" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt</url>
+          <line>195</line>
+          <option name="timeStamp" value="41" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt</url>
+          <line>217</line>
+          <option name="timeStamp" value="46" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt</url>
+          <line>202</line>
+          <option name="timeStamp" value="47" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt</url>
+          <line>76</line>
+          <option name="timeStamp" value="49" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt</url>
+          <line>73</line>
+          <properties>
+            <option name="lambda-ordinal" value="-1" />
+          </properties>
+          <option name="timeStamp" value="50" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-function">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/Chat.kt</url>
+          <line>619</line>
+          <properties class="core.Chat">
+            <option name="WATCH_EXIT" value="false" />
+          </properties>
+          <option name="timeStamp" value="29" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
@@ -1179,6 +1245,12 @@
         <PinnedItemInfo parentTag="jdk.internal.net.http.HttpRequestBuilderImpl" memberName="method" />
       </pinned-members>
     </pin-to-top-manager>
+    <watches-manager>
+      <configuration name="GradleRunConfiguration">
+        <watch expression="jsonObject[&quot;code&quot;]" />
+        <watch expression="isApiSuccess(response)" />
+      </configuration>
+    </watches-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

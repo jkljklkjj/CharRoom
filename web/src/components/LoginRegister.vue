@@ -41,10 +41,11 @@ async function doAction() {
 
 async function doLogin() {
   if (!account.value || !password.value) { alert('请填写账号和密码'); return }
-  const token = await api.login(account.value, password.value)
-  if (token) {
-    store.setToken(token)
-    emit('logged', token)
+  const tokens = await api.login(account.value, password.value)
+  if (tokens && tokens.accessToken) {
+    store.setToken(tokens.accessToken)
+    store.setRefreshToken(tokens.refreshToken || '')
+    emit('logged', tokens)
   } else {
     alert('登录失败，请检查账号密码')
   }

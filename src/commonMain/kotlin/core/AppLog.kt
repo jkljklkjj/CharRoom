@@ -1,41 +1,39 @@
 package core
 
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 
 /**
  * 日志工具类，兼容原有调用方式
+ * 新代码请直接使用KotlinLogging标准用法：private val logger = KotlinLogging.logger {}
  */
+import kotlin.PublishedApi
+
 object AppLog {
-    private val logger = LoggerFactory.getLogger("ChatApp")
+    @PublishedApi
+    internal val logger = KotlinLogging.logger("ChatApp")
 
     /**
      * 调试日志
      * @param message 消息生成函数
      */
-    fun d(message: () -> String) {
-        if (logger.isDebugEnabled) {
-            logger.debug(message())
-        }
+    inline fun d(crossinline message: () -> String) {
+        logger.debug { message() }
     }
 
     /**
      * 信息日志
      * @param message 消息生成函数
      */
-    fun i(message: () -> String) {
-        if (logger.isInfoEnabled) {
-            logger.info(message())
-        }
+    inline fun i(crossinline message: () -> String) {
+        logger.info { message() }
     }
 
     /**
      * 警告日志
      * @param message 消息生成函数
      */
-    fun w(message: () -> String) {
-        if (logger.isWarnEnabled) {
-            logger.warn(message())
-        }
+    inline fun w(crossinline message: () -> String) {
+        logger.warn { message() }
     }
 
     /**
@@ -43,13 +41,11 @@ object AppLog {
      * @param message 消息生成函数
      * @param throwable 异常
      */
-    fun e(message: () -> String, throwable: Throwable? = null) {
-        if (logger.isErrorEnabled) {
-            if (throwable != null) {
-                logger.error(message(), throwable)
-            } else {
-                logger.error(message())
-            }
+    inline fun e(crossinline message: () -> String, throwable: Throwable? = null) {
+        if (throwable != null) {
+            logger.error(throwable) { message() }
+        } else {
+            logger.error { message() }
         }
     }
 }

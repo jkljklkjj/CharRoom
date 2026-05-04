@@ -22,6 +22,7 @@ class NetworkRepository private constructor() {
 
         // API路径常量
         private const val LOGIN_PATH = ApiEndpoints.LOGIN
+        private const val REFRESH_TOKEN_PATH = ApiEndpoints.REFRESH_TOKEN
         private const val REGISTER_PATH = ApiEndpoints.REGISTER
         private const val VALIDATE_TOKEN_PATH = ApiEndpoints.VALIDATE_TOKEN
         private const val FRIEND_GET_PATH = ApiEndpoints.FRIEND_GET
@@ -48,13 +49,26 @@ class NetworkRepository private constructor() {
 
     private val wsClient = AndroidWebSocketClient()
 
-    suspend fun login(account: String, password: String): String = withContext(Dispatchers.IO) {
+    data class TokenBundle(
+        val accessToken: String,
+        val refreshToken: String
+    )
+
+    suspend fun login(account: String, password: String): TokenBundle? = withContext(Dispatchers.IO) {
         val body = JSONObject().apply {
             put("account", account)
             put("password", password)
         }
         val response = sendRequest(LOGIN_PATH, "POST", body.toString(), null)
-        parseStringData(response)
+        parseLoginTokenBundle(response)
+    }
+
+    suspend fun refreshAccessToken(refreshToken: String): TokenBundle? = withContext(Dispatchers.IO) {
+        val body = JSONObject().apply {
+            put("refreshToken", refreshToken)
+        }
+        val response = sendRequest(REFRESH_TOKEN_PATH, "POST", body.toString(), null)
+        parseLoginTokenBundle(response)
     }
 
     suspend fun register(username: String, password: String): Int = withContext(Dispatchers.IO) {
@@ -118,12 +132,13 @@ class NetworkRepository private constructor() {
         token: String,
         ownUserId: Int,
         onMessage: (ChatMessage) -> Unit,
-        onStatusUpdate: (clientId: String, online: Boolean) -> Unit
+        onStatusUpdate: (clientId: String, online: Boolean) -> Unit,
+        onAuthFailed: ((reason: String) -> Unit)? = null
     ): Boolean = withContext(Dispatchers.IO) {
-        val success = wsClient.connect(token, ownUserId, onMessage, onStatusUpdate)
+        val success = wsClient.connect(token, ownUserId, onMessage, onStatusUpdate, onAuthFailed)
         if (success) {
             isConnected = true
-            saveConnectionInfo(token, ownUserId, onMessage, onStatusUpdate)
+            saveConnectionInfo(token, ownUserId, onMessage, onStatusUpdate, onAuthFailed)
         }
         success
     }
@@ -171,13 +186,30 @@ class NetworkRepository private constructor() {
         }
     }
 
-    private fun parseStringData(response: String): String {
+    private fun parseLoginTokenBundle(response: String): TokenBundle? {
         return try {
             val root = JSONObject(response)
-            if (root.optInt("code", -1) != 0) return ""
-            root.optString("data", "")
+            if (root.optInt("code", -1) != 0) return null
+            val data = root.opt("data")
+            when (data) {
+                is JSONObject -> {
+                    val accessToken = data.optString("accessToken", "")
+                    if (accessToken.isBlank()) {
+                        null
+                    } else {
+                        TokenBundle(
+                            accessToken = accessToken,
+                            refreshToken = data.optString("refreshToken", "")
+                        )
+                    }
+                }
+                is String -> {
+                    if (data.isBlank()) null else TokenBundle(accessToken = data, refreshToken = "")
+                }
+                else -> null
+            }
         } catch (e: Exception) {
-            ""
+            null
         }
     }
 
@@ -307,6 +339,7 @@ class NetworkRepository private constructor() {
     private var isConnected = false
     private var onMessageCallback: ((ChatMessage) -> Unit)? = null
     private var onStatusCallback: ((clientId: String, online: Boolean) -> Unit)? = null
+    private var onAuthFailedCallback: ((reason: String) -> Unit)? = null
 
     /**
      * 网络恢复时自动重连
@@ -321,7 +354,8 @@ class NetworkRepository private constructor() {
                         token = currentToken!!,
                         ownUserId = currentUserId,
                         onMessage = onMessageCallback ?: {},
-                        onStatusUpdate = onStatusCallback ?: { _, _ -> }
+                        onStatusUpdate = onStatusCallback ?: { _, _ -> },
+                        onAuthFailed = onAuthFailedCallback
                     )
                 } catch (e: Exception) {
                     // 重连失败，稍后再试
@@ -352,11 +386,13 @@ class NetworkRepository private constructor() {
      */
     fun saveConnectionInfo(token: String, userId: Int,
                            onMessage: (ChatMessage) -> Unit,
-                           onStatus: (clientId: String, online: Boolean) -> Unit) {
+                           onStatus: (clientId: String, online: Boolean) -> Unit,
+                           onAuthFailed: ((reason: String) -> Unit)? = null) {
         currentToken = token
         currentUserId = userId
         onMessageCallback = onMessage
         onStatusCallback = onStatus
+        onAuthFailedCallback = onAuthFailed
     }
 
     /**
@@ -367,6 +403,7 @@ class NetworkRepository private constructor() {
         currentUserId = 0
         onMessageCallback = null
         onStatusCallback = null
+        onAuthFailedCallback = null
         isConnected = false
     }
 }

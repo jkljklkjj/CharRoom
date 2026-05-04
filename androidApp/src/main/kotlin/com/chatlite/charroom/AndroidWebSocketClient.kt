@@ -36,7 +36,8 @@ class AndroidWebSocketClient {
         token: String,
         ownUserId: Int,
         onMessage: (ChatMessage) -> Unit,
-        onStatusUpdate: (clientId: String, online: Boolean) -> Unit
+        onStatusUpdate: (clientId: String, online: Boolean) -> Unit,
+        onAuthFailed: ((reason: String) -> Unit)? = null
     ): Boolean {
         if (channel?.isActive == true) return true
 
@@ -100,8 +101,30 @@ class AndroidWebSocketClient {
                                             if (response.clientId.isNotBlank()) {
                                                 onStatusUpdate(response.clientId, response.online)
                                             }
+                                            // 检查响应是否为登录失败
+                                            if (!response.success) {
+                                                val msg = response.message ?: ""
+                                                if (msg.contains("登录失败") || msg.contains("token无效") || msg.contains("token过期") || msg.contains("token不能为空")) {
+                                                    // 认证失败，通知上层
+                                                    onAuthFailed?.invoke(msg)
+                                                    // 关闭连接
+                                                    ctx.close()
+                                                }
+                                            }
                                         } catch (_: Exception) {
-                                            // ignore non-response messages
+                                            // 尝试解析普通响应
+                                            try {
+                                                val root = org.json.JSONObject(String(bytes, Charsets.UTF_8))
+                                                if (!root.optBoolean("success", true)) {
+                                                    val msg = root.optString("message", "")
+                                                    if (msg.contains("登录失败") || msg.contains("token无效") || msg.contains("token过期") || msg.contains("token不能为空")) {
+                                                        onAuthFailed?.invoke(msg)
+                                                        ctx.close()
+                                                    }
+                                                }
+                                            } catch (_: Exception) {
+                                                // ignore invalid messages
+                                            }
                                         }
                                     }
                                 }

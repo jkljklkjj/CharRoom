@@ -58,6 +58,7 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.32")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.2")
     implementation("co.touchlab:kermit:2.1.0")
+    implementation("io.github.oshai:kotlin-logging:6.0.3") // Kotlin官方日志库
     implementation("com.google.protobuf:protobuf-java:4.34.1")
     implementation("com.google.protobuf:protobuf-kotlin:4.34.1")
     implementation(project(":proto"))
@@ -96,7 +97,8 @@ compose.desktop {
             "-Dfile.encoding=UTF-8",
             "-Dsun.jnu.encoding=UTF-8",
             "-Duser.language=zh",
-            "-Duser.country=CN"
+            "-Duser.country=CN",
+            "-Dconsole.encoding=UTF-8"
         )
 
         buildTypes {

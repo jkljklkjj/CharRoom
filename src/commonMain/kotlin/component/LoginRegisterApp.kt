@@ -10,6 +10,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import java.io.File
+import core.Chat
+import core.MessageReceiveListener
 import core.ServerConfig
 import core.ApiService
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +38,7 @@ fun LoginRegisterApp(
     var res by remember { mutableStateOf(-1) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var token by remember { mutableStateOf("") }
+    var refreshToken by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     var account by remember { mutableStateOf(ServerConfig.id) }
     val credentialsFile = remember { File("credentials.txt") }
@@ -43,10 +46,10 @@ fun LoginRegisterApp(
     var triedAutoLogin by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    fun saveAuth(account: String, token: String) {
+    fun saveAuth(account: String, token: String, refreshToken: String = "") {
         try {
             authFile.parentFile?.mkdirs()
-            authFile.writeText("$account\n$token")
+            authFile.writeText("$account\n$token\n$refreshToken")
         } catch (_: Exception) {
         }
     }
@@ -66,16 +69,46 @@ fun LoginRegisterApp(
                 if (savedLines.size >= 2) {
                     val savedAccount = savedLines[0].trim()
                     val savedToken = savedLines[1].trim()
+                    val savedRefreshToken = savedLines.getOrNull(2)?.trim().orEmpty()
                     if (savedToken.isNotBlank()) {
                         message = "正在尝试自动登录..."
+                        refreshToken = savedRefreshToken
+                        // 后台自动认证本地的token
+                        println("[Auth] 自动登录读取到 token，length=${savedToken.length}, tail=${savedToken.takeLast(6)}")
                         val validated = withContext(Dispatchers.IO) { ApiService.validateToken(savedToken) }
+                        println("[Auth] validateToken 结果=$validated, account=$savedAccount")
                         if (validated) {
                             account = savedAccount
                             token = savedToken
                             ServerConfig.Token = savedToken
                             ServerConfig.id = savedAccount
+                            println("[Auth] 已写入 ServerConfig.Token，length=${ServerConfig.Token.length}, tail=${ServerConfig.Token.takeLast(6)}")
+
+                            // 建立WebSocket连接并完成登录流程
+                            message = "正在建立连接..."
+
+                            // 不在这里直接启动 WebSocket，交给 ChatApp 统一启动，避免自动登录路径和页面初始化重复建连
+                            // 如果登录失败，AuthStateListener 会在 ChatApp 中统一处理
                             message = "已使用保存的令牌自动登录"
                             isLoggedIn = true
+                        } else if (savedRefreshToken.isNotBlank()) {
+                            message = "访问令牌失效，正在尝试刷新..."
+                            val refreshed = withContext(Dispatchers.IO) {
+                                ApiService.refreshTokenBundle(savedRefreshToken)
+                            }
+                            if (refreshed != null && refreshed.accessToken.isNotBlank()) {
+                                account = savedAccount
+                                token = refreshed.accessToken
+                                refreshToken = refreshed.refreshToken
+                                ServerConfig.Token = refreshed.accessToken
+                                ServerConfig.id = savedAccount
+                                saveAuth(savedAccount, refreshed.accessToken, refreshed.refreshToken)
+                                message = "刷新成功，已自动登录"
+                                isLoggedIn = true
+                            } else {
+                                deleteAuth()
+                                message = "自动登录失败，请重新登录"
+                            }
                         } else {
                             deleteAuth()
                             message = "自动登录失败，请重新登录"
@@ -111,6 +144,7 @@ fun LoginRegisterApp(
             onToggleDarkMode = onToggleDarkMode,
             onLogout = {
                 ServerConfig.Token = ""
+                refreshToken = ""
                 token = ""
                 isLoggedIn = false
                 password = ""
@@ -173,14 +207,16 @@ fun LoginRegisterApp(
                             isSubmitting = true
                             message = "正在登录..."
 
-                            val tk = withContext(Dispatchers.IO) { ApiService.login(acc, pwd) }
-                            token = tk
-                            if (tk.isNotEmpty()) {
-                                ServerConfig.Token = tk
+                            val tk = withContext(Dispatchers.IO) { ApiService.loginTokens(acc, pwd) }
+                            if (tk != null && tk.accessToken.isNotBlank()) {
+                                token = tk.accessToken
+                                refreshToken = tk.refreshToken
+                                ServerConfig.Token = tk.accessToken
                                 ServerConfig.id = acc
+                                println("[Auth] 手动登录成功，token length=${tk.accessToken.length}, tail=${tk.accessToken.takeLast(6)}")
                                 message = "登录成功"
                                 credentialsFile.takeIf { rememberMe }?.writeText(acc)
-                                saveAuth(acc, tk)
+                                saveAuth(acc, tk.accessToken, tk.refreshToken)
                                 isLoggedIn = true
                             } else {
                                 message = "登录失败，请检查账号或密码"

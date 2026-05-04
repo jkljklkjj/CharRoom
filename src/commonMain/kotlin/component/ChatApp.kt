@@ -55,6 +55,7 @@ import core.Action
 import core.ActionLogger
 import core.ActionType
 import core.LocalChatHistoryStore
+import io.github.oshai.kotlinlogging.KotlinLogging
 import model.groupMessages
 import viewmodel.chatViewModel
 import kotlin.collections.isNotEmpty
@@ -229,6 +230,7 @@ fun sendMessage(
             if (!delivered) {
                 localCopy.isSent.value = false
             }
+            // todo 添加返回ackHandler的逻辑
             onDone(delivered)
         }
         return
@@ -529,6 +531,7 @@ fun ChatApp(
         // 注册登录状态监听器，token失效时自动退出
         val authListener = Chat.AuthStateListener { reason ->
             scope.launch(Dispatchers.Main) {
+                println("Auth state changed: $reason")
                 // 清除本地保存的无效凭证
                 try {
                     val authFile = java.io.File(System.getProperty("user.home"), ".qingliao/auth.txt")

@@ -4,6 +4,7 @@ object ApiEndpoints {
     private val BASE = "https://${ServerConfig.SERVER_IP}/api"
 
     const val LOGIN = "/user/login"
+    const val REFRESH_TOKEN = "/user/refreshToken"
     const val REGISTER = "/user/register"
     const val VALIDATE_TOKEN = "/user/validateToken"
     const val FRIEND_GET = "/friend/get"

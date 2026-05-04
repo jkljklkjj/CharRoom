@@ -8,11 +8,22 @@ import model.User
  * Api服务单例，兼容现有调用
  */
 object ApiService {
+    data class LoginTokens(
+        val accessToken: String,
+        val refreshToken: String
+    )
+
     /**
      * 登录，返回 token
      */
     suspend fun login(account: String, password: String): String {
         return core.login(account, password).orEmpty()
+    }
+
+    suspend fun loginTokens(account: String, password: String): LoginTokens? {
+        val bundle = core.loginTokens(account, password) ?: return null
+        if (bundle.accessToken.isBlank()) return null
+        return LoginTokens(bundle.accessToken, bundle.refreshToken)
     }
 
     /**
@@ -38,6 +49,16 @@ object ApiService {
 
     suspend fun validateToken(token: String): Boolean {
         return core.validateToken(token)
+    }
+
+    suspend fun refreshAccessToken(refreshToken: String): String {
+        return core.refreshAccessToken(refreshToken).orEmpty()
+    }
+
+    suspend fun refreshTokenBundle(refreshToken: String): LoginTokens? {
+        val bundle = core.refreshTokenBundle(refreshToken) ?: return null
+        if (bundle.accessToken.isBlank()) return null
+        return LoginTokens(bundle.accessToken, bundle.refreshToken)
     }
 
     /**

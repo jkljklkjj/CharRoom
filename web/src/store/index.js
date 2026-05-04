@@ -7,6 +7,7 @@ const state = reactive({
   messages: [],
   groupMessages: [],
   token: '',
+  refreshToken: '',
   accountId: '',
   pendingRegister: null,
   selectedChatId: null
@@ -122,6 +123,7 @@ function loadConversation(id, isGroup = false) {
 }
 
 function setToken(t) { state.token = t }
+function setRefreshToken(t) { state.refreshToken = t }
 function setAccountId(id) {
   state.accountId = id
   state.messages = []
@@ -162,6 +164,7 @@ export function useStore() {
   return {
     state: readonly(state),
     setToken,
+    setRefreshToken,
     setAccountId,
     setUsers,
     addUser,

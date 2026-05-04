@@ -3,10 +3,16 @@ package com.chatlite.charroom
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class ChatAppState(private val repository: NetworkRepository) {
+class ChatAppState(
+    private val repository: NetworkRepository,
+    private val coroutineScope: CoroutineScope,
+    private val onAuthFailed: (() -> Unit)? = null
+) {
     var screen by mutableStateOf<Screen>(Screen.Login)
     var token by mutableStateOf("")
     var users by mutableStateOf<List<LocalUser>>(emptyList())
@@ -16,22 +22,28 @@ class ChatAppState(private val repository: NetworkRepository) {
     var wsConnected by mutableStateOf(false)
     var errorMessage by mutableStateOf("")
     var currentUserId by mutableStateOf(0)
+    var refreshToken by mutableStateOf("")
     private var accountId by mutableStateOf(0)
 
-    suspend fun login(account: String, password: String, saveToken: ((String, Int) -> Unit)? = null): Boolean {
+    suspend fun login(
+        account: String,
+        password: String,
+        saveToken: ((token: String, refreshToken: String, accountId: Int) -> Unit)? = null
+    ): Boolean {
         errorMessage = ""
         authLoading = true
-        val tokenResult = withContext(Dispatchers.IO) {
+        val loginResult = withContext(Dispatchers.IO) {
             repository.login(account, password)
         }
 
-        if (tokenResult.isNotBlank()) {
-            token = tokenResult
+        if (loginResult != null && loginResult.accessToken.isNotBlank()) {
+            token = loginResult.accessToken
+            refreshToken = loginResult.refreshToken
             accountId = account.toIntOrNull() ?: 0
             currentUserId = accountId
             loadUserList(token)
             connectWebSocket()
-            saveToken?.invoke(token, accountId)
+            saveToken?.invoke(token, refreshToken, accountId)
             authLoading = false
             return true
         } else {
@@ -41,21 +53,37 @@ class ChatAppState(private val repository: NetworkRepository) {
         }
     }
 
-    suspend fun tryRestoreSession(token: String, accountId: Int): Boolean {
+    suspend fun tryRestoreSession(token: String, accountId: Int, refreshToken: String = ""): Boolean {
         errorMessage = ""
         authLoading = true
-        val valid = withContext(Dispatchers.IO) {
+        var activeToken = token
+        var activeRefreshToken = refreshToken
+
+        var valid = withContext(Dispatchers.IO) {
             repository.validateToken(token)
         }
+
+        if (!valid && refreshToken.isNotBlank()) {
+            val refreshed = withContext(Dispatchers.IO) {
+                repository.refreshAccessToken(refreshToken)
+            }
+            if (refreshed != null && refreshed.accessToken.isNotBlank()) {
+                activeToken = refreshed.accessToken
+                activeRefreshToken = refreshed.refreshToken
+                valid = true
+            }
+        }
+
         if (!valid) {
             authLoading = false
             return false
         }
 
-        this.token = token
+        this.token = activeToken
+        this.refreshToken = activeRefreshToken
         this.accountId = accountId
         this.currentUserId = accountId
-        loadUserList(token)
+        loadUserList(activeToken)
         connectWebSocket()
         authLoading = false
         return wsConnected
@@ -115,11 +143,25 @@ class ChatAppState(private val repository: NetworkRepository) {
     private suspend fun connectWebSocket() {
         wsConnecting = true
         wsConnected = withContext(Dispatchers.IO) {
-            repository.connectWebSocket(token, accountId, { message ->
-                handleIncomingMessage(message)
-            }, { clientId, online ->
-                handleStatusUpdate(clientId, online)
-            })
+            repository.connectWebSocket(
+                token = token,
+                ownUserId = accountId.toInt(),
+                onMessage = { message ->
+                    handleIncomingMessage(message)
+                },
+                onStatusUpdate = { clientId, online ->
+                    handleStatusUpdate(clientId, online)
+                },
+                onAuthFailed = { reason ->
+                    // 认证失败，清除本地凭证并跳回登录页
+                    coroutineScope.launch(Dispatchers.Main) {
+                        repository.clearConnectionInfo()
+                        logout()
+                        errorMessage = reason
+                        onAuthFailed?.invoke()
+                    }
+                }
+            )
         }
         wsConnecting = false
         if (!wsConnected) {
@@ -167,6 +209,7 @@ class ChatAppState(private val repository: NetworkRepository) {
         repository.disconnectWebSocket()
         wsConnected = false
         token = ""
+        refreshToken = ""
         users = emptyList()
         screen = Screen.Login
         currentUserId = 0
