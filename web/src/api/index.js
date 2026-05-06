@@ -157,22 +157,27 @@ export async function getCurrentUser() {
 }
 
 export async function validateToken() {
-  const { ok, body } = await safeFetch(`${API_BASE}/user/validateToken`, { method: 'GET' })
-  if (!ok) return false
-  if (body?.code === 0 && body?.data && typeof body.data === 'object') {
-    // 新接口：返回token对，更新store中的token
-    const accessToken = String(body.data.accessToken || '')
-    const refreshToken = String(body.data.refreshToken || '')
-    if (accessToken) {
-      store.commit('setToken', accessToken)
-      if (refreshToken) {
-        store.commit('setRefreshToken', refreshToken)
+  try {
+    const { ok, body } = await safeFetch(`${API_BASE}/user/validateToken`, { method: 'GET' })
+    if (!ok) return null
+    if (body?.code === 0 && body?.data && typeof body.data === 'object') {
+      // 新接口：返回token对，更新store中的token
+      const accessToken = String(body.data.accessToken || '')
+      const refreshToken = String(body.data.refreshToken || '')
+      if (accessToken) {
+        store.commit('setToken', accessToken)
+        if (refreshToken) {
+          store.commit('setRefreshToken', refreshToken)
+        }
+        return body.data // 返回token对象
       }
-      return true
     }
+    // 验证失败（包括401、token过期、旧接口验证失败等）统一返回null
+    return null
+  } catch (e) {
+    // 任何异常都返回null
+    return null
   }
-  // 兼容旧接口
-  return body?.code === 0 || body?.data === true
 }
 
 export async function getFriends() {

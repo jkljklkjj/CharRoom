@@ -3,14 +3,21 @@ package component
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -18,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import core.ApiService
 import core.FileUploader
 import core.loadImageBitmapFromUrl
+import core.loadImageBitmapWithCache
 import kotlinx.coroutines.launch
 import model.User
 import model.users
@@ -57,6 +65,11 @@ fun ProfileScreen(
     var errorMessage by remember { mutableStateOf("") }
     var successMessage by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
+    // 头像裁剪相关状态
+    var showCropDialog by remember { mutableStateOf(false) }
+    var selectedImageBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var selectedImageFileName by remember { mutableStateOf("") }
+    var isUploadingAvatar by remember { mutableStateOf(false) } // 头像上传状态
     val scope = rememberCoroutineScope()
 
     // 发送邮箱验证码
@@ -208,7 +221,7 @@ fun ProfileScreen(
                 // 加载头像
                 val url = u.avatarUrl
                 if (url != null && url.isNotBlank()) {
-                    avatarBitmap = loadImageBitmapFromUrl(url, u.avatarKey)
+                    avatarBitmap = loadImageBitmapWithCache(url, u.avatarKey)
                 }
             }
             isLoading = false
@@ -250,27 +263,28 @@ fun ProfileScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .widthIn(max = 860.dp),
-                    elevation = 8.dp
+                        .widthIn(max = 720.dp), // 优化宽度，更适合桌面端
+                    elevation = 2.dp, // 降低阴影，更现代
+                    shape = RoundedCornerShape(16.dp) // 圆角优化
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp)
+                            .padding(horizontal = 40.dp, vertical = 32.dp) // 调整内边距
                             .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.Start
+                        horizontalAlignment = Alignment.CenterHorizontally // 整体居中
                     ) {
                         // 操作按钮区域
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (!isEditing) {
                                 Text(
-                                    text = "查看模式",
-                                    style = MaterialTheme.typography.subtitle2,
-                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                    text = "个人信息",
+                                    style = MaterialTheme.typography.h5, // 更大的标题
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                 )
                                 Button(
                                     onClick = {
@@ -281,15 +295,20 @@ fun ProfileScreen(
                                         initialNewEmail = newEmail
                                         isEditing = true
                                     },
-                                    modifier = Modifier.height(40.dp)
+                                    modifier = Modifier.height(40.dp),
+                                    shape = RoundedCornerShape(12.dp), // 按钮圆角
+                                    colors = ButtonDefaults.buttonColors(
+                                        backgroundColor = MaterialTheme.colors.primary
+                                    )
                                 ) {
-                                    Text("编辑")
+                                    Text("编辑资料")
                                 }
                             } else {
                                 Text(
-                                    text = "编辑模式",
-                                    style = MaterialTheme.typography.subtitle2,
-                                    color = MaterialTheme.colors.secondary
+                                    text = "编辑资料",
+                                    style = MaterialTheme.typography.h5,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = MaterialTheme.colors.primary
                                 )
                                 Row {
                                     OutlinedButton(
@@ -297,9 +316,10 @@ fun ProfileScreen(
                                             resetChanges()
                                             isEditing = false
                                         },
-                                        modifier = Modifier.height(40.dp).padding(end = 8.dp)
+                                        modifier = Modifier.height(40.dp).padding(end = 8.dp),
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Text("还原")
+                                        Text("取消")
                                     }
                                     Button(
                                         onClick = {
@@ -308,7 +328,8 @@ fun ProfileScreen(
                                             }
                                         },
                                         modifier = Modifier.height(40.dp),
-                                        enabled = !isSaving
+                                        enabled = !isSaving,
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
                                         if (isSaving) {
                                             CircularProgressIndicator(
@@ -319,38 +340,45 @@ fun ProfileScreen(
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text("保存中...")
                                         } else {
-                                            Text("确认修改")
+                                            Text("保存修改")
                                         }
                                     }
                                 }
                             }
                         }
 
-                        // 头像区域
+                        // 头像区域 - 美化
                         var isUploadingAvatar by remember { mutableStateOf(false) }
+                        val avatarInteractionSource = remember { MutableInteractionSource() }
+                        val isHoveringAvatar by avatarInteractionSource.collectIsHoveredAsState()
                         Box(
                             modifier = Modifier
-                                .size(120.dp)
+                                .size(140.dp) // 增大头像尺寸
+                                .shadow(
+                                    elevation = if (isHoveringAvatar && isEditing) 16.dp else 8.dp,
+                                    shape = CircleShape,
+                                    clip = true
+                                )
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colors.primary.copy(alpha = 0.1f))
+                                .hoverable(interactionSource = avatarInteractionSource, enabled = isEditing) // 悬停效果
                                 .clickable(enabled = isEditing && !isUploadingAvatar) { // 只有编辑模式才能上传头像
                                     FilePicker.pickImage { bytes, fileName ->
                                         scope.launch {
-                                            isUploadingAvatar = true
                                             errorMessage = ""
                                             successMessage = ""
-                                            // 上传头像
-                                            val avatarUrl = FileUploader.uploadImage(bytes, fileName)
-                                            if (avatarUrl != null) {
-                                                // 重新加载头像
-                                                avatarBitmap = loadImageBitmapFromUrl(avatarUrl, null)
-                                                successMessage = "头像上传成功"
-                                                // 更新用户信息缓存
-                                                user = user?.copy(avatarUrl = avatarUrl)
-                                            } else {
-                                                errorMessage = "头像上传失败，请重试"
+
+                                            // 前端先检查文件大小，超过10MB直接提示（避免413错误）
+                                            val maxSize = 10 * 1024 * 1024 // 10MB
+                                            if (bytes.size > maxSize) {
+                                                errorMessage = "图片大小不能超过10MB，请选择更小的图片"
+                                                return@launch
                                             }
-                                            isUploadingAvatar = false
+
+                                            // 打开裁剪对话框
+                                            selectedImageBytes = bytes
+                                            selectedImageFileName = fileName
+                                            showCropDialog = true
                                         }
                                     }
                                 },
@@ -359,7 +387,8 @@ fun ProfileScreen(
                             if (isUploadingAvatar) {
                                 CircularProgressIndicator(
                                     color = MaterialTheme.colors.primary,
-                                    strokeWidth = 3.dp
+                                    strokeWidth = 3.dp,
+                                    modifier = Modifier.size(40.dp)
                                 )
                             } else if (avatarBitmap != null) {
                                 Image(
@@ -367,180 +396,361 @@ fun ProfileScreen(
                                     contentDescription = "头像",
                                     modifier = Modifier.fillMaxSize()
                                 )
+                                // 编辑模式下悬停显示蒙层
+                                if (isEditing && isHoveringAvatar) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.5f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "更换头像",
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.subtitle2
+                                        )
+                                    }
+                                }
                             } else {
                                 Text(
                                     text = username.firstOrNull()?.toString() ?: "U",
-                                    style = MaterialTheme.typography.h3,
+                                    style = MaterialTheme.typography.h2, // 更大的默认头像文字
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                     color = MaterialTheme.colors.primary
                                 )
                             }
                         }
-                        Text(
-                            text = "点击更换头像",
-                            style = MaterialTheme.typography.caption,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // 表单字段
-                        OutlinedTextField(
-                            value = username,
-                            onValueChange = { username = it },
-                            label = { Text("用户名") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            enabled = isEditing
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // 邮箱修改区域
-                        Text(
-                            text = "邮箱",
-                            style = MaterialTheme.typography.subtitle2,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = newEmail,
-                                onValueChange = { newEmail = it },
-                                label = { Text("新邮箱") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                enabled = isEditing && emailVerifyCountdown == 0 && !isSendingEmailCode
+                        if (isEditing) {
+                            Text(
+                                text = "点击头像可上传新头像",
+                                style = MaterialTheme.typography.caption,
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(top = 12.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        sendEmailVerifyCode()
-                                    }
-                                },
-                                enabled = isEditing && newEmail.isNotBlank() && newEmail != email && emailVerifyCountdown == 0 && !isSendingEmailCode,
-                                modifier = Modifier.height(56.dp)
-                            ) {
-                                if (isSendingEmailCode) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        color = MaterialTheme.colors.onPrimary,
-                                        strokeWidth = 2.dp
+                        }
+
+                        Spacer(modifier = Modifier.height(36.dp))
+
+                        // 基本信息分组
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = 0.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.3f)
+                        ) {
+                            Column(modifier = Modifier.padding(24.dp)) {
+                                Text(
+                                    text = "基本信息",
+                                    style = MaterialTheme.typography.h6,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+
+                                // 用户名
+                                OutlinedTextField(
+                                    value = username,
+                                    onValueChange = { username = it },
+                                    label = { Text("用户名") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    enabled = isEditing,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                                        focusedBorderColor = MaterialTheme.colors.primary,
+                                        unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
                                     )
-                                } else if (emailVerifyCountdown > 0) {
-                                    Text("${emailVerifyCountdown}s")
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // 个性签名
+                                OutlinedTextField(
+                                    value = signature,
+                                    onValueChange = { signature = it },
+                                    label = { Text("个性签名") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = false,
+                                    maxLines = 2,
+                                    enabled = isEditing,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                                        focusedBorderColor = MaterialTheme.colors.primary,
+                                        unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                                    )
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // 手机
+                                OutlinedTextField(
+                                    value = phone,
+                                    onValueChange = { phone = it },
+                                    label = { Text("手机号码") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    enabled = isEditing,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                                        focusedBorderColor = MaterialTheme.colors.primary,
+                                        unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // 邮箱安全分组
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = 0.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.3f)
+                        ) {
+                            Column(modifier = Modifier.padding(24.dp)) {
+                                Text(
+                                    text = "邮箱与安全",
+                                    style = MaterialTheme.typography.h6,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+
+                                // 当前邮箱显示
+                                if (!isEditing) {
+                                    OutlinedTextField(
+                                        value = email,
+                                        onValueChange = {},
+                                        label = { Text("当前邮箱") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        enabled = false,
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                                            disabledBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
+                                            disabledTextColor = MaterialTheme.colors.onSurface
+                                        )
+                                    )
                                 } else {
-                                    Text("发送验证码")
+                                    // 邮箱修改区域
+                                    Text(
+                                        text = "修改邮箱",
+                                        style = MaterialTheme.typography.subtitle2,
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedTextField(
+                                            value = newEmail,
+                                            onValueChange = { newEmail = it },
+                                            label = { Text("新邮箱地址") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                            enabled = isEditing && emailVerifyCountdown == 0 && !isSendingEmailCode,
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                                focusedBorderColor = MaterialTheme.colors.primary,
+                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Button(
+                                            onClick = {
+                                                scope.launch {
+                                                    sendEmailVerifyCode()
+                                                }
+                                            },
+                                            enabled = isEditing && newEmail.isNotBlank() && newEmail != email && emailVerifyCountdown == 0 && !isSendingEmailCode,
+                                            modifier = Modifier.height(56.dp),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            if (isSendingEmailCode) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(20.dp),
+                                                    color = MaterialTheme.colors.onPrimary,
+                                                    strokeWidth = 2.dp
+                                                )
+                                            } else if (emailVerifyCountdown > 0) {
+                                                Text("${emailVerifyCountdown}s")
+                                            } else {
+                                                Text("发送验证码")
+                                            }
+                                        }
+                                    }
+
+                                    if (newEmail != email) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        OutlinedTextField(
+                                            value = emailVerifyCode,
+                                            onValueChange = { emailVerifyCode = it },
+                                            label = { Text("邮箱验证码") },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            enabled = isEditing,
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                                focusedBorderColor = MaterialTheme.colors.primary,
+                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        if (newEmail != email) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = emailVerifyCode,
-                                onValueChange = { emailVerifyCode = it },
-                                label = { Text("邮箱验证码") },
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // 修改密码分组 - 仅编辑模式显示
+                        if (isEditing) {
+                            Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                enabled = isEditing
-                            )
+                                elevation = 0.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.3f)
+                            ) {
+                                Column(modifier = Modifier.padding(24.dp)) {
+                                    Text(
+                                        text = "修改密码（不修改请留空）",
+                                        style = MaterialTheme.typography.h6,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                        modifier = Modifier.padding(bottom = 16.dp)
+                                    )
+
+                                    OutlinedTextField(
+                                        value = currentPassword,
+                                        onValueChange = { currentPassword = it },
+                                        label = { Text("当前密码") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        visualTransformation = PasswordVisualTransformation(),
+                                        enabled = isEditing,
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                                            focusedBorderColor = MaterialTheme.colors.primary,
+                                            unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                                        )
+                                    )
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // 密码两栏布局
+                                    Row(modifier = Modifier.fillMaxWidth()) {
+                                        OutlinedTextField(
+                                            value = newPassword,
+                                            onValueChange = { newPassword = it },
+                                            label = { Text("新密码") },
+                                            modifier = Modifier.weight(1f).padding(end = 6.dp),
+                                            singleLine = true,
+                                            visualTransformation = PasswordVisualTransformation(),
+                                            enabled = isEditing,
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                                focusedBorderColor = MaterialTheme.colors.primary,
+                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                                            )
+                                        )
+
+                                        OutlinedTextField(
+                                            value = confirmPassword,
+                                            onValueChange = { confirmPassword = it },
+                                            label = { Text("确认密码") },
+                                            modifier = Modifier.weight(1f).padding(start = 6.dp),
+                                            singleLine = true,
+                                            visualTransformation = PasswordVisualTransformation(),
+                                            enabled = isEditing,
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                                focusedBorderColor = MaterialTheme.colors.primary,
+                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                                            )
+                                        )
+                                    }
+                                }
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                        OutlinedTextField(
-                            value = phone,
-                            onValueChange = { phone = it },
-                            label = { Text("手机号码") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            enabled = isEditing
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = signature,
-                            onValueChange = { signature = it },
-                            label = { Text("个性签名") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = false,
-                            maxLines = 3,
-                            enabled = isEditing
-                        )
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        Text(
-                            text = "修改密码（不修改请留空）",
-                            style = MaterialTheme.typography.subtitle2,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = currentPassword,
-                            onValueChange = { currentPassword = it },
-                            label = { Text("当前密码") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            enabled = isEditing
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = newPassword,
-                            onValueChange = { newPassword = it },
-                            label = { Text("新密码") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            enabled = isEditing
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = confirmPassword,
-                            onValueChange = { confirmPassword = it },
-                            label = { Text("确认新密码") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            enabled = isEditing
-                        )
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // 提示信息在底部
-                        // 错误/成功提示
-                        if (errorMessage.isNotBlank()) {
-                            Text(
-                                text = errorMessage,
-                                color = MaterialTheme.colors.error,
-                                style = MaterialTheme.typography.caption,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                        }
-                        if (successMessage.isNotBlank()) {
-                            Text(
-                                text = successMessage,
-                                color = MaterialTheme.colors.secondary,
-                                style = MaterialTheme.typography.caption,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
+                        // 操作提示区域
+                        if (errorMessage.isNotBlank() || successMessage.isNotBlank()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                elevation = 0.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                backgroundColor = if (errorMessage.isNotBlank())
+                                    MaterialTheme.colors.error.copy(alpha = 0.1f)
+                                else
+                                    MaterialTheme.colors.secondary.copy(alpha = 0.1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (errorMessage.isNotBlank()) {
+                                        Icon(
+                                            imageVector = Icons.Default.Error,
+                                            contentDescription = "错误",
+                                            tint = MaterialTheme.colors.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = errorMessage,
+                                            color = MaterialTheme.colors.error,
+                                            style = MaterialTheme.typography.body2
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "成功",
+                                            tint = MaterialTheme.colors.secondary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = successMessage,
+                                            color = MaterialTheme.colors.secondary,
+                                            style = MaterialTheme.typography.body2
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+            }
+
+            // 头像裁剪对话框
+            if (showCropDialog && selectedImageBytes != null) {
+                AvatarCropDialog(
+                    imageBytes = selectedImageBytes!!,
+                    originalFileName = selectedImageFileName,
+                    onDismiss = {
+                        showCropDialog = false
+                        selectedImageBytes = null
+                    },
+                    onCropComplete = { croppedBytes, fileName ->
+                        scope.launch {
+                            isUploadingAvatar = true
+                            // 上传裁剪后的头像
+                            val avatarUrl = FileUploader.uploadAvatar(croppedBytes, fileName)
+                            if (avatarUrl != null) {
+                                // 重新加载头像
+                                avatarBitmap = loadImageBitmapWithCache(avatarUrl, null)
+                                successMessage = "头像上传成功"
+                                // 更新用户信息缓存
+                                user = user?.copy(avatarUrl = avatarUrl)
+                            } else {
+                                errorMessage = "头像上传失败，请重试"
+                            }
+                            isUploadingAvatar = false
+                        }
+                    }
+                )
             }
         }
     }

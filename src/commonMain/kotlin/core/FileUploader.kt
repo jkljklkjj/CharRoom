@@ -1,6 +1,5 @@
 package core
 
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
@@ -9,15 +8,13 @@ import io.ktor.http.*
 import io.ktor.utils.io.core.writeFully
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayInputStream
 
 /**
  * 文件上传服务
  */
 object FileUploader {
-    private val client = HttpClient {
-        followRedirects = true
-    }
+    // 复用ApiClient中统一配置的HttpClient实例
+    private val client get() = httpClient
 
     /**
      * 上传文件
@@ -42,8 +39,8 @@ object FileUploader {
             }
 
             if (response.status.isSuccess()) {
-                val result = response.body<Map<String, Any>>()
-                result["data"] as? String
+                val result = response.body<ApiResponse<String>>()
+                result.data
             } else {
                 println("File upload failed: ${response.status}")
                 null
@@ -62,5 +59,40 @@ object FileUploader {
      */
     suspend fun uploadImage(bytes: ByteArray, fileName: String): String? {
         return uploadFile(bytes, fileName)
+    }
+
+    /**
+     * 上传头像（使用专门的头像上传接口）
+     * @param bytes 头像图片字节数组
+     * @param fileName 文件名
+     * @return 上传成功返回头像URL，失败返回null
+     */
+    suspend fun uploadAvatar(bytes: ByteArray, fileName: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val response = client.submitFormWithBinaryData(
+                url = ApiEndpoints.url(ApiEndpoints.USER_AVATAR_UPLOAD),
+                formData = formData {
+                    append("file", fileName, ContentType.Image.Any) {
+                        writeFully(bytes)
+                    }
+                }
+            ) {
+                header("Authorization", "Bearer ${ServerConfig.Token}")
+                timeout {
+                    requestTimeoutMillis = 30000 // 30秒超时
+                }
+            }
+
+            if (response.status.isSuccess()) {
+                val result = response.body<ApiResponse<String>>()
+                result.data
+            } else {
+                println("Avatar upload failed: ${response.status}")
+                null
+            }
+        } catch (e: Exception) {
+            println("Avatar upload error: ${e.message}")
+            null
+        }
     }
 }

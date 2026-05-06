@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import component.EmojiPickerPanel
+import core.LocalChatHistoryStore
 import component.FilePicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -90,7 +91,33 @@ fun ChatScreen(user: LocalUser, appState: ChatAppState, onBack: () -> Unit, onSe
 
     LaunchedEffect(user.id, appState.currentUserId) {
         val saved = withContext(Dispatchers.IO) {
-            AndroidLocalChatHistoryStore.loadChatHistory(context, appState.currentUserId, user.id)
+            if (user.id > 0) {
+                // 私聊消息
+                LocalChatHistoryStore.getPrivateMessagesPage(appState.currentUserId.toString(), user.id)
+                    .map { message ->
+                        ChatMessage(
+                            senderId = message.senderId,
+                            receiverId = message.receiverId,
+                            content = message.message,
+                            isMe = message.sender,
+                            timestamp = message.timestamp,
+                            messageId = message.messageId
+                        )
+                    }
+            } else {
+                // 群聊消息，groupId是负数
+                LocalChatHistoryStore.getGroupMessagesPage(appState.currentUserId.toString(), -user.id)
+                    .map { groupMessage ->
+                        ChatMessage(
+                            senderId = groupMessage.senderId,
+                            receiverId = -groupMessage.groupId,
+                            content = groupMessage.text,
+                            isMe = groupMessage.senderId == appState.currentUserId,
+                            timestamp = groupMessage.timestamp,
+                            messageId = groupMessage.messageId
+                        )
+                    }
+            }
         }
         if (saved.isNotEmpty()) {
             chatSession.messages.clear()
@@ -98,15 +125,8 @@ fun ChatScreen(user: LocalUser, appState: ChatAppState, onBack: () -> Unit, onSe
         }
     }
 
-    LaunchedEffect(chatSession.messages) {
-        snapshotFlow { chatSession.messages.toList() }
-            .debounce(500)
-            .collect { snapshot ->
-                withContext(Dispatchers.IO) {
-                    AndroidLocalChatHistoryStore.saveChatHistory(context, appState.currentUserId, user.id, snapshot)
-                }
-            }
-    }
+    // 注意：现在全局的自动保存已经在ChatApp中实现，这里不需要单独保存
+    // 如果需要单独保存，可以调用save方法，但需要区分私聊和群聊
 
     DisposableEffect(chatSession, user) {
         val receiver: (ChatMessage) -> Unit = { message ->

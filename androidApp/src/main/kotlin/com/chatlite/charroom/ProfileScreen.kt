@@ -19,9 +19,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import component.AvatarCropDialog
 import component.FilePicker
 import core.loadImageBitmapFromUrl
-import core.uploadAvatar
 import kotlinx.coroutines.launch
 
 @Composable
@@ -94,6 +94,10 @@ fun ProfileScreen(
                 var isEditing by remember { mutableStateOf(false) }
                 var successMessage by remember { mutableStateOf("") }
                 var saveLoading by remember { mutableStateOf(false) }
+                var avatarUploading by remember { mutableStateOf(false) }
+                var pendingAvatarBytes by remember { mutableStateOf<ByteArray?>(null) }
+                var pendingAvatarFileName by remember { mutableStateOf("") }
+                var showAvatarCropDialog by remember { mutableStateOf(false) }
 
                 fun saveProfile() {
                     errorMessage = ""
@@ -132,19 +136,25 @@ fun ProfileScreen(
                     FilePicker.pickImage { bytes, fileName ->
                         successMessage = ""
                         errorMessage = ""
-                        isLoading = true
-                        scope.launch {
-                            try {
-                                val avatarUrl = uploadAvatar(token, bytes, fileName)
-                                if (avatarUrl.isNullOrBlank()) throw Exception("上传失败")
-                                user = user?.copy(avatarUrl = avatarUrl)
-                                showAvatar(bytes)
-                                successMessage = "头像已更新"
-                            } catch (e: Exception) {
-                                errorMessage = "头像上传失败：${e.message ?: "请重试"}"
-                            } finally {
-                                isLoading = false
-                            }
+                        pendingAvatarBytes = bytes
+                        pendingAvatarFileName = fileName
+                        showAvatarCropDialog = true
+                    }
+                }
+
+                fun uploadCroppedAvatar(bytes: ByteArray, fileName: String) {
+                    avatarUploading = true
+                    scope.launch {
+                        try {
+                            val avatarUrl = NetworkRepository.getInstance().uploadAvatar(token, bytes, fileName)
+                            if (avatarUrl.isNullOrBlank()) throw Exception("上传失败")
+                            user = user?.copy(avatarUrl = avatarUrl)
+                            showAvatar(bytes)
+                            successMessage = "头像已更新"
+                        } catch (e: Exception) {
+                            errorMessage = "头像上传失败：${e.message ?: "请重试"}"
+                        } finally {
+                            avatarUploading = false
                         }
                     }
                 }
@@ -177,6 +187,29 @@ fun ProfileScreen(
                                 color = MaterialTheme.colors.primary
                             )
                         }
+                    }
+
+                    if (showAvatarCropDialog && pendingAvatarBytes != null) {
+                        AvatarCropDialog(
+                            imageBytes = pendingAvatarBytes!!,
+                            originalFileName = pendingAvatarFileName,
+                            onDismiss = {
+                                showAvatarCropDialog = false
+                                pendingAvatarBytes = null
+                                pendingAvatarFileName = ""
+                            },
+                            onCropComplete = { croppedBytes, croppedFileName ->
+                                showAvatarCropDialog = false
+                                pendingAvatarBytes = null
+                                pendingAvatarFileName = ""
+                                uploadCroppedAvatar(croppedBytes, croppedFileName)
+                            }
+                        )
+                    }
+
+                    if (avatarUploading) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        CircularProgressIndicator()
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))

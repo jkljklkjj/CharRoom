@@ -221,8 +221,8 @@ onMounted(async () => {
 
     // 先验证token有效性，再获取用户信息
     let activeToken = storedToken
-    let tokenValid = await api.validateToken()
-    if (!tokenValid && storedRefreshToken) {
+    let validatedToken = await api.validateToken()
+    if (!validatedToken && storedRefreshToken) {
       const refreshed = await api.refreshToken(storedRefreshToken)
       if (refreshed && refreshed.accessToken) {
         activeToken = refreshed.accessToken
@@ -234,11 +234,11 @@ onMounted(async () => {
         } catch (_e) {
           // ignore localStorage failures
         }
-        tokenValid = await api.validateToken()
+        validatedToken = await api.validateToken()
       }
     }
 
-    if (tokenValid) {
+    if (validatedToken) {
       const userRes = await api.getCurrentUser()
       if (userRes && userRes.id) {
         store.setAccountId(userRes.id)

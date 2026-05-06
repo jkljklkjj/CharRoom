@@ -13,6 +13,7 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
 class NetworkRepository private constructor() {
     // 单例实现和常量定义合并到同一个companion object
@@ -116,6 +117,54 @@ class NetworkRepository private constructor() {
         }
         val response = sendRequest(ApiEndpoints.USER_PROFILE_UPDATE, "POST", body.toString(), token)
         interpretBoolean(response)
+    }
+
+    suspend fun uploadAvatar(token: String, imageBytes: ByteArray, fileName: String): String? = withContext(Dispatchers.IO) {
+        val boundary = "----WebKitFormBoundary${System.currentTimeMillis()}"
+        val lineEnd = "\r\n"
+        val twoHyphens = "--"
+
+        val conn = URL(ApiEndpoints.url(ApiEndpoints.USER_AVATAR_UPLOAD)).openConnection() as HttpURLConnection
+        conn.connectTimeout = 30000
+        conn.readTimeout = 30000
+        conn.requestMethod = "POST"
+        conn.doInput = true
+        conn.doOutput = true
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+
+        val outputStream = conn.outputStream
+        val writer = outputStream.bufferedWriter()
+
+        // 写入文件部分
+        writer.append(twoHyphens + boundary + lineEnd)
+        writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"$lineEnd")
+        writer.append("Content-Type: image/jpeg$lineEnd")
+        writer.append(lineEnd)
+        writer.flush()
+        outputStream.write(imageBytes)
+        outputStream.flush()
+        writer.append(lineEnd)
+
+        // 结束请求
+        writer.append(twoHyphens + boundary + twoHyphens + lineEnd)
+        writer.flush()
+        writer.close()
+
+        val responseCode = conn.responseCode
+        val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
+        val response = stream.bufferedReader().use { it.readText() }
+
+        return@withContext try {
+            val root = JSONObject(response)
+            if (root.optInt("code", -1) == 0) {
+                root.optString("data")
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     suspend fun getGroupDetail(groupId: String, token: String): LocalUser? = withContext(Dispatchers.IO) {

@@ -1,43 +1,27 @@
-package com.chatlite.charroom
+package core
 
-import android.content.Context
-import androidx.compose.runtime.mutableStateOf
-import core.LocalChatHistoryStoreProvider
-import core.RestoredChatHistory
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import model.GroupMessage
 import model.Message
 import model.MessageType
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
+import androidx.compose.runtime.mutableStateOf
 
 /**
- * Android端本地聊天历史存储实现
+ * 桌面端本地聊天历史存储实现
  */
-object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
-    private const val HISTORY_DIR_NAME = "chat_history"
-    private const val MAX_PRIVATE_HISTORY = 5000
-    private const val MAX_GROUP_HISTORY = 5000
-
-    private lateinit var context: Context
-
-    /**
-     * 初始化，需要在Application中调用
-     */
-    fun init(context: Context) {
-        this.context = context.applicationContext
-    }
+object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
+    private const val HISTORY_DIR_NAME = ".qingliao/history"
+    private val objectMapper = jacksonObjectMapper()
 
     override fun save(accountId: String, privateMessages: List<Message>, groupMessages: List<GroupMessage>) {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return
-        }
-
         // 保存私聊消息
         privateMessages
-            .groupBy { if (it.sender) it.receiverId else it.senderId }
-            .forEach { (peerId, messages) ->
-                saveMessages(accountId, peerId.toString(), false, messages)
+            .groupBy { it.receiverId }
+            .forEach { (receiverId, messages) ->
+                saveMessages(accountId, receiverId.toString(), false, messages)
             }
 
         // 保存群聊消息
@@ -70,7 +54,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun restorePage(accountId: String, page: Int, pageSize: Int): RestoredChatHistory {
-        if (accountId.isBlank() || !this::context.isInitialized) {
+        if (accountId.isBlank()) {
             return RestoredChatHistory()
         }
 
@@ -80,14 +64,14 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }
 
         // 加载所有私聊消息
-        val privateFiles = accountDir.listFiles { file -> file.name.startsWith("private-") } ?: emptyArray()
-        val allPrivateMessages = privateFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("private-"), false) }
+        val privateFiles = accountDir.listFiles { file -> file.name.startsWith("private_") } ?: emptyArray()
+        val allPrivateMessages = privateFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("private_"), false) }
             .filterIsInstance<Message>()
             .sortedByDescending { it.timestamp }
 
         // 加载所有群聊消息
-        val groupFiles = accountDir.listFiles { file -> file.name.startsWith("group-") } ?: emptyArray()
-        val allGroupMessages = groupFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("group-"), true) }
+        val groupFiles = accountDir.listFiles { file -> file.name.startsWith("group_") } ?: emptyArray()
+        val allGroupMessages = groupFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("group_"), true) }
             .filterIsInstance<GroupMessage>()
             .sortedByDescending { it.timestamp }
 
@@ -115,7 +99,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun getPrivateMessagesByTimeRange(accountId: String, userId: Int, startTime: Long, endTime: Long): List<Message> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
+        if (accountId.isBlank()) {
             return emptyList()
         }
 
@@ -126,7 +110,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun getGroupMessagesByTimeRange(accountId: String, groupId: Int, startTime: Long, endTime: Long): List<GroupMessage> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
+        if (accountId.isBlank()) {
             return emptyList()
         }
 
@@ -137,7 +121,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int, pageSize: Int): List<Message> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
+        if (accountId.isBlank()) {
             return emptyList()
         }
 
@@ -156,7 +140,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int, pageSize: Int): List<GroupMessage> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
+        if (accountId.isBlank()) {
             return emptyList()
         }
 
@@ -175,7 +159,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun clear(accountId: String): Boolean {
-        if (accountId.isBlank() || !this::context.isInitialized) {
+        if (accountId.isBlank()) {
             return false
         }
 
@@ -193,11 +177,11 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
         runCatching {
             val file = getHistoryFile(accountId, targetId, isGroup)
-            val array = JSONArray()
+            val array = objectMapper.createArrayNode()
             messages.takeLast(500).forEach { // 只保留最近500条
-                array.put(messageToJson(it))
+                array.add(messageToJson(it))
             }
-            file.writeText(array.toString())
+            file.writeText(objectMapper.writeValueAsString(array))
         }.onFailure {
             it.printStackTrace()
         }
@@ -209,10 +193,10 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             if (!file.exists()) return emptyList()
             val text = file.readText()
             if (text.isBlank()) return emptyList()
-            val array = JSONArray(text)
+            val array = objectMapper.readTree(text) as? ArrayNode ?: return emptyList()
             val records = mutableListOf<Any>()
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
+            for (index in 0 until array.size()) {
+                val item = array.get(index) as? ObjectNode ?: continue
                 records.add(jsonToMessage(item, isGroup))
             }
             records
@@ -223,7 +207,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     private fun getHistoryFile(accountId: String, targetId: String, isGroup: Boolean): File {
-        val folder = File(context.filesDir, HISTORY_DIR_NAME)
+        val userHome = System.getProperty("user.home")
+        val folder = File(userHome, HISTORY_DIR_NAME)
         if (!folder.exists()) {
             folder.mkdirs()
         }
@@ -237,7 +222,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     private fun getAccountDir(accountId: String): File {
-        val folder = File(context.filesDir, HISTORY_DIR_NAME)
+        val userHome = System.getProperty("user.home")
+        val folder = File(userHome, HISTORY_DIR_NAME)
         if (!folder.exists()) {
             folder.mkdirs()
         }
@@ -245,8 +231,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         return File(folder, safeAccountId)
     }
 
-    private fun messageToJson(message: Message): JSONObject {
-        return JSONObject().apply {
+    private fun messageToJson(message: Message): ObjectNode {
+        return objectMapper.createObjectNode().apply {
             put("senderId", message.senderId)
             put("receiverId", message.receiverId)
             put("content", message.message)
@@ -264,46 +250,46 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }
     }
 
-    private fun jsonToMessage(json: JSONObject, isGroup: Boolean): Any {
+    private fun jsonToMessage(json: ObjectNode, isGroup: Boolean): Any {
         val messageType = try {
-            MessageType.valueOf(json.optString("messageType", "TEXT"))
+            MessageType.valueOf(json.path("messageType").asText("TEXT"))
         } catch (_: Exception) {
             MessageType.TEXT
         }
 
         return if (isGroup) {
             GroupMessage(
-                groupId = json.optInt("receiverId", 0).let { if (it < 0) -it else it },
-                senderName = json.optString("senderName", "未知用户"),
-                text = json.optString("content", ""),
-                senderId = json.optInt("senderId", 0),
-                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
-                isSent = mutableStateOf(json.optBoolean("isSent", true)),
-                messageId = json.optString("messageId", ""),
-                replyToMessageId = json.optString("replyToMessageId", null),
-                replyToContent = json.optString("replyToContent", null),
-                replyToSender = json.optString("replyToSender", null),
+                groupId = json.path("receiverId").asInt(0).let { if (it < 0) -it else it },
+                senderName = json.path("senderName").asText("未知用户"),
+                text = json.path("content").asText(""),
+                senderId = json.path("senderId").asInt(0),
+                timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
+                isSent = mutableStateOf(json.path("isSent").asBoolean(true)),
+                messageId = json.path("messageId").asText(""),
+                replyToMessageId = json.path("replyToMessageId").asText(null),
+                replyToContent = json.path("replyToContent").asText(null),
+                replyToSender = json.path("replyToSender").asText(null),
                 messageType = messageType,
-                fileUrl = json.optString("fileUrl", null),
-                fileName = json.optString("fileName", null),
-                fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
+                fileUrl = json.path("fileUrl").asText(null),
+                fileName = json.path("fileName").asText(null),
+                fileSize = if (json.has("fileSize")) json.path("fileSize").asLong() else null
             )
         } else {
             Message(
-                senderId = json.optInt("senderId", 0),
-                receiverId = json.optInt("receiverId", 0),
-                message = json.optString("content", ""),
-                sender = json.optBoolean("sender", false),
-                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
-                isSent = mutableStateOf(json.optBoolean("isSent", true)),
-                messageId = json.optString("messageId", ""),
-                replyToMessageId = json.optString("replyToMessageId", null),
-                replyToContent = json.optString("replyToContent", null),
-                replyToSender = json.optString("replyToSender", null),
+                senderId = json.path("senderId").asInt(0),
+                receiverId = json.path("receiverId").asInt(0),
+                message = json.path("content").asText(""),
+                sender = json.path("sender").asBoolean(false),
+                timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
+                isSent = mutableStateOf(json.path("isSent").asBoolean(true)),
+                messageId = json.path("messageId").asText(""),
+                replyToMessageId = json.path("replyToMessageId").asText(null),
+                replyToContent = json.path("replyToContent").asText(null),
+                replyToSender = json.path("replyToSender").asText(null),
                 messageType = messageType,
-                fileUrl = json.optString("fileUrl", null),
-                fileName = json.optString("fileName", null),
-                fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
+                fileUrl = json.path("fileUrl").asText(null),
+                fileName = json.path("fileName").asText(null),
+                fileSize = if (json.has("fileSize")) json.path("fileSize").asLong() else null
             )
         }
     }

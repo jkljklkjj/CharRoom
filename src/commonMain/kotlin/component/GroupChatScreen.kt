@@ -125,6 +125,9 @@ fun GroupChatScreen(
     val isDarkMode = !MaterialTheme.colors.isLight
     val clipboardManager = LocalClipboardManager.current
     val currentUserId = ServerConfig.id.toIntOrNull() ?: 0
+    // 消息动画控制：仅新消息第一次显示时才有动画，滚动历史消息无动画
+    val animatedMessageIds = remember { mutableSetOf<String>() }
+    val pageCreateTime = remember { System.currentTimeMillis() }
 
     // 分页加载相关状态
     var currentPage by remember { mutableStateOf(1) } // 第0页已经在启动时加载
@@ -397,20 +400,28 @@ fun GroupChatScreen(
                         }
                     }
                     val self = message.senderId == ServerConfig.id.toIntOrNull()
-                    var visible by remember(message.messageId) { mutableStateOf(false) }
+                    // 动画规则：仅新消息（页面打开后新收到/新发送的）显示弹出动画
+                    // 历史消息（包括滚动加载的）直接显示，无动画
+                    val messageTime = message.timestamp
+                    val isNewMessage = messageTime > pageCreateTime && !animatedMessageIds.contains(message.messageId)
+                    var visible by remember(message.messageId) { mutableStateOf(!isNewMessage) }
+
                     LaunchedEffect(message.messageId) {
-                        visible = true
+                        if (isNewMessage) {
+                            visible = true
+                            animatedMessageIds.add(message.messageId)
+                        }
                     }
 
                     AnimatedVisibility(
                         visible = visible,
-                        enter = fadeIn() + scaleIn(
+                        enter = if (isNewMessage) fadeIn() + scaleIn(
                             initialScale = 0.9f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessLow
                             )
-                        ),
+                        ) else fadeIn(initialAlpha = 1f), // 历史消息无动画直接显示
                         modifier = Modifier
                             .fillMaxWidth()
                     ) {
@@ -721,9 +732,20 @@ fun GroupChatScreen(
             }
         }
 
-        LaunchedEffect(group.id, filteredGroupMessages.size) {
+        // 组件挂载和消息变化时自动滚动到底部
+        LaunchedEffect(Unit, group.id, filteredGroupMessages.size) {
             if (filteredGroupMessages.isNotEmpty()) {
-                listState.animateScrollToItem(filteredGroupMessages.size - 1)
+                // 延迟确保列表完全渲染
+                kotlinx.coroutines.delay(50)
+                // 先尝试滚动到最后一个item
+                runCatching {
+                    listState.scrollToItem(filteredGroupMessages.size - 1)
+                }
+                // 再次确认滚动，确保完全到底
+                kotlinx.coroutines.delay(50)
+                runCatching {
+                    listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                }
             }
         }
 

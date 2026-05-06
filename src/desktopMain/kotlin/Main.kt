@@ -8,7 +8,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import core.MessageReceiveListener
-import core.Chat.addMessageReceiveListener
+import core.Chat
 import model.users
 import java.awt.SystemTray
 import java.awt.Toolkit
@@ -20,6 +20,12 @@ import component.DesktopFilePicker
 import component.FilePicker
 import core.DesktopImageLoader
 import core.ImageLoaderImpl
+import core.DesktopLocalChatHistoryStore
+import core.LocalChatHistoryStore
+import core.NettyWebSocketClient
+import core.Chat
+import component.DesktopAvatarCropDialog
+import component.AvatarCropDialogImpl
 
 /**
  * 桌面端应用入口
@@ -31,6 +37,9 @@ fun main() = application {
     BackHandlerImpl = DesktopBackHandler
     FilePicker = DesktopFilePicker
     ImageLoaderImpl = DesktopImageLoader
+    LocalChatHistoryStore = DesktopLocalChatHistoryStore
+    Chat = NettyWebSocketClient
+    AvatarCropDialogImpl = DesktopAvatarCropDialog
 
     // 窗口状态记忆
     val prefs = Preferences.userNodeForPackage(javaClass)
@@ -55,7 +64,7 @@ fun main() = application {
 
     LaunchedEffect(Unit) {
         // 注册消息接收监听器
-        addMessageReceiveListener(notificationManager)
+        Chat.addMessageReceiveListener(notificationManager)
     }
 
     // 系统托盘

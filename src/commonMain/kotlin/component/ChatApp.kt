@@ -4,6 +4,7 @@ import core.ServerConfig
 import core.Chat
 import core.MsgType
 import core.ApiService
+import core.AuthStateListener
 import model.User
 import model.Message
 import model.GroupMessage
@@ -37,7 +38,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import io.netty.util.CharsetUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -411,13 +411,14 @@ fun ChatApp(
     var showApplications by remember { mutableStateOf(false) } // 统一申请管理对话框
     var showUserDetail: User? by remember { mutableStateOf(null) } // 显示用户详情弹窗
     var clearHistoryHint by remember { mutableStateOf("") }
+    var applicationRefreshTrigger by remember { mutableStateOf(0L) } // 申请列表刷新触发器，值变化时触发刷新
 
     fun handleCheckResponse(user: User, success: Boolean, resp: List<Any>) {
         if (!success || resp.isEmpty()) return
         scope.launch {
             val lastBytes = resp.last() as? ByteArray ?: return@launch
             val unwrap = parseProtoResponse(lastBytes)
-            val dataStr = unwrap.dataJson ?: String(lastBytes, CharsetUtil.UTF_8)
+            val dataStr = unwrap.dataJson ?: String(lastBytes, Charsets.UTF_8)
             val map = Util.jsonToMap(dataStr)
             val online = map["online"] as? Boolean ?: false
             updateUserOnlineStatus(user.id, online)
@@ -529,7 +530,7 @@ fun ChatApp(
         val accountId = ServerConfig.id
 
         // 注册登录状态监听器，token失效时自动退出
-        val authListener = Chat.AuthStateListener { reason ->
+        val authListener = AuthStateListener { reason ->
             scope.launch(Dispatchers.Main) {
                 println("Auth state changed: $reason")
                 // 清除本地保存的无效凭证
@@ -553,14 +554,14 @@ fun ChatApp(
 
             launch {
                 snapshotFlow {
-                    LocalChatHistoryStore.capture(messages, groupMessages)
+                    messages.toList() to groupMessages.toList()
                 }
                     .distinctUntilChanged()
                     .debounce(350)
-                    .collect { snapshot ->
+                    .collect { (privateMsgs, groupMsgs) ->
                         if (ServerConfig.Token.isNotBlank()) {
                             withContext(Dispatchers.IO) {
-                                LocalChatHistoryStore.save(accountId, snapshot)
+                                LocalChatHistoryStore.save(accountId, privateMsgs, groupMsgs)
                             }
                         }
                     }
@@ -659,7 +660,8 @@ fun ChatApp(
                                 if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) { // 普通用户才能查看详情
                                     showUserDetail = user
                                 }
-                            }
+                            },
+                            refreshTrigger = applicationRefreshTrigger
                         )
                     }
                 }
@@ -704,7 +706,8 @@ fun ChatApp(
                             if (user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) { // 普通用户才能查看详情
                                 showUserDetail = user
                             }
-                        }
+                        },
+                        refreshTrigger = applicationRefreshTrigger
                     )
                 }
             } else {
@@ -761,7 +764,11 @@ fun ChatApp(
 
         if (showApplications) {
             ApplicationDialog(
-                onDismiss = { showApplications = false }
+                onDismiss = {
+                    showApplications = false
+                    // 关闭申请对话框时刷新申请状态
+                    applicationRefreshTrigger = System.currentTimeMillis()
+                }
             )
         }
 
@@ -826,8 +833,7 @@ fun ChatApp(
                             onClick = {
                                 showSettings = false
                                 runCatching {
-                                    val snapshot = LocalChatHistoryStore.capture(messages, groupMessages)
-                                    LocalChatHistoryStore.save(ServerConfig.id, snapshot)
+                                    LocalChatHistoryStore.save(ServerConfig.id, messages.toList(), groupMessages.toList())
                                 }
                                 Chat.logoutAndDisconnect()
                                 onLogout()

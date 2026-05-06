@@ -32,7 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
-import core.loadImageBitmapFromUrl
+import core.loadImageBitmapWithCache
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -75,7 +75,8 @@ fun UserList(
     onOpenApplications: () -> Unit = {}, // 打开统一申请管理界面
     onOpenProfile: () -> Unit = {}, // 打开个人信息页面
     onUserClick: (User) -> Unit,
-    onUserLongClick: ((User) -> Unit)? = null // 长按用户头像回调
+    onUserLongClick: ((User) -> Unit)? = null, // 长按用户头像回调
+    refreshTrigger: Long = 0L // 外部触发刷新的触发器，值变化时刷新申请列表
 ) {
     // 是否有未处理的申请（好友或群聊）
     var hasPendingApplications by remember { mutableStateOf(false) }
@@ -98,16 +99,35 @@ fun UserList(
         }
     }
 
-    // 定时检查是否有未处理的申请
+    // 检查是否有未处理的申请（仅主动调用时执行）
+    suspend fun refreshPendingApplications() {
+        val groupRequests = ApiService.fetchGroupRequests()
+        val friendRequests = ApiService.fetchFriendRequests()
+        hasPendingApplications = groupRequests.isNotEmpty() || friendRequests.isNotEmpty()
+    }
+
+    // 首次启动时检查一次，之后不再自动轮询
     LaunchedEffect(Unit) {
         scope.launch {
-            while (true) {
-                val groupRequests = ApiService.fetchGroupRequests()
-                val friendRequests = ApiService.fetchFriendRequests()
-                hasPendingApplications = groupRequests.isNotEmpty() || friendRequests.isNotEmpty()
-                kotlinx.coroutines.delay(30000.milliseconds) // 每30秒检查一次
+            refreshPendingApplications()
+        }
+    }
+
+    // 外部触发刷新时执行
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            scope.launch {
+                refreshPendingApplications()
             }
         }
+    }
+
+    // 点击申请管理按钮时主动刷新一次
+    fun handleOpenApplications() {
+        scope.launch {
+            refreshPendingApplications()
+        }
+        onOpenApplications()
     }
 
     val onlineCount = userListState.count { it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
@@ -120,7 +140,7 @@ fun UserList(
             currentUser = ApiService.getCurrentUserProfile()
             currentUser?.let { user ->
                 user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                    currentUserAvatar = loadImageBitmapFromUrl(url, user.avatarKey)
+                    currentUserAvatar = loadImageBitmapWithCache(url, user.avatarKey)
                 }
             }
         }
@@ -191,7 +211,7 @@ fun UserList(
                             ElasticHeaderAction(
                                 icon = Icons.Default.Notifications,
                                 contentDescription = "申请管理",
-                                onClick = onOpenApplications
+                                onClick = ::handleOpenApplications
                             )
                             if (hasPendingApplications) {
                                 Box(
@@ -295,7 +315,7 @@ fun UserList(
                         var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                         LaunchedEffect(avatarUrl, user.avatarKey) {
                             if (!avatarUrl.isNullOrBlank()) {
-                                avatarBitmap = loadImageBitmapFromUrl(avatarUrl, user.avatarKey)
+                                avatarBitmap = loadImageBitmapWithCache(avatarUrl, user.avatarKey)
                             } else {
                                 avatarBitmap = null
                             }

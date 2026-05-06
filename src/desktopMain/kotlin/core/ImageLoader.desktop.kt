@@ -1,13 +1,15 @@
 package core
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import java.awt.image.BufferedImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.URI
 import java.net.URL
-// SKIKO extension `toComposeImageBitmap` may be missing in some CI classpaths.
-// Temporarily avoid calling it so the project can compile in CI.
+import javax.imageio.ImageIO
 
 /**
  * 桌面端图片加载器实现
@@ -31,31 +33,43 @@ object DesktopImageLoader : ImageLoaderProvider {
             }
         }
 
+        // 先读缓存
         if (cacheFile != null && cacheFile.exists()) {
             try {
-                // Avoid relying on platform extension conversion here; return null so callers
-                // handle missing image gracefully. Replace with proper conversion later.
-                return@withContext null
+                val bufferedImage = ImageIO.read(cacheFile)
+                if (bufferedImage != null) {
+                    return@withContext bufferedImage.toComposeImageBitmap()
+                }
             } catch (_: Exception) {
-                // fallthrough to re-download
+                // 缓存损坏，重新下载
             }
         }
 
+        // 下载图片
         val conn = URL(url).openConnection() as java.net.HttpURLConnection
         conn.connectTimeout = 5000
         conn.readTimeout = 10000
         conn.requestMethod = "GET"
         conn.instanceFollowRedirects = true
+        conn.setRequestProperty("User-Agent", "QingLiao-Chat/1.0")
+
+        // 如果是本站资源，带上Authorization头
+        if (url.contains(ServerConfig.SERVER_IP)) {
+            conn.setRequestProperty("Authorization", "Bearer ${ServerConfig.Token}")
+        }
+
         conn.inputStream.use { ins ->
             val bytes = ins.readBytes()
+            // 写入缓存
             if (cacheFile != null) {
                 try { cacheFile.writeBytes(bytes) } catch (_: Exception) {}
             }
-            // TODO: convert bytes -> ImageBitmap using Skiko/Skia extension. For now return null
-            // to avoid CI compile failure when the extension isn't available.
-            return@withContext null
+            // 转换为ImageBitmap
+            val bufferedImage = ImageIO.read(ByteArrayInputStream(bytes))
+            return@withContext bufferedImage?.toComposeImageBitmap()
         }
     } catch (e: Exception) {
+        println("Image load error: $url, ${e.message}")
         null
     }
 }

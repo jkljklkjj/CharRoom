@@ -1,9 +1,5 @@
 package core
 
-import model.Message
-import model.GroupMessage
-import model.messages
-import model.groupMessages
 import androidx.compose.runtime.mutableStateOf
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -13,6 +9,8 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.websocketx.*
+import model.GroupMessage
+import model.Message
 import java.net.URI
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -26,37 +24,7 @@ import component.appendAgentChunk
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.milliseconds
 
-val logger = KotlinLogging.logger("Chat")
-
-/**
- * 全局消息接收回调接口
- */
-interface MessageReceiveListener {
-    /**
-     * 收到私聊消息
-     */
-    fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long)
-
-    /**
-     * 收到群聊消息
-     */
-    fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long)
-}
-
-// 定义发送类型枚举，统一管理后端协议中的字符串
-enum class MsgType(val wire: String) {
-    LOGIN("login"),
-    LOGOUT("logout"),
-    CHAT("chat"),
-    AGENT_CHAT("agentChat"),
-    AGENT_CHAT_STREAM("agentChatStream"),
-    GROUP_CHAT("groupChat"),
-    CHECK("check"),
-    HEARTBEAT("heartbeat"),
-    ACK("ack");
-}
-
-// ApiUnwrap is defined in core.ApiUnwrap (ApiUnwrap.kt)
+val logger = KotlinLogging.logger("NettyWebSocketClient")
 
 /**
  * 处理接收到的WebSocket信息
@@ -151,7 +119,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         prompt(unwrap.message)
                     } else {
                         val rawData = unwrap.dataJson ?: String(bodyBytes, Charsets.UTF_8)
-                        val dataStr = rawData.trim().trimStart('\uFEFF', '\uFFFE')
+                        val dataStr = rawData.trim().trimStart('﻿', '￾')
                         if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                             val json = jacksonObjectMapper().readTree(dataStr)
                             val typeText = json.get("type")?.asText()
@@ -187,7 +155,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
 
                 // collect response for callers waiting in send()
                 val shouldCollectResponse = try {
-                    val dataStr = String(bodyBytes, Charsets.UTF_8).trim().trimStart('\uFEFF', '\uFFFE')
+                    val dataStr = String(bodyBytes, Charsets.UTF_8).trim().trimStart('﻿', '￾')
                     if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                         val json = jacksonObjectMapper().readTree(dataStr)
                         val typeText = json.get("type")?.asText()
@@ -235,17 +203,16 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
             var isDuplicate = false
             if (messageId != null && messageId.isNotBlank()) {
                 isDuplicate = runBlocking {
-                    Chat.messageCacheMutex.withLock {
-                        if (Chat.receivedMessageIds.contains(messageId)) {
-//                            AppLog.d{"收到重复消息，忽略: $messageId"}
+                    NettyWebSocketClient.messageCacheMutex.withLock {
+                        if (NettyWebSocketClient.receivedMessageIds.contains(messageId)) {
                             logger.info { "收到重复消息，忽略: $messageId" }
                             true
                         } else {
                             // 添加到去重缓存
-                            Chat.receivedMessageIds.add(messageId)
+                            NettyWebSocketClient.receivedMessageIds.add(messageId)
                             // 缓存超过大小，移除最旧的
-                            if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
-                                val iterator = Chat.receivedMessageIds.iterator()
+                            if (NettyWebSocketClient.receivedMessageIds.size > NettyWebSocketClient.maxMessageCacheSize) {
+                                val iterator = NettyWebSocketClient.receivedMessageIds.iterator()
                                 if (iterator.hasNext()) {
                                     iterator.next()
                                     iterator.remove()
@@ -266,12 +233,12 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                 isSent = mutableStateOf(true),
                 messageId = messageId ?: ""
             )
-            messages += message
+            model.messages += message
             try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = senderId.toString(), metadata = mapOf("text" to text.take(64)))) } catch (_: Exception) {}
 
             // 通知消息监听器
-            synchronized(Chat.messageListeners) {
-                Chat.messageListeners.forEach {
+            synchronized(NettyWebSocketClient.messageListeners) {
+                NettyWebSocketClient.messageListeners.forEach {
                     it.onPrivateMessageReceived(senderId, text, timestamp)
                 }
             }
@@ -302,14 +269,14 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     var isDuplicate = false
                     if (messageId.isNotBlank()) {
                         isDuplicate = runBlocking {
-                            Chat.messageCacheMutex.withLock {
-                                if (Chat.receivedMessageIds.contains(messageId)) {
+                            NettyWebSocketClient.messageCacheMutex.withLock {
+                                if (NettyWebSocketClient.receivedMessageIds.contains(messageId)) {
                                     AppLog.d{"收到重复消息，忽略: $messageId"}
                                     true
                                 } else {
-                                    Chat.receivedMessageIds.add(messageId)
-                                    if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
-                                        val iterator = Chat.receivedMessageIds.iterator()
+                                    NettyWebSocketClient.receivedMessageIds.add(messageId)
+                                    if (NettyWebSocketClient.receivedMessageIds.size > NettyWebSocketClient.maxMessageCacheSize) {
+                                        val iterator = NettyWebSocketClient.receivedMessageIds.iterator()
                                         if (iterator.hasNext()) {
                                             iterator.next()
                                             iterator.remove()
@@ -330,7 +297,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         isSent = mutableStateOf(true),
                         messageId = messageId
                     )
-                    messages += message
+                    model.messages += message
                     try {
                         ActionLogger.log(
                             Action(
@@ -343,8 +310,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     }
 
                     // 通知消息监听器
-                    synchronized(Chat.messageListeners) {
-                        Chat.messageListeners.forEach {
+                    synchronized(NettyWebSocketClient.messageListeners) {
+                        NettyWebSocketClient.messageListeners.forEach {
                             it.onPrivateMessageReceived(senderId, text, ts)
                         }
                     }
@@ -365,15 +332,15 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     var isDuplicate = false
                     if (messageId.isNotBlank()) {
                         isDuplicate = runBlocking {
-                            Chat.messageCacheMutex.withLock {
+                            NettyWebSocketClient.messageCacheMutex.withLock {
                                 val uniqueId = "group_${groupId}_${senderId}_$messageId"
-                                if (Chat.receivedMessageIds.contains(uniqueId)) {
+                                if (NettyWebSocketClient.receivedMessageIds.contains(uniqueId)) {
                                     AppLog.d{"收到重复群聊消息，忽略: $uniqueId"}
                                     true
                                 } else {
-                                    Chat.receivedMessageIds.add(uniqueId)
-                                    if (Chat.receivedMessageIds.size > Chat.maxMessageCacheSize) {
-                                        val iterator = Chat.receivedMessageIds.iterator()
+                                    NettyWebSocketClient.receivedMessageIds.add(uniqueId)
+                                    if (NettyWebSocketClient.receivedMessageIds.size > NettyWebSocketClient.maxMessageCacheSize) {
+                                        val iterator = NettyWebSocketClient.receivedMessageIds.iterator()
                                         if (iterator.hasNext()) {
                                             iterator.next()
                                             iterator.remove()
@@ -395,7 +362,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         isSent = mutableStateOf(true),
                         messageId = messageId
                     )
-                    groupMessages += groupMessage
+                    model.groupMessages += groupMessage
                     try {
                         ActionLogger.log(
                             Action(
@@ -408,8 +375,8 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     }
 
                     // 通知消息监听器
-                    synchronized(Chat.messageListeners) {
-                        Chat.messageListeners.forEach {
+                    synchronized(NettyWebSocketClient.messageListeners) {
+                        NettyWebSocketClient.messageListeners.forEach {
                             it.onGroupMessageReceived(groupId, senderId, senderId.toString(), text, groupMessage.timestamp)
                         }
                     }
@@ -455,7 +422,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
         if (messageId.isBlank()) return
         try {
             val ackPayload = buildAckPayload(messageId)
-            Chat.send(ackPayload, MsgType.ACK, ServerConfig.Token, 1) { success, _ ->
+            NettyWebSocketClient.send(ackPayload, MsgType.ACK, ServerConfig.Token, 1) { success, _ ->
                 if (!success) {
                     AppLog.w({"ACK发送失败: $messageId"})
                 }
@@ -489,7 +456,6 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                 }
                 else -> {
                     if (messageType.contains("登录失败") || messageType.contains("token无效") || messageType.contains("token已过期") || messageType.contains("token不能为空")) {
-//                        throw IllegalArgumentException("登录失败")
                         logger.info { "登录失败" }
                         AppLog.w({"登录凭证失效: $messageType"})
                         prompt(messageType)
@@ -497,10 +463,10 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         ServerConfig.Token = ""
                         ServerConfig.id = ""
                         // 标记认证失败，停止自动重连
-                        Chat.authFailed = true
+                        NettyWebSocketClient.authFailed = true
                         // 通知所有监听器登录状态失效
-                        synchronized(Chat.authStateListeners) {
-                            Chat.authStateListeners.forEachIndexed { index, listener ->
+                        synchronized(NettyWebSocketClient.authStateListeners) {
+                            NettyWebSocketClient.authStateListeners.forEachIndexed { index, listener ->
                                 try {
                                     println("👉 触发第 $index 个监听器")
                                     listener.onAuthInvalidated(messageType)
@@ -534,12 +500,12 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         timestamp = timestamp,
                         isSent = mutableStateOf(true)
                     )
-                    messages += message
+                    model.messages += message
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = userId.toString(), metadata = mapOf("text" to messageContent.take(64)))) } catch (_: Exception) {}
 
                     // 通知消息监听器
-                    synchronized(Chat.messageListeners) {
-                        Chat.messageListeners.forEach {
+                    synchronized(NettyWebSocketClient.messageListeners) {
+                        NettyWebSocketClient.messageListeners.forEach {
                             it.onPrivateMessageReceived(userId, messageContent, timestamp)
                         }
                     }
@@ -556,12 +522,12 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         timestamp = timestamp,
                         isSent = mutableStateOf(true)
                     )
-                    groupMessages += groupMessage
+                    model.groupMessages += groupMessage
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = groupId.toString(), metadata = mapOf("text" to messageContent.take(64), "group" to "true"))) } catch (_: Exception) {}
 
                     // 通知消息监听器
-                    synchronized(Chat.messageListeners) {
-                        Chat.messageListeners.forEach {
+                    synchronized(NettyWebSocketClient.messageListeners) {
+                        NettyWebSocketClient.messageListeners.forEach {
                             it.onGroupMessageReceived(groupId, userId, senderName, messageContent, timestamp)
                         }
                     }
@@ -610,20 +576,15 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
 }
 
 /**
- * Netty构建的功能类
+ * Netty实现的WebSocket客户端
  */
-object Chat {
-        private lateinit var channel: Channel
-        private var host = ServerConfig.SERVER_IP
-        // 强制使用WSS 443端口，避免301重定向
-        private var port = 443
-        private lateinit var responseHandler: CustomWebSocketHandler
-        private val sendLock = Any()
-
-    // 登录状态监听器
-    fun interface AuthStateListener {
-        fun onAuthInvalidated(reason: String)
-    }
+object NettyWebSocketClient : WebSocketClientProvider {
+    private lateinit var channel: Channel
+    private var host = ServerConfig.SERVER_IP
+    // 强制使用WSS 443端口，避免301重定向
+    private var port = 443
+    private lateinit var responseHandler: CustomWebSocketHandler
+    private val sendLock = Any()
 
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
@@ -631,7 +592,7 @@ object Chat {
     // 认证失败标记，认证失败时不再自动重连
     var authFailed = false
 
-    fun addMessageReceiveListener(listener: MessageReceiveListener) {
+    override fun addMessageReceiveListener(listener: MessageReceiveListener) {
         synchronized(messageListeners) {
             if (!messageListeners.contains(listener)) {
                 messageListeners.add(listener)
@@ -639,13 +600,13 @@ object Chat {
         }
     }
 
-    fun removeMessageReceiveListener(listener: MessageReceiveListener) {
+    override fun removeMessageReceiveListener(listener: MessageReceiveListener) {
         synchronized(messageListeners) {
             messageListeners.remove(listener)
         }
     }
 
-    fun addAuthStateListener(listener: AuthStateListener) {
+    override fun addAuthStateListener(listener: AuthStateListener) {
         synchronized(authStateListeners) {
             if (!authStateListeners.contains(listener)) {
                 authStateListeners.add(listener)
@@ -653,13 +614,16 @@ object Chat {
         }
     }
 
-    fun removeAuthStateListener(listener: AuthStateListener) {
+    override fun removeAuthStateListener(listener: AuthStateListener) {
         synchronized(authStateListeners) {
             authStateListeners.remove(listener)
         }
     }
 
-    val isServerConnected = mutableStateOf(true)
+    override val isServerConnected: Boolean
+        get() = _isServerConnected.value
+
+    private val _isServerConnected = mutableStateOf(true)
     private var heartbeatJob: Job? = null
     private val heartbeatIntervalMillis = 30000L // 30秒心跳
     private val heartbeatTimeoutMillis = 5000L // 心跳超时5秒
@@ -678,7 +642,6 @@ object Chat {
     private val maxQueueSize = 1000 // 最大队列长度，防止内存溢出
 
     // 消息去重缓存，存储最近收到的消息ID
-    // Make these visible to other classes in the module (e.g. CustomWebSocketHandler)
     internal val receivedMessageIds = mutableSetOf<String>()
     internal val maxMessageCacheSize = 1000 // 最多缓存1000条消息ID
     internal val messageCacheMutex = Mutex()
@@ -689,7 +652,7 @@ object Chat {
         val type: MsgType,
         val targetClientId: String,
         val expectedResponses: Int,
-        val callback: (Boolean, List<Any>) -> Unit,
+        val callback: (Boolean, List<ByteArray>) -> Unit,
         val timestamp: Long = System.currentTimeMillis(),
         val retryCount: Int = 0,
         val maxRetries: Int = 3
@@ -709,14 +672,14 @@ object Chat {
         return rawHost.substringBefore(':')
     }
 
-    fun start(newHost: String = host, newPort: Int = if (NetworkConstants.WS_PROTOCOL == "wss") 443 else 80) {
+    override fun start(newHost: String?, newPort: Int?) {
         // normalize host to remove any provided ":port" suffix
         println("正在接入Netty服务")
-        host = newHost
+        host = newHost ?: host
         // 根据协议自动选择端口：WSS用443，WS用80
-        port = newPort
+        port = newPort ?: if (NetworkConstants.WS_PROTOCOL == "wss") 443 else 80
         stopReconnect.set(false)
-        Chat.authFailed = false // 重置认证失败标记，允许重新连接
+        authFailed = false // 重置认证失败标记，允许重新连接
 
         // 如果已经连接或正在连接，则直接返回，避免重复连接导致的多次握手/登录
         if (isConnected()) {
@@ -745,7 +708,7 @@ object Chat {
                     AppLog.e({ "等待通道关闭时出错: ${e.message}" }, e)
                 } finally {
                     // 标记连接断开并触发重连（如果未被显式停止）
-                    isServerConnected.value = false
+                    _isServerConnected.value = false
                     heartbeatJob?.cancel()
 
                     // 释放 event loop group
@@ -800,7 +763,7 @@ object Chat {
                         heartbeatResult.await()
                     } ?: false
 
-                    isServerConnected.value = ok
+                    _isServerConnected.value = ok
 
                     if (!ok) {
                         AppLog.w({ "心跳超时，连接可能已断开" })
@@ -810,7 +773,7 @@ object Chat {
                     }
                 } catch (e: Exception) {
                     AppLog.e({ "心跳发送失败: ${e.message}" })
-                    isServerConnected.value = false
+                    _isServerConnected.value = false
                     // 关闭连接触发重连
                     if (::channel.isInitialized && channel.isActive) {
                         runCatching { channel.close() }
@@ -831,12 +794,12 @@ object Chat {
      * @param expectedResponses 预期的响应数量
      * @param callback 发送完成后的回调函数
      */
-    fun send(
+    override fun send(
         payload: ByteArray,
         type: MsgType,
         targetClientId: String,
         expectedResponses: Int,
-        callback: (Boolean, List<Any>) -> Unit
+        callback: (Boolean, List<ByteArray>) -> Unit
     ) {
         AppLog.d{"正在发送WebSocket消息"}
 
@@ -875,7 +838,7 @@ object Chat {
         type: MsgType,
         targetClientId: String,
         expectedResponses: Int,
-        callback: (Boolean, List<Any>) -> Unit
+        callback: (Boolean, List<ByteArray>) -> Unit
     ) {
         // 如果握手尚未完成，延后发送以避免 WebSocket 编码器在 state=0 时接收到帧
         try {
@@ -958,7 +921,7 @@ object Chat {
                                                         false
                                                     } else {
                                                         val rawData = unwrap.dataJson ?: String(bytes, Charsets.UTF_8)
-                                                        val dataStr = rawData.trim().trimStart('\uFEFF', '\uFFFE')
+                                                        val dataStr = rawData.trim().trimStart('﻿', '￾')
                                                         if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                                                             val json = jacksonObjectMapper().readTree(dataStr)
                                                             val typeText = json.get("type")?.asText()
@@ -975,7 +938,7 @@ object Chat {
                                             } catch (e: Exception) {
                                                 true
                                             }
-                                            callback(isValid, if (isValid) responses.map { it as Any } else emptyList())
+                                            callback(isValid, if (isValid) responses.map { it } else emptyList())
                                         }
                                     } finally {
                                         // reset expectation after handling
@@ -1010,7 +973,7 @@ object Chat {
          }
      }
 
-    fun sendText(
+    override fun sendText(
         content: String,
         callback: (Boolean) -> Unit
     ) {
@@ -1040,14 +1003,14 @@ object Chat {
     /**
      * 检查是否已连接
      */
-    fun isConnected(): Boolean {
-        return ::channel.isInitialized && channel.isActive && isServerConnected.value
+    override fun isConnected(): Boolean {
+        return ::channel.isInitialized && channel.isActive && _isServerConnected.value
     }
 
     /**
      * 手动重连
      */
-    fun reconnect() {
+    override fun reconnect() {
         if (isReconnecting.compareAndSet(false, true)) {
             stopReconnect.set(false)
             currentReconnectDelay = initialReconnectDelay
@@ -1061,12 +1024,12 @@ object Chat {
     private fun startReconnectLoop() {
         reconnectJob?.cancel()
         // 认证失败时不启动重连
-        if (Chat.authFailed) {
+        if (authFailed) {
             AppLog.i({"认证失败，停止自动重连，请重新登录"})
             return
         }
         reconnectJob = CoroutineScope(Dispatchers.IO).launch {
-            while (isActive && !stopReconnect.get() && !isConnected() && !Chat.authFailed) {
+            while (isActive && !stopReconnect.get() && !isConnected() && !authFailed) {
                 try {
                     AppLog.i({ "尝试重连，延迟 ${currentReconnectDelay}ms..." })
                     delay(currentReconnectDelay.milliseconds)
@@ -1078,7 +1041,7 @@ object Chat {
 
                     if (result.isSuccess) {
                         AppLog.i({ "重连成功" })
-                        isServerConnected.value = true
+                        _isServerConnected.value = true
                         isReconnecting.set(false)
                         // 重连成功，发送队列中缓存的消息
                         flushMessageQueue()
@@ -1243,7 +1206,7 @@ object Chat {
                     println("[WS] 登录失败，响应条数=${resp.size}, tokenLength=${loginTokenSnapshot.length}, tokenTail=${loginTokenSnapshot.takeLast(6)}")
                     // 尝试从响应中提取错误信息
                     val errorMsg = try {
-                        val lastBytes = resp.last() as? ByteArray
+                        val lastBytes = resp.last()
                         if (lastBytes != null) {
                             val unwrap = parseProtoResponse(lastBytes)
                             unwrap.message ?: "登录失败，token无效或已过期"
@@ -1277,7 +1240,7 @@ object Chat {
             // 监听连接关闭
             channel.closeFuture().addListener {
                 AppLog.i({ "连接已关闭" })
-                isServerConnected.value = false
+                _isServerConnected.value = false
                 heartbeatJob?.cancel()
 
                 // 释放 event loop group
@@ -1300,7 +1263,7 @@ object Chat {
         }
     }
 
-    fun logoutAndDisconnect() {
+    override fun logoutAndDisconnect() {
         stopReconnect.set(true)
         reconnectJob?.cancel()
         heartbeatJob?.cancel()
@@ -1347,6 +1310,10 @@ object Chat {
             } catch (_: Exception) {
             }
         }
+    }
+
+    override fun stop() {
+        logoutAndDisconnect()
     }
 
     private fun shutdown() {

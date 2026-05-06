@@ -2,7 +2,10 @@ package com.chatlite.charroom
 
 import android.app.Application
 import android.util.Log
+import core.LocalChatHistoryStore
 import core.ServerConfig
+import component.AvatarCropDialogImpl
+import component.AndroidAvatarCropDialog
 import timber.log.Timber
 
 class ChatApplication : Application() {
@@ -19,6 +22,11 @@ class ChatApplication : Application() {
         chatNotificationManager = ChatNotificationManager(this)
         // 注册应用生命周期观察者
         AppLifecycleObserver.register(this)
+        // 初始化本地存储
+        AndroidLocalChatHistoryStore.init(this)
+        LocalChatHistoryStore = AndroidLocalChatHistoryStore
+        // 初始化头像裁剪对话框
+        AvatarCropDialogImpl = AndroidAvatarCropDialog
         // 初始化日志
         if (BuildConfig.DEBUG) {
             Timber.plant(object : Timber.DebugTree() {
