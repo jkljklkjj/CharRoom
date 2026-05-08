@@ -117,7 +117,7 @@ message MessageWrapper {
         AgentChatMessage agentChat = 9;
         GroupChatMessage groupChat = 4;
         CheckMessage check = 5;
-        Heartbeat heartbeat = 6;
+        HeartbeatMessage heartbeat = 6;
         LogoutMessage logout = 7;
         AgentStreamMessage agentStream = 8;
         AckMessage ack = 10;
