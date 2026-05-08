@@ -33,9 +33,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import model.messages
+import model.groupMessages
 
 class ChatSession(
     private val user: LocalUser,
+    private val currentUserId: Int,
     private val onSendNetwork: (String) -> Unit = {}
 ) {
     val messages: SnapshotStateList<ChatMessage> = mutableStateListOf(
@@ -65,7 +68,7 @@ class ChatSession(
         if (trimmed.isBlank()) return
         messages.add(
             ChatMessage(
-                senderId = 0,
+                senderId = currentUserId,
                 receiverId = user.id,
                 content = trimmed,
                 isMe = true,
@@ -100,17 +103,19 @@ class ChatSession(
 @Composable
 fun ChatScreen(user: LocalUser, appState: ChatAppState, currentUserAvatar: String?, onBack: () -> Unit, onSend: (String) -> Unit) {
     val context = LocalContext.current
-    val chatSession = remember(user, onSend) { ChatSession(user, onSend) }
+    val chatSession = remember(user, appState.currentUserId, onSend) {
+        ChatSession(user, appState.currentUserId, onSend)
+    }
 
     LaunchedEffect(user.id, appState.currentUserId) {
         val saved = withContext(Dispatchers.IO) {
             if (user.id > 0) {
-                // 私聊消息
+                // 私聊消息：同时包含自己发送的和对方发送的
                 LocalChatHistoryStore.getPrivateMessagesPage(appState.currentUserId.toString(), user.id)
                     .map { message ->
                         ChatMessage(
-                            senderId = message.senderId,
-                            receiverId = message.receiverId,
+                            senderId = if (message.sender) appState.currentUserId else user.id,
+                            receiverId = if (message.sender) user.id else appState.currentUserId,
                             content = message.message,
                             isMe = message.sender,
                             timestamp = message.timestamp,
@@ -144,9 +149,11 @@ fun ChatScreen(user: LocalUser, appState: ChatAppState, currentUserAvatar: Strin
     DisposableEffect(chatSession, user) {
         val receiver: (ChatMessage) -> Unit = { message ->
             val shouldReceive = if (user.id < 0) {
-                message.receiverId == user.id && !message.isMe
+                // 群聊消息：接收所有发给该群的消息
+                message.receiverId == user.id
             } else {
-                message.senderId == user.id && !message.isMe
+                // 私聊消息：接收对方发给我的，或者我发给对方的
+                (message.senderId == user.id && !message.isMe) || (message.receiverId == user.id && message.isMe)
             }
             if (shouldReceive) {
                 chatSession.receiveMessage(message)

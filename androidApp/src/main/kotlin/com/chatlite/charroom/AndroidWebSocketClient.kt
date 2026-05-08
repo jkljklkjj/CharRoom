@@ -93,7 +93,13 @@ class AndroidWebSocketClient {
                                             wrapper.payloadCase == MessageProtos.MessageWrapper.PayloadCase.AGENTCHAT ||
                                             wrapper.payloadCase == MessageProtos.MessageWrapper.PayloadCase.GROUPCHAT ||
                                             wrapper.payloadCase == MessageProtos.MessageWrapper.PayloadCase.AGENTSTREAM) {
-                                            parseIncomingChat(bytes, ownUserId)?.let(onMessage)
+                                            parseIncomingChat(bytes, ownUserId)?.let { chatMsg ->
+                                                // 回复ACK确认（流式消息不需要重复确认）
+                                                if (chatMsg.messageId.isNotBlank() && !chatMsg.messageId.startsWith("agent-stream-")) {
+                                                    sendBinary(buildAckPayload(chatMsg.messageId))
+                                                }
+                                                onMessage(chatMsg)
+                                            }
                                         }
                                     } catch (_: Exception) {
                                         try {
@@ -396,6 +402,20 @@ class AndroidWebSocketClient {
         return MessageProtos.MessageWrapper.newBuilder()
             .setType(MsgType.CHECK.wire)
             .setCheck(check)
+            .build()
+            .toByteArray()
+    }
+
+    /**
+     * 构建ACK确认消息，通知后端消息已收到
+     */
+    private fun buildAckPayload(messageId: String): ByteArray {
+        val ack = MessageProtos.AckMessage.newBuilder()
+            .setMessageId(messageId)
+            .build()
+        return MessageProtos.MessageWrapper.newBuilder()
+            .setType(MsgType.ACK.wire)
+            .setAck(ack)
             .build()
             .toByteArray()
     }

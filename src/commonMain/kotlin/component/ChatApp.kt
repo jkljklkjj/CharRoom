@@ -866,21 +866,6 @@ fun ChatApp(
             )
         }
 
-        // 用户详情页面
-        showUserDetail?.let { user ->
-            UserDetailScreen(
-                userId = user.id,
-                onBack = { showUserDetail = null },
-                onAddFriend = {
-                    showUserDetail = null
-                    // 添加好友后刷新列表
-                    scope.launch {
-                        updateList()
-                    }
-                }
-            )
-        }
-
         // 个人信息页面
         if (showProfile) {
             Surface(
@@ -892,7 +877,7 @@ fun ChatApp(
                     onProfileUpdated = {
                         // 个人信息更新后刷新用户列表
                         scope.launch {
-                            model.updateList()
+                            updateList()
                         }
                     }
                 )
@@ -905,6 +890,7 @@ fun ChatApp(
                 user = user,
                 onDismiss = { showUserDetail = null },
                 onSendMessage = {
+                    showUserDetail = null
                     selectedUser = user
                 }
             )

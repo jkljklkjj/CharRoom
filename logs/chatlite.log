@@ -246,3 +246,19 @@
 2026-05-08 12:33:30.901 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
 2026-05-08 12:33:59.816 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
 2026-05-08 12:34:31.125 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:20:39.745 [DefaultDispatcher-worker-6] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 15:20:41.617 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:20:41.671 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 15:20:41.674 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 15:21:11.647 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:21:43.757 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:22:15.571 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:22:42.440 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:22:42.441 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=1, callback will process it
+2026-05-08 15:22:47.437 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:23:38.752 [DefaultDispatcher-worker-6] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 15:23:40.655 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:23:40.699 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 15:23:40.701 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 15:23:59.878 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 15:23:59.880 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=1, callback will process it
