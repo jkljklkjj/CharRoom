@@ -215,6 +215,9 @@ class AndroidWebSocketClient {
                 }
                 MessageProtos.MessageWrapper.PayloadCase.AGENTCHAT -> {
                     val v = wrapper.agentChat
+                    if (v.content.isBlank()) {
+                        return null
+                    }
                     val senderId = v.userId.toIntOrNull() ?: 0
                     val timestamp = (v.timestamp.takeIf { it.isNotBlank() }?.toLongOrNull() ?: System.currentTimeMillis())
                     ChatMessage(

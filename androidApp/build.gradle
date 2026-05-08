@@ -157,7 +157,8 @@ dependencies {
 
     // Ktor 客户端 (Android版本)
     implementation 'io.ktor:ktor-client-core:3.4.3'
-    implementation 'io.ktor:ktor-client-android:3.4.3'
+    implementation 'io.ktor:ktor-client-okhttp:3.4.3' // OkHttp engine for HTTP/2 support
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0' // OkHttp core library
     implementation 'io.ktor:ktor-client-content-negotiation:3.4.3'
     implementation 'io.ktor:ktor-serialization-kotlinx-json:3.4.3'
 

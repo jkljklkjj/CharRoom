@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import core.ServerConfig
 import core.loadImageBitmapFromUrl
 
 @Composable
@@ -113,10 +114,13 @@ fun UserListItem(user: LocalUser, onClick: () -> Unit, onDetailClick: () -> Unit
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = user.username, style = MaterialTheme.typography.subtitle1)
-                Text(
-                    text = if (user.online) "在线" else "离线",
-                    style = MaterialTheme.typography.caption
-                )
+                // 普通用户显示在线状态，AI助手不显示
+                if (!ServerConfig.isAgentAssistant(user.id)) {
+                    Text(
+                        text = if (user.online) "在线" else "离线",
+                        style = MaterialTheme.typography.caption
+                    )
+                }
                 user.signature?.takeIf { it.isNotBlank() }?.let {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(

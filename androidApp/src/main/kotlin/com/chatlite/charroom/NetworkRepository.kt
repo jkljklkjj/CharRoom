@@ -1,19 +1,33 @@
 package com.chatlite.charroom
 
 import core.ApiEndpoints
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.accept
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.contentType
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.BufferedWriter
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
 class NetworkRepository private constructor() {
     // 单例实现和常量定义合并到同一个companion object
@@ -49,6 +63,28 @@ class NetworkRepository private constructor() {
     }
 
     private val wsClient = AndroidWebSocketClient()
+
+    // 预配置的 OkHttpClient：启用连接池与 HTTP/2 优先
+    private val preconfiguredOkHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectionPool(ConnectionPool(5, 5, TimeUnit.MINUTES))
+        .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
+        .pingInterval(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private val httpClient = HttpClient(OkHttp) {
+        engine {
+            preconfigured = preconfiguredOkHttpClient
+        }
+        expectSuccess = false
+        install(HttpTimeout) {
+            connectTimeoutMillis = 10_000
+            socketTimeoutMillis = 10_000
+            requestTimeoutMillis = 10_000
+        }
+    }
 
     data class TokenBundle(
         val accessToken: String,
@@ -120,40 +156,23 @@ class NetworkRepository private constructor() {
     }
 
     suspend fun uploadAvatar(token: String, imageBytes: ByteArray, fileName: String): String? = withContext(Dispatchers.IO) {
-        val boundary = "----WebKitFormBoundary${System.currentTimeMillis()}"
-        val lineEnd = "\r\n"
-        val twoHyphens = "--"
-
-        val conn = URL(ApiEndpoints.url(ApiEndpoints.USER_AVATAR_UPLOAD)).openConnection() as HttpURLConnection
-        conn.connectTimeout = 30000
-        conn.readTimeout = 30000
-        conn.requestMethod = "POST"
-        conn.doInput = true
-        conn.doOutput = true
-        conn.setRequestProperty("Authorization", "Bearer $token")
-        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-
-        val outputStream = conn.outputStream
-        val writer = outputStream.bufferedWriter()
-
-        // 写入文件部分
-        writer.append(twoHyphens + boundary + lineEnd)
-        writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"$lineEnd")
-        writer.append("Content-Type: image/jpeg$lineEnd")
-        writer.append(lineEnd)
-        writer.flush()
-        outputStream.write(imageBytes)
-        outputStream.flush()
-        writer.append(lineEnd)
-
-        // 结束请求
-        writer.append(twoHyphens + boundary + twoHyphens + lineEnd)
-        writer.flush()
-        writer.close()
-
-        val responseCode = conn.responseCode
-        val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
-        val response = stream.bufferedReader().use { it.readText() }
+        val response = httpClient.post(ApiEndpoints.url(ApiEndpoints.USER_AVATAR_UPLOAD)) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            key = "file",
+                            value = imageBytes,
+                            headers = Headers.build {
+                                append(HttpHeaders.ContentType, "image/jpeg")
+                                append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                            }
+                        )
+                    }
+                )
+            )
+        }.bodyAsText()
 
         return@withContext try {
             val root = JSONObject(response)
@@ -175,6 +194,24 @@ class NetworkRepository private constructor() {
     suspend fun getOfflineMessages(token: String): List<ChatMessage> = withContext(Dispatchers.IO) {
         val response = sendRequest(OFFLINE_MESSAGE_PATH, "GET", null, token)
         parseChatMessages(response)
+    }
+
+    /**
+     * 验证指定 URL 使用的底层协议（OKHTTP 可返回 HTTP/2 或 HTTP/1.1）
+     * 用于排查服务器是否启用了 HTTP/2
+     */
+    suspend fun detectHttpProtocol(url: String): String = withContext(Dispatchers.IO) {
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .head()
+                .build()
+            preconfiguredOkHttpClient.newCall(req).execute().use { resp ->
+                return@withContext resp.protocol.toString()
+            }
+        } catch (e: Exception) {
+            return@withContext "UNKNOWN: ${e.message}"
+        }
     }
 
     suspend fun connectWebSocket(
@@ -217,7 +254,7 @@ class NetworkRepository private constructor() {
         isConnected = false
     }
 
-    private fun fetchList(path: String, token: String, method: String = "GET"): List<LocalUser> {
+    private suspend fun fetchList(path: String, token: String, method: String = "GET"): List<LocalUser> {
         return try {
             val response = sendRequest(path, method, if (method == "POST") "{}" else null, token)
             parseUserList(response)
@@ -226,7 +263,7 @@ class NetworkRepository private constructor() {
         }
     }
 
-    private fun fetchGroups(path: String, token: String): List<LocalUser> {
+    private suspend fun fetchGroups(path: String, token: String): List<LocalUser> {
         return try {
             val response = sendRequest(path, "GET", null, token)
             parseGroupList(response)
@@ -358,27 +395,18 @@ class NetworkRepository private constructor() {
         return emptyList()
     }
 
-    private fun sendRequest(path: String, method: String, body: String?, token: String?): String {
-        val url = URL(ApiEndpoints.url(path))
-        val conn = url.openConnection() as HttpURLConnection
-        conn.connectTimeout = 10000
-        conn.readTimeout = 10000
-        conn.requestMethod = method
-        conn.setRequestProperty("Accept", "application/json")
-        if (!token.isNullOrBlank()) {
-            conn.setRequestProperty("Authorization", "Bearer $token")
-        }
-        if (!body.isNullOrBlank()) {
-            conn.doOutput = true
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            BufferedWriter(OutputStreamWriter(conn.outputStream, Charsets.UTF_8)).use {
-                it.write(body)
-                it.flush()
+    private suspend fun sendRequest(path: String, method: String, body: String?, token: String?): String {
+        return httpClient.request(ApiEndpoints.url(path)) {
+            this.method = HttpMethod.parse(method)
+            accept(ContentType.Application.Json)
+            if (!token.isNullOrBlank()) {
+                header(HttpHeaders.Authorization, "Bearer $token")
             }
-        }
-        val responseCode = conn.responseCode
-        val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
-        return BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+            if (!body.isNullOrBlank()) {
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+        }.bodyAsText()
     }
 
     // -------------------------- 网络状态管理 --------------------------

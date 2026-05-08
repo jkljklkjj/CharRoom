@@ -22,6 +22,7 @@ class ChatAppState(
     var wsConnected by mutableStateOf(false)
     var errorMessage by mutableStateOf("")
     var currentUserId by mutableStateOf(0)
+    var currentUserAvatar: String? by mutableStateOf(null) // 当前登录用户的头像
     var refreshToken by mutableStateOf("")
     private var accountId by mutableStateOf(0)
 
@@ -41,6 +42,13 @@ class ChatAppState(
             refreshToken = loginResult.refreshToken
             accountId = account.toIntOrNull() ?: 0
             currentUserId = accountId
+
+            // 拉取当前用户详情，保存头像
+            val currentUser = withContext(Dispatchers.IO) {
+                repository.getUserDetail(accountId.toString(), token)
+            }
+            currentUserAvatar = currentUser?.avatarUrl
+
             loadUserList(token)
             connectWebSocket()
             saveToken?.invoke(token, refreshToken, accountId)
@@ -87,6 +95,13 @@ class ChatAppState(
         this.refreshToken = activeRefreshToken
         this.accountId = accountId
         this.currentUserId = accountId
+
+        // 拉取当前用户详情，保存头像
+        val currentUser = withContext(Dispatchers.IO) {
+            repository.getUserDetail(accountId.toString(), activeToken)
+        }
+        currentUserAvatar = currentUser?.avatarUrl
+
         loadUserList(activeToken)
         connectWebSocket()
         authLoading = false
@@ -134,8 +149,24 @@ class ChatAppState(
         loadingUsers = false
         authLoading = false
 
-        if (loadedUsers.isNotEmpty()) {
-            users = loadedUsers
+        // 添加AI助手到好友列表最前面（如果不存在）
+        val usersWithAgent = if (!loadedUsers.any { it.id == core.ServerConfig.AGENT_ASSISTANT_ID }) {
+            listOf(
+                LocalUser(
+                    id = core.ServerConfig.AGENT_ASSISTANT_ID,
+                    username = core.ServerConfig.AGENT_ASSISTANT_NAME,
+                    online = true,
+                    avatarUrl = null,
+                    signature = "智能聊天助手",
+                    isGroup = false
+                )
+            ) + loadedUsers
+        } else {
+            loadedUsers
+        }
+
+        if (usersWithAgent.isNotEmpty()) {
+            users = usersWithAgent
             screen = Screen.Users
         } else {
             users = emptyList()

@@ -1,11 +1,14 @@
 package com.chatlite.charroom
 
 import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
@@ -15,10 +18,14 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import component.EmojiPickerPanel
 import core.LocalChatHistoryStore
+import core.loadImageBitmapFromUrl
 import component.FilePicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -69,12 +76,18 @@ class ChatSession(
     }
 
     fun receiveMessage(message: ChatMessage) {
+        if (!message.isMe && message.content.isBlank()) {
+            return
+        }
         if (message.messageId.isBlank()) {
             messages.add(message)
             return
         }
         val idx = messages.indexOfFirst { it.messageId == message.messageId }
         if (idx >= 0) {
+            if (message.content.isBlank()) {
+                return
+            }
             val target = messages[idx]
             messages[idx] = target.copy(content = target.content + message.content)
             return
@@ -85,7 +98,7 @@ class ChatSession(
 
 @OptIn(FlowPreview::class)
 @Composable
-fun ChatScreen(user: LocalUser, appState: ChatAppState, onBack: () -> Unit, onSend: (String) -> Unit) {
+fun ChatScreen(user: LocalUser, appState: ChatAppState, currentUserAvatar: String?, onBack: () -> Unit, onSend: (String) -> Unit) {
     val context = LocalContext.current
     val chatSession = remember(user, onSend) { ChatSession(user, onSend) }
 
@@ -147,12 +160,12 @@ fun ChatScreen(user: LocalUser, appState: ChatAppState, onBack: () -> Unit, onSe
 
     Column(modifier = Modifier.fillMaxSize().imePadding()) {
         ChatUi.ScreenTopBar(title = user.username, navigationIcon = { ChatUi.BackButton(onBack) })
-        ChatBody(userId = user.id, messages = chatSession.messages, onSend = { chatSession.sendMessage(it) })
+        ChatBody(chatUser = user, currentUserAvatar = currentUserAvatar, messages = chatSession.messages, onSend = { chatSession.sendMessage(it) })
     }
 }
 
 @Composable
-fun ChatBody(userId: Int, messages: SnapshotStateList<ChatMessage>, onSend: (String) -> Unit) {
+fun ChatBody(chatUser: LocalUser, currentUserAvatar: String?, messages: SnapshotStateList<ChatMessage>, onSend: (String) -> Unit) {
     val listState = rememberLazyListState()
     var input by remember { mutableStateOf("") }
     var showEmojiPanel by remember { mutableStateOf(false) }
@@ -184,7 +197,7 @@ fun ChatBody(userId: Int, messages: SnapshotStateList<ChatMessage>, onSend: (Str
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(messages, key = { it.messageId }) { message ->
-                ChatMessageItem(message = message)
+                ChatMessageItem(message = message, chatUser = chatUser, currentUserAvatar = currentUserAvatar)
             }
         }
 
@@ -261,7 +274,7 @@ fun ChatBody(userId: Int, messages: SnapshotStateList<ChatMessage>, onSend: (Str
         }
     }
 
-    LaunchedEffect(userId, messages.size) {
+    LaunchedEffect(chatUser.id, messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }
@@ -269,22 +282,97 @@ fun ChatBody(userId: Int, messages: SnapshotStateList<ChatMessage>, onSend: (Str
 }
 
 @Composable
-fun ChatMessageItem(message: ChatMessage) {
-    val alignment = if (message.isMe) Alignment.End else Alignment.Start
-    val bubbleColor = if (message.isMe) MaterialTheme.colors.primary else MaterialTheme.colors.surface
-    val contentColor = if (message.isMe) MaterialTheme.colors.onPrimary else MaterialTheme.colors.onSurface
+fun ChatMessageItem(message: ChatMessage, chatUser: LocalUser, currentUserAvatar: String?) {
+    val isMe = message.isMe
+    val alignment = if (isMe) Alignment.End else Alignment.Start
+    val bubbleColor = if (isMe) MaterialTheme.colors.primary else MaterialTheme.colors.surface
+    val contentColor = if (isMe) MaterialTheme.colors.onPrimary else MaterialTheme.colors.onSurface
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = alignment
+    // 加载对方用户的头像
+    var otherAvatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(chatUser.avatarUrl) {
+        chatUser.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            otherAvatarBitmap = loadImageBitmapFromUrl(url, url)
+        }
+    }
+
+    // 加载当前用户（自己）的头像
+    var myAvatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(currentUserAvatar) {
+        currentUserAvatar?.takeIf { it.isNotBlank() }?.let { url ->
+            myAvatarBitmap = loadImageBitmapFromUrl(url, url)
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
     ) {
+        // 对方消息：显示头像在左边
+        if (!isMe) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colors.primary.copy(alpha = 0.1f))
+                    .border(1.dp, MaterialTheme.colors.primary.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (otherAvatarBitmap != null) {
+                    Image(
+                        bitmap = otherAvatarBitmap!!,
+                        contentDescription = chatUser.username,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = chatUser.username.take(1),
+                        color = MaterialTheme.colors.primary,
+                        style = MaterialTheme.typography.subtitle2
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
+        // 消息气泡
         Box(
             modifier = Modifier
-                .widthIn(max = 280.dp)
+                .widthIn(max = 260.dp)
                 .background(color = bubbleColor, shape = MaterialTheme.shapes.medium)
                 .padding(12.dp)
         ) {
             Text(text = message.content, color = contentColor)
+        }
+
+        // 自己的消息：显示头像在右边
+        if (isMe) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colors.secondary.copy(alpha = 0.1f))
+                    .border(1.dp, MaterialTheme.colors.secondary.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (myAvatarBitmap != null) {
+                    Image(
+                        bitmap = myAvatarBitmap!!,
+                        contentDescription = "我的头像",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = "我",
+                        color = MaterialTheme.colors.secondary,
+                        style = MaterialTheme.typography.subtitle2
+                    )
+                }
+            }
         }
     }
 }

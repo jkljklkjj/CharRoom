@@ -113,6 +113,7 @@ fun ChatApp(
                 is Screen.Chat -> ChatScreen(
                     user = screen.user,
                     appState = appState,
+                    currentUserAvatar = appState.currentUserAvatar,
                     onBack = { appState.screen = Screen.Users },
                     onSend = { message ->
                         scope.launch {

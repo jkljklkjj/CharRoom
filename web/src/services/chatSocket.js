@@ -8,8 +8,9 @@ let reconnectTimer = null
 let heartbeatTimer = null
 let heartbeatTimeoutTimer = null
 let heartbeatInterval = 30000 // 30秒心跳
-let heartbeatTimeout = 5000 // 心跳超时5秒
+let heartbeatTimeout = 10000 // 心跳超时10秒（给服务端更多响应时间）
 let currentReconnectDelay = 1000 // 初始重连间隔1秒
+let lastHeartbeatResponseTime = 0 // 最后一次收到心跳响应的时间
 let maxReconnectDelay = 30000 // 最大重连间隔30秒
 let isReconnecting = false
 let stopReconnect = false
@@ -84,11 +85,12 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
 
     handlers.onopen(e)
     // flush queue (buffers) - 先不flush，等登录完成后再发
-    // 启动心跳
-    startHeartbeat()
+    // 暂时禁用心跳，排查登录问题
+    // startHeartbeat()
   })
 
   socket.addEventListener('message', async (e) => {
+    console.log('📥 收到WebSocket原始消息:', e.data, '类型:', typeof e.data, '大小:', e.data?.byteLength || e.data?.length)
     const data = e.data
     let processedData = data
 
@@ -97,14 +99,18 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
       let buf
       if (data instanceof Blob) buf = await data.arrayBuffer()
       else buf = data
+      console.log('🔍 二进制消息长度:', buf.byteLength)
       try {
         processedData = await decodeMessage(buf)
+        console.log('✅ Protobuf解码成功:', processedData)
       } catch (err) {
+        console.error('❌ Protobuf解码失败:', err, '原始数据:', new Uint8Array(buf))
         // could not parse protobuf, pass raw
         processedData = buf
       }
     } else {
       // 处理文本消息
+      console.log('📄 收到文本消息:', data)
       try {
         processedData = JSON.parse(data)
       } catch (_) {}
@@ -116,9 +122,17 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
       if (processedData.success) {
         if (processedData.message === 'heartbeat') {
           // 心跳只是保活，不需要传给页面层
-          console.log('❤️ 收到 heartbeat 响应，忽略')
+          console.log('❤️ 收到 heartbeat 响应')
+          lastHeartbeatResponseTime = Date.now()
+          // 心跳响应成功，清除超时定时器
+          if (heartbeatTimeoutTimer) {
+            clearTimeout(heartbeatTimeoutTimer)
+            heartbeatTimeoutTimer = null
+          }
         } else {
           console.log('✅ 登录响应成功，开始发送队列消息')
+          // 登录成功，更新心跳响应时间
+          lastHeartbeatResponseTime = Date.now()
           // 登录成功后flush消息队列
           flushQueue()
         }
@@ -200,26 +214,28 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
  */
 function startHeartbeat() {
   stopHeartbeat()
+  lastHeartbeatResponseTime = Date.now() // 初始化响应时间
   heartbeatTimer = setInterval(() => {
     if (socket && socket.readyState === WebSocket.OPEN) {
-      // 启动心跳超时定时器
-      heartbeatTimeoutTimer = setTimeout(() => {
-        console.log('心跳超时，关闭连接触发重连')
+      // 检查上次心跳响应是否超时
+      const timeSinceLastResponse = Date.now() - lastHeartbeatResponseTime
+      if (timeSinceLastResponse > heartbeatInterval + heartbeatTimeout) {
+        console.log(`心跳超时，距离上次响应已过去 ${timeSinceLastResponse}ms，关闭连接触发重连`)
         if (socket) {
           socket.close()
         }
-      }, heartbeatTimeout)
+        return
+      }
 
-      // 发送心跳消息
+      // 发送心跳消息（不需要等待发送结果，超时由上面的全局检查处理）
       sendWrapper({
         type: 'heartbeat',
-        timestamp: Date.now()
-      }).then(() => {
-        // 心跳发送成功，清除超时
-        clearTimeout(heartbeatTimeoutTimer)
+        heartbeat: {
+          timestamp: Date.now()
+        }
       }).catch(() => {
-        // 心跳发送失败，清除超时并关闭连接
-        clearTimeout(heartbeatTimeoutTimer)
+        // 心跳发送失败，直接关闭连接
+        console.log('心跳发送失败，关闭连接')
         if (socket) {
           socket.close()
         }

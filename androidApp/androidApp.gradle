@@ -84,6 +84,12 @@ dependencies {
         exclude group: 'io.netty', module: 'netty-codec-native-quic'
     }
 
+    // Ktor HTTP client (Android)
+    implementation 'io.ktor:ktor-client-core:3.4.3'
+    implementation 'io.ktor:ktor-client-okhttp:3.4.3'
+    // OkHttp core (engine dependency)
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+
     // Kotlin stdlib that matches your Kotlin version
     implementation "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"  // Kotlin 2.3.20
 }

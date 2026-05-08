@@ -86,3 +86,163 @@
 2026-05-08 10:08:44.972 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
 2026-05-08 10:09:18.951 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
 2026-05-08 10:09:18.951 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:09:53.137 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:09:53.137 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:10:27.299 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:10:27.300 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:11:01.423 [DefaultDispatcher-worker-1] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:11:01.424 [DefaultDispatcher-worker-1] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:11:35.209 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:11:35.209 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:12:09.923 [DefaultDispatcher-worker-1] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:12:09.924 [DefaultDispatcher-worker-1] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:12:43.958 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:12:43.958 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:13:17.350 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:13:17.350 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:13:50.731 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:13:50.731 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:14:23.718 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:14:23.719 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:14:57.525 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:14:57.526 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:15:31.783 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:15:31.783 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:16:06.125 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:16:06.125 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:16:40.464 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:16:40.464 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:17:14.653 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:17:14.653 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:17:48.621 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:17:48.622 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:18:23.148 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:18:23.148 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:19:01.573 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:19:01.573 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:19:42.059 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: null
+2026-05-08 10:19:42.059 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:20:18.458 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:20:18.458 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:20:52.675 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:20:52.675 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:21:31.431 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:21:31.431 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:22:11.680 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: null
+2026-05-08 10:22:11.680 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:22:45.851 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:22:45.852 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:23:23.820 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:23:23.820 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:23:58.048 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:23:58.048 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:24:29.201 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:24:29.202 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:25:00.251 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:25:00.252 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:25:36.081 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:25:36.082 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:26:10.273 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:26:10.273 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:26:43.665 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:26:43.666 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:27:20.043 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:27:20.044 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:27:56.608 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:27:56.609 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:28:35.046 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:28:35.047 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:29:09.263 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:29:09.263 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:29:43.483 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:29:43.484 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:30:20.253 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:30:20.254 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:30:54.293 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:30:54.294 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:31:28.490 [DefaultDispatcher-worker-3] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:31:28.490 [DefaultDispatcher-worker-3] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:32:01.890 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:32:01.891 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:32:38.720 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:32:38.720 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:33:12.781 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:33:12.781 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:33:47.232 [DefaultDispatcher-worker-1] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:33:47.233 [DefaultDispatcher-worker-1] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:34:18.354 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:34:18.354 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:34:49.466 [DefaultDispatcher-worker-5] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:34:49.467 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 12:25:48.023 [DefaultDispatcher-worker-6] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 12:25:49.906 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:25:50.005 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 12:25:50.008 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 12:25:58.317 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:25:58.319 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=1, callback will process it
+2026-05-08 12:26:01.886 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:26:01.904 [nioEventLoopGroup-2-1] WARN  ChatApp:1395 - Binary websocket JSON did not contain expected fields: {"type":"该好友不在线，已存离线消息"}
+2026-05-08 12:26:19.901 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:26:20.246 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:26:20.247 [nioEventLoopGroup-2-1] WARN  ChatApp:1395 - Binary websocket JSON did not contain expected fields: {"type":"该好友不在线，已存离线消息"}
+2026-05-08 12:26:23.101 [DefaultDispatcher-worker-1] WARN  ChatApp:1374 - 心跳超时，连接可能已断开
+2026-05-08 12:26:23.108 [DefaultDispatcher-worker-6] INFO  ChatApp:1374 - channel.closeFuture completed in background
+2026-05-08 12:26:23.108 [nioEventLoopGroup-2-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 12:26:23.113 [DefaultDispatcher-worker-6] INFO  ChatApp:1374 - 尝试重连，延迟 1000ms...
+2026-05-08 12:26:27.452 [DefaultDispatcher-worker-1] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 12:26:27.453 [DefaultDispatcher-worker-1] INFO  ChatApp:1376 - 重连成功
+2026-05-08 12:26:29.274 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:26:29.275 [nioEventLoopGroup-3-1] WARN  ChatApp:1395 - Binary websocket JSON did not contain expected fields: {"type":"登录失败：token无效或已过期"}
+2026-05-08 12:26:29.277 [nioEventLoopGroup-3-1] INFO  NettyWebSocketClient:459 - 登录失败
+2026-05-08 12:26:29.278 [nioEventLoopGroup-3-1] WARN  ChatApp:1421 - 登录凭证失效: 登录失败：token无效或已过期
+2026-05-08 12:26:29.279 [nioEventLoopGroup-3-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 12:26:29.284 [nioEventLoopGroup-3-1] INFO  ChatApp:1398 - 认证失败，停止自动重连，请重新登录
+2026-05-08 12:26:29.287 [ForkJoinPool.commonPool-worker-1] ERROR ChatApp:1461 - 登录失败
+2026-05-08 12:27:07.099 [DefaultDispatcher-worker-14] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 12:27:08.704 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:27:08.750 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 12:27:08.753 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 12:27:17.249 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:27:17.250 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=1, callback will process it
+2026-05-08 12:27:38.981 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:27:51.119 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:27:51.129 [nioEventLoopGroup-2-1] WARN  ChatApp:1395 - Binary websocket JSON did not contain expected fields: {"type":"该好友不在线，已存离线消息"}
+2026-05-08 12:28:10.819 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:28:42.208 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:29:13.966 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:29:45.826 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:30:17.716 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:30:49.270 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:31:21.103 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:31:26.820 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:31:26.821 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:31:35.639 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:31:35.640 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:31:52.883 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:31:56.784 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:31:56.784 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:32:00.908 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:32:00.909 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:32:09.753 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:32:09.754 [nioEventLoopGroup-2-1] WARN  ChatApp:1395 - Binary websocket JSON did not contain expected fields: {"type":"消息发送成功"}
+2026-05-08 12:32:10.290 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:32:10.291 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:32:24.144 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:32:30.888 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:32:30.890 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:32:30.891 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:32:30.893 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:32:40.916 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:32:40.916 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:32:55.987 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:33:00.874 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:33:00.875 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:33:00.876 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:33:00.877 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:33:10.912 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:33:10.913 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:33:27.923 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:33:30.899 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:33:30.901 [nioEventLoopGroup-2-1] INFO  ChatApp:1389 - Binary websocket envelope contains proto wrapper: chat
+2026-05-08 12:33:59.816 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 12:34:31.125 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
