@@ -1,0 +1,88 @@
+2026-05-08 09:44:09.485 [DefaultDispatcher-worker-5] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 09:44:11.803 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:44:11.868 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 09:44:11.870 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 09:44:41.405 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:44:44.571 [DefaultDispatcher-worker-7] WARN  ChatApp:1374 - 心跳超时，连接可能已断开
+2026-05-08 09:44:44.575 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - channel.closeFuture completed in background
+2026-05-08 09:44:44.575 [nioEventLoopGroup-2-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 09:44:44.580 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 1000ms...
+2026-05-08 09:44:49.154 [DefaultDispatcher-worker-17] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 09:44:49.155 [DefaultDispatcher-worker-17] INFO  ChatApp:1376 - 重连成功
+2026-05-08 09:44:50.970 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:44:50.971 [nioEventLoopGroup-3-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 09:44:50.972 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 09:45:20.980 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:45:52.811 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:46:24.223 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:46:54.580 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:47:26.409 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:47:58.216 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:48:29.621 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:49:01.475 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:49:33.307 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:50:05.128 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:50:36.960 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:51:08.805 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:51:40.650 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:52:11.918 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:52:43.760 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:53:15.571 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:53:47.126 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:54:18.958 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:54:50.761 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:55:22.563 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 09:55:57.572 [DefaultDispatcher-worker-5] WARN  ChatApp:1374 - 心跳超时，连接可能已断开
+2026-05-08 09:55:57.573 [nioEventLoopGroup-3-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 09:55:57.575 [DefaultDispatcher-worker-5] INFO  ChatApp:1374 - 尝试重连，延迟 1000ms...
+2026-05-08 09:56:02.800 [DefaultDispatcher-worker-8] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 09:56:02.800 [DefaultDispatcher-worker-8] INFO  ChatApp:1376 - 重连成功
+2026-05-08 09:56:02.801 [DefaultDispatcher-worker-8] INFO  ChatApp:1422 - 开始发送队列中的消息，共 1 条
+2026-05-08 09:56:37.821 [DefaultDispatcher-worker-8] WARN  ChatApp:1374 - 心跳超时，连接可能已断开
+2026-05-08 09:56:37.822 [nioEventLoopGroup-4-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 09:56:37.824 [DefaultDispatcher-worker-8] INFO  ChatApp:1374 - 尝试重连，延迟 1000ms...
+2026-05-08 09:56:41.956 [DefaultDispatcher-worker-1] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 09:56:41.957 [DefaultDispatcher-worker-1] INFO  ChatApp:1376 - 重连成功
+2026-05-08 09:56:41.957 [DefaultDispatcher-worker-1] INFO  ChatApp:1422 - 开始发送队列中的消息，共 1 条
+2026-05-08 09:57:11.973 [ForkJoinPool.commonPool-worker-1] ERROR ChatApp:1461 - 登录失败
+2026-05-08 09:57:11.976 [nioEventLoopGroup-5-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 09:57:11.977 [DefaultDispatcher-worker-9] ERROR ChatApp:1380 - 心跳发送失败: StandaloneCoroutine was cancelled
+2026-05-08 09:57:11.979 [nioEventLoopGroup-5-1] INFO  ChatApp:1398 - 认证失败，停止自动重连，请重新登录
+2026-05-08 10:02:38.725 [DefaultDispatcher-worker-7] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 10:02:40.828 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:02:40.882 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 10:02:40.884 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 10:03:15.133 [DefaultDispatcher-worker-18] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 10:03:16.947 [nioEventLoopGroup-2-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:03:16.988 [nioEventLoopGroup-2-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 10:03:16.989 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 10:03:50.186 [DefaultDispatcher-worker-4] WARN  ChatApp:1374 - 心跳超时，连接可能已断开
+2026-05-08 10:03:50.188 [DefaultDispatcher-worker-18] INFO  ChatApp:1374 - channel.closeFuture completed in background
+2026-05-08 10:03:50.188 [nioEventLoopGroup-2-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 10:03:50.192 [DefaultDispatcher-worker-18] INFO  ChatApp:1374 - 尝试重连，延迟 1000ms...
+2026-05-08 10:03:54.952 [DefaultDispatcher-worker-1] INFO  ChatApp:1428 - WebSocket连接成功
+2026-05-08 10:03:54.952 [DefaultDispatcher-worker-1] INFO  ChatApp:1376 - 重连成功
+2026-05-08 10:03:56.542 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:03:56.543 [nioEventLoopGroup-3-1] INFO  ChatApp:1393 - Binary websocket JSON contains CHECK response for clientId=3, callback will process it
+2026-05-08 10:03:56.544 [ForkJoinPool.commonPool-worker-1] INFO  ChatApp:1455 - 登录成功
+2026-05-08 10:04:26.250 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:04:56.699 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:05:27.779 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:05:58.121 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:06:29.812 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:07:01.371 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:07:32.507 [nioEventLoopGroup-3-1] INFO  ChatApp:1375 - Received WebSocket message of type io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+2026-05-08 10:07:54.989 [nioEventLoopGroup-3-1] INFO  ChatApp:1466 - 连接已关闭
+2026-05-08 10:07:54.993 [DefaultDispatcher-worker-1] INFO  ChatApp:1374 - 尝试重连，延迟 1000ms...
+2026-05-08 10:08:00.332 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:08:00.332 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 2000ms...
+2026-05-08 10:08:06.361 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:08:06.361 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 4000ms...
+2026-05-08 10:08:13.921 [DefaultDispatcher-worker-4] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:08:13.922 [DefaultDispatcher-worker-4] INFO  ChatApp:1374 - 尝试重连，延迟 8000ms...
+2026-05-08 10:08:26.112 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:08:26.113 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 16000ms...
+2026-05-08 10:08:44.971 [DefaultDispatcher-worker-9] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:08:44.972 [DefaultDispatcher-worker-9] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...
+2026-05-08 10:09:18.951 [DefaultDispatcher-worker-12] ERROR ChatApp:1382 - 重连失败: io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException: Invalid handshake response getStatus: 502 Bad Gateway
+2026-05-08 10:09:18.951 [DefaultDispatcher-worker-12] INFO  ChatApp:1374 - 尝试重连，延迟 30000ms...

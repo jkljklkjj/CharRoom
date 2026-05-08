@@ -10,10 +10,20 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.systemBarsPadding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.debounce
+import core.LocalChatHistoryStore
+import core.ServerConfig
+import model.messages
+import model.groupMessages
 
 @Composable
 fun ChatApp(
@@ -126,5 +136,23 @@ fun ChatApp(
                 )
             }
         }
+    }
+
+    // Android端：监听全局消息列表并自动保存到本地（防止历史丢失）
+    @OptIn(FlowPreview::class)
+    LaunchedEffect(Unit) {
+        snapshotFlow { messages.toList() to groupMessages.toList() }
+            .distinctUntilChanged()
+            .debounce(350)
+            .collect { (privateMsgs, groupMsgs) ->
+                if (ServerConfig.id.isNotBlank()) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            LocalChatHistoryStore.save(ServerConfig.id, privateMsgs, groupMsgs)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
     }
 }

@@ -166,8 +166,8 @@ object AndroidAvatarCropDialog : AvatarCropDialogProvider {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer(
-                                        scaleX = fitScale * scale,
-                                        scaleY = fitScale * scale,
+                                        scaleX = scale,
+                                        scaleY = scale,
                                         translationX = offset.x,
                                         translationY = offset.y
                                     )

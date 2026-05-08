@@ -514,6 +514,28 @@ fun ChatScreen(
                                                 }
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
+                                    } else {
+                                        // 如果对方没有头像，展示首字母占位符，保持布局一致
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    brush = sidebarHeaderBrush(isDarkMode),
+                                                    shape = CircleShape
+                                                )
+                                                .clickable {
+                                                    onAvatarClick?.invoke(user)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = user.username.firstOrNull()?.toString() ?: "U",
+                                                color = Color.White,
+                                                style = MaterialTheme.typography.caption
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
                                     }
                                 }
 
@@ -744,16 +766,26 @@ fun ChatScreen(
         // 组件挂载和消息变化时自动滚动到底部
         LaunchedEffect(Unit, user.id, userMessages.size) {
             if (userMessages.isNotEmpty()) {
-                // 延迟确保列表完全渲染
                 kotlinx.coroutines.delay(50)
-                // 先尝试滚动到最后一个item
                 runCatching {
-                    listState.scrollToItem(userMessages.size - 1)
+                    listState.scrollToItem(userMessages.lastIndex)
                 }
-                // 再次确认滚动，确保完全到底
                 kotlinx.coroutines.delay(50)
                 runCatching {
                     listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                }
+            }
+        }
+
+        // agent 流式输出时，同一条消息内容会持续增长，需要在内容变化后再次贴底
+        if (ServerConfig.isAgentAssistant(user.id)) {
+            val latestMessage = userMessages.lastOrNull()
+            LaunchedEffect(latestMessage?.messageId, latestMessage?.message) {
+                if (latestMessage != null) {
+                    kotlinx.coroutines.delay(16)
+                    runCatching {
+                        listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                    }
                 }
             }
         }

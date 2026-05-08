@@ -119,7 +119,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         prompt(unwrap.message)
                     } else {
                         val rawData = unwrap.dataJson ?: String(bodyBytes, Charsets.UTF_8)
-                        val dataStr = rawData.trim().trimStart('﻿', '￾')
+                        val dataStr = rawData.trim().trimStart('\uFEFF', '\uFFFD')
                         if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                             val json = jacksonObjectMapper().readTree(dataStr)
                             val typeText = json.get("type")?.asText()
@@ -155,7 +155,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
 
                 // collect response for callers waiting in send()
                 val shouldCollectResponse = try {
-                    val dataStr = String(bodyBytes, Charsets.UTF_8).trim().trimStart('﻿', '￾')
+                    val dataStr = String(bodyBytes, Charsets.UTF_8).trim().trimStart('\uFEFF', '\uFFFD')
                     if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                         val json = jacksonObjectMapper().readTree(dataStr)
                         val typeText = json.get("type")?.asText()
@@ -921,7 +921,7 @@ object NettyWebSocketClient : WebSocketClientProvider {
                                                         false
                                                     } else {
                                                         val rawData = unwrap.dataJson ?: String(bytes, Charsets.UTF_8)
-                                                        val dataStr = rawData.trim().trimStart('﻿', '￾')
+                                                        val dataStr = rawData.trim().trimStart('\uFEFF', '\uFFFD')
                                                         if (dataStr.startsWith("{") && dataStr.endsWith("}")) {
                                                             val json = jacksonObjectMapper().readTree(dataStr)
                                                             val typeText = json.get("type")?.asText()
