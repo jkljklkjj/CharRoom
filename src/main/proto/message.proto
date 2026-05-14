@@ -15,7 +15,7 @@ enum MessageType {
 
 // 登录消息
 message LoginMessage {
-    string targetClientId = 1;  // 通过token和redis获取的客户端ID
+    string token = 1;  // 登录凭证token，后端解析获取用户信息
 }
 
 // 聊天消息
@@ -104,12 +104,16 @@ message LogoutMessage {
 
 // ACK确认消息
 message AckMessage {
-    string messageId = 1;  // 要确认的消息ID
+    optional string messageId = 1;  // 要确认的消息ID，可选
+    optional string message = 2;    // 说明信息，用于调试
+    optional bool success = 3;      // 是否成功，默认true
+    optional string clientId = 4;   // 客户端ID (用于CheckMessage响应)
+    optional bool online = 5;       // 是否在线 (用于CheckMessage响应)
 }
 
 // 通用消息包装器
 message MessageWrapper {
-    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout, agentChatStream, ack
+    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout, agentChatStream, ack, response
 
     oneof payload {
         LoginMessage login = 2;
@@ -121,6 +125,7 @@ message MessageWrapper {
         LogoutMessage logout = 7;
         AgentStreamMessage agentStream = 8;
         AckMessage ack = 10;
+        ResponseMessage response = 11;
     }
 }
 
@@ -131,5 +136,3 @@ message ResponseMessage {
     string clientId = 3;     // 客户端ID (用于CheckMessage响应)
     bool online = 4;        // 是否在线 (用于CheckMessage响应)
 }
-
-

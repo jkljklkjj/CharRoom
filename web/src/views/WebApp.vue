@@ -95,6 +95,72 @@ function handleResize() {
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
+
+  // 页面加载时从localStorage恢复登录状态
+  const savedToken = localStorage.getItem('charroom_token')
+  const savedRefreshToken = localStorage.getItem('charroom_refreshToken')
+  const savedAccountId = localStorage.getItem('charroom_accountId')
+  if (savedToken && savedAccountId) {
+    store.setToken(savedToken)
+    store.setRefreshToken(savedRefreshToken || '')
+    store.setAccountId(savedAccountId)
+
+    // 验证token有效性，无效会自动刷新
+    api.validateToken().then(validated => {
+      if (!validated) {
+        // token无效，清除状态
+        logout()
+      } else {
+        // 验证成功，加载好友列表
+        api.getFriends().then(friends => {
+          store.setUsers(friends || [])
+        })
+        // 建立WebSocket连接
+        chatSocket.connect(WS_URL, savedToken, savedAccountId, {
+          onopen: () => console.log('ws restored'),
+          onmessage: (msg) => {
+            // msg is decoded MessageWrapper object
+            console.log('📩 收到原始消息:', msg)
+            try {
+              if (msg.type === 'chat' && msg.chat) {
+                console.log('💬 收到聊天消息:', msg.chat)
+                const m = {
+                  user: String(msg.chat.userId || 'unknown'), // 确保userId是字符串类型
+                  text: msg.chat.content,
+                  time: normalizeTimestamp(msg.chat.timestamp),
+                  targetId: msg.chat.targetClientId // 保留目标ID用于调试
+                }
+                store.addMessage(m)
+              } else if (msg.type === 'groupChat' && msg.groupChat) {
+                console.log('👥 收到群聊消息:', msg.groupChat)
+                const gm = {
+                  user: String(msg.groupChat.userId), // 确保userId是字符串类型
+                  text: msg.groupChat.content,
+                  time: normalizeTimestamp(msg.groupChat.timestamp),
+                  groupId: msg.groupChat.targetClientId
+                }
+                store.addGroupMessage(gm)
+              } else if (msg.clientId !== undefined && msg.online !== undefined) {
+                // 处理用户在线状态更新
+                const clientId = parseInt(msg.clientId)
+                const online = msg.online
+                console.log(`👤 收到用户在线状态更新: userId=${clientId}, online=${online}`)
+                store.updateUserOnlineStatus(clientId, online)
+              }
+            } catch (e) {
+              console.error('❌ 处理 incoming 消息失败', e)
+            }
+          },
+          onclose: () => console.log('ws closed'),
+          onerror: (e) => console.error('ws error', e),
+          onAuthFailed: (reason) => {
+            console.error('🔑 认证失败:', reason)
+            logout()
+          }
+        })
+      }
+    })
+  }
 })
 
 onUnmounted(() => {

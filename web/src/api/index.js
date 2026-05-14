@@ -2,6 +2,37 @@ import store from '../store'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://chatlite.xin/api'
 
+// 刷新token锁，防止多个请求同时刷新
+let isRefreshing = false
+// 等待刷新的请求队列
+let refreshQueue = []
+
+/**
+ * 处理刷新成功后的请求重试
+ */
+function onRefreshSuccess(newToken) {
+  refreshQueue.forEach(callback => callback(newToken))
+  refreshQueue = []
+  isRefreshing = false
+}
+
+/**
+ * 处理刷新失败后的逻辑
+ */
+function onRefreshFailure() {
+  refreshQueue = []
+  isRefreshing = false
+  // 清除登录状态，跳转到登录页
+  store.clearAll()
+  store.setToken('')
+  store.setRefreshToken('')
+  store.setAccountId('')
+  localStorage.removeItem('charroom_token')
+  localStorage.removeItem('charroom_refreshToken')
+  localStorage.removeItem('charroom_accountId')
+  window.location.href = '/login'
+}
+
 async function safeFetch(url, options = {}) {
   try {
     // 自动添加Authorization头
@@ -11,6 +42,58 @@ async function safeFetch(url, options = {}) {
     }
 
     const res = await fetch(url, { ...options, headers })
+
+    // 如果返回401，尝试刷新token
+    if (res.status === 401 && store.state.refreshToken) {
+      // 如果正在刷新，把当前请求加入队列等待
+      if (isRefreshing) {
+        return new Promise(resolve => {
+          refreshQueue.push((newToken) => {
+            // 使用新token重试请求
+            headers.Authorization = `Bearer ${newToken}`
+            resolve(safeFetch(url, { ...options, headers }))
+          })
+        })
+      }
+
+      isRefreshing = true
+      try {
+        // 调用刷新接口
+        const refreshResult = await refreshToken(store.state.refreshToken)
+        if (refreshResult && refreshResult.accessToken) {
+          // 刷新成功，更新store和本地存储
+          const { accessToken, refreshToken: newRefreshToken } = refreshResult
+          store.setToken(accessToken)
+          store.setRefreshToken(newRefreshToken)
+          localStorage.setItem('charroom_token', accessToken)
+          localStorage.setItem('charroom_refreshToken', newRefreshToken)
+
+          // 重试当前请求
+          headers.Authorization = `Bearer ${accessToken}`
+          const retryRes = await fetch(url, { ...options, headers })
+
+          // 通知队列中的其他请求重试
+          onRefreshSuccess(accessToken)
+
+          if (!retryRes.ok) return { ok: false, status: retryRes.status, body: null }
+          const text = await retryRes.text()
+          try {
+            return { ok: true, status: retryRes.status, body: JSON.parse(text) }
+          } catch (_){
+            return { ok: true, status: retryRes.status, body: text }
+          }
+        } else {
+          // 刷新失败，退出登录
+          onRefreshFailure()
+          return { ok: false, status: 401, body: null }
+        }
+      } catch (e) {
+        // 刷新过程出错，退出登录
+        onRefreshFailure()
+        return { ok: false, status: 401, body: null }
+      }
+    }
+
     if (!res.ok) return { ok: false, status: res.status, body: null }
     const text = await res.text()
     try {

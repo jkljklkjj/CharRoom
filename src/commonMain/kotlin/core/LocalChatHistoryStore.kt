@@ -77,6 +77,21 @@ interface LocalChatHistoryStoreProvider {
      * @return 是否清除成功
      */
     fun clear(accountId: String): Boolean
+
+    /**
+     * 清除指定会话的聊天历史（私聊或群聊）
+     * @param accountId 用户账号ID
+     * @param targetId 私聊时对方用户ID或群聊时的群ID（群为正数）
+     * @param isGroup 是否为群聊
+     * @return 是否清除成功
+     */
+    fun clearConversation(accountId: String, targetId: String, isGroup: Boolean): Boolean
+
+    /**
+     * 清除当前设备上所有账号的聊天历史（删除历史根目录）
+     * @return 是否清除成功
+     */
+    fun clearAll(): Boolean
 }
 
 /**

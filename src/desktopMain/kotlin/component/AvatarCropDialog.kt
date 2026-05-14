@@ -1,5 +1,7 @@
 package component
 
+import component.dialog.AvatarCropDialogProvider
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

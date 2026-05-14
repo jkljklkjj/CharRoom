@@ -7,7 +7,7 @@ import com.chatlite.proto.MessageProtos
  */
 fun buildLoginPayload(token: String?): ByteArray {
     val login = MessageProtos.LoginMessage.newBuilder()
-        .setTargetClientId(token ?: "")
+        .setToken(token ?: "")
         .build()
     return MessageProtos.MessageWrapper.newBuilder()
         .setType(MsgType.LOGIN.wire)

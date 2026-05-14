@@ -66,6 +66,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useStore } from '../store'
 import api from '../api'
+import chatSocket from '../services/chatSocket'
 
 const emit = defineEmits(['user-selected', 'open-settings'])
 
@@ -98,6 +99,18 @@ function initials(name) {
 function select(u) {
   store.setSelectedChat(u.id)
   emit('user-selected', u)
+
+  // 点击用户时，主动查询该用户的在线状态（排除AI助手和群组）
+  if (u.id > 0 && u.id !== 900000001) {
+    chatSocket.sendWrapper({
+      type: 'check',
+      check: {
+        targetClientId: u.id.toString()
+      }
+    }).catch(err => {
+      console.warn('发送在线状态查询失败:', err)
+    })
+  }
 }
 
 function onAdd() {

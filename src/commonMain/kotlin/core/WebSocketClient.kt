@@ -97,6 +97,11 @@ interface MessageReceiveListener {
      * 收到群聊消息
      */
     fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long)
+
+    /**
+     * 收到聊天助手流式输出（默认空实现，按需覆盖）
+     */
+    fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean) {}
 }
 
 /**
@@ -118,7 +123,8 @@ enum class MsgType(val wire: String) {
     GROUP_CHAT("groupChat"),
     CHECK("check"),
     HEARTBEAT("heartbeat"),
-    ACK("ack");
+    ACK("ack"),
+    RESPONSE("response"); // 通用响应消息
 }
 
 // 全局WebSocket客户端实现，由各平台初始化

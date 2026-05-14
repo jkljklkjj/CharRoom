@@ -20,9 +20,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import component.appendAgentChunk
+import core.state.GlobalChatState
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.runBlocking
+import model.MessageIdGenerator
 
 val logger = KotlinLogging.logger("NettyWebSocketClient")
 
@@ -126,10 +128,14 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                             if (typeText == "heartbeat") {
                                 AppLog.d{"Received heartbeat frame"}
                                 if (pendingMsgType != MsgType.HEARTBEAT) {
-                                    AppLog.d{"Ignoring heartbeat while waiting for ${pendingMsgType?.wire ?: "response"}"}
+                                    // 收到服务端主动发来的心跳，立即回复心跳响应
+                                    AppLog.d{"Received server-initiated heartbeat, sending response"}
+                                    val heartbeatPayload = buildHeartbeatPayload()
+                                    NettyWebSocketClient.send(heartbeatPayload, MsgType.HEARTBEAT, "1", 1) { _, _ -> }
                                     return
                                 }
-                                // heartbeat response is expected for heartbeat requests
+                                // 这是我们主动发送的心跳的响应
+                                AppLog.d{"Received response to our heartbeat request"}
                             }
                             if (json.has("type") && json.has("payload")) {
                                 AppLog.i({"Binary websocket envelope contains proto wrapper: ${json.get("type").asText()}"})
@@ -139,6 +145,14 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                                 handleIncomingFromJson(json)
                             } else if (json.has("clientId") && json.has("online")) {
                                 AppLog.i({"Binary websocket JSON contains CHECK response for clientId=${json.get("clientId").asText()}, callback will process it"})
+                                // 处理用户在线状态更新
+                                val clientId = json.get("clientId").asText().toIntOrNull()
+                                val online = json.get("online").asBoolean()
+                                if (clientId != null) {
+                                    // 通过全局ChatViewModel更新用户在线状态
+                                    presentation.viewmodel.GlobalChatViewModel.updateUserOnlineStatus(clientId, online)
+                                    AppLog.i({"更新用户在线状态: clientId=$clientId, online=$online"})
+                                }
                             } else if (typeText == "heartbeat") {
                                 // ignore heartbeat messages that are not direct responses to send()
                             } else {
@@ -230,10 +244,12 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                 message = text,
                 sender = sender,
                 timestamp = timestamp,
-                isSent = mutableStateOf(true),
-                messageId = messageId ?: ""
+                isSent = true,
+                messageId = messageId ?: MessageIdGenerator.generateMessageId(senderId, text, timestamp)
             )
-            model.messages += message
+            runBlocking {
+                GlobalChatState.addMessage(message)
+            }
             try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = senderId.toString(), metadata = mapOf("text" to text.take(64)))) } catch (_: Exception) {}
 
             // 通知消息监听器
@@ -294,10 +310,12 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         message = text,
                         sender = false,
                         timestamp = ts,
-                        isSent = mutableStateOf(true),
+                        isSent = true,
                         messageId = messageId
                     )
-                    model.messages += message
+                    runBlocking {
+                        GlobalChatState.addMessage(message)
+                    }
                     try {
                         ActionLogger.log(
                             Action(
@@ -359,10 +377,12 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         text = text,
                         senderId = senderId,
                         timestamp = System.currentTimeMillis(),
-                        isSent = mutableStateOf(true),
+                        isSent = true,
                         messageId = messageId
                     )
-                    model.groupMessages += groupMessage
+                    runBlocking {
+                        GlobalChatState.addGroupMessage(groupMessage)
+                    }
                     try {
                         ActionLogger.log(
                             Action(
@@ -394,7 +414,7 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     }
                     if (messageText.isBlank() && !error) return
 
-                    appendAgentChunk(messageId, messageText)
+                    NettyWebSocketClient.appendAgentChunk(messageId, messageText, done, error)
                     if (done && error) {
                         try {
                             ActionLogger.log(
@@ -461,7 +481,6 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                         prompt(messageType)
                         // 清除无效凭证
                         ServerConfig.Token = ""
-                        ServerConfig.id = ""
                         // 标记认证失败，停止自动重连
                         NettyWebSocketClient.authFailed = true
                         // 通知所有监听器登录状态失效
@@ -493,14 +512,18 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                 "chat" -> {
                     println("New private message from $senderName: $messageContent")
                     val timestamp = System.currentTimeMillis()
+                    val messageId = MessageIdGenerator.generateMessageId(userId, messageContent, timestamp)
                     val message = Message(
                         senderId = userId,
                         message = messageContent,
                         sender = false,
                         timestamp = timestamp,
-                        isSent = mutableStateOf(true)
+                        isSent = true,
+                        messageId = messageId
                     )
-                    model.messages += message
+                    runBlocking {
+                        GlobalChatState.addMessage(message)
+                    }
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = userId.toString(), metadata = mapOf("text" to messageContent.take(64)))) } catch (_: Exception) {}
 
                     // 通知消息监听器
@@ -514,15 +537,19 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     val groupId = json.get("groupId")?.asInt() ?: throw IllegalArgumentException("Missing groupId")
                     println("New group message in group $groupId from $senderName: $messageContent")
                     val timestamp = System.currentTimeMillis()
+                    val messageId = MessageIdGenerator.generateMessageId(userId, messageContent, timestamp)
                     val groupMessage = GroupMessage(
                         groupId = groupId,
                         senderName = senderName,
                         text = messageContent,
                         senderId = userId,
                         timestamp = timestamp,
-                        isSent = mutableStateOf(true)
+                        isSent = true,
+                        messageId = messageId
                     )
-                    model.groupMessages += groupMessage
+                    runBlocking {
+                        GlobalChatState.addGroupMessage(groupMessage)
+                    }
                     try { ActionLogger.log(Action(type = ActionType.RECEIVE_MESSAGE, targetId = groupId.toString(), metadata = mapOf("text" to messageContent.take(64), "group" to "true"))) } catch (_: Exception) {}
 
                     // 通知消息监听器
@@ -645,6 +672,10 @@ object NettyWebSocketClient : WebSocketClientProvider {
     internal val receivedMessageIds = mutableSetOf<String>()
     internal val maxMessageCacheSize = 1000 // 最多缓存1000条消息ID
     internal val messageCacheMutex = Mutex()
+
+    // Agent流式消息缓存
+    private val streamingAgentMessages = mutableMapOf<String, StringBuilder>()
+    private var currentStreamSessionId: String? = null
 
     // 待发送消息封装
     private data class PendingMessage(
@@ -1008,6 +1039,59 @@ object NettyWebSocketClient : WebSocketClientProvider {
     }
 
     /**
+     * 追加Agent流式消息块
+     */
+    internal fun appendAgentChunk(messageId: String, chunk: String, isDone: Boolean, isError: Boolean) {
+        // 处理空messageId的情况：使用当前会话ID或创建新的
+        val actualMessageId = if (messageId.isBlank()) {
+            if (currentStreamSessionId == null) {
+                // 新的流式会话开始，生成新ID
+                currentStreamSessionId = "agent-stream-${System.currentTimeMillis()}"
+            }
+            currentStreamSessionId!!
+        } else {
+            messageId
+        }
+
+        // 从缓存中获取或创建StringBuilder
+        val contentBuilder = streamingAgentMessages.getOrPut(actualMessageId) {
+            StringBuilder()
+        }
+
+        // 追加新的内容块
+        contentBuilder.append(chunk)
+        val fullContent = contentBuilder.toString()
+
+        // 创建或更新消息
+        runBlocking {
+            val message = Message(
+                senderId = 900000001, // AI助手ID
+                message = fullContent,
+                sender = false,
+                timestamp = System.currentTimeMillis(),
+                isSent = true,
+                messageId = actualMessageId
+            )
+
+            // 先尝试更新现有消息，如果不存在则添加
+            val existingMessage = GlobalChatState.messages.value.find { it.messageId == actualMessageId }
+            if (existingMessage != null) {
+                GlobalChatState.updateMessage(message)
+            } else {
+                GlobalChatState.addMessage(message)
+            }
+        }
+
+        // 会话结束时清理
+        if (isDone || isError) {
+            if (actualMessageId == currentStreamSessionId) {
+                currentStreamSessionId = null
+            }
+            streamingAgentMessages.remove(actualMessageId)
+        }
+    }
+
+    /**
      * 手动重连
      */
     override fun reconnect() {
@@ -1153,12 +1237,6 @@ object NettyWebSocketClient : WebSocketClientProvider {
                         pipeline.addLast(HttpClientCodec())
                         pipeline.addLast(HttpObjectAggregator(8192))
 
-                        val uidQuery = try {
-                            val idVal = ServerConfig.id
-                            if (idVal.isNotBlank()) "?clientId=${idVal}" else ""
-                        } catch (_: Exception) {
-                            ""
-                        }
                         // 使用配置的WebSocket地址，自动适配WSS/WS协议
                         val wsUri = URI(NetworkConstants.wsUrl())
                         val effectiveHost = wsUri.host
@@ -1197,7 +1275,7 @@ object NettyWebSocketClient : WebSocketClientProvider {
             // 发送登录消息
             val loginTokenSnapshot = ServerConfig.Token
             val loginWrapperBytes = buildLoginPayload(loginTokenSnapshot)
-            println("[WS] 准备发送登录包，ServerConfig.id=${ServerConfig.id}, tokenLength=${loginTokenSnapshot.length}, tokenTail=${loginTokenSnapshot.takeLast(6)}, loginPayloadBytes=${loginWrapperBytes.size}")
+            println("[WS] 准备发送登录包，tokenLength=${loginTokenSnapshot.length}, tokenTail=${loginTokenSnapshot.takeLast(6)}, loginPayloadBytes=${loginWrapperBytes.size}")
             sendInternal(loginWrapperBytes, MsgType.LOGIN, loginTokenSnapshot, 1) { success, resp ->
                 if (success) {
                     AppLog.i({ "登录成功" })
@@ -1219,7 +1297,6 @@ object NettyWebSocketClient : WebSocketClientProvider {
 
                     // 清除无效凭证
                     ServerConfig.Token = ""
-                    ServerConfig.id = ""
                     // 标记认证失败，停止自动重连
                     authFailed = true
                     // 通知所有监听器登录状态失效

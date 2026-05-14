@@ -33,7 +33,7 @@
         </activity>
 
         <!-- 网络变化广播接收器 -->
-        <receiver android:name="com.chatlite.charroom.NetworkChangeReceiver"
+        <receiver android:name="com.chatlite.charroom.core.NetworkChangeReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.net.conn.CONNECTIVITY_CHANGE" tools:ignore="BatteryLife"/>
@@ -43,7 +43,7 @@
 
         <!-- 前台服务 -->
         <service
-            android:name="com.chatlite.charroom.ChatForegroundService"
+            android:name="com.chatlite.charroom.service.ChatForegroundService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
     </application>

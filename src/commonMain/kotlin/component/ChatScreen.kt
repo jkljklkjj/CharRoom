@@ -38,6 +38,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.EmojiEmotions
@@ -47,11 +48,15 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -60,6 +65,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -71,8 +77,6 @@ import kotlinx.coroutines.withContext
 import model.Message
 import model.MessageType
 import model.User
-import model.messages
-import model.users
 import core.FileUploader
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.heightIn
@@ -80,32 +84,107 @@ import androidx.compose.material.IconButton
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.ImageBitmap
-import component.FilePicker
+import component.io.FilePicker
 import core.LocalChatHistoryStore
 import core.ServerConfig
 import core.loadImageBitmapWithCache
-import viewmodel.chatViewModel
+import core.state.GlobalAppState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import presentation.viewmodel.ChatViewModel
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * 发送消息
+ */
+fun sendMessage(
+    chatViewModel: ChatViewModel,
+    user: User,
+    messageText: String,
+    messageType: MessageType = MessageType.TEXT,
+    fileUrl: String? = null,
+    fileName: String? = null,
+    fileSize: Long? = null,
+    replyToMessageId: String? = null,
+    replyToContent: String? = null,
+    replyToSender: String? = null,
+    onDone: () -> Unit = {}
+) {
+    // 委托给ViewModel处理，使用ViewModel的协程作用域
+    chatViewModel.sendPrivateMessage(
+        user = user,
+        messageText = messageText,
+        messageType = messageType,
+        fileUrl = fileUrl,
+        fileName = fileName,
+        fileSize = fileSize,
+        replyToMessageId = replyToMessageId,
+        replyToContent = replyToContent,
+        replyToSender = replyToSender,
+        onDone = onDone
+    )
+}
+
+/**
+ * 重发消息
+ */
+fun resendMessage(chatViewModel: ChatViewModel, user: User, message: Message) {
+    // 删除原来的消息
+    chatViewModel.deleteMessage(message.messageId)
+
+    // 重新发送
+    sendMessage(
+        chatViewModel = chatViewModel,
+        user = user,
+        messageText = message.message,
+        messageType = message.messageType,
+        fileUrl = message.fileUrl,
+        fileName = message.fileName,
+        fileSize = message.fileSize,
+        replyToMessageId = message.replyToMessageId,
+        replyToContent = message.replyToContent,
+        replyToSender = message.replyToSender
+    )
+}
 
 /**
  * 好友聊天界面
  */
 @Composable
 fun ChatScreen(
+    chatViewModel: ChatViewModel,
     user: User,
     onAvatarClick: ((User) -> Unit)? = null, // 点击消息头像回调
-    onMyAvatarClick: (() -> Unit)? = null // 点击自己头像回调
+    onMyAvatarClick: (() -> Unit)? = null, // 点击自己头像回调
+    onBackClick: (() -> Unit)? = null // 点击返回按钮回调
 ) {
     var messageText by remember { mutableStateOf("") }
+    // 从ViewModel收集消息状态
+    val allMessages by chatViewModel.messagesFlow.collectAsState()
+    // 从ViewModel收集用户列表状态
+    val allUsers by chatViewModel.usersFlow.collectAsState()
+
+    // 消息气泡宽度适配所有设备
+    // 固定最大宽度220dp（约11个汉字），在手机和平板上都有良好的显示效果
+    // 既不会过窄也不会过长，不需要动态计算屏幕宽度，跨平台兼容性最好
+    val maxBubbleWidth = 220.dp
+
     // 使用derivedStateOf优化消息过滤，只有messages变化或user变化时才重新计算
-    val userMessages by remember(user.id) {
+    val userMessages by remember(user.id, allMessages) {
         derivedStateOf {
-            messages.filter { it.senderId == user.id }
+            val filtered = allMessages.filter { message ->
+                // 显示和当前用户的所有对话：我发给对方的 + 对方发给我的
+                (message.receiverId == user.id && message.sender) || // 我发的消息
+                (message.senderId == user.id && !message.sender)   // 对方发的消息（包括AI）
+            }
+//            println("[ChatScreen] 用户 ${user.id} 的消息过滤结果：总数 ${allMessages.size} → 显示 ${filtered.size}")
+            filtered
         }
     }
     // 获取当前登录用户信息（自己）
-    val currentUser: User? by remember {
+    val currentUser: User? by remember(allUsers) {
         derivedStateOf {
-            users.find { user -> user.id == ServerConfig.id.toIntOrNull() } as User?
+            allUsers.find { user -> user.id == GlobalAppState.currentUserId }
         }
     }
     var historyQuery by remember { mutableStateOf("") }
@@ -155,6 +234,23 @@ fun ChatScreen(
     var showForwardDialog by remember { mutableStateOf(false) }
     var forwardMessage by remember { mutableStateOf<Message?>(null) }
 
+    // 智能自动滚动：只有当前已经在底部附近时，新消息才自动滚动
+    LaunchedEffect(filteredMessages.size) {
+        if (filteredMessages.isEmpty()) return@LaunchedEffect
+
+        val lastIndex = filteredMessages.size - 1
+        val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+
+        // 判断是否接近底部（最后一条可见，或者距离最后一条小于3条）
+        val isNearBottom = lastVisibleIndex >= lastIndex - 3
+
+        if (isNearBottom) {
+            // 延迟一点，等UI更新完成再滚动
+            delay(50.milliseconds)
+            listState.animateScrollToItem(lastIndex)
+        }
+    }
+
     fun submitMessage() {
         val text = messageText.trim()
         if (text.isEmpty() || isSending) {
@@ -164,6 +260,7 @@ fun ChatScreen(
         messageText = ""
 
         sendMessage(
+            chatViewModel = chatViewModel,
             user = user,
             messageText = text,
             replyToMessageId = replyToMessage?.messageId,
@@ -206,6 +303,7 @@ fun ChatScreen(
                 if (fileUrl != null) {
                     // 发送图片消息
                     sendMessage(
+                        chatViewModel = chatViewModel,
                         user = user,
                         messageText = "",
                         messageType = MessageType.IMAGE,
@@ -245,6 +343,7 @@ fun ChatScreen(
                 if (fileUrl != null) {
                     // 发送文件消息
                     sendMessage(
+                        chatViewModel = chatViewModel,
                         user = user,
                         messageText = "",
                         messageType = MessageType.FILE,
@@ -275,11 +374,8 @@ fun ChatScreen(
      * 删除消息
      */
     fun deleteMessage(message: Message) {
-        // 仅本地删除
-        val index = messages.indexOfFirst { it.messageId == message.messageId }
-        if (index != -1) {
-            messages.removeAt(index)
-        }
+        // 通过ViewModel删除消息
+        chatViewModel.deleteMessage(message.messageId)
     }
 
     /**
@@ -287,6 +383,7 @@ fun ChatScreen(
      */
     fun forwardMessage(message: Message, targetUser: User) {
         sendMessage(
+            chatViewModel = chatViewModel,
             user = targetUser,
             messageText = message.message,
             messageType = message.messageType,
@@ -296,7 +393,7 @@ fun ChatScreen(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(14.dp).statusBarsPadding().imePadding()) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
@@ -310,6 +407,63 @@ fun ChatScreen(
                     .padding(horizontal = 14.dp, vertical = 12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 返回按钮（仅在onBackClick存在时显示）
+                    onBackClick?.let { onBack ->
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colors.onBackground
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+
+                    // 用户头像 - 优化：先同步查内存缓存，避免闪烁
+                    var partnerAvatar by remember(user.avatarUrl, user.avatarKey) {
+                        mutableStateOf(
+                            // 先尝试从内存缓存同步获取
+                            if (!user.avatarUrl.isNullOrBlank()) {
+                                runBlocking { loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) }
+                            } else null
+                        )
+                    }
+                    LaunchedEffect(user.avatarUrl, user.avatarKey) {
+                        if (partnerAvatar == null && !user.avatarUrl.isNullOrBlank()) {
+                            partnerAvatar = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
+                        }
+                    }
+                    if (partnerAvatar != null) {
+                        Image(
+                            bitmap = partnerAvatar!!,
+                            contentDescription = "avatar",
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .clickable { onAvatarClick?.invoke(user) }
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colors.primary)
+                                .clickable { onAvatarClick?.invoke(user) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = user.username.firstOrNull()?.toString() ?: "?",
+                                style = MaterialTheme.typography.h6,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     Box(
                         modifier = Modifier
                             .size(10.dp)
@@ -366,7 +520,7 @@ fun ChatScreen(
                 if (!isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
                     isLoadingMore = true
                     val olderMessages = LocalChatHistoryStore.getPrivateMessagesPage(
-                        accountId = ServerConfig.id,
+                        accountId = GlobalAppState.currentUserId.toString(),
                         userId = user.id,
                         page = currentPage,
                         pageSize = 50
@@ -484,23 +638,32 @@ fun ChatScreen(
                             horizontalArrangement = if (message.sender) Arrangement.End else Arrangement.Start
                         ) {
                                     Row(verticalAlignment = Alignment.Bottom) {
-                                if (message.sender && !message.isSent.value) {
+                                if (message.sender && !message.isSent) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Send,
                                         contentDescription = "重发",
                                         tint = MaterialTheme.colors.secondary,
                                         modifier = Modifier
                                             .size(20.dp)
-                                            .clickable { resendMessage(user, message) }
+                                            .clickable { resendMessage(chatViewModel, user, message) }
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                 }
 
                                 // If message is from the other user, show their avatar on the left
                                 if (!message.sender) {
-                                    var partnerAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
+                                    // 优化头像加载：先同步查内存缓存，避免闪烁
+                                    var partnerAvatar by remember(user.avatarUrl, user.avatarKey) {
+                                        mutableStateOf(
+                                            if (!user.avatarUrl.isNullOrBlank()) {
+                                                runBlocking { loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) }
+                                            } else null
+                                        )
+                                    }
                                     LaunchedEffect(user.avatarUrl, user.avatarKey) {
-                                        partnerAvatar = if (!user.avatarUrl.isNullOrBlank()) loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) else null
+                                        if (partnerAvatar == null && !user.avatarUrl.isNullOrBlank()) {
+                                            partnerAvatar = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
+                                        }
                                     }
                                     if (partnerAvatar != null) {
                                         Image(
@@ -541,7 +704,7 @@ fun ChatScreen(
 
                                 Box(
                                     modifier = Modifier
-                                        .widthIn(max = 430.dp)
+                                        .widthIn(max = maxBubbleWidth) // 最大宽度为屏幕的40%，内容短自动适配
                                         .shadow(
                                             elevation = if (message.sender) 4.dp else 2.dp,
                                             shape = RoundedCornerShape(18.dp)
@@ -558,7 +721,7 @@ fun ChatScreen(
                                         )
                                         .let {
                                             // 发送中的消息添加半透明效果
-                                            if (message.sender && !message.isSent.value) {
+                                            if (message.sender && !message.isSent) {
                                                 it.alpha(0.7f)
                                             } else {
                                                 it
@@ -663,31 +826,27 @@ fun ChatScreen(
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.End
-                                        ) {
-                                            Text(
-                                                text = formatTime(message.timestamp),
-                                                style = MaterialTheme.typography.caption,
-                                                color = bubbleTextColor.copy(alpha = 0.74f),
-                                                textAlign = TextAlign.End
-                                            )
-                                        }
+                                        // 已移除聊天气泡内的时间戳显示
                                     }
                                 }
 
                                 // 如果是自己发送的消息，在右侧显示自己的头像
                                 if (message.sender) {
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    var myAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
+                                    // 优化头像加载：先同步查内存缓存，避免闪烁
+                                    var myAvatar by remember(currentUser?.avatarUrl, currentUser?.avatarKey) {
+                                        mutableStateOf(
+                                            currentUser?.let { user ->
+                                                if (!user.avatarUrl.isNullOrBlank()) {
+                                                    runBlocking { loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) }
+                                                } else null
+                                            }
+                                        )
+                                    }
                                     LaunchedEffect(currentUser?.avatarUrl, currentUser?.avatarKey) {
                                         val user = currentUser
-                                        myAvatar = if (user != null && !user.avatarUrl.isNullOrBlank()) {
-                                            loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
-                                        } else {
-                                            null
+                                        if (myAvatar == null && user != null && !user.avatarUrl.isNullOrBlank()) {
+                                            myAvatar = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
                                         }
                                     }
                                     if (myAvatar != null) {
@@ -748,7 +907,7 @@ fun ChatScreen(
                         }
                     }
 
-                    if (message.sender && !message.isSent.value) {
+                    if (message.sender && !message.isSent) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             Text(
                                 text = "发送失败，点击图标重试",
@@ -912,6 +1071,7 @@ fun ChatScreen(
     // 转发选择对话框
     if (showForwardDialog) {
         ForwardSelectDialog(
+            users = allUsers,
             onDismiss = { showForwardDialog = false },
             onForward = { targetUser ->
                 forwardMessage?.let { message ->

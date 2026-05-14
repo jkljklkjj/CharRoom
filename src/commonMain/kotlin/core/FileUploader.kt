@@ -1,5 +1,6 @@
 package core
 
+import core.state.GlobalAppState
 import io.ktor.client.call.*
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
@@ -32,7 +33,7 @@ object FileUploader {
                     }
                 }
             ) {
-                header("Authorization", "Bearer ${ServerConfig.Token}")
+                header("Authorization", "Bearer ${GlobalAppState.currentToken}")
                 timeout {
                     requestTimeoutMillis = 30000 // 30秒超时
                 }
@@ -77,7 +78,7 @@ object FileUploader {
                     }
                 }
             ) {
-                header("Authorization", "Bearer ${ServerConfig.Token}")
+                header("Authorization", "Bearer ${GlobalAppState.currentToken}")
                 timeout {
                     requestTimeoutMillis = 30000 // 30秒超时
                 }

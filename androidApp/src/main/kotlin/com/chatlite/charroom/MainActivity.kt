@@ -2,7 +2,6 @@ package com.chatlite.charroom
 
 import android.Manifest
 import android.content.Intent
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -13,18 +12,29 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
-import component.AndroidBackHandler
-import component.AndroidFilePicker
+import com.chatlite.charroom.component.AndroidBackHandler
+import com.chatlite.charroom.component.AndroidFilePicker
+import com.chatlite.charroom.core.AndroidImageLoader
+import com.chatlite.charroom.core.NetworkChangeReceiver
+import com.chatlite.charroom.service.ChatForegroundService
+import com.chatlite.charroom.ui.theme.ChatTheme
+import com.chatlite.charroom.data.datasource.local.AndroidTokenStorage
 import component.BackHandlerImpl
-import component.FilePicker
+import component.io.FilePicker
 import core.ImageLoaderImpl
-import core.AndroidImageLoader
 import androidx.core.graphics.toColorInt
+import org.koin.androidx.compose.koinViewModel
+import presentation.viewmodel.AuthViewModel
+import com.chatlite.charroom.presentation.viewmodel.AndroidAuthViewModel
+import com.chatlite.charroom.presentation.viewmodel.AndroidChatViewModel
+import core.state.AuthState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+import timber.log.Timber
 
 class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
@@ -33,9 +43,22 @@ class MainActivity : ComponentActivity() {
         // 权限处理
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val notificationGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
-            if (notificationGranted) {
-                // 通知权限已授予
+            if (!notificationGranted) {
+                // 通知权限被拒绝，可以在这里显示提示引导用户去设置中开启
+                Timber.w("通知权限被拒绝，新消息通知将无法显示")
             }
+        }
+    }
+
+    /**
+     * 检查是否有通知权限
+     */
+    private fun hasNotificationPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            // Android 13以下默认有通知权限
+            true
         }
     }
 
@@ -94,32 +117,52 @@ class MainActivity : ComponentActivity() {
             ChatTheme {
                 val context = LocalContext.current
                 val scope = rememberCoroutineScope()
-                val appState = remember {
-                    ChatAppState(
-                        repository = NetworkRepository.getInstance(),
-                        coroutineScope = scope,
-                        onAuthFailed = {
-                            AndroidTokenStorage.clear(context)
-                        }
-                    )
-                }
+
+                // 通过依赖注入获取ViewModel
+                val androidAuthViewModel = koinViewModel<AndroidAuthViewModel>()
+                val authViewModel = androidAuthViewModel.viewModel
+                val chatViewModel = org.koin.core.context.GlobalContext.get().get<AndroidChatViewModel>()
+
+                // 观察认证状态
+                val authState by authViewModel.authState.collectAsState()
 
                 LaunchedEffect(Unit) {
-                    AndroidTokenStorage.load(context)?.let { stored ->
-                        val restored = appState.tryRestoreSession(
-                            token = stored.token,
-                            accountId = stored.accountId,
-                            refreshToken = stored.refreshToken
-                        )
-                        if (!restored) {
-                            AndroidTokenStorage.clear(context)
-                        } else {
-                            AndroidTokenStorage.save(
-                                context,
-                                appState.token,
-                                appState.currentUserId,
-                                appState.refreshToken
-                            )
+                    // 初始化ViewModel，尝试自动登录
+                    authViewModel.init()
+
+                    // 监听认证状态变化
+                    authViewModel.authState.collect { state ->
+                        when (state) {
+                            is AuthState.Authenticated -> {
+                                // 登录成功，保存token到本地
+                                val userId = state.account.toIntOrNull() ?: 0
+                                AndroidTokenStorage.save(
+                                    context,
+                                    state.accessToken,
+                                    userId,
+                                    state.refreshToken
+                                )
+
+                                // 加载联系人列表
+                                chatViewModel.loadContacts()
+
+                                // 连接WebSocket
+                                chatViewModel.connectWebSocket(
+                                    token = state.accessToken,
+                                    userId = userId,
+                                    onAuthFailed = {
+                                        AndroidTokenStorage.clear(context)
+                                        authViewModel.logout()
+                                    }
+                                )
+                            }
+                            is AuthState.Unauthenticated,
+                            is AuthState.Error -> {
+                                // 未登录或认证失败，清除本地存储
+                                AndroidTokenStorage.clear(context)
+                                chatViewModel.clear()
+                            }
+                            else -> {}
                         }
                     }
                 }
@@ -127,8 +170,10 @@ class MainActivity : ComponentActivity() {
                 Box(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    ChatApp(
-                        appState = appState,
+                    // 使用commonMain的LoginRegisterApp，统一登录注册逻辑
+                    component.LoginRegisterApp(
+                        isDarkMode = false, // 后续可以添加主题切换
+                        onToggleDarkMode = {},
                         onBackPressed = { callback ->
                             onBackPressedCallback = callback
                         }
@@ -141,7 +186,7 @@ class MainActivity : ComponentActivity() {
     private fun requestNecessaryPermissions() {
         val permissions = mutableListOf<String>()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission()) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
@@ -165,6 +210,9 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         try {
+            // 注销网络状态回调
+            NetworkChangeReceiver.unregisterNetworkCallback(this)
+            // 停止前台服务
             ChatForegroundService.stop(this)
         } catch (e: Exception) {
             e.printStackTrace()

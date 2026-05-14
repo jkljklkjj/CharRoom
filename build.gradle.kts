@@ -62,6 +62,13 @@ dependencies {
     implementation("com.google.protobuf:protobuf-java:4.34.1")
     implementation("com.google.protobuf:protobuf-kotlin:4.34.1")
     implementation(project(":proto"))
+    // Markdown渲染支持
+    implementation("com.halilibo.compose-richtext:richtext-ui-material:1.0.0-alpha04")
+    implementation("com.halilibo.compose-richtext:richtext-commonmark:1.0.0-alpha04")
+
+    // Koin 依赖注入
+    implementation("io.insert-koin:koin-core:4.2.0-RC1")
+    implementation("io.insert-koin:koin-compose:4.2.0-RC1")
 
     // 桌面端特有依赖
     implementation("io.ktor:ktor-client-cio:3.4.3")

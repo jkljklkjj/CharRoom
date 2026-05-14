@@ -1,5 +1,9 @@
 package component
 
+import component.chat.ChatApp
+import presentation.viewmodel.AuthViewModel
+import presentation.viewmodel.GlobalAuthViewModel
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.*
@@ -7,263 +11,278 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import java.io.File
-import core.Chat
-import core.MessageReceiveListener
-import core.ServerConfig
-import core.ApiService
-import kotlinx.coroutines.Dispatchers
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import model.groupMessages
-import model.messages
-import model.users
 
 /**
  * 登录或注册界面
+ * UI层只负责渲染和事件转发，业务逻辑由AuthViewModel处理
  */
 @Composable
 fun LoginRegisterApp(
     isDarkMode: Boolean,
     onToggleDarkMode: () -> Unit,
-    onBackPressed: ((() -> Boolean) -> Unit)? = null
+    onBackPressed: ((() -> Boolean) -> Unit)? = null,
+    authViewModel: AuthViewModel = GlobalAuthViewModel
 ) {
     var isLogin by remember { mutableStateOf(true) }
     var username by remember { mutableStateOf("") } // 注册模式下用户名
     var password by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
-    var res by remember { mutableStateOf(-1) }
-    var isLoggedIn by remember { mutableStateOf(false) }
-    var token by remember { mutableStateOf("") }
-    var refreshToken by remember { mutableStateOf("") }
-    var isSubmitting by remember { mutableStateOf(false) }
-    var account by remember { mutableStateOf(ServerConfig.id) }
-    val credentialsFile = remember { File("credentials.txt") }
-    val authFile = remember { File(System.getProperty("user.home"), ".qingliao/auth.txt") }
+    var account by remember { mutableStateOf("") }
     var triedAutoLogin by remember { mutableStateOf(false) }
+    var email by remember { mutableStateOf("") } // 注册模式下邮箱
+    var verifyCode by remember { mutableStateOf("") } // 注册模式下验证码
+    var isSendingCode by remember { mutableStateOf(false) } // 验证码发送中状态
+    var countdownTime by remember { mutableStateOf(0) } // 倒计时秒数
+
+    // 观察认证状态
+    val authState by authViewModel.authState.collectAsState()
+
     val scope = rememberCoroutineScope()
 
-    fun saveAuth(account: String, token: String, refreshToken: String = "") {
-        try {
-            authFile.parentFile?.mkdirs()
-            authFile.writeText("$account\n$token\n$refreshToken")
-        } catch (_: Exception) {
-        }
+    // 处理退出登录
+    fun handleLogout() {
+        authViewModel.logout()
+        password = ""
+        message = "已退出登录"
     }
 
-    fun deleteAuth() {
-        try {
-            if (authFile.exists()) authFile.delete()
-        } catch (_: Exception) {
-        }
-    }
-
-    // 只在首次组合时尝试自动读取
+    // 只在首次组合时初始化ViewModel，尝试自动登录
     LaunchedEffect(Unit) {
         if (!triedAutoLogin) {
-            val authLoaded = if (authFile.exists()) {
-                val savedLines = runCatching { authFile.readLines() }.getOrElse { emptyList() }
-                if (savedLines.size >= 2) {
-                    val savedAccount = savedLines[0].trim()
-                    val savedToken = savedLines[1].trim()
-                    val savedRefreshToken = savedLines.getOrNull(2)?.trim().orEmpty()
-                    if (savedToken.isNotBlank()) {
-                        message = "正在尝试自动登录..."
-                        refreshToken = savedRefreshToken
-                        // 后台自动认证本地的token
-                        println("[Auth] 自动登录读取到 token，length=${savedToken.length}, tail=${savedToken.takeLast(6)}")
-                        val validatedBundle = withContext(Dispatchers.IO) { ApiService.validateToken(savedToken) }
-                        println("[Auth] validateToken 结果=${validatedBundle != null}, account=$savedAccount")
-                        if (validatedBundle != null) {
-                            account = savedAccount
-                            token = validatedBundle.accessToken
-                            refreshToken = validatedBundle.refreshToken
-                            ServerConfig.Token = validatedBundle.accessToken
-                            ServerConfig.id = savedAccount
-                            // 保存新的token对
-                            saveAuth(savedAccount, validatedBundle.accessToken, validatedBundle.refreshToken)
-                            println("[Auth] 已写入 ServerConfig.Token，length=${ServerConfig.Token.length}, tail=${ServerConfig.Token.takeLast(6)}")
-
-                            // 建立WebSocket连接并完成登录流程
-                            message = "正在建立连接..."
-
-                            // 不在这里直接启动 WebSocket，交给 ChatApp 统一启动，避免自动登录路径和页面初始化重复建连
-                            // 如果登录失败，AuthStateListener 会在 ChatApp 中统一处理
-                            message = "已使用保存的令牌自动登录"
-                            isLoggedIn = true
-                        } else if (savedRefreshToken.isNotBlank()) {
-                            message = "访问令牌失效，正在尝试刷新..."
-                            val refreshed = withContext(Dispatchers.IO) {
-                                ApiService.refreshTokenBundle(savedRefreshToken)
-                            }
-                            if (refreshed != null && refreshed.accessToken.isNotBlank()) {
-                                account = savedAccount
-                                token = refreshed.accessToken
-                                refreshToken = refreshed.refreshToken
-                                ServerConfig.Token = refreshed.accessToken
-                                ServerConfig.id = savedAccount
-                                saveAuth(savedAccount, refreshed.accessToken, refreshed.refreshToken)
-                                message = "刷新成功，已自动登录"
-                                isLoggedIn = true
-                            } else {
-                                deleteAuth()
-                                message = "自动登录失败，请重新登录"
-                            }
-                        } else {
-                            deleteAuth()
-                            message = "自动登录失败，请重新登录"
-                        }
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-
-            if (!authLoaded && credentialsFile.exists()) {
-                val saved = runCatching { credentialsFile.readLines() }.getOrElse { emptyList() }
-                if (saved.isNotEmpty()) {
-                    account = saved[0]
-                    message = "已填充上次使用的账号"
-                }
-            }
-
+            // 自动登录逻辑完全由ViewModel处理
+            authViewModel.init()
             triedAutoLogin = true
+
+            // 填充上次使用的账号
+            val savedAccount = authViewModel.getCurrentAccount()
+            if (!savedAccount.isNullOrBlank()) {
+                account = savedAccount
+                message = "已填充上次使用的账号"
+            }
         }
     }
 
-    if (isLoggedIn) {
-        ChatApp(
-            windowSize = DpSize(800.dp, 600.dp),
-            token = token,
-            isDarkMode = isDarkMode,
-            onToggleDarkMode = onToggleDarkMode,
-            onLogout = {
-                ServerConfig.Token = ""
-                refreshToken = ""
-                token = ""
-                isLoggedIn = false
-                password = ""
-                message = "已退出登录"
-                if (credentialsFile.exists() && !rememberMe) credentialsFile.delete()
-                deleteAuth()
-                messages.clear()
-                groupMessages.clear()
-                users = emptyList()
-            },
-            onBackPressed = onBackPressed
-        )
-    } else {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(text = if (isLogin) "登录" else "注册", style = MaterialTheme.typography.h4)
-            Spacer(modifier = Modifier.height(16.dp))
-            TextField(
-                value = if (isLogin) account else username,
-                onValueChange = {
-                    if (isLogin) account = it else username = it
-                },
-                label = { Text(if (isLogin) "账号" else "用户名") },
-                enabled = !isSubmitting
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("密码") },
-                visualTransformation = PasswordVisualTransformation(),
-                enabled = !isSubmitting
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            if (isLogin) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it }, enabled = !isSubmitting)
-                    Text(text = "记住账号")
+    // 根据认证状态显示不同界面
+    when (authState) {
+        is core.state.AuthState.Authenticated -> {
+            val authenticatedState = authState as core.state.AuthState.Authenticated
+            // 使用BoxWithConstraints跨平台获取屏幕尺寸
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val windowSize = DpSize(
+                    width = maxWidth,
+                    height = maxHeight
+                )
+
+                // 调试日志：输出屏幕尺寸
+                LaunchedEffect(Unit) {
+                    println("[LoginRegisterApp DEBUG] Screen size: ${windowSize.width} x ${windowSize.height}, isSmallScreen: ${windowSize.width < 600.dp}")
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+
+                ChatApp(
+                    windowSize = windowSize,
+                    token = authenticatedState.accessToken,
+                    isDarkMode = isDarkMode,
+                    onToggleDarkMode = onToggleDarkMode,
+                    onLogout = ::handleLogout,
+                    onBackPressed = onBackPressed
+                )
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                enabled = !isSubmitting,
-                onClick = {
-                    if (isSubmitting) return@Button
+        }
+        else -> {
+            // 根据认证状态更新提示消息
+            LaunchedEffect(authState) {
+                message = when (authState) {
+                    is core.state.AuthState.Loading -> "正在登录..."
+                    is core.state.AuthState.Error -> (authState as core.state.AuthState.Error).message
+                    else -> message
+                }
+            }
 
-                    if (isLogin) {
-                        val acc = account.trim()
-                        val pwd = password.trim()
-                        if (acc.isEmpty() || pwd.isEmpty()) {
-                            message = "账号和密码不能为空"
-                            return@Button
-                        }
+            val isSubmitting = authState is core.state.AuthState.Loading
 
-                        scope.launch {
-                            isSubmitting = true
-                            message = "正在登录..."
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = if (isLogin) "登录" else "注册", style = MaterialTheme.typography.h4)
+                Spacer(modifier = Modifier.height(16.dp))
+                TextField(
+                    value = if (isLogin) account else username,
+                    onValueChange = {
+                        if (isLogin) account = it else username = it
+                    },
+                    label = { Text(if (isLogin) "账号" else "用户名") },
+                    enabled = !isSubmitting
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("密码") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    enabled = !isSubmitting
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                            val tk = withContext(Dispatchers.IO) { ApiService.loginTokens(acc, pwd) }
-                            if (tk != null && tk.accessToken.isNotBlank()) {
-                                token = tk.accessToken
-                                refreshToken = tk.refreshToken
-                                ServerConfig.Token = tk.accessToken
-                                ServerConfig.id = acc
-                                println("[Auth] 手动登录成功，token length=${tk.accessToken.length}, tail=${tk.accessToken.takeLast(6)}")
-                                message = "登录成功"
-                                credentialsFile.takeIf { rememberMe }?.writeText(acc)
-                                saveAuth(acc, tk.accessToken, tk.refreshToken)
-                                isLoggedIn = true
-                            } else {
-                                message = "登录失败，请检查账号或密码"
-                            }
-                            isSubmitting = false
-                        }
-                    } else {
-                        val name = username.trim()
-                        val pwd = password.trim()
-                        if (name.isEmpty() || pwd.isEmpty()) {
-                            message = "用户名和密码不能为空"
-                            return@Button
-                        }
+                // 注册模式下显示邮箱和验证码输入框
+                if (!isLogin) {
+                    TextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("邮箱") },
+                        enabled = !isSubmitting
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                        scope.launch {
-                            isSubmitting = true
-                            message = "正在注册..."
-
-                            res = withContext(Dispatchers.IO) { ApiService.register(name, pwd) }
-                            if (res != -1) {
-                                account = res.toString()
-                                message = "注册成功，您的账号是 $res"
-                                isLogin = true
-                                password = ""
-                            } else {
-                                message = "注册失败，请稍后重试"
-                            }
-
-                            isSubmitting = false
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextField(
+                            value = verifyCode,
+                            onValueChange = { verifyCode = it },
+                            label = { Text("验证码") },
+                            enabled = !isSubmitting,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (email.isBlank()) {
+                                    message = "请先输入邮箱地址"
+                                    return@Button
+                                }
+                                // 发送验证码
+                                isSendingCode = true
+                                authViewModel.sendRegisterVerifyCode(email) { result ->
+                                    result.onSuccess {
+                                        message = "验证码已发送，请注意查收"
+                                        // 开始60秒倒计时
+                                        countdownTime = 60
+                                        scope.launch {
+                                            while (countdownTime > 0) {
+                                                delay(1000)
+                                                countdownTime--
+                                            }
+                                            isSendingCode = false
+                                        }
+                                    }.onFailure {
+                                        message = "验证码发送失败: ${it.message}"
+                                        isSendingCode = false
+                                    }
+                                }
+                            },
+                            enabled = !isSubmitting && !isSendingCode && countdownTime == 0,
+                            modifier = Modifier.height(56.dp)
+                        ) {
+                            Text(
+                                if (countdownTime > 0) "${countdownTime}s后重新发送"
+                                else if (isSendingCode) "发送中..."
+                                else "发送验证码"
+                            )
                         }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-            ) {
-                Text(text = if (isSubmitting) "处理中..." else if (isLogin) "登录" else "注册")
+
+                if (isLogin) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it }, enabled = !isSubmitting)
+                        Text(text = "记住账号")
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    enabled = !isSubmitting,
+                    onClick = {
+                        if (isSubmitting) return@Button
+
+                        if (isLogin) {
+                            val acc = account.trim()
+                            val pwd = password.trim()
+                            if (acc.isEmpty() || pwd.isEmpty()) {
+                                message = "账号和密码不能为空"
+                                return@Button
+                            }
+
+                            // 转发登录事件到ViewModel
+                            authViewModel.login(acc, pwd, rememberMe)
+                        } else {
+                            val name = username.trim()
+                            val pwd = password.trim()
+                            val emailText = email.trim()
+                            val code = verifyCode.trim()
+
+                            if (name.isEmpty() || pwd.isEmpty()) {
+                                message = "用户名和密码不能为空"
+                                return@Button
+                            }
+                            if (emailText.isEmpty()) {
+                                message = "邮箱不能为空"
+                                return@Button
+                            }
+                            if (code.isEmpty()) {
+                                message = "验证码不能为空"
+                                return@Button
+                            }
+
+                            // 转发注册事件到ViewModel，使用verifyRegister接口与网页端逻辑一致
+                            authViewModel.verifyRegister(name, pwd, emailText, code) { result ->
+                                result.onSuccess { accountId ->
+                                    account = accountId.toString()
+                                    message = "注册成功，您的账号是 $accountId"
+                                    isLogin = true
+                                    password = ""
+                                    email = ""
+                                    verifyCode = ""
+                                }.onFailure {
+                                    message = "注册失败: ${it.message ?: "请稍后重试"}"
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text(text = if (isSubmitting) "处理中..." else if (isLogin) "登录" else "注册")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        if (!isSubmitting) {
+                            isLogin = !isLogin
+                            // 切换模式时清空相关字段
+                            if (isLogin) {
+                                // 切换到登录模式，清空注册相关字段
+                                email = ""
+                                verifyCode = ""
+                                countdownTime = 0
+                                isSendingCode = false
+                            } else {
+                                // 切换到注册模式，清空账号字段（注册用username）
+                                account = ""
+                            }
+                            message = ""
+                        }
+                    },
+                    enabled = !isSubmitting
+                ) {
+                    Text(text = if (isLogin) "切换到注册" else "切换到登录")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = message,
+                    color = if (message.contains("成功")) Color(0xFF2E7D32) else MaterialTheme.colors.error
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(onClick = { if (!isSubmitting) isLogin = !isLogin }, enabled = !isSubmitting) {
-                Text(text = if (isLogin) "切换到注册" else "切换到登录")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                color = if (message.contains("成功")) Color(0xFF2E7D32) else MaterialTheme.colors.error
-            )
         }
     }
 }

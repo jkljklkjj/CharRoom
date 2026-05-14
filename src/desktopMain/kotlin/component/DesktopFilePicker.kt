@@ -1,5 +1,7 @@
 package component
 
+import component.io.FilePickerProvider
+
 import androidx.compose.runtime.Composable
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream

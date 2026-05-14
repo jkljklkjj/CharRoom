@@ -85,8 +85,8 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
 
     handlers.onopen(e)
     // flush queue (buffers) - 先不flush，等登录完成后再发
-    // 暂时禁用心跳，排查登录问题
-    // startHeartbeat()
+    // 启动心跳保活
+    startHeartbeat()
   })
 
   socket.addEventListener('message', async (e) => {
@@ -117,36 +117,66 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
     }
 
     // 处理登录/心跳等服务器响应
-    if (processedData && typeof processedData === 'object' && processedData.success !== undefined) {
-      console.log('🔐 收到响应消息:', processedData)
-      if (processedData.success) {
-        if (processedData.message === 'heartbeat') {
-          // 心跳只是保活，不需要传给页面层
-          console.log('❤️ 收到 heartbeat 响应')
-          lastHeartbeatResponseTime = Date.now()
-          // 心跳响应成功，清除超时定时器
-          if (heartbeatTimeoutTimer) {
-            clearTimeout(heartbeatTimeoutTimer)
-            heartbeatTimeoutTimer = null
+    if (processedData && typeof processedData === 'object') {
+      // 处理带success字段的响应消息
+      if (processedData.success !== undefined) {
+        console.log('🔐 收到响应消息:', processedData)
+        if (processedData.success) {
+          if (processedData.message === 'heartbeat') {
+            // 心跳只是保活，不需要传给页面层
+            console.log('❤️ 收到 heartbeat 响应')
+            lastHeartbeatResponseTime = Date.now()
+            // 心跳响应成功，清除超时定时器
+            if (heartbeatTimeoutTimer) {
+              clearTimeout(heartbeatTimeoutTimer)
+              heartbeatTimeoutTimer = null
+            }
+            return // 心跳响应不需要继续处理
+          } else {
+            console.log('✅ 登录响应成功，开始发送队列消息')
+            // 登录成功，更新心跳响应时间
+            lastHeartbeatResponseTime = Date.now()
+            // 登录成功后flush消息队列
+            flushQueue()
           }
         } else {
-          console.log('✅ 登录响应成功，开始发送队列消息')
-          // 登录成功，更新心跳响应时间
-          lastHeartbeatResponseTime = Date.now()
-          // 登录成功后flush消息队列
-          flushQueue()
-        }
-      } else {
-        console.error('❌ 响应失败:', processedData.message)
-        const msg = (processedData.message || '').toLowerCase()
-        // 认证相关错误，通知上层
-        if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
-          console.log('🔑 认证失败，停止重连并通知上层')
-          stopReconnect = true // 停止自动重连
-          handlers.onAuthFailed(processedData.message)
+          console.error('❌ 响应失败:', processedData.message)
+          const msg = (processedData.message || '').toLowerCase()
+          // 认证相关错误，通知上层
+          if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
+            console.log('🔑 认证失败，停止重连并通知上层')
+            stopReconnect = true // 停止自动重连
+            handlers.onAuthFailed(processedData.message)
+          }
+          return // 响应消息处理完成
         }
       }
-      return
+
+      // 处理服务端主动发送的心跳消息（不带success字段）
+      if (processedData.type === 'heartbeat' || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
+        console.log('❤️ 收到服务端主动心跳，发送响应')
+        // 回复心跳响应
+        sendWrapper({
+          type: 'heartbeat',
+          heartbeat: {
+            timestamp: Date.now()
+          }
+        }).catch(err => {
+          console.warn('发送心跳响应失败:', err)
+        })
+        // 更新心跳响应时间
+        lastHeartbeatResponseTime = Date.now()
+        return // 心跳消息不需要继续处理
+      }
+
+      // 处理用户在线状态更新（CHECK响应）
+      if (processedData.clientId !== undefined && processedData.online !== undefined) {
+        const clientId = parseInt(processedData.clientId)
+        const online = processedData.online
+        console.log(`👤 收到用户在线状态更新: userId=${clientId}, online=${online}`)
+        // 这里不需要额外处理，直接传给上层Vuex/store更新状态即可
+        // 上层会负责更新用户列表中的在线状态
+      }
     }
 
     // 消息去重和ACK确认
@@ -160,6 +190,9 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
         isChatOrGroupMessage = true
       } else if (processedData.groupChat && processedData.groupChat.messageId) {
         messageId = processedData.groupChat.messageId
+        isChatOrGroupMessage = true
+      } else if (processedData.agentChat && processedData.agentChat.messageId) {
+        messageId = processedData.agentChat.messageId
         isChatOrGroupMessage = true
       }
 

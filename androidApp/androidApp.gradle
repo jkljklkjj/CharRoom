@@ -92,4 +92,8 @@ dependencies {
 
     // Kotlin stdlib that matches your Kotlin version
     implementation "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"  // Kotlin 2.3.20
+
+    // Koin 依赖注入（Android）
+    implementation 'io.insert-koin:koin-android:4.2.0-RC1'
+    implementation 'io.insert-koin:koin-androidx-compose:4.2.0-RC1'
 }

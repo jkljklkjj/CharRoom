@@ -9,15 +9,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import core.MessageReceiveListener
 import core.Chat
-import model.users
 import java.awt.SystemTray
+import presentation.viewmodel.GlobalChatViewModel
 import java.awt.Toolkit
 import java.awt.TrayIcon
 import java.util.prefs.Preferences
 import component.BackHandlerImpl
 import component.DesktopBackHandler
 import component.DesktopFilePicker
-import component.FilePicker
+import component.io.FilePicker
 import core.DesktopImageLoader
 import core.ImageLoaderImpl
 import core.DesktopLocalChatHistoryStore
@@ -25,7 +25,8 @@ import core.LocalChatHistoryStore
 import core.NettyWebSocketClient
 import core.Chat
 import component.DesktopAvatarCropDialog
-import component.AvatarCropDialogImpl
+import component.dialog.AvatarCropDialogImpl
+import core.di.KoinInitializer
 
 /**
  * 桌面端应用入口
@@ -33,6 +34,9 @@ import component.AvatarCropDialogImpl
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() = application {
+    // 初始化依赖注入
+    KoinInitializer.init()
+
     // 初始化跨平台接口实现
     BackHandlerImpl = DesktopBackHandler
     FilePicker = DesktopFilePicker
@@ -145,13 +149,13 @@ class DesktopNotificationManager : MessageReceiveListener {
     }
 
     override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long) {
-        val sender = users.find { it.id == senderId }
+        val sender = GlobalChatViewModel.usersFlow.value.find { it.id == senderId }
         val senderName = sender?.username ?: "陌生人"
         showNotification("新消息", "$senderName: $message")
     }
 
     override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long) {
-        val group = users.find { it.id == -groupId }
+        val group = GlobalChatViewModel.usersFlow.value.find { it.id == -groupId }
         val groupName = group?.username ?: "群组"
         showNotification("群消息 - $groupName", "$senderName: $message")
     }

@@ -1,6 +1,7 @@
 package core
 
 import androidx.compose.runtime.mutableStateOf
+import core.state.GlobalAppState
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -206,20 +207,10 @@ suspend fun loginTokens(account: String, password: String): LoginTokenBundle? {
         body = requestBody
     )
 
-    if (response.isSuccess && response.data != null && response.data!!.accessToken.isNotBlank()) {
+    if (response.isSuccess && response.data != null && response.data.accessToken.isNotBlank()) {
         return response.data
     }
-
-    // 兼容旧后端：data 直接是字符串 token
-    val stringResponse = sendRequest<String>(
-        path = ApiEndpoints.LOGIN,
-        method = "POST",
-        body = requestBody
-    )
-
-    if (stringResponse.isSuccess && stringResponse.data != null && stringResponse.data!!.isNotBlank()) {
-        return LoginTokenBundle(accessToken = stringResponse.data!!, refreshToken = "")
-    }
+//    throw Exception("登录失败")
 
     return null
 }
@@ -284,6 +275,43 @@ suspend fun register(username: String, password: String, email: String = ""): In
     )
 
     return response.data
+}
+
+/**
+ * 验证注册接口（与网页端逻辑一致）
+ */
+suspend fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = ""): Int? {
+    val requestBody = buildJsonObject {
+        put("username", username)
+        put("password", password)
+        put("email", email)
+        put("verifyCode", verifyCode)
+    }
+
+    val response = sendRequest<Int>(
+        path = ApiEndpoints.VERIFY_REGISTER,
+        method = "POST",
+        body = requestBody
+    )
+
+    return response.data
+}
+
+/**
+ * 发送注册验证码
+ */
+suspend fun sendRegisterVerifyCode(email: String): Boolean {
+    val requestBody = buildJsonObject {
+        put("email", email)
+    }
+
+    val response = sendRequest<Boolean>(
+        path = ApiEndpoints.SEND_REGISTER_VERIFY_CODE,
+        method = "POST",
+        body = requestBody
+    )
+
+    return response.data == true
 }
 
 /**
@@ -868,9 +896,9 @@ fun convertMessages(messages: List<MessageSerializer>): List<Message> {
             senderId = msg.senderId,
             receiverId = msg.receiverId,
             message = msg.content,
-            sender = msg.senderId == ServerConfig.id.toIntOrNull(),
+            sender = msg.senderId == GlobalAppState.currentAccount?.toInt(),
             timestamp = msg.timestamp,
-            isSent = mutableStateOf(true),
+            isSent = true,
             messageType = MessageType.valueOf(msg.messageType),
             fileUrl = msg.fileUrl,
             fileName = msg.fileName,
@@ -892,9 +920,9 @@ fun convertMessages(messages: List<GroupMessageSerializer>, groupId: Int): List<
             senderId = msg.senderId,
             receiverId = -groupId, // 群消息receiverId用负的groupId表示
             message = msg.content,
-            sender = msg.senderId == ServerConfig.id.toIntOrNull(),
+            sender = msg.senderId == GlobalAppState.currentAccount?.toInt(),
             timestamp = msg.timestamp,
-            isSent = mutableStateOf(true),
+            isSent = true,
             messageType = MessageType.valueOf(msg.messageType),
             fileUrl = msg.fileUrl,
             fileName = msg.fileName,
@@ -904,5 +932,83 @@ fun convertMessages(messages: List<GroupMessageSerializer>, groupId: Int): List<
             replyToSender = msg.replyToSender,
             messageId = msg.messageId ?: "${msg.groupId}_${msg.senderId}_${msg.timestamp}"
         )
+    }
+}
+
+/**
+ * 发送私聊消息
+ */
+suspend fun sendPrivateMessage(
+    token: String,
+    receiverId: String,
+    content: String,
+    messageType: String,
+    fileUrl: String? = null,
+    fileName: String? = null,
+    fileSize: Long? = null,
+    replyToMessageId: String? = null
+): Boolean {
+    return try {
+        println("[ApiClient] 发送私聊消息请求：token=${token.take(10)}..., receiverId=$receiverId, content=$content, messageType=$messageType")
+        val response = httpClient.post(ApiEndpoints.url("/message/send/private")) {
+            header("Authorization", "Bearer $token")
+            contentType(ContentType.Application.Json)
+            val body = buildJsonObject {
+                put("receiverId", receiverId)
+                put("content", content)
+                put("messageType", messageType)
+                fileUrl?.let { put("fileUrl", it) }
+                fileName?.let { put("fileName", it) }
+                fileSize?.let { put("fileSize", it) }
+                replyToMessageId?.let { put("replyToMessageId", it) }
+            }
+            println("[ApiClient] 请求体: $body")
+            setBody(body)
+        }
+        println("[ApiClient] 响应状态: ${response.status}")
+        val responseBody = response.body<String>()
+        println("[ApiClient] 响应内容: $responseBody")
+        val apiResponse = response.body<ApiResponse<Unit>>()
+        println("[ApiClient] 解析结果: isSuccess=${apiResponse.isSuccess}, code=${apiResponse.code}, message=${apiResponse.message}")
+        apiResponse.isSuccess
+    } catch (e: Exception) {
+        println("[ApiClient] 发送消息异常: ${e.message}, 堆栈: ${e.stackTraceToString()}")
+        false
+    }
+}
+
+/**
+ * 发送群聊消息
+ */
+suspend fun sendGroupMessage(
+    token: String,
+    groupId: String,
+    content: String,
+    messageType: String,
+    fileUrl: String? = null,
+    fileName: String? = null,
+    fileSize: Long? = null,
+    replyToMessageId: String? = null
+): Boolean {
+    return try {
+        val response = httpClient.post(ApiEndpoints.url("/message/send/group")) {
+            header("Authorization", "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(
+                buildJsonObject {
+                    put("groupId", groupId)
+                    put("content", content)
+                    put("messageType", messageType)
+                    fileUrl?.let { put("fileUrl", it) }
+                    fileName?.let { put("fileName", it) }
+                    fileSize?.let { put("fileSize", it) }
+                    replyToMessageId?.let { put("replyToMessageId", it) }
+                }
+            )
+        }
+        val apiResponse = response.body<ApiResponse<Unit>>()
+        apiResponse.isSuccess
+    } catch (e: Exception) {
+        false
     }
 }

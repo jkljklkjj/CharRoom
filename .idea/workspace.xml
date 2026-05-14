@@ -11,13 +11,99 @@
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="实现手机版的头像裁剪功能">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/androidApp.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/androidApp.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidLocalChatHistoryStore.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidTokenStorage.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppLifecycleObserver.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppModels.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AuthScreens.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatForegroundService.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkChangeReceiver.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NotificationExtensions.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NotificationManager.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ProfileScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/Theme.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UiComponents.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UserDetailScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UserListScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AndroidBackHandler.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AndroidFilePicker.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AvatarCropDialog.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/ImageLoader.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/logs/chatlite.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/chatlite.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/AddUserOrGroupDialog.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/AvatarCropDialog.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/EmojiPickerPanel.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/FilePicker.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ForwardSelectDialog.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/MessageLongPressMenu.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ProfileScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ReplyPreviewBar.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserDetailDialog.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserDetailScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiEndpoints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiEndpoints.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/LocalChatHistoryStore.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/LocalChatHistoryStore.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufResponseParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufResponseParser.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/WebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/WebSocketClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/viewmodel/ChatViewModel.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/AvatarCropDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/AvatarCropDialog.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/LocalChatHistoryStore.desktop.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/LocalChatHistoryStore.desktop.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/proto/message.proto" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/public/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/web/public/proto/message.proto" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/api/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/api/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/proto/message.proto" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/services/chatSocket.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/services/chatSocket.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/store/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/store/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/views/WebApp.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/views/WebApp.vue" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotChats">
+    <option name="panelChat">
+      <chat>
+        <option name="activeSessionId" value="fd36da6d-36f5-45a9-98bb-033b0c7a5c5c" />
+        <option name="sessions">
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="fd36da6d-36f5-45a9-98bb-033b0c7a5c5c" />
+            <option name="modeId" value="Ask" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+        </option>
+        <option name="type" value="PANEL" />
+      </chat>
+    </option>
   </component>
   <component name="CopilotPersistence">
     <persistenceIdMap>
@@ -215,7 +301,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Android App.CharRoom">
+  <component name="RunManager" selected="Gradle.desktop">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -751,7 +837,31 @@
       <workItem from="1778058483623" duration="11508000" />
       <workItem from="1778149549327" duration="6795000" />
       <workItem from="1778204389874" duration="7602000" />
-      <workItem from="1778224758618" duration="302000" />
+      <workItem from="1778224758618" duration="5775000" />
+      <workItem from="1778287876361" duration="2512000" />
+      <workItem from="1778328997854" duration="91000" />
+      <workItem from="1778329136956" duration="712000" />
+      <workItem from="1778345116823" duration="678000" />
+      <workItem from="1778345853924" duration="666000" />
+      <workItem from="1778377906115" duration="7291000" />
+      <workItem from="1778389557450" duration="1328000" />
+      <workItem from="1778398793725" duration="1128000" />
+      <workItem from="1778402605717" duration="3905000" />
+      <workItem from="1778409579412" duration="7410000" />
+      <workItem from="1778422812806" duration="408000" />
+      <workItem from="1778423782469" duration="1635000" />
+      <workItem from="1778464259784" duration="1412000" />
+      <workItem from="1778467077101" duration="4428000" />
+      <workItem from="1778478829403" duration="280000" />
+      <workItem from="1778485509487" duration="5494000" />
+      <workItem from="1778507304083" duration="2148000" />
+      <workItem from="1778581063503" duration="1034000" />
+      <workItem from="1778585253836" duration="4092000" />
+      <workItem from="1778636313968" duration="80000" />
+      <workItem from="1778683932605" duration="598000" />
+      <workItem from="1778728112565" duration="747000" />
+      <workItem from="1778731849555" duration="118000" />
+      <workItem from="1778740545962" duration="197000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1180,82 +1290,54 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/build.gradle.kts</url>
-          <line>159</line>
+          <line>163</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>
           <option name="timeStamp" value="26" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt</url>
-          <line>281</line>
-          <option name="timeStamp" value="41" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt</url>
-          <line>217</line>
-          <option name="timeStamp" value="46" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt</url>
-          <line>202</line>
-          <option name="timeStamp" value="47" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt</url>
-          <line>76</line>
-          <option name="timeStamp" value="49" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt</url>
-          <line>78</line>
-          <option name="timeStamp" value="53" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt</url>
-          <line>71</line>
+          <line>72</line>
           <option name="timeStamp" value="55" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt</url>
-          <line>257</line>
+          <line>248</line>
           <option name="timeStamp" value="56" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt</url>
-          <line>85</line>
+          <line>86</line>
           <option name="timeStamp" value="57" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt</url>
-          <line>197</line>
-          <properties>
-            <option name="lambda-ordinal" value="-1" />
-          </properties>
-          <option name="timeStamp" value="58" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt</url>
-          <line>38</line>
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/AuthViewModel.kt</url>
+          <line>35</line>
           <option name="timeStamp" value="60" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt</url>
-          <line>71</line>
-          <properties>
-            <option name="lambda-ordinal" value="-1" />
-          </properties>
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufResponseParser.kt</url>
+          <line>22</line>
           <option name="timeStamp" value="61" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AuthScreens.kt</url>
-          <line>38</line>
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt</url>
+          <line>8</line>
           <option name="timeStamp" value="62" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt</url>
-          <line>399</line>
+          <url>file://$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt</url>
+          <line>515</line>
           <option name="timeStamp" value="64" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/bin/main/core/NettyWebSocketClient.kt</url>
+          <line>1254</line>
+          <properties>
+            <option name="lambda-ordinal" value="-1" />
+          </properties>
+          <option name="timeStamp" value="65" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

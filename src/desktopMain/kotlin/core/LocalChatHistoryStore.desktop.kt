@@ -172,6 +172,26 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(false)
     }
 
+    override fun clearConversation(accountId: String, targetId: String, isGroup: Boolean): Boolean {
+        if (accountId.isBlank()) return false
+        return runCatching {
+            val file = getHistoryFile(accountId, targetId, isGroup)
+            if (file.exists()) file.delete()
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun clearAll(): Boolean {
+        return runCatching {
+            val userHome = System.getProperty("user.home")
+            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            if (folder.exists()) {
+                folder.deleteRecursively()
+            }
+            true
+        }.getOrDefault(false)
+    }
+
     // 内部方法
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
@@ -238,7 +258,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("content", message.message)
             put("sender", message.sender)
             put("timestamp", message.timestamp)
-            put("isSent", message.isSent.value)
+            put("isSent", message.isSent)
             put("messageId", message.messageId)
             put("replyToMessageId", message.replyToMessageId)
             put("replyToContent", message.replyToContent)
@@ -264,7 +284,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 text = json.path("content").asText(""),
                 senderId = json.path("senderId").asInt(0),
                 timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
-                isSent = mutableStateOf(json.path("isSent").asBoolean(true)),
+                isSent = json.path("isSent").asBoolean(true),
                 messageId = json.path("messageId").asText(""),
                 replyToMessageId = json.path("replyToMessageId").asText(null),
                 replyToContent = json.path("replyToContent").asText(null),
@@ -281,7 +301,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 message = json.path("content").asText(""),
                 sender = json.path("sender").asBoolean(false),
                 timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
-                isSent = mutableStateOf(json.path("isSent").asBoolean(true)),
+                isSent = json.path("isSent").asBoolean(true),
                 messageId = json.path("messageId").asText(""),
                 replyToMessageId = json.path("replyToMessageId").asText(null),
                 replyToContent = json.path("replyToContent").asText(null),

@@ -2,10 +2,22 @@ package com.chatlite.charroom
 
 import android.app.Application
 import android.util.Log
+import com.chatlite.charroom.core.AppLifecycleObserver
+import com.chatlite.charroom.core.ChatNotificationManager
+import com.chatlite.charroom.data.network.AndroidGlobalWebSocketClient
+import com.chatlite.charroom.data.datasource.local.AndroidLocalChatHistoryStore
+import com.chatlite.charroom.data.datasource.local.AndroidLocalDataSourceImpl
 import core.LocalChatHistoryStore
-import core.ServerConfig
-import component.AvatarCropDialogImpl
-import component.AndroidAvatarCropDialog
+import data.repository.AuthRepository
+import data.repository.GlobalAuthRepository
+import data.datasource.remote.RemoteDataSourceImpl
+import core.Chat
+import com.chatlite.charroom.core.AndroidImageLoader
+import component.dialog.AvatarCropDialogImpl
+import com.chatlite.charroom.component.AndroidAvatarCropDialog
+import core.di.KoinInitializer
+import com.chatlite.charroom.di.androidModule
+import org.koin.android.ext.koin.androidContext
 import timber.log.Timber
 
 class ChatApplication : Application() {
@@ -14,19 +26,44 @@ class ChatApplication : Application() {
         const val NOTIFICATION_ID = 1
     }
 
-    lateinit var chatNotificationManager: ChatNotificationManager
-        private set
+    val chatNotificationManager: ChatNotificationManager by lazy {
+        ChatNotificationManager(this)
+    }
 
     override fun onCreate() {
         super.onCreate()
-        chatNotificationManager = ChatNotificationManager(this)
-        // 注册应用生命周期观察者
+
+        // 初始化依赖注入
+        KoinInitializer.init {
+            androidContext(this@ChatApplication)
+            modules(androidModule)
+        }
+
+        // 提前初始化通知管理器，确保在需要时已经可用
+        chatNotificationManager
+        // 注册应用生命周期观察者，仅在完全关闭程序时断开WebSocket连接
         AppLifecycleObserver.register(this)
         // 初始化本地存储
         AndroidLocalChatHistoryStore.init(this)
         LocalChatHistoryStore = AndroidLocalChatHistoryStore
+
+        // 替换为Android版LocalDataSource，实现token持久化
+        val androidLocalDataSource = AndroidLocalDataSourceImpl(this)
+        // 反射修改GlobalAuthRepository的localDataSource字段
+        try {
+            val field = AuthRepository::class.java.getDeclaredField("localDataSource")
+            field.isAccessible = true
+            field.set(GlobalAuthRepository, androidLocalDataSource)
+            println("[ChatApplication] 已替换为Android本地数据源实现")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        // 初始化图片加载器
+        AndroidImageLoader.init(this)
         // 初始化头像裁剪对话框
         AvatarCropDialogImpl = AndroidAvatarCropDialog
+        // 初始化 commonMain 全局 WebSocket 客户端实现
+        Chat = AndroidGlobalWebSocketClient
         // 初始化日志
         if (BuildConfig.DEBUG) {
             Timber.plant(object : Timber.DebugTree() {
@@ -66,5 +103,13 @@ class ChatApplication : Application() {
             })
         }
         // 初始化全局配置（ServerConfig会自动从资源文件加载配置）
+    }
+
+    override fun onTerminate() {
+        super.onTerminate()
+        // 注销生命周期观察者
+        AppLifecycleObserver.unregister(this)
+        // 销毁Koin
+        KoinInitializer.destroy()
     }
 }

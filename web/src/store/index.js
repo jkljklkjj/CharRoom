@@ -131,6 +131,22 @@ function setAccountId(id) {
 }
 function setUsers(list) { state.users = list }
 function addUser(u) { if (!state.users.some(x => x.id === u.id)) state.users.push(u) }
+
+/**
+ * 更新用户在线状态
+ */
+function updateUserOnlineStatus(userId, online) {
+  state.users = state.users.map(user => {
+    if (user.id === userId) {
+      return {
+        ...user,
+        online: online,
+        status: online ? '在线' : '离线'
+      }
+    }
+    return user
+  })
+}
 function addMessage(m) {
   const chatId = getPrivateConversationId(m)
   if (!chatId) return
@@ -173,7 +189,8 @@ export function useStore() {
     setSelectedChat,
     clearAll,
     setPendingRegister,
-    clearPendingRegister
+    clearPendingRegister,
+    updateUserOnlineStatus
   }
 }
 
