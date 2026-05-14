@@ -7,6 +7,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
+import component.settings.CurrentPlatform
+import component.settings.Platform
 import core.MessageReceiveListener
 import core.Chat
 import java.awt.SystemTray
@@ -27,7 +29,6 @@ import core.Chat
 import component.DesktopAvatarCropDialog
 import component.dialog.AvatarCropDialogImpl
 import core.di.KoinInitializer
-import core.GlobalAppUpdateManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -47,6 +48,12 @@ fun main() = application {
     LocalChatHistoryStore = DesktopLocalChatHistoryStore
     Chat = NettyWebSocketClient
     AvatarCropDialogImpl = DesktopAvatarCropDialog
+
+    // 初始化平台信息
+    CurrentPlatform = Platform.DESKTOP
+
+    // 初始化应用更新管理器
+    initAppUpdateManager()
 
     // 启动时自动检查更新
     kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {

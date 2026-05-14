@@ -54,7 +54,7 @@ sealed class UpdateState {
  * 应用更新管理器接口
  * 各平台需要实现具体的下载和安装逻辑
  */
-expect class AppUpdateManager {
+interface AppUpdateManager {
     /**
      * 更新状态流
      */
@@ -93,4 +93,6 @@ expect class AppUpdateManager {
 /**
  * 全局应用更新管理器实例
  */
-expect val GlobalAppUpdateManager: AppUpdateManager
+lateinit var GlobalAppUpdateManager: AppUpdateManager
+    internal set
+

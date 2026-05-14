@@ -36,7 +36,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,14 +51,20 @@ import core.LocalChatHistoryStore
 import core.model.AppVersionInfo
 import core.state.GlobalAppState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import presentation.viewmodel.ChatViewModel
 
 /**
- * 获取当前平台
+ * 平台类型
  */
-expect fun getPlatform(): String
+enum class Platform {
+    ANDROID, DESKTOP, WEB
+}
+
+/**
+ * 当前平台，由各平台初始化时设置
+ */
+lateinit var CurrentPlatform: Platform
 
 /**
  * 设置界面
@@ -68,6 +76,7 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     onProfileClick: () -> Unit = {}
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
@@ -173,9 +182,13 @@ fun SettingsScreen(
                 subtitle = "当前版本 v${AppConfig.VERSION_NAME} (${AppConfig.VERSION_CODE})",
                 onClick = {
                     // 启动协程检查更新
-                    androidx.compose.runtime.rememberCoroutineScope().launch(Dispatchers.IO) {
+                    coroutineScope.launch(Dispatchers.IO) {
                         GlobalAppUpdateManager.checkForUpdates(
-                            platform = getPlatform(),
+                            platform = when (CurrentPlatform) {
+                                Platform.ANDROID -> "android"
+                                Platform.DESKTOP -> "desktop"
+                                Platform.WEB -> "web"
+                            },
                             autoDownload = false
                         )
                     }
@@ -369,7 +382,7 @@ fun SettingsScreen(
                                 Button(
                                     onClick = {
                                         showUpdateDialog = false
-                                        androidx.compose.runtime.rememberCoroutineScope().launch(Dispatchers.IO) {
+                                        coroutineScope.launch(Dispatchers.IO) {
                                             val filePath = (updateState as UpdateState.Downloaded).filePath
                                             GlobalAppUpdateManager.installUpdate(filePath)
                                         }
@@ -382,7 +395,7 @@ fun SettingsScreen(
                                 Button(
                                     onClick = {
                                         showUpdateDialog = false
-                                        androidx.compose.runtime.rememberCoroutineScope().launch(Dispatchers.IO) {
+                                        coroutineScope.launch(Dispatchers.IO) {
                                             GlobalAppUpdateManager.downloadUpdate(version)
                                         }
                                     }

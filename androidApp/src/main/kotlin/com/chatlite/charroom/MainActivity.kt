@@ -19,8 +19,9 @@ import androidx.core.view.WindowCompat
 import com.chatlite.charroom.component.AndroidBackHandler
 import com.chatlite.charroom.component.AndroidFilePicker
 import com.chatlite.charroom.core.AndroidImageLoader
+import component.settings.CurrentPlatform
+import component.settings.Platform
 import com.chatlite.charroom.core.NetworkChangeReceiver
-import com.chatlite.charroom.core.initAppUpdateManager
 import com.chatlite.charroom.service.ChatForegroundService
 import com.chatlite.charroom.ui.theme.ChatTheme
 import com.chatlite.charroom.data.datasource.local.AndroidTokenStorage
@@ -28,6 +29,7 @@ import component.BackHandlerImpl
 import component.io.FilePicker
 import core.GlobalAppUpdateManager
 import core.ImageLoaderImpl
+import core.initAppUpdateManager
 import androidx.core.graphics.toColorInt
 import org.koin.androidx.compose.koinViewModel
 import presentation.viewmodel.AuthViewModel
@@ -76,6 +78,9 @@ class MainActivity : ComponentActivity() {
         BackHandlerImpl = AndroidBackHandler
         FilePicker = AndroidFilePicker
         ImageLoaderImpl = AndroidImageLoader
+
+        // 初始化平台信息
+        CurrentPlatform = Platform.ANDROID
 
         // 初始化应用更新管理器
         initAppUpdateManager(this)

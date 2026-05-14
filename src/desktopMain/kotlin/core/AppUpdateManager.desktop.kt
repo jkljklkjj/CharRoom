@@ -164,6 +164,8 @@ actual class AppUpdateManager {
 }
 
 /**
- * 桌面端全局应用更新管理器实例
+ * 初始化桌面端应用更新管理器
  */
-actual val GlobalAppUpdateManager: AppUpdateManager = AppUpdateManager()
+fun initAppUpdateManager() {
+    GlobalAppUpdateManager = AppUpdateManager()
+}

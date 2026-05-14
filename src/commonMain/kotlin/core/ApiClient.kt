@@ -791,10 +791,12 @@ suspend fun checkAppVersion(
         put("channel", channel)
     }
 
+    // 版本检查不需要token，公开接口
     val response = sendRequest<VersionCheckResult>(
         path = ApiEndpoints.APP_VERSION_CHECK,
         method = "POST",
-        body = requestBody
+        body = requestBody,
+        token = null // 明确不传token
     )
 
     return response.data
