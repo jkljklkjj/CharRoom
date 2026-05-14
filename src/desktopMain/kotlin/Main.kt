@@ -21,6 +21,7 @@ import component.DesktopBackHandler
 import component.DesktopFilePicker
 import component.io.FilePicker
 import core.DesktopImageLoader
+import core.GlobalAppUpdateManager
 import core.ImageLoaderImpl
 import core.DesktopLocalChatHistoryStore
 import core.LocalChatHistoryStore
@@ -29,8 +30,13 @@ import core.Chat
 import component.DesktopAvatarCropDialog
 import component.dialog.AvatarCropDialogImpl
 import core.di.KoinInitializer
+import core.initAppUpdateManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+// 平台信息
+import component.settings.CurrentPlatform
+import component.settings.Platform as AppPlatform
 
 /**
  * 桌面端应用入口
@@ -50,7 +56,7 @@ fun main() = application {
     AvatarCropDialogImpl = DesktopAvatarCropDialog
 
     // 初始化平台信息
-    CurrentPlatform = Platform.DESKTOP
+    CurrentPlatform = AppPlatform.DESKTOP
 
     // 初始化应用更新管理器
     initAppUpdateManager()
