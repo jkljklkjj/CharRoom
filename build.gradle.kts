@@ -49,8 +49,6 @@ dependencies {
     implementation("org.jetbrains.compose.material:material-icons-core:1.7.3")
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("org.glassfish.jaxb:jaxb-runtime:4.0.7")
-    implementation("com.konghq:unirest-java:3.14.5")
     implementation("io.netty:netty-all:4.2.5.Final")
     implementation("org.jboss.marshalling:jboss-marshalling:2.3.0")
     implementation("org.jboss.marshalling:jboss-marshalling-river:2.3.0")
@@ -108,10 +106,18 @@ compose.desktop {
             "-Dconsole.encoding=UTF-8"
         )
 
+        // 使用JDK 21
+        javaHome = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }.get().metadata.installationPath.asFile.absolutePath
+
         buildTypes {
             release {
                 proguard {
                     version.set("7.8.2")
+                    isEnabled = true
+                    obfuscate = true // 启用混淆
+                    optimize = true  // 启用最高级别代码优化
                     configurationFiles.from(project.file("proguard-rules.pro"))
                 }
             }

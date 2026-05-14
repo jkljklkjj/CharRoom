@@ -180,7 +180,7 @@
 
 # 如果你在 build.gradle.kts 里设置了 obfuscate = false
 # 那么以下两行其实已经隐含生效，写在这里作为显式声明
--dontobfuscate
+# -dontobfuscate
 
 # 允许优化 (配合 build.gradle.kts 里的 optimize = true)
 # 如果遇到问题，可以加 -dontoptimize 临时关闭

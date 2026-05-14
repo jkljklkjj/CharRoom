@@ -34,8 +34,38 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true // 启用代码混淆和压缩
+            shrinkResources true // 移除未使用的资源
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            // 启用R8全模式优化
+            optimization {
+                enabled = true
+                // 最高优化级别
+                keepRuleOptimizations = true
+                unboxEnumOptimization = true
+                classInlining = true
+                finalClassInline = true
+                methodInlining = true
+                lambdaMerging = true
+                stringConcatenationOptimization = true
+            }
+
+            // 资源混淆
+            androidResources {
+                noCompress 'png', 'jpg', 'jpeg'
+                additionalParameters "--enable-resource-obfuscation"
+            }
+
+            // 只打包需要的CPU架构，减少体积
+            ndk {
+                abiFilters 'arm64-v8a' // 只保留主流64位架构，进一步减小体积
+            }
+
+            // 移除调试信息
+            debuggable false
+            jniDebuggable false
+            renderscriptDebuggable false
         }
     }
 
@@ -79,10 +109,14 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-extended:1.9.0'
     debugImplementation 'androidx.compose.ui:ui-tooling:1.10.6'
 
-    // Netty WebSocket client
-    implementation('io.netty:netty-all:4.1.68.Final') {
-        exclude group: 'io.netty', module: 'netty-codec-native-quic'
-    }
+    // Netty WebSocket client - 只引入需要的模块，减小体积
+    implementation 'io.netty:netty-codec-http:4.1.112.Final'
+    implementation 'io.netty:netty-handler:4.1.112.Final'
+    implementation 'io.netty:netty-transport:4.1.112.Final'
+    implementation 'io.netty:netty-codec:4.1.112.Final'
+    implementation 'io.netty:netty-buffer:4.1.112.Final'
+    implementation 'io.netty:netty-common:4.1.112.Final'
+    implementation 'io.netty:netty-resolver:4.1.112.Final'
 
     // Ktor HTTP client (Android)
     implementation 'io.ktor:ktor-client-core:3.4.3'
