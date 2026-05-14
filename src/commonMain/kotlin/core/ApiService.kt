@@ -1,5 +1,7 @@
 package core
 
+import core.model.AppVersionInfo
+import core.model.VersionCheckResult
 import core.state.GlobalAppState
 import model.Group
 import model.Message
@@ -213,6 +215,22 @@ class ApiService(private val authToken: String? = null) {
             fileName = fileName,
             fileSize = fileSize,
             replyToMessageId = replyToMessageId
+        )
+    }
+
+    /**
+     * 检查应用版本更新
+     * @param platform 平台：android/desktop/web
+     * @param channel 渠道：official/debug等
+     */
+    suspend fun checkAppVersion(
+        platform: String,
+        channel: String = "official"
+    ): VersionCheckResult? {
+        return core.checkAppVersion(
+            appVersion = AppConfig.VERSION_CODE,
+            platform = platform,
+            channel = channel
         )
     }
 

@@ -20,11 +20,13 @@ import com.chatlite.charroom.component.AndroidBackHandler
 import com.chatlite.charroom.component.AndroidFilePicker
 import com.chatlite.charroom.core.AndroidImageLoader
 import com.chatlite.charroom.core.NetworkChangeReceiver
+import com.chatlite.charroom.core.initAppUpdateManager
 import com.chatlite.charroom.service.ChatForegroundService
 import com.chatlite.charroom.ui.theme.ChatTheme
 import com.chatlite.charroom.data.datasource.local.AndroidTokenStorage
 import component.BackHandlerImpl
 import component.io.FilePicker
+import core.GlobalAppUpdateManager
 import core.ImageLoaderImpl
 import androidx.core.graphics.toColorInt
 import org.koin.androidx.compose.koinViewModel
@@ -34,6 +36,8 @@ import com.chatlite.charroom.presentation.viewmodel.AndroidChatViewModel
 import core.state.AuthState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 class MainActivity : ComponentActivity() {
@@ -72,6 +76,21 @@ class MainActivity : ComponentActivity() {
         BackHandlerImpl = AndroidBackHandler
         FilePicker = AndroidFilePicker
         ImageLoaderImpl = AndroidImageLoader
+
+        // 初始化应用更新管理器
+        initAppUpdateManager(this)
+
+        // 启动时自动检查更新
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            try {
+                GlobalAppUpdateManager.checkForUpdates(
+                    platform = "android",
+                    autoDownload = false
+                )
+            } catch (_: Exception) {
+                // 忽略更新检查错误
+            }
+        }
 
         // 沉浸式状态栏，内容延伸到状态栏下
         WindowCompat.setDecorFitsSystemWindows(window, false)

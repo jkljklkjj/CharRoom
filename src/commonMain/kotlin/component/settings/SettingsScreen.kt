@@ -30,7 +30,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,9 +42,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import core.AppConfig
+import core.GlobalAppUpdateManager
+import core.UpdateState
 import core.LocalChatHistoryStore
+import core.model.AppVersionInfo
 import core.state.GlobalAppState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.launch
 import presentation.viewmodel.ChatViewModel
+
+/**
+ * 获取当前平台
+ */
+expect fun getPlatform(): String
 
 /**
  * 设置界面
@@ -57,6 +71,48 @@ fun SettingsScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var showUpdateProgressDialog by remember { mutableStateOf(false) }
+    var latestVersionInfo: AppVersionInfo? by remember { mutableStateOf(null) }
+    var updateError: String? by remember { mutableStateOf(null) }
+
+    // 监听更新状态
+    val updateState by GlobalAppUpdateManager.updateState.collectAsState()
+
+    LaunchedEffect(updateState) {
+        when (val state = updateState) {
+            is UpdateState.Available -> {
+                latestVersionInfo = state.versionInfo
+                showUpdateDialog = true
+            }
+            is UpdateState.Downloading -> {
+                showUpdateProgressDialog = true
+            }
+            is UpdateState.Downloaded -> {
+                showUpdateProgressDialog = false
+                // 询问是否安装
+                if (state.versionInfo.forceUpdate) {
+                    // 强制更新直接安装
+                    launch(Dispatchers.IO) {
+                        GlobalAppUpdateManager.installUpdate(state.filePath)
+                    }
+                } else {
+                    // 弹出确认安装对话框
+                    showUpdateDialog = true
+                }
+            }
+            is UpdateState.Failed -> {
+                showUpdateProgressDialog = false
+                updateError = state.error
+                showUpdateDialog = true
+            }
+            is UpdateState.NoUpdate -> {
+                updateError = "当前已是最新版本"
+                showUpdateDialog = true
+            }
+            else -> {}
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -108,6 +164,22 @@ fun SettingsScreen(
                 title = "个人资料",
                 subtitle = "查看和编辑个人信息",
                 onClick = onProfileClick
+            )
+
+            // 检查更新
+            SettingItem(
+                icon = Icons.Default.SystemUpdate,
+                title = "检查更新",
+                subtitle = "当前版本 v${AppConfig.VERSION_NAME} (${AppConfig.VERSION_CODE})",
+                onClick = {
+                    // 启动协程检查更新
+                    androidx.compose.runtime.rememberCoroutineScope().launch(Dispatchers.IO) {
+                        GlobalAppUpdateManager.checkForUpdates(
+                            platform = getPlatform(),
+                            autoDownload = false
+                        )
+                    }
+                }
             )
 
             // 清空聊天记录
@@ -233,6 +305,169 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    // 更新提示对话框
+    if (showUpdateDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showUpdateDialog = false
+                updateError = null
+                if (latestVersionInfo?.forceUpdate == true) {
+                    // 强制更新不能关闭
+                    return@AlertDialog
+                }
+            },
+            title = {
+                Text(
+                    when {
+                        updateError != null -> "更新提示"
+                        latestVersionInfo != null -> "发现新版本 v${latestVersionInfo?.versionName}"
+                        else -> "检查更新"
+                    }
+                )
+            },
+            text = {
+                when {
+                    updateError != null -> {
+                        Text(updateError!!)
+                    }
+                    latestVersionInfo != null -> {
+                        val version = latestVersionInfo!!
+                        Column {
+                            Text("新版本大小: ${formatFileSize(version.fileSize)}")
+                            if (version.releaseTime != null) {
+                                Text("发布时间: ${version.releaseTime}")
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("更新内容:\n${version.updateContent}")
+                            if (version.forceUpdate) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("此版本为强制更新，必须安装后才能继续使用", color = Color(0xFFF44336))
+                            }
+                        }
+                    }
+                    else -> {
+                        Text("检查更新中...")
+                    }
+                }
+            },
+            confirmButton = {
+                when {
+                    updateError != null -> {
+                        TextButton(onClick = {
+                            showUpdateDialog = false
+                            updateError = null
+                        }) {
+                            Text("确定")
+                        }
+                    }
+                    latestVersionInfo != null -> {
+                        val version = latestVersionInfo!!
+                        when (updateState) {
+                            is UpdateState.Downloaded -> {
+                                Button(
+                                    onClick = {
+                                        showUpdateDialog = false
+                                        androidx.compose.runtime.rememberCoroutineScope().launch(Dispatchers.IO) {
+                                            val filePath = (updateState as UpdateState.Downloaded).filePath
+                                            GlobalAppUpdateManager.installUpdate(filePath)
+                                        }
+                                    }
+                                ) {
+                                    Text("立即安装")
+                                }
+                            }
+                            else -> {
+                                Button(
+                                    onClick = {
+                                        showUpdateDialog = false
+                                        androidx.compose.runtime.rememberCoroutineScope().launch(Dispatchers.IO) {
+                                            GlobalAppUpdateManager.downloadUpdate(version)
+                                        }
+                                    }
+                                ) {
+                                    Text(if (version.forceUpdate) "强制更新" else "立即更新")
+                                }
+                            }
+                        }
+                    }
+                    else -> {}
+                }
+            },
+            dismissButton = {
+                if (latestVersionInfo?.forceUpdate != true && updateError == null && latestVersionInfo != null) {
+                    TextButton(
+                        onClick = {
+                            showUpdateDialog = false
+                        },
+                        enabled = latestVersionInfo?.forceUpdate != true
+                    ) {
+                        Text("稍后再说")
+                    }
+                }
+            }
+        )
+    }
+
+    // 更新进度对话框
+    if (showUpdateProgressDialog) {
+        val downloadState = updateState as? UpdateState.Downloading
+        AlertDialog(
+            onDismissRequest = {
+                if (latestVersionInfo?.forceUpdate != true) {
+                    showUpdateProgressDialog = false
+                    GlobalAppUpdateManager.cancelDownload()
+                }
+            },
+            title = { Text("下载更新中") },
+            text = {
+                Column {
+                    val progress = downloadState?.progress ?: 0
+                    val total = downloadState?.total ?: 0
+                    Text("已下载: $progress% (${formatFileSize(progress.toLong() * total / 100)}/${formatFileSize(total)})")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // 简单进度条
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .background(Color.LightGray, RoundedCornerShape(4.dp))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress / 100f)
+                                .height(8.dp)
+                                .background(MaterialTheme.colors.primary, RoundedCornerShape(4.dp))
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                if (latestVersionInfo?.forceUpdate != true) {
+                    TextButton(onClick = {
+                        showUpdateProgressDialog = false
+                        GlobalAppUpdateManager.cancelDownload()
+                    }) {
+                        Text("取消")
+                    }
+                }
+            }
+        )
+    }
+}
+
+/**
+ * 格式化文件大小
+ */
+private fun formatFileSize(size: Long): String {
+    return when {
+        size <= 0 -> "未知"
+        size < 1024 -> "$size B"
+        size < 1024 * 1024 -> "%.1f KB".format(size / 1024.0)
+        size < 1024 * 1024 * 1024 -> "%.1f MB".format(size / (1024.0 * 1024))
+        else -> "%.1f GB".format(size / (1024.0 * 1024 * 1024))
     }
 }
 

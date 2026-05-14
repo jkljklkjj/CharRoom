@@ -27,6 +27,9 @@ import core.Chat
 import component.DesktopAvatarCropDialog
 import component.dialog.AvatarCropDialogImpl
 import core.di.KoinInitializer
+import core.GlobalAppUpdateManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * 桌面端应用入口
@@ -44,6 +47,18 @@ fun main() = application {
     LocalChatHistoryStore = DesktopLocalChatHistoryStore
     Chat = NettyWebSocketClient
     AvatarCropDialogImpl = DesktopAvatarCropDialog
+
+    // 启动时自动检查更新
+    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        try {
+            GlobalAppUpdateManager.checkForUpdates(
+                platform = "desktop",
+                autoDownload = false
+            )
+        } catch (_: Exception) {
+            // 忽略更新检查错误
+        }
+    }
 
     // 窗口状态记忆
     val prefs = Preferences.userNodeForPackage(javaClass)

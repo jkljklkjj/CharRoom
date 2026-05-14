@@ -16,6 +16,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
+import core.model.AppVersionInfo
+import core.model.VersionCheckResult
 import model.Group
 import model.Message
 import model.MessageType
@@ -770,6 +772,32 @@ suspend fun searchUser(token: String, keyword: String): List<User> {
     )
 
     return response.data ?: emptyList()
+}
+
+/**
+ * 检查应用版本更新
+ * @param appVersion 当前应用版本号
+ * @param platform 平台：android/desktop/web
+ * @param channel 渠道：official/debug等
+ */
+suspend fun checkAppVersion(
+    appVersion: Int,
+    platform: String,
+    channel: String = "official"
+): VersionCheckResult? {
+    val requestBody = buildJsonObject {
+        put("versionCode", appVersion)
+        put("platform", platform)
+        put("channel", channel)
+    }
+
+    val response = sendRequest<VersionCheckResult>(
+        path = ApiEndpoints.APP_VERSION_CHECK,
+        method = "POST",
+        body = requestBody
+    )
+
+    return response.data
 }
 
 /**

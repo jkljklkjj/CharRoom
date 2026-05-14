@@ -30,6 +30,7 @@ object ApiEndpoints {
     const val USER_PROFILE_UPDATE_EMAIL = "/user/profile/updateEmail"
     const val SEND_EMAIL_UPDATE_VERIFY_CODE = "/user/sendEmailUpdateVerifyCode"
     const val USER_AVATAR_UPLOAD = "/user/avatar/upload"
+    const val APP_VERSION_CHECK = "/app/version/check"
 
     fun url(path: String): String = BASE + path
 }
