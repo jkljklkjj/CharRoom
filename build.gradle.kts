@@ -49,11 +49,17 @@ dependencies {
     implementation("org.jetbrains.compose.material:material-icons-core:1.7.3")
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("io.netty:netty-all:4.2.5.Final")
+    implementation("io.netty:netty-common:4.2.5.Final")
+    implementation("io.netty:netty-buffer:4.2.5.Final")
+    implementation("io.netty:netty-transport:4.2.5.Final")
+    implementation("io.netty:netty-resolver:4.2.5.Final")
+    implementation("io.netty:netty-codec:4.2.5.Final")
+    implementation("io.netty:netty-codec-http:4.2.5.Final")
+    implementation("io.netty:netty-handler:4.2.5.Final")
     implementation("org.jboss.marshalling:jboss-marshalling:2.3.0")
     implementation("org.jboss.marshalling:jboss-marshalling-river:2.3.0")
     implementation("org.slf4j:slf4j-api:2.0.17")
-    implementation("ch.qos.logback:logback-classic:1.5.32")
+    implementation("org.slf4j:slf4j-simple:2.0.17")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.2")
     implementation("co.touchlab:kermit:2.1.0")
     implementation("io.github.oshai:kotlin-logging:6.0.3") // Kotlin官方日志库
@@ -125,6 +131,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            modules("java.prefs", "jdk.unsupported")
             packageName = "chatlite"
             packageVersion = "1.0.0"
             vendor = "QingLiao"
@@ -153,7 +160,17 @@ compose.desktop {
 tasks.register("buildInstallers") {
     group = "distribution"
     description = "Build native installers (DMG / MSI / DEB)"
-    dependsOn(tasks.matching { it.name.startsWith("package") || it.name.startsWith("jpackage") })
+
+    val isWindows = System.getProperty("os.name").contains("Windows", ignoreCase = true)
+
+    dependsOn(tasks.matching {
+        (it.name.startsWith("package") || it.name.startsWith("jpackage")) &&
+            (!isWindows || it.name != "packageReleaseMsi")
+    })
+
+    if (isWindows) {
+        dependsOn("buildTrimmedMsi")
+    }
 }
 
 tasks.register<Copy>("stageDesktopReleaseArtifacts") {
@@ -194,6 +211,37 @@ tasks.register("stageReleaseArtifacts") {
     group = "distribution"
     description = "Stage all release artifacts with fixed filenames"
     dependsOn("stageDesktopReleaseArtifacts", "stageAndroidReleaseArtifact")
+}
+
+// 自定义任务：使用裁剪后的最小JRE构建MSI
+tasks.register("buildTrimmedMsi") {
+    group = "distribution"
+    description = "Build MSI with trimmed minimal JRE (reduces size by ~25MB)"
+    dependsOn("packageReleaseMsi")
+
+    doLast {
+        val originalRuntime = file("build/compose/tmp/main/release/runtime")
+        val trimmedRuntime = rootProject.projectDir.parentFile.resolve("minimal-jre")
+
+        if (trimmedRuntime.exists()) {
+            // 替换原runtime为裁剪版本
+            originalRuntime.deleteRecursively()
+            trimmedRuntime.copyRecursively(originalRuntime)
+
+            // 重新打包MSI
+            delete(file("build/compose/binaries/main-release/msi/chatlite-1.0.0.msi"))
+            exec {
+                workingDir = rootProject.projectDir
+                if (System.getProperty("os.name").contains("Windows", ignoreCase = true)) {
+                    commandLine("gradlew.bat", "--rerun-tasks", "packageReleaseMsi")
+                } else {
+                    commandLine("./gradlew", "--rerun-tasks", "packageReleaseMsi")
+                }
+            }
+        } else {
+            logger.warn("Trimmed JRE not found at ${trimmedRuntime.absolutePath}")
+        }
+    }
 }
 
 tasks.register<Jar>("customJar") {

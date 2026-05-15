@@ -119,7 +119,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
@@ -136,8 +137,8 @@ dependencies {
     implementation "androidx.activity:activity-compose:$activityComposeVersion"
     implementation "androidx.compose.ui:ui:$composeVersion"
     implementation "androidx.compose.material:material:$composeVersion"
-    implementation "androidx.compose.ui:ui-tooling-preview:$composeVersion"
     debugImplementation "androidx.compose.ui:ui-tooling:$composeVersion"
+    debugImplementation "androidx.compose.ui:ui-tooling-preview:$composeVersion"
     // AppCompat is required by the styles in androidApp/src/main/res/values/styles.xml
     implementation 'androidx.appcompat:appcompat:1.7.1'
     // Material components (optional) — keep for themes and widgets
@@ -167,9 +168,6 @@ dependencies {
 
     // Jackson JSON 处理
     implementation 'com.fasterxml.jackson.module:jackson-module-kotlin:2.21.2'
-
-    // Unirest HTTP 客户端
-    implementation 'com.konghq:unirest-java:3.14.5'
 
     // 日志
     implementation 'org.slf4j:slf4j-api:2.0.17'
