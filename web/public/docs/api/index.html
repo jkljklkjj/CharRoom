@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>轻聊 API 文档</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f5ef;
+            --panel: #ffffff;
+            --text: #1d2433;
+            --muted: #667085;
+            --accent: #0b6cff;
+            --line: #e5e7eb;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(180deg, #fbfbf8 0%, #f4f7fb 100%);
+            color: var(--text);
+        }
+
+        main {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 48px 20px 80px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
+            padding: 28px;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: clamp(32px, 4vw, 44px);
+        }
+
+        p {
+            line-height: 1.7;
+            color: var(--muted);
+        }
+
+        code,
+        pre {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        pre {
+            overflow: auto;
+            padding: 16px;
+            border-radius: 14px;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        ul {
+            line-height: 1.9;
+        }
+
+        .meta {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid var(--line);
+            display: grid;
+            gap: 8px;
+        }
+
+        .label {
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <section class="card">
+            <div class="label">Service Documentation</div>
+            <h1>轻聊 API 文档</h1>
+            <p>
+                这里提供轻聊站点的公开服务说明，供浏览器、搜索引擎和自动化代理发现。
+            </p>
+            <p>
+                若需要接口目录，请优先查看
+                <a href="/.well-known/api-catalog.json">/.well-known/api-catalog.json</a>。
+            </p>
+            <h2>公开入口</h2>
+            <ul>
+                <li><a href="/">首页</a></li>
+                <li><a href="/app">Web 体验</a></li>
+                <li><a href="/verify">站点验证页</a></li>
+                <li><a href="/sitemap.xml">Sitemap</a></li>
+            </ul>
+            <h2>常见约定</h2>
+            <pre>{
+  "content-type": "application/json",
+  "auth": "Authorization: Bearer &lt;token&gt;",
+  "base-url": "https://www.chatlite.xin"
+}</pre>
+            <div class="meta">
+                <div><strong>Canonical Host:</strong> <a href="https://www.chatlite.xin/">https://www.chatlite.xin</a>
+                </div>
+                <div><strong>Catalog:</strong> <a href="/.well-known/api-catalog.json">/.well-known/api-catalog.json</a>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>
