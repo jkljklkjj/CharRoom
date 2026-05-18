@@ -1,0 +1,22 @@
+{
+  "name": "ChatRoom API Catalog",
+  "baseUrl": "https://www.chatlite.xin",
+  "version": 1,
+  "resources": [
+    {
+      "rel": "service-doc",
+      "href": "https://www.chatlite.xin/docs/api/",
+      "title": "API Documentation"
+    },
+    {
+      "rel": "sitemap",
+      "href": "https://www.chatlite.xin/sitemap.xml",
+      "title": "Public Sitemap"
+    },
+    {
+      "rel": "homepage",
+      "href": "https://www.chatlite.xin/",
+      "title": "Homepage"
+    }
+  ]
+}

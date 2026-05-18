@@ -1,0 +1,20 @@
+{
+  "baseUrl": "https://www.chatlite.xin",
+  "routes": [
+    {
+      "path": "/",
+      "changefreq": "daily",
+      "priority": 1.0
+    },
+    {
+      "path": "/app",
+      "changefreq": "weekly",
+      "priority": 0.8
+    },
+    {
+      "path": "/verify",
+      "changefreq": "monthly",
+      "priority": 0.3
+    }
+  ]
+}
