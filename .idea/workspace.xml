@@ -11,76 +11,7 @@
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="实现手机版的头像裁剪功能">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/androidApp.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/androidApp.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidLocalChatHistoryStore.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidTokenStorage.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AndroidWebSocketClient.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppLifecycleObserver.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppModels.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AppState.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/AuthScreens.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApp.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatForegroundService.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkChangeReceiver.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NetworkRepository.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NotificationExtensions.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/NotificationManager.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ProfileScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/Theme.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UiComponents.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UserDetailScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/UserListScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AndroidBackHandler.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AndroidFilePicker.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/component/AvatarCropDialog.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/ImageLoader.android.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/logs/chatlite.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/chatlite.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/AddUserOrGroupDialog.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ApplicationDialog.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/AvatarCropDialog.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatApp.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/EmojiPickerPanel.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/FilePicker.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ForwardSelectDialog.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/GroupChatScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/MessageLongPressMenu.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ProfileScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ReplyPreviewBar.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserDetailDialog.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserDetailScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/UserListScreen.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiEndpoints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiEndpoints.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ApiService.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/LocalChatHistoryStore.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/LocalChatHistoryStore.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufResponseParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufResponseParser.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ServerConfig.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/WebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/WebSocketClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/model/data.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/viewmodel/ChatViewModel.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/Main.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/AvatarCropDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/AvatarCropDialog.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/LocalChatHistoryStore.desktop.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/LocalChatHistoryStore.desktop.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/proto/message.proto" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/public/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/web/public/proto/message.proto" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/api/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/api/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/proto/message.proto" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/proto/message.proto" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/services/chatSocket.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/services/chatSocket.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/store/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/store/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/views/WebApp.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/views/WebApp.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/AppUpdateManager.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/AppUpdateManager.android.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -119,7 +50,7 @@
       <entry key="chat-panel" value="GPT-5 mini" />
     </selectedModels>
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=10AD5U25FA000YT)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -301,7 +232,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.desktop">
+  <component name="RunManager" selected="Android App.CharRoom">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -862,6 +793,7 @@
       <workItem from="1778728112565" duration="747000" />
       <workItem from="1778731849555" duration="118000" />
       <workItem from="1778740545962" duration="197000" />
+      <workItem from="1779104006996" duration="476000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />

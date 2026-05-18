@@ -69,7 +69,12 @@ class AndroidAppUpdateManager(private val context: Context) : AppUpdateManager {
     private var latestVersionInfo: AppVersionInfo? = null
 
     init {
-        context.registerReceiver(downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        val intentFilter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(downloadReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(downloadReceiver, intentFilter)
+        }
     }
 
     override suspend fun checkForUpdates(
