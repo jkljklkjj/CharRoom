@@ -61,14 +61,27 @@
 # ============================================
 # 网络相关保留
 # ============================================
-# Netty 核心保留（只保留必要部分）
--keep class io.netty.bootstrap.** { *; }
--keep class io.netty.channel.** { *; }
--keep class io.netty.handler.codec.http.** { *; }
--keep class io.netty.handler.codec.http.websocketx.** { *; }
--keep class io.netty.util.** { *; }
+# Netty 核心保留（Android端需要更完整的规则）
+-keep class io.netty.** { *; }
+-keepclassmembers class io.netty.** { *; }
+-keep class io.netty.util.internal.logging.** { *; }
+# 特别保留资源泄漏检测相关类和方法
+-keep class io.netty.util.ReferenceCountUtil { *; }
+-keepclassmembers class io.netty.util.ReferenceCountUtil {
+    *;
+}
+-keep class io.netty.buffer.** { *; }
+-keepclassmembers class io.netty.buffer.** {
+    *;
+}
 -dontwarn io.netty.**
 -dontwarn org.jboss.marshalling.**
+# 屏蔽Netty Android平台相关警告
+-dontwarn io.netty.channel.epoll.**
+-dontwarn io.netty.channel.kqueue.**
+-dontwarn io.netty.channel.unix.**
+-dontwarn io.netty.handler.ssl.OpenSsl**
+-dontwarn io.netty.internal.tcnative.**
 
 # Ktor
 -keep class io.ktor.** { *; }

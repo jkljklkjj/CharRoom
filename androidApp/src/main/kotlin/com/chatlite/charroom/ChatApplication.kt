@@ -31,6 +31,11 @@ class ChatApplication : Application() {
     }
 
     override fun onCreate() {
+        // 配置Netty系统属性，禁用资源泄漏检测，避免Android混淆导致的类找不到问题
+        System.setProperty("io.netty.leakDetection.level", "DISABLED")
+        System.setProperty("io.netty.tryReflectionSetAccessible", "true")
+        System.setProperty("io.netty.noResourceLeakDetector", "true")
+
         super.onCreate()
 
         // 初始化依赖注入

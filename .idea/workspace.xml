@@ -11,7 +11,7 @@
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="实现手机版的头像裁剪功能">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/AppUpdateManager.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/AppUpdateManager.android.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/package-lock.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -793,7 +793,8 @@
       <workItem from="1778728112565" duration="747000" />
       <workItem from="1778731849555" duration="118000" />
       <workItem from="1778740545962" duration="197000" />
-      <workItem from="1779104006996" duration="476000" />
+      <workItem from="1779104006996" duration="2049000" />
+      <workItem from="1779109584159" duration="589000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
