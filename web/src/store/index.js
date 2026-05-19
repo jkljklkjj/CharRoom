@@ -10,7 +10,8 @@ const state = reactive({
   refreshToken: '',
   accountId: '',
   pendingRegister: null,
-  selectedChatId: null
+  selectedChatId: null,
+  loginValid: false // 标记token是否已经通过有效性验证
 })
 
 function sanitizeId(value) {
@@ -175,6 +176,7 @@ function clearAll() {
 }
 function setPendingRegister(obj) { state.pendingRegister = obj }
 function clearPendingRegister() { state.pendingRegister = null }
+function setLoginValid(valid) { state.loginValid = valid }
 
 export function useStore() {
   return {
@@ -190,7 +192,8 @@ export function useStore() {
     clearAll,
     setPendingRegister,
     clearPendingRegister,
-    updateUserOnlineStatus
+    updateUserOnlineStatus,
+    setLoginValid
   }
 }
 

@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from '../store'
 import api from '../api'
 import chatSocket from '../services/chatSocket'
@@ -164,7 +164,16 @@ async function handleReject(userId) {
 
 onMounted(() => {
   // 页面加载时检查是否有好友申请和加载好友列表
-  if (store.state.token) {
+  // 只有在token已经通过有效性验证后才调用，避免过期token导致的错误
+  if (store.state.token && store.state.loginValid) {
+    loadFriendRequests()
+    loadFriends()
+  }
+})
+
+// 监听登录有效性变化，登录成功后自动加载数据
+watch(() => store.state.loginValid, (newVal) => {
+  if (newVal && store.state.token) {
     loadFriendRequests()
     loadFriends()
   }

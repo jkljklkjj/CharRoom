@@ -111,7 +111,9 @@ onMounted(() => {
         // token无效，清除状态
         logout()
       } else {
-        // 验证成功，加载好友列表
+        // 验证成功，标记登录状态有效
+        store.setLoginValid(true)
+        // 加载好友列表
         api.getFriends().then(friends => {
           store.setUsers(friends || [])
         })
@@ -159,6 +161,9 @@ onMounted(() => {
           }
         })
       }
+    }).catch(() => {
+      // 验证过程出错，清除状态
+      logout()
     })
   }
 })
@@ -192,6 +197,7 @@ function logout() {
   store.setRefreshToken('')
   store.setAccountId('')
   store.setSelectedChat(null)
+  store.setLoginValid(false)
   localStorage.removeItem('charroom_token')
   localStorage.removeItem('charroom_refreshToken')
   localStorage.removeItem('charroom_accountId')
@@ -208,6 +214,8 @@ async function onLogged(tokens) {
   const userRes = await api.getCurrentUser()
   if (userRes && userRes.id) {
     store.setAccountId(userRes.id)
+    // 登录成功，标记登录状态有效
+    store.setLoginValid(true)
     try {
       localStorage.setItem('charroom_token', accessToken)
       localStorage.setItem('charroom_refreshToken', refreshToken)
