@@ -54,7 +54,10 @@
         <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="avatar" /></div>
         <div v-else class="avatar">{{ initials(u.name || u.account || u.username) }}</div>
         <div class="meta">
-          <div class="name">{{ u.name || u.account || u.username }}</div>
+          <div class="name-row">
+            <div class="name">{{ u.name || u.account || u.username }}</div>
+            <span v-if="u.preview.unreadCount > 0" class="unread-badge">{{ u.preview.unreadCount > 99 ? '99+' : u.preview.unreadCount }}</span>
+          </div>
           <div class="sub">{{ u.status || '在线' }}</div>
         </div>
       </li>
@@ -75,10 +78,29 @@ const showFriendRequests = ref(false)
 const friendRequests = ref([])
 const searchQuery = ref('')
 
+const sortedUsers = computed(() => {
+  return [...store.state.users]
+    .map((user, index) => ({
+      ...user,
+      __index: index,
+      preview: store.state.conversationStates[String(user.id)] || {
+        lastIncomingMessageTime: 0,
+        unreadCount: 0
+      }
+    }))
+    .sort((a, b) => {
+      const timeDiff = (b.preview.lastIncomingMessageTime || 0) - (a.preview.lastIncomingMessageTime || 0)
+      if (timeDiff !== 0) return timeDiff
+      const unreadDiff = (b.preview.unreadCount || 0) - (a.preview.unreadCount || 0)
+      if (unreadDiff !== 0) return unreadDiff
+      return a.__index - b.__index
+    })
+})
+
 const filteredUsers = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase()
-  if (!keyword) return store.state.users
-  return store.state.users.filter(u => {
+  if (!keyword) return sortedUsers.value
+  return sortedUsers.value.filter(u => {
     const username = String(u.name || u.account || u.username || '').toLowerCase()
     const id = String(u.id || '').toLowerCase()
     return username.includes(keyword) || id.includes(keyword)
@@ -191,8 +213,11 @@ async function loadFriends() {
 .users-list li.active{background:rgba(255,122,51,0.08)}
 .avatar{width:40px;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;background:#f0f0f0}
 .avatar img{width:100%;height:100%;object-fit:cover}
-.meta .name{font-weight:600}
+.meta{flex:1;min-width:0}
+.name-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.meta .name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta .sub{font-size:12px;color:var(--muted)}
+.unread-badge{background:#ff4757;color:white;font-size:10px;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center;line-height:16px;flex:none}
 
 /* 搜索框样式 */
 .search-bar{padding: 0 12px 12px;}

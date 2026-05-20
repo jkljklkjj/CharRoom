@@ -94,13 +94,24 @@ fun UserList(
     var currentUserAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     val userListState by chatViewModel.usersFlow.collectAsState()
+    val conversationStates by chatViewModel.conversationStatesFlow.collectAsState()
     val allMessages by chatViewModel.messagesFlow.collectAsState()
     val allGroupMessages by chatViewModel.groupMessagesFlow.collectAsState()
-    val filteredUsers by remember(searchQuery, userListState) {
+    val sortedUsers by remember(searchQuery, userListState, conversationStates) {
+        derivedStateOf {
+            val indexById = userListState.withIndex().associate { it.value.id to it.index }
+            userListState.sortedWith(
+                compareByDescending<User> { conversationStates[it.id]?.lastIncomingMessageTime ?: 0L }
+                    .thenByDescending { conversationStates[it.id]?.unreadCount ?: 0 }
+                    .thenBy { indexById[it.id] ?: Int.MAX_VALUE }
+            )
+        }
+    }
+    val filteredUsers by remember(searchQuery, sortedUsers) {
         derivedStateOf {
             val keyword = searchQuery.trim().lowercase()
-            if (keyword.isBlank()) return@derivedStateOf userListState
-            userListState.filter { user ->
+            if (keyword.isBlank()) return@derivedStateOf sortedUsers
+            sortedUsers.filter { user ->
                 val displayName = buildDisplayName(user).lowercase()
                 val accountId = user.id.toString().lowercase()
                 val extra = (user.username ?: "") + " " + (user.email ?: "")
@@ -142,11 +153,9 @@ fun UserList(
 
     val onlineCount = userListState.count { it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
 
-    // 首次进入时拉取列表，写回 users（在 updateList 内部）
+    // 首次进入时只补充当前用户信息和头像，联系人列表由 ChatApp 统一加载
     LaunchedEffect(Unit) {
         scope.launch {
-            chatViewModel.loadContacts()
-            // 获取当前用户信息
             currentUser = GlobalApiService.getCurrentUserProfile()
             currentUser?.let { user ->
                 user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
@@ -268,6 +277,7 @@ fun UserList(
             ) { user ->
                 val displayName = buildDisplayName(user)
                 val subtitle = buildSubtitle(user, allMessages, allGroupMessages)
+                val unreadCount = conversationStates[user.id]?.unreadCount ?: 0
                 val selected = selectedUserId == user.id
                 val cardColor by animateColorAsState(
                     targetValue = if (selected) {
@@ -395,13 +405,32 @@ fun UserList(
                         }
 
                         val timeText = buildLastMessageTime(user, allMessages, allGroupMessages)
-                        if (timeText.isNotBlank()) {
+                        if (timeText.isNotBlank() || unreadCount > 0) {
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = timeText,
-                                style = MaterialTheme.typography.caption,
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f)
-                            )
+                            Column(horizontalAlignment = Alignment.End) {
+                                if (timeText.isNotBlank()) {
+                                    Text(
+                                        text = timeText,
+                                        style = MaterialTheme.typography.caption,
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f)
+                                    )
+                                }
+                                if (unreadCount > 0) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Surface(
+                                        color = Color(0xFFF44336),
+                                        shape = CircleShape,
+                                        elevation = 0.dp
+                                    ) {
+                                        Text(
+                                            text = if (unreadCount > 99) "99+" else unreadCount.toString(),
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.overline,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -475,7 +504,7 @@ private fun buildSubtitle(
         }
     }
 
-    val last = messages.lastOrNull { it.senderId == user.id }
+    val last = messages.lastOrNull { it.senderId == user.id || it.receiverId == user.id }
     return if (last == null) {
         if (user.online == true) "在线" else "暂无消息"
     } else {
@@ -492,7 +521,7 @@ private fun buildLastMessageTime(
         val groupId = -user.id
         groupMessages.lastOrNull { it.groupId == groupId }?.timestamp
     } else {
-        messages.lastOrNull { it.senderId == user.id }?.timestamp
+        messages.lastOrNull { it.senderId == user.id || it.receiverId == user.id }?.timestamp
     }
 
     return timestamp?.let { formatTime(it) } ?: ""

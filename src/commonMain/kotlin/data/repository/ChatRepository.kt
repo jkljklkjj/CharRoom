@@ -60,6 +60,15 @@ class ChatRepository(
     }
 
     /**
+     * 获取本地缓存的联系人列表（用于启动时先渲染旧数据）
+     */
+    suspend fun getCachedContacts(): List<User> {
+        val friends = localDataSource.getFriends()
+        val groups = localDataSource.getGroups()
+        return (friends + groups).withAgentAssistant()
+    }
+
+    /**
      * 更新并获取所有联系人（包含AI助手）
      */
     suspend fun updateAllContacts(): List<User> {

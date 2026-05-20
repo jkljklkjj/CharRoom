@@ -17,9 +17,9 @@ import java.io.InputStream
 import component.io.FilePickerProvider
 
 /**
- * Android平台文件选择器实现
+ * Android 平台文件选择器实现
  */
-private const val MAX_AVATAR_BYTES = 5 * 1024 * 1024
+private const val MAX_AVATAR_BYTES = 500 * 1024 // 500KB
 
 object AndroidFilePicker : FilePickerProvider {
     private var pickImageCallback: ((ByteArray, String) -> Unit)? = null

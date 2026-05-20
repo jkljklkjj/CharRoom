@@ -1,8 +1,11 @@
 package data.datasource.local
 
+import core.json
 import model.GroupMessage
 import model.Message
 import model.User
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import java.io.File
 
 /**
@@ -11,7 +14,9 @@ import java.io.File
  */
 class LocalDataSourceImpl(
     private val authFile: File = File(System.getProperty("user.home"), ".qingliao/auth.txt"),
-    private val credentialsFile: File = File("credentials.txt")
+    private val credentialsFile: File = File("credentials.txt"),
+    private val friendsFile: File = File(System.getProperty("user.home"), ".qingliao/friends.json"),
+    private val groupsFile: File = File(System.getProperty("user.home"), ".qingliao/groups.json")
 ) : LocalDataSource {
 
     override suspend fun saveAuth(account: String, accessToken: String, refreshToken: String) {
@@ -76,21 +81,37 @@ class LocalDataSourceImpl(
     }
 
     override suspend fun saveFriends(friends: List<User>) {
-        // TODO: 实现好友列表本地存储
+        runCatching {
+            friendsFile.parentFile?.mkdirs()
+            friendsFile.writeText(json.encodeToString(friends))
+        }
     }
 
     override suspend fun getFriends(): List<User> {
-        // TODO: 实现好友列表本地读取
-        return emptyList()
+        return runCatching {
+            if (!friendsFile.exists()) {
+                emptyList()
+            } else {
+                json.decodeFromString<List<User>>(friendsFile.readText())
+            }
+        }.getOrDefault(emptyList())
     }
 
     override suspend fun saveGroups(groups: List<User>) {
-        // TODO: 实现群组列表本地存储
+        runCatching {
+            groupsFile.parentFile?.mkdirs()
+            groupsFile.writeText(json.encodeToString(groups))
+        }
     }
 
     override suspend fun getGroups(): List<User> {
-        // TODO: 实现群组列表本地读取
-        return emptyList()
+        return runCatching {
+            if (!groupsFile.exists()) {
+                emptyList()
+            } else {
+                json.decodeFromString<List<User>>(groupsFile.readText())
+            }
+        }.getOrDefault(emptyList())
     }
 
     override suspend fun saveMessages(messages: List<Message>) {

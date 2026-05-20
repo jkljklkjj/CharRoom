@@ -64,6 +64,13 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -147,6 +154,19 @@ fun GroupChatScreen(
     }
     var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val inputFocusRequester = remember { FocusRequester() }
+    var isInputFocused by remember { mutableStateOf(false) }
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
+    // 键盘弹起时滚动到底部，等待布局稳定后执行
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && filteredMessages.isNotEmpty()) {
+            delay(100)
+            runCatching {
+                listState.animateScrollToItem(filteredMessages.lastIndex)
+            }
+        }
+    }
     val scope = rememberCoroutineScope()
     val isDarkMode = !MaterialTheme.colors.isLight
     val clipboardManager = LocalClipboardManager.current
@@ -175,6 +195,9 @@ fun GroupChatScreen(
     // 转发相关状态
     var showForwardDialog by remember { mutableStateOf(false) }
     var forwardMessage by remember { mutableStateOf<GroupMessage?>(null) }
+
+    var hasInitializedScroll by remember(group.id) { mutableStateOf(false) }
+    var isViewportReady by remember(group.id) { mutableStateOf(false) }
 
     fun submitMessage() {
         val text = messageText.trim()
@@ -317,7 +340,7 @@ fun GroupChatScreen(
         )
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(14.dp).statusBarsPadding()) {
+    Column(modifier = modifier.fillMaxSize().padding(14.dp).statusBarsPadding().imePadding()) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
@@ -369,15 +392,15 @@ fun GroupChatScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         Surface(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
             color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.3f else 0.6f),
             shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
             elevation = 0.dp
         ) {
             // 监听滚动位置，滚动到顶部时加载更多历史
-            LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
-                if (!isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+            LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll) {
+                if (hasInitializedScroll && !isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
                     isLoadingMore = true
                     val olderMessages = LocalChatHistoryStore.getGroupMessagesPage(
                         accountId = GlobalAppState.currentUserId.toString(),
@@ -517,8 +540,8 @@ fun GroupChatScreen(
                                 if (!isMine) {
                                     val senderUser = allUsers.find { it.id == message.senderId }
                                     var senderAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
-                                    LaunchedEffect(senderUser?.avatarUrl, senderUser?.avatarKey) {
-                                        senderAvatar = if (senderUser != null && !senderUser.avatarUrl.isNullOrBlank()) {
+                                        LaunchedEffect(senderUser?.avatarUrl, senderUser?.avatarKey, isViewportReady) {
+                                            senderAvatar = if (isViewportReady && senderUser != null && !senderUser.avatarUrl.isNullOrBlank()) {
                                             loadImageBitmapWithCache(senderUser.avatarUrl!!, senderUser.avatarKey)
                                         } else {
                                             null
@@ -703,9 +726,9 @@ fun GroupChatScreen(
                                 if (isMine) {
                                     Spacer(modifier = Modifier.width(8.dp))
                                     var myAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
-                                    LaunchedEffect(currentUser?.avatarUrl, currentUser?.avatarKey) {
+                                    LaunchedEffect(currentUser?.avatarUrl, currentUser?.avatarKey, isViewportReady) {
                                         val user = currentUser
-                                        myAvatar = if (user != null && !user.avatarUrl.isNullOrBlank()) {
+                                        myAvatar = if (isViewportReady && user != null && !user.avatarUrl.isNullOrBlank()) {
                                             loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
                                         } else {
                                             null
@@ -802,8 +825,18 @@ fun GroupChatScreen(
         }
 
         // 组件挂载和消息变化时自动滚动到底部
-        LaunchedEffect(Unit, group.id, groupMessageList.size) {
+        LaunchedEffect(group.id, groupMessageList.size) {
             if (groupMessageList.isNotEmpty()) {
+                if (!hasInitializedScroll) {
+                    hasInitializedScroll = true
+                    kotlinx.coroutines.delay(16)
+                    runCatching {
+                        listState.scrollToItem(groupMessageList.lastIndex)
+                    }
+                    isViewportReady = true
+                    return@LaunchedEffect
+                }
+
                 kotlinx.coroutines.delay(50)
                 runCatching {
                     listState.scrollToItem(groupMessageList.lastIndex)
@@ -817,7 +850,7 @@ fun GroupChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Column(modifier = Modifier.imePadding()) {
+        Column {
             // 引用回复预览栏
             replyToMessage?.let { msg ->
                 // 将GroupMessage转换为Message适配公共组件
@@ -898,6 +931,20 @@ fun GroupChatScreen(
                             onValueChange = { messageText = it },
                             modifier = Modifier
                                 .weight(1f)
+                                .focusRequester(inputFocusRequester)
+                                .onFocusChanged { state ->
+                                    val focused = state.isFocused
+                                    if (focused && !isInputFocused) {
+                                        isInputFocused = true
+                                        scope.launch {
+                                            if (filteredMessages.isNotEmpty()) {
+                                                listState.animateScrollToItem(filteredMessages.lastIndex)
+                                            }
+                                        }
+                                    } else if (!focused) {
+                                        isInputFocused = false
+                                    }
+                                }
                                 .onKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyUp && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
                                         submitMessage()

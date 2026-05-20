@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -67,6 +68,13 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,14 +93,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.ImageBitmap
 import component.io.FilePicker
+import component.UserAvatar
 import core.LocalChatHistoryStore
 import core.ServerConfig
 import core.loadImageBitmapWithCache
 import core.state.GlobalAppState
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import presentation.viewmodel.ChatViewModel
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 发送消息
@@ -204,7 +210,23 @@ fun ChatScreen(
         }
     }
     var isSending by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    val listState = remember(user.id) {
+        LazyListState(filteredMessages.lastIndex.coerceAtLeast(0), 0)
+    }
+    val inputFocusRequester = remember { FocusRequester() }
+    var isInputFocused by remember { mutableStateOf(false) }
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
+    // 当输入法弹起时（IME 可见），稍等布局稳定后贴底最新消息，解决键盘弹起后气泡未跟随的问题
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && filteredMessages.isNotEmpty()) {
+            // 等待系统布局/动画稳定
+            delay(100)
+            runCatching {
+                listState.animateScrollToItem(filteredMessages.lastIndex)
+            }
+        }
+    }
     val scope = rememberCoroutineScope()
     val isDarkMode = !MaterialTheme.colors.isLight
     val clipboardManager = LocalClipboardManager.current
@@ -234,9 +256,22 @@ fun ChatScreen(
     var showForwardDialog by remember { mutableStateOf(false) }
     var forwardMessage by remember { mutableStateOf<Message?>(null) }
 
-    // 智能自动滚动：只有当前已经在底部附近时，新消息才自动滚动
+    var hasInitializedScroll by remember(user.id) { mutableStateOf(false) }
+    var isViewportReady by remember(user.id) { mutableStateOf(false) }
+
+    // 智能自动滚动：首次进入时先定位到底部，后续仅在当前接近底部时跟随新消息滚动
     LaunchedEffect(filteredMessages.size) {
         if (filteredMessages.isEmpty()) return@LaunchedEffect
+
+        if (!hasInitializedScroll) {
+            hasInitializedScroll = true
+            kotlinx.coroutines.delay(16)
+            runCatching {
+                listState.scrollToItem(filteredMessages.lastIndex)
+            }
+            isViewportReady = true
+            return@LaunchedEffect
+        }
 
         val lastIndex = filteredMessages.size - 1
         val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
@@ -245,8 +280,6 @@ fun ChatScreen(
         val isNearBottom = lastVisibleIndex >= lastIndex - 3
 
         if (isNearBottom) {
-            // 延迟一点，等UI更新完成再滚动
-            delay(50.milliseconds)
             listState.animateScrollToItem(lastIndex)
         }
     }
@@ -393,7 +426,7 @@ fun ChatScreen(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(14.dp).statusBarsPadding()) {
+    Column(modifier = Modifier.fillMaxSize().padding(14.dp).statusBarsPadding().imePadding()) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
@@ -422,45 +455,12 @@ fun ChatScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
 
-                    // 用户头像 - 优化：先同步查内存缓存，避免闪烁
-                    var partnerAvatar by remember(user.avatarUrl, user.avatarKey) {
-                        mutableStateOf(
-                            // 先尝试从内存缓存同步获取
-                            if (!user.avatarUrl.isNullOrBlank()) {
-                                runBlocking { loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) }
-                            } else null
-                        )
-                    }
-                    LaunchedEffect(user.avatarUrl, user.avatarKey) {
-                        if (partnerAvatar == null && !user.avatarUrl.isNullOrBlank()) {
-                            partnerAvatar = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
-                        }
-                    }
-                    if (partnerAvatar != null) {
-                        Image(
-                            bitmap = partnerAvatar!!,
-                            contentDescription = "avatar",
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .clickable { onAvatarClick?.invoke(user) }
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colors.primary)
-                                .clickable { onAvatarClick?.invoke(user) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = user.username.firstOrNull()?.toString() ?: "?",
-                                style = MaterialTheme.typography.h6,
-                                color = Color.White
-                            )
-                        }
-                    }
+                    // 用户头像：使用统一的头像组件
+                    UserAvatar(
+                        user = user,
+                        size = 40.dp,
+                        onClick = { onAvatarClick?.invoke(user) }
+                    )
 
                     Spacer(modifier = Modifier.width(8.dp))
 
@@ -491,33 +491,33 @@ fun ChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        TextField(
-            value = historyQuery,
-            onValueChange = { historyQuery = it },
-            placeholder = { Text(text = "搜索本地聊天历史，支持消息内容和发送者") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            colors = TextFieldDefaults.textFieldColors(
-                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.14f),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = MaterialTheme.colors.primary
-            )
-        )
+//        TextField(
+//            value = historyQuery,
+//            onValueChange = { historyQuery = it },
+//            placeholder = { Text(text = "搜索本地聊天历史，支持消息内容和发送者") },
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 4.dp),
+//            colors = TextFieldDefaults.textFieldColors(
+//                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.14f),
+//                focusedIndicatorColor = Color.Transparent,
+//                unfocusedIndicatorColor = Color.Transparent,
+//                cursorColor = MaterialTheme.colors.primary
+//            )
+//        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
         Surface(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
             color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.3f else 0.6f),
             shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
             elevation = 0.dp
         ) {
             // 监听滚动位置，滚动到顶部时加载更多历史
-            LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
-                if (!isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+            LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll) {
+                if (hasInitializedScroll && !isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
                     isLoadingMore = true
                     val olderMessages = LocalChatHistoryStore.getPrivateMessagesPage(
                         accountId = GlobalAppState.currentUserId.toString(),
@@ -652,54 +652,13 @@ fun ChatScreen(
 
                                 // If message is from the other user, show their avatar on the left
                                 if (!message.sender) {
-                                    // 优化头像加载：先同步查内存缓存，避免闪烁
-                                    var partnerAvatar by remember(user.avatarUrl, user.avatarKey) {
-                                        mutableStateOf(
-                                            if (!user.avatarUrl.isNullOrBlank()) {
-                                                runBlocking { loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) }
-                                            } else null
-                                        )
-                                    }
-                                    LaunchedEffect(user.avatarUrl, user.avatarKey) {
-                                        if (partnerAvatar == null && !user.avatarUrl.isNullOrBlank()) {
-                                            partnerAvatar = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
-                                        }
-                                    }
-                                    if (partnerAvatar != null) {
-                                        Image(
-                                            bitmap = partnerAvatar!!,
-                                            contentDescription = "avatar",
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .clickable {
-                                                    onAvatarClick?.invoke(user)
-                                                }
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                    } else {
-                                        // 如果对方没有头像，展示首字母占位符，保持布局一致
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                    brush = sidebarHeaderBrush(isDarkMode),
-                                                    shape = CircleShape
-                                                )
-                                                .clickable {
-                                                    onAvatarClick?.invoke(user)
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = user.username.firstOrNull()?.toString() ?: "U",
-                                                color = Color.White,
-                                                style = MaterialTheme.typography.caption
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                    }
+                                    // 消息头像：使用统一的头像组件
+                                    UserAvatar(
+                                        user = user,
+                                        size = 32.dp,
+                                        onClick = { onAvatarClick?.invoke(user) }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
 
                                 Box(
@@ -833,53 +792,13 @@ fun ChatScreen(
                                 // 如果是自己发送的消息，在右侧显示自己的头像
                                 if (message.sender) {
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    // 优化头像加载：先同步查内存缓存，避免闪烁
-                                    var myAvatar by remember(currentUser?.avatarUrl, currentUser?.avatarKey) {
-                                        mutableStateOf(
-                                            currentUser?.let { user ->
-                                                if (!user.avatarUrl.isNullOrBlank()) {
-                                                    runBlocking { loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey) }
-                                                } else null
-                                            }
+                                    // 我的头像：使用统一的头像组件
+                                    if (currentUser != null) {
+                                        UserAvatar(
+                                            user = currentUser!!,
+                                            size = 32.dp,
+                                            onClick = { onMyAvatarClick?.invoke() }
                                         )
-                                    }
-                                    LaunchedEffect(currentUser?.avatarUrl, currentUser?.avatarKey) {
-                                        val user = currentUser
-                                        if (myAvatar == null && user != null && !user.avatarUrl.isNullOrBlank()) {
-                                            myAvatar = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
-                                        }
-                                    }
-                                    if (myAvatar != null) {
-                                        Image(
-                                            bitmap = myAvatar!!,
-                                            contentDescription = "我的头像",
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .clickable {
-                                                    onMyAvatarClick?.invoke()
-                                                }
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                    brush = sidebarHeaderBrush(isDarkMode),
-                                                    shape = CircleShape
-                                                )
-                                                .clickable {
-                                                    onMyAvatarClick?.invoke()
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = currentUser?.username?.firstOrNull()?.toString() ?: "我",
-                                                color = Color.White,
-                                                style = MaterialTheme.typography.caption
-                                            )
-                                        }
                                     }
                                 }
 
@@ -922,20 +841,6 @@ fun ChatScreen(
             }
         }
 
-        // 组件挂载和消息变化时自动滚动到底部
-        LaunchedEffect(Unit, user.id, userMessages.size) {
-            if (userMessages.isNotEmpty()) {
-                kotlinx.coroutines.delay(50)
-                runCatching {
-                    listState.scrollToItem(userMessages.lastIndex)
-                }
-                kotlinx.coroutines.delay(50)
-                runCatching {
-                    listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                }
-            }
-        }
-
         // agent 流式输出时，同一条消息内容会持续增长，需要在内容变化后再次贴底
         if (ServerConfig.isAgentAssistant(user.id)) {
             val latestMessage = userMessages.lastOrNull()
@@ -951,7 +856,7 @@ fun ChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Column(modifier = Modifier.imePadding()) {
+        Column {
             // 引用回复预览栏
             ReplyPreviewBar(
                 replyToMessage = replyToMessage,
@@ -1013,6 +918,21 @@ fun ChatScreen(
                             onValueChange = { messageText = it },
                             modifier = Modifier
                                 .weight(1f)
+                                .focusRequester(inputFocusRequester)
+                                .onFocusChanged { state ->
+                                    val focused = state.isFocused
+                                    if (focused && !isInputFocused) {
+                                        isInputFocused = true
+                                        // 输入框获焦时滚动到底部，覆盖因键盘弹起导致消息被遮挡的问题
+                                        scope.launch {
+                                            if (filteredMessages.isNotEmpty()) {
+                                                listState.animateScrollToItem(filteredMessages.lastIndex)
+                                            }
+                                        }
+                                    } else if (!focused) {
+                                        isInputFocused = false
+                                    }
+                                }
                                 .onKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyUp && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
                                         submitMessage()

@@ -6,6 +6,7 @@ const state = reactive({
   users: [],
   messages: [],
   groupMessages: [],
+  conversationStates: {},
   token: '',
   refreshToken: '',
   accountId: '',
@@ -27,6 +28,93 @@ function buildGroupHistoryKey(accountId, groupId) {
 
 function buildAccountPrefix(accountId) {
   return `${STORAGE_PREFIX}${sanitizeId(accountId)}_`
+}
+
+function getConversationKey(conversationId) {
+  return String(conversationId || '')
+}
+
+function isGroupConversationId(conversationId) {
+  return Number(conversationId) < 0
+}
+
+function normalizeTimeValue(value) {
+  if (value == null || value === '') return 0
+  if (typeof value === 'number') return value
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function loadConversationPreview(accountId, conversationId) {
+  const id = sanitizeId(conversationId)
+  if (!accountId || !id) {
+    return { lastIncomingMessageTime: 0, unreadCount: 0 }
+  }
+
+  const isGroup = isGroupConversationId(id)
+  const items = isGroup
+    ? loadGroupConversation(accountId, Math.abs(Number(id)))
+    : loadPrivateConversation(accountId, id)
+
+  let lastIncomingMessageTime = 0
+  items.forEach(item => {
+    const messageTime = normalizeTimeValue(item.time || item.timestamp)
+    const isIncoming = isGroup
+      ? String(item.user) !== String(accountId)
+      : String(item.user) !== 'you'
+    if (isIncoming) {
+      lastIncomingMessageTime = Math.max(lastIncomingMessageTime, messageTime)
+    }
+  })
+
+  return { lastIncomingMessageTime, unreadCount: 0 }
+}
+
+function rebuildConversationStates() {
+  if (!state.accountId || !Array.isArray(state.users)) {
+    state.conversationStates = {}
+    return
+  }
+
+  const existingStates = state.conversationStates || {}
+  const nextStates = {}
+  state.users.forEach(user => {
+    if (!user || user.id == null) return
+    const preview = loadConversationPreview(state.accountId, user.id)
+    const existing = existingStates[String(user.id)] || {}
+    nextStates[String(user.id)] = {
+      lastIncomingMessageTime: preview.lastIncomingMessageTime,
+      unreadCount: existing.unreadCount || 0
+    }
+  })
+  state.conversationStates = nextStates
+}
+
+function updateConversationState(conversationId, patch = {}) {
+  const key = getConversationKey(conversationId)
+  if (!key) return
+  const current = state.conversationStates[key] || { lastIncomingMessageTime: 0, unreadCount: 0 }
+  state.conversationStates = {
+    ...state.conversationStates,
+    [key]: {
+      lastIncomingMessageTime: Math.max(current.lastIncomingMessageTime || 0, patch.lastIncomingMessageTime || 0),
+      unreadCount: patch.unreadCount != null
+        ? Math.max(0, patch.unreadCount)
+        : Math.max(0, (current.unreadCount || 0) + (patch.unreadDelta || 0))
+    }
+  }
+}
+
+function clearConversationUnread(conversationId) {
+  const key = getConversationKey(conversationId)
+  if (!key || !state.conversationStates[key]) return
+  state.conversationStates = {
+    ...state.conversationStates,
+    [key]: {
+      ...state.conversationStates[key],
+      unreadCount: 0
+    }
+  }
 }
 
 function getPrivateConversationId(message) {
@@ -113,9 +201,10 @@ function loadConversation(id, isGroup = false) {
     return
   }
   state.selectedChatId = id
+  clearConversationUnread(id)
   if (isGroup) {
     state.messages = []
-    state.groupMessages = loadGroupConversation(state.accountId, id)
+    state.groupMessages = loadGroupConversation(state.accountId, Math.abs(Number(id)))
   } else {
     state.groupMessages = []
     state.messages = loadPrivateConversation(state.accountId, id)
@@ -128,9 +217,19 @@ function setAccountId(id) {
   state.accountId = id
   state.messages = []
   state.groupMessages = []
+  state.conversationStates = {}
+  rebuildConversationStates()
 }
-function setUsers(list) { state.users = list }
-function addUser(u) { if (!state.users.some(x => x.id === u.id)) state.users.push(u) }
+function setUsers(list) {
+  state.users = list
+  rebuildConversationStates()
+}
+function addUser(u) {
+  if (!state.users.some(x => x.id === u.id)) {
+    state.users.push(u)
+    rebuildConversationStates()
+  }
+}
 
 /**
  * 更新用户在线状态
@@ -153,15 +252,31 @@ function addMessage(m) {
   if (String(state.selectedChatId) === String(chatId)) {
     state.messages.push(m)
   }
+  if (String(m.user) !== 'you') {
+    updateConversationState(chatId, {
+      lastIncomingMessageTime: normalizeTimeValue(m.time || m.timestamp),
+      unreadDelta: String(state.selectedChatId) === String(chatId) ? 0 : 1
+    })
+  }
   savePrivateMessage(m)
 }
 function addGroupMessage(m) {
-  if (String(state.selectedChatId) === String(m.groupId)) {
+  const conversationId = `-${m.groupId}`
+  if (Math.abs(Number(state.selectedChatId)) === Number(m.groupId)) {
     state.groupMessages.push(m)
+  }
+  if (String(m.user) !== String(state.accountId)) {
+    updateConversationState(conversationId, {
+      lastIncomingMessageTime: normalizeTimeValue(m.time || m.timestamp),
+      unreadDelta: Math.abs(Number(state.selectedChatId)) === Number(m.groupId) ? 0 : 1
+    })
   }
   saveGroupMessage(m)
 }
-function setSelectedChat(id) { loadConversation(id, Number(id) < 0) }
+function setSelectedChat(id) {
+  loadConversation(id, Number(id) < 0)
+  clearConversationUnread(id)
+}
 function clearAll() {
   if (state.accountId) {
     const prefix = buildAccountPrefix(state.accountId)
@@ -172,6 +287,7 @@ function clearAll() {
   state.users = []
   state.messages = []
   state.groupMessages = []
+  state.conversationStates = {}
 }
 function setPendingRegister(obj) { state.pendingRegister = obj }
 function clearPendingRegister() { state.pendingRegister = null }
@@ -190,7 +306,10 @@ export function useStore() {
     clearAll,
     setPendingRegister,
     clearPendingRegister,
-    updateUserOnlineStatus
+    updateUserOnlineStatus,
+    rebuildConversationStates,
+    updateConversationState,
+    clearConversationUnread
   }
 }
 

@@ -25,6 +25,7 @@ import model.Message
 import model.MessageIdGenerator
 import model.MessageType
 import model.User
+import core.state.ConversationPreviewState
 
 private const val AGENT_ASSISTANT_ID = 900000001
 
@@ -48,6 +49,9 @@ open class ChatViewModel(
 
     // 当前选中的用户/群组Flow
     val selectedChatTargetFlow: StateFlow<User?> = chatState.selectedChatTarget
+
+    // 会话预览状态Flow（最近消息时间、未读数）
+    val conversationStatesFlow: StateFlow<Map<Int, ConversationPreviewState>> = chatState.conversationStates
 
     // 加载更多历史消息的状态Flow
     val isLoadingMoreFlow: StateFlow<Boolean> = chatState.isLoadingMore
@@ -120,6 +124,21 @@ open class ChatViewModel(
                 pendingMessages.add(message)
                 println("[ChatViewModel] 离线消息拉取中，私聊消息已缓存: messageId=${message.messageId}")
                 return@launch
+            }
+
+            // 收到陌生人的第一条私聊消息时，先补进联系人列表，避免必须重启才能看到
+            if (!message.sender && message.senderId != (GlobalAppState.currentUserId ?: -1) && message.senderId != AGENT_ASSISTANT_ID) {
+                val currentUsers = chatState.users.value
+                if (currentUsers.none { it.id == message.senderId }) {
+                    val senderUser = runCatching {
+                        chatRepository.getUserDetail(message.senderId.toString())
+                    }.getOrNull() ?: User(
+                        id = message.senderId,
+                        username = "用户${message.senderId}",
+                        online = true
+                    )
+                    chatState.upsertUser(senderUser)
+                }
             }
 
             chatState.addMessage(message)
@@ -229,9 +248,16 @@ open class ChatViewModel(
      * 加载好友和群组列表
      */
     fun loadContacts() {
-        coroutineScope.launch {
+        coroutineScope.launch(Dispatchers.IO) {
+            val cachedContacts = chatRepository.getCachedContacts()
+            if (cachedContacts.isNotEmpty() && chatState.users.value.isEmpty()) {
+                chatState.updateUsers(cachedContacts)
+            }
+
             val contacts = chatRepository.fetchAllContacts()
-            chatState.updateUsers(contacts)
+            if (contacts.isNotEmpty()) {
+                chatState.replaceUsersPreservingOrder(contacts)
+            }
         }
     }
 
@@ -318,7 +344,7 @@ open class ChatViewModel(
             }
 
             // 分页拉取的离线消息本身就是按时间从旧到新排序的，直接批量前置插入
-            chatState.prependMessages(messages.sortedBy { it.timestamp })
+            chatState.prependMessages(messages.sortedBy { it.timestamp }, markAsUnread = true)
             println("[ChatViewModel] 成功拉取离线消息 ${messages.size} 条，页码: $page，批量插入完成")
 
             // 递归拉取下一页
@@ -446,6 +472,11 @@ open class ChatViewModel(
                 fileName = fileName,
                 fileSize = fileSize
             )
+
+            // 发送前先把对方放入联系人列表，方便立即进入聊天并发送招呼消息
+            coroutineScope.launch {
+                chatState.upsertUser(user)
+            }
 
             // 添加到本地消息列表
             addMessage(message)
@@ -672,8 +703,8 @@ open class ChatViewModel(
                 val history = LocalChatHistoryStore.restore(accountId)
                 if (history.privateMessages.isNotEmpty() || history.groupMessages.isNotEmpty()) {
                     // 加载到聊天状态
-                    chatState.prependMessages(history.privateMessages)
-                    chatState.prependGroupMessages(history.groupMessages)
+                    chatState.prependMessages(history.privateMessages, markAsUnread = false)
+                    chatState.prependGroupMessages(history.groupMessages, markAsUnread = false)
                     println("[ChatViewModel] 从本地加载聊天历史，私聊消息: ${history.privateMessages.size}条, 群聊消息: ${history.groupMessages.size}条")
                 }
             } catch (e: Exception) {

@@ -11,9 +11,26 @@
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="实现手机版的头像裁剪功能">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/network/AndroidWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/network/AndroidWebSocketClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/repository/NetworkRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/repository/NetworkRepository.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/component/AndroidFilePicker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/component/AndroidFilePicker.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/CommonComponents.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/CommonComponents.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/ChatApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/ProfileScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/ProfileScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserDetailScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserDetailScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserListScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserListScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ImageLoader.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ImageLoader.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/state/ChatState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/state/ChatState.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSourceImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSourceImpl.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/repository/ChatRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/repository/ChatRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/DesktopFilePicker.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/public/og-image.png" beforeDir="false" afterPath="$PROJECT_DIR$/web/public/og-image.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/public/robots.txt" beforeDir="false" afterPath="$PROJECT_DIR$/web/public/robots.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/public/sitemap.xml" beforeDir="false" afterPath="$PROJECT_DIR$/web/public/sitemap.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/components/SidebarUsers.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/store/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/store/index.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -804,6 +821,10 @@
       <workItem from="1779198166562" duration="24000" />
       <workItem from="1779198732624" duration="80000" />
       <workItem from="1779240060823" duration="7163000" />
+      <workItem from="1779268432890" duration="1634000" />
+      <workItem from="1779272406594" duration="5265000" />
+      <workItem from="1779285524347" duration="672000" />
+      <workItem from="1779292323590" duration="318000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />

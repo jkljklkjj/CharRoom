@@ -3,19 +3,7 @@ package component
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -23,35 +11,20 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Card
-import androidx.compose.material.Divider
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Forward
-import androidx.compose.material.icons.filled.Reply
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import core.loadImageBitmapWithCache
+import core.getCachedImage
 import model.Message
 import model.User
 
@@ -398,4 +371,62 @@ fun ForwardSelectDialog(
             }
         }
     )
+}
+
+/**
+ * 统一的头像组件
+ */
+@Composable
+fun UserAvatar(
+    user: User,
+    size: Dp = 40.dp,
+    onClick: (() -> Unit)? = null
+) {
+    // 在 remember 中立即从缓存加载，避免闪动
+    val avatarBitmapState = remember(user.id) {
+        // 先从缓存同步读取
+        val cached = if (!user.avatarUrl.isNullOrBlank()) {
+            getCachedImage(user.avatarUrl!!)
+        } else {
+            null
+        }
+        mutableStateOf(cached)
+    }
+    
+    var isAvatarLoading by remember { mutableStateOf(false) }
+    val avatarBitmap = avatarBitmapState.value
+    
+    LaunchedEffect(user.avatarUrl, user.avatarKey) {
+        if (!isAvatarLoading && avatarBitmap == null && !user.avatarUrl.isNullOrBlank()) {
+            isAvatarLoading = true
+            avatarBitmapState.value = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
+            isAvatarLoading = false
+        }
+    }
+    
+    if (avatarBitmap != null) {
+        Image(
+            bitmap = avatarBitmap,
+            contentDescription = "用户头像",
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .clickable { onClick?.invoke() }
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(MaterialTheme.colors.primary)
+                .clickable { onClick?.invoke() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = user.username.firstOrNull()?.toString() ?: "U",
+                color = Color.White,
+                style = MaterialTheme.typography.caption
+            )
+        }
+    }
 }

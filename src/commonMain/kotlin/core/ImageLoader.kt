@@ -64,6 +64,13 @@ suspend fun loadImageBitmapWithCache(url: String, cacheKey: String? = null): Ima
 }
 
 /**
+ * 同步从缓存获取图片（不发起网络请求）
+ */
+fun getCachedImage(cacheKey: String): ImageBitmap? {
+    return imageCache[cacheKey]
+}
+
+/**
  * 清空图片缓存
  */
 fun clearImageCache() {

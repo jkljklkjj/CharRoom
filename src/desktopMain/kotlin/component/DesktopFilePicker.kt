@@ -17,7 +17,7 @@ import javax.swing.filechooser.FileNameExtensionFilter
 /**
  * 桌面端文件选择器实现
  */
-private const val MAX_AVATAR_BYTES = 5 * 1024 * 1024
+private const val MAX_AVATAR_BYTES = 500 * 1024 // 500KB
 
 object DesktopFilePicker : FilePickerProvider {
     override fun pickImage(onResult: (ByteArray, String) -> Unit) {

@@ -166,19 +166,6 @@ class MainActivity : ComponentActivity() {
                                     userId,
                                     state.refreshToken
                                 )
-
-                                // 加载联系人列表
-                                chatViewModel.loadContacts()
-
-                                // 连接WebSocket
-                                chatViewModel.connectWebSocket(
-                                    token = state.accessToken,
-                                    userId = userId,
-                                    onAuthFailed = {
-                                        AndroidTokenStorage.clear(context)
-                                        authViewModel.logout()
-                                    }
-                                )
                             }
                             is AuthState.Unauthenticated,
                             is AuthState.Error -> {

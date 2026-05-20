@@ -23,16 +23,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import component.ChatScreen
 import component.dialog.AddUserOrGroupDialog
 import component.dialog.ApplicationDialog
-import component.user.UserDetailDialog
 import component.user.UserDetailScreen
 import component.user.UserList
-import component.user.UserProfileDialog
+import component.user.ProfileScreen
 import core.Chat
 import core.MessageReceiveListener
 import core.state.GlobalAppState
@@ -70,8 +70,6 @@ fun ChatApp(
     var showAddUserDialog by remember { mutableStateOf(false) }
     var showApplicationDialog by remember { mutableStateOf(false) }
     var showProfileScreen by remember { mutableStateOf(false) }
-    var showUserDetailDialog by remember { mutableStateOf<User?>(null) }
-    var showMyProfileDialog by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
     var pendingRefreshTrigger by remember { mutableStateOf(0L) }
 
@@ -174,7 +172,7 @@ fun ChatApp(
             }
 
             // 注册系统返回键处理逻辑
-            LaunchedEffect(selectedChatTarget, isSmallScreen, onBackPressed, showSettingsScreen, showMyProfileDialog, showAddUserDialog, showApplicationDialog, showUserDetailScreen) {
+            LaunchedEffect(selectedChatTarget, isSmallScreen, onBackPressed, showSettingsScreen, showProfileScreen, showAddUserDialog, showApplicationDialog, showUserDetailScreen) {
                 if (isSmallScreen && onBackPressed != null) {
                     when {
                         showUserDetailScreen -> {
@@ -192,10 +190,9 @@ fun ChatApp(
                                 true
                             }
                         }
-                        showMyProfileDialog || showAddUserDialog || showApplicationDialog -> {
+                        showAddUserDialog || showApplicationDialog -> {
                             // 在对话框时，返回键关闭对话框
                             onBackPressed {
-                                showMyProfileDialog = false
                                 showAddUserDialog = false
                                 showApplicationDialog = false
                                 true
@@ -227,12 +224,14 @@ fun ChatApp(
                                 onOpenSearch = { showAddUserDialog = true },
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
-                                onOpenProfile = { showMyProfileDialog = true },
+                                onOpenProfile = { showProfileScreen = true },
                                 onUserClick = { user ->
                                     chatViewModel.selectedUser = user
                                 },
                                 onUserLongClick = { user ->
-                                    showUserDetailDialog = user
+                                    // 点击/长按头像都打开用户详情页面
+                                    selectedDetailUserId = user.id
+                                    showUserDetailScreen = true
                                 },
                                 refreshTrigger = pendingRefreshTrigger,
                                 chatViewModel = chatViewModel
@@ -240,23 +239,25 @@ fun ChatApp(
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            ChatScreen(
-                                chatViewModel = chatViewModel,
-                                user = selectedChatTarget!!,
-                                onAvatarClick = { user ->
-                                    // 点击对方头像，打开用户详情页
-                                    selectedDetailUserId = user.id
-                                    showUserDetailScreen = true
-                                },
-                                onMyAvatarClick = {
-                                    // 点击自己头像，打开个人资料页
-                                    showMyProfileDialog = true
-                                },
-                                onBackClick = {
-                                    // 返回用户列表
-                                    chatViewModel.selectedUser = null
-                                }
-                            )
+                            key(selectedChatTarget!!.id) {
+                                ChatScreen(
+                                    chatViewModel = chatViewModel,
+                                    user = selectedChatTarget!!,
+                                    onAvatarClick = { user ->
+                                        // 点击对方头像，打开用户详情页
+                                        selectedDetailUserId = user.id
+                                        showUserDetailScreen = true
+                                    },
+                                    onMyAvatarClick = {
+                                        // 点击自己头像，打开个人资料页
+                                        showProfileScreen = true
+                                    },
+                                    onBackClick = {
+                                        // 返回用户列表
+                                        chatViewModel.selectedUser = null
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -270,12 +271,14 @@ fun ChatApp(
                                 onOpenSearch = { showAddUserDialog = true },
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
-                                onOpenProfile = { showMyProfileDialog = true },
+                                onOpenProfile = { showProfileScreen = true },
                                 onUserClick = { user ->
                                     chatViewModel.selectedUser = user
                                 },
                                 onUserLongClick = { user ->
-                                    showUserDetailDialog = user
+                                    // 点击/长按头像都打开用户详情页面
+                                    selectedDetailUserId = user.id
+                                    showUserDetailScreen = true
                                 },
                                 refreshTrigger = pendingRefreshTrigger,
                                 chatViewModel = chatViewModel
@@ -290,19 +293,21 @@ fun ChatApp(
                         // 右侧聊天区域
                         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                             if (selectedChatTarget != null) {
-                                ChatScreen(
-                                    chatViewModel = chatViewModel,
-                                    user = selectedChatTarget!!,
-                                    onAvatarClick = { user ->
-                                        // 点击对方头像，打开用户详情页
-                                        selectedDetailUserId = user.id
-                                        showUserDetailScreen = true
-                                    },
-                                    onMyAvatarClick = {
-                                        // 点击自己头像，打开个人资料页
-                                        showMyProfileDialog = true
-                                    }
-                                )
+                                key(selectedChatTarget!!.id) {
+                                    ChatScreen(
+                                        chatViewModel = chatViewModel,
+                                        user = selectedChatTarget!!,
+                                        onAvatarClick = { user ->
+                                            // 点击对方头像，打开用户详情页
+                                            selectedDetailUserId = user.id
+                                            showUserDetailScreen = true
+                                        },
+                                        onMyAvatarClick = {
+                                            // 点击自己头像，打开个人资料页
+                                            showProfileScreen = true
+                                        }
+                                    )
+                                }
                             } else {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
@@ -342,26 +347,14 @@ fun ChatApp(
                 )
             }
 
-            // 用户详情对话框
-            if (showUserDetailDialog != null) {
-                UserDetailDialog(
-                    user = showUserDetailDialog!!,
-                    onDismiss = { showUserDetailDialog = null },
-                    onSendMessage = {
-                        chatViewModel.selectedUser = showUserDetailDialog
-                        showUserDetailDialog = null
-                    }
-                )
-            }
-
-            // 我的资料对话框
-            if (showMyProfileDialog) {
-                UserProfileDialog(
-                    chatViewModel = chatViewModel,
-                    onDismiss = { showMyProfileDialog = false },
-                    onLogout = {
-                        chatViewModel.clear()
-                        onLogout()
+            // 我的资料页面（独立页面，非弹窗）
+            if (showProfileScreen) {
+                ProfileScreen(
+                    onBack = { showProfileScreen = false },
+                    onProfileUpdated = {
+                        // 刷新用户列表
+                        chatViewModel.loadContacts()
+                        showProfileScreen = false
                     }
                 )
             }
@@ -377,7 +370,7 @@ fun ChatApp(
                     },
                     onProfileClick = {
                         showSettingsScreen = false
-                        showMyProfileDialog = true
+                        showProfileScreen = true
                     }
                 )
             }
@@ -392,8 +385,7 @@ fun ChatApp(
                         selectedDetailUserId = null
                     },
                     onAddFriend = {
-                        // 好友申请发送后，刷新联系人列表
-                        pendingRefreshTrigger++
+                        // 已由详情页把目标联系人补入本地列表，这里不再强制拉全量，避免把临时联系人刷新掉
                     },
                     onStartChat = {
                         // 关闭详情页，打开与该用户的聊天界面

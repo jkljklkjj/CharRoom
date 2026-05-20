@@ -199,10 +199,9 @@ fun ProfileScreen(
                                         )
                                         .clickable(enabled = viewModel.isEditing.value && !viewModel.isUploadingAvatar.value) {
                                             FilePicker.pickImage { bytes, fileName ->
-                                                val maxSize = 10 * 1024 * 1024
+                                                val maxSize = 500 * 1024 // 500KB
                                                 if (bytes.size > maxSize) {
-                                                    viewModel.errorMessage.value = "图片大小不能超过10MB，请选择更小的图片"
-                                                    return@pickImage
+                                                    viewModel.errorMessage.value = "图片大小不能超过 500KB，将自动压缩"
                                                 }
                                                 selectedImageBytes = bytes
                                                 selectedImageFileName = fileName
@@ -218,11 +217,22 @@ fun ProfileScreen(
                                             modifier = Modifier.size(36.dp)
                                         )
                                     } else if (viewModel.avatarBitmap.value != null) {
-                                        Image(
-                                            bitmap = viewModel.avatarBitmap.value!!,
-                                            contentDescription = "头像",
-                                            modifier = Modifier.fillMaxSize()
-                                        )
+                                        // 使用 clip 确保图片不会超出圆形边界
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Image(
+                                                bitmap = viewModel.avatarBitmap.value!!,
+                                                contentDescription = "头像",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape)
+                                            )
+                                        }
+
                                         if (viewModel.isEditing.value && isHoveringAvatar) {
                                             Box(
                                                 modifier = Modifier

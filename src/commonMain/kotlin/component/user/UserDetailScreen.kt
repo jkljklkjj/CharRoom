@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import core.ApiService
+import core.getCachedImage
 import core.loadImageBitmapFromUrl
 import model.User
 import kotlinx.coroutines.launch
@@ -49,11 +50,12 @@ fun UserDetailScreen(
     LaunchedEffect(userId) {
         scope.launch {
             user = ApiService.getUserDetail(userId.toString())
-            user?.let {
-                // 加载头像
+            user?.let { it ->
+                // 优先从缓存同步读取头像，避免闪动
                 it.avatarUrl?.let { url ->
                     if (url.isNotBlank()) {
-                        avatarBitmap = loadImageBitmapFromUrl(url, it.avatarKey)
+                        val cacheKey = it.avatarKey
+                        avatarBitmap = cacheKey?.let { key -> getCachedImage(key) } ?: loadImageBitmapFromUrl(url, cacheKey)
                     }
                 }
                 // 检查是否已经是好友
@@ -71,7 +73,13 @@ fun UserDetailScreen(
             successMessage = ""
             val success = ApiService.addFriend(user?.id.toString())
             if (success) {
-                successMessage = "好友申请已发送，等待对方确认"
+                user?.let { targetUser ->
+                    val currentUsers = chatViewModel.usersFlow.value
+                    if (currentUsers.none { it.id == targetUser.id }) {
+                        chatViewModel.updateUsers(currentUsers + targetUser)
+                    }
+                }
+                successMessage = "好友申请已发送，可以先发个招呼消息"
             } else {
                 errorMessage = "好友申请发送失败，请稍后重试"
             }
@@ -172,7 +180,19 @@ fun UserDetailScreen(
                                     color = MaterialTheme.colors.onSurface
                                 )
 
-                                Spacer(modifier = Modifier.height(6.dp))
+                                // 个性签名 - 移到用户名下方更明显的位置
+                                u.signature?.takeIf { it.isNotBlank() }?.let { signature ->
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = signature,
+                                        style = MaterialTheme.typography.body1,
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.70f),
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     DetailBadge(
@@ -187,16 +207,7 @@ fun UserDetailScreen(
                                     )
                                 }
 
-                                u.signature?.takeIf { it.isNotBlank() }?.let { signature ->
-                                    Spacer(modifier = Modifier.height(14.dp))
-                                    Text(
-                                        text = signature,
-                                        style = MaterialTheme.typography.body1,
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.70f),
-                                        modifier = Modifier.padding(horizontal = 10.dp),
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                }
+                                Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
 
@@ -236,7 +247,7 @@ fun UserDetailScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         DetailCard(title = "操作") {
-                            if (!isFriend) {
+                            if (!isFriend && successMessage.isBlank()) {
                                 Button(
                                     onClick = { addFriend() },
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -263,7 +274,7 @@ fun UserDetailScreen(
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = RoundedCornerShape(14.dp)
                                 ) {
-                                    Text("发消息")
+                                    Text(if (isFriend) "发消息" else "发招呼消息")
                                 }
                             }
                         }
