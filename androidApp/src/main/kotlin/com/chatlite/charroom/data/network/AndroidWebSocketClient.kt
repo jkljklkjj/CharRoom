@@ -38,9 +38,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.chatlite.charroom.BuildConfig
+import timber.log.Timber
 import java.net.URI
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 
 class AndroidWebSocketClient {
     private var group: EventLoopGroup? = null
@@ -55,6 +58,10 @@ class AndroidWebSocketClient {
     private var onStatusUpdateCallback: ((clientId: String, online: Boolean) -> Unit)? = null
     private var onAuthFailedCallback: ((reason: String) -> Unit)? = null
     private var isManualDisconnect = false
+    private val connectionGeneration = AtomicInteger(0)
+    private var lastConnectedAtMs: Long = 0L
+    private var awaitingLoginAck = false
+    private var loginAckFuture: CompletableFuture<Boolean>? = null
     private var reconnectDelay = 1000L // 初始重连延迟1秒
     private val maxReconnectDelay = 30000L // 最大重连延迟30秒
 
@@ -79,6 +86,8 @@ class AndroidWebSocketClient {
     ): Boolean {
         if (channel?.isActive == true) return true
 
+        val generation = connectionGeneration.incrementAndGet()
+
         // 保存连接参数，用于重连
         currentToken = token
         currentUserId = ownUserId
@@ -87,6 +96,8 @@ class AndroidWebSocketClient {
         onAuthFailedCallback = onAuthFailed
         connectionListener = listener
         isManualDisconnect = false
+        awaitingLoginAck = false
+        loginAckFuture = CompletableFuture()
 
         group = NioEventLoopGroup()
         connectFuture = CompletableFuture()
@@ -141,6 +152,37 @@ class AndroidWebSocketClient {
                                     msg.content().readBytes(bytes)
                                     try {
                                         val wrapper = MessageProtos.MessageWrapper.parseFrom(bytes)
+                                        if (awaitingLoginAck) {
+                                            Timber.i("WebSocket登录等待中收到包: type=${wrapper.payloadCase}, bytes=${bytes.size}")
+                                        }
+                                        if (awaitingLoginAck) {
+                                            when (wrapper.payloadCase) {
+                                                MessageProtos.MessageWrapper.PayloadCase.ACK -> {
+                                                    val ackMessage = wrapper.getAck().message
+                                                    Timber.i("WebSocket登录ACK内容: message=$ackMessage")
+                                                    if (ackMessage.contains("登录成功")) {
+                                                        awaitingLoginAck = false
+                                                        loginAckFuture?.complete(true)
+                                                        Timber.i("WebSocket登录ACK确认成功")
+                                                    } else {
+                                                        Timber.w("WebSocket登录ACK未命中成功标记: message=$ackMessage")
+                                                    }
+                                                }
+                                                MessageProtos.MessageWrapper.PayloadCase.RESPONSE -> {
+                                                    val response = wrapper.getResponse()
+                                                    Timber.i("WebSocket登录等待中收到RESPONSE: success=${response.success}, message=${response.message}")
+                                                    if (!response.success) {
+                                                        val reason = response.message.takeIf { it.isNotBlank() } ?: "WebSocket登录失败"
+                                                        awaitingLoginAck = false
+                                                        loginAckFuture?.complete(false)
+                                                        onAuthFailed?.invoke(reason)
+                                                        ctx.close()
+                                                        return
+                                                    }
+                                                }
+                                                else -> {}
+                                            }
+                                        }
                                         if (wrapper.payloadCase == MessageProtos.MessageWrapper.PayloadCase.CHAT ||
                                             wrapper.payloadCase == MessageProtos.MessageWrapper.PayloadCase.AGENTCHAT ||
                                             wrapper.payloadCase == MessageProtos.MessageWrapper.PayloadCase.GROUPCHAT ||
@@ -164,6 +206,8 @@ class AndroidWebSocketClient {
                                                 val msg = response.message ?: ""
                                                 if (msg.contains("登录失败") || msg.contains("token无效") || msg.contains("token过期") || msg.contains("token不能为空")) {
                                                     // 认证失败，通知上层
+                                                    awaitingLoginAck = false
+                                                    loginAckFuture?.complete(false)
                                                     onAuthFailed?.invoke(msg)
                                                     // 关闭连接
                                                     ctx.close()
@@ -228,21 +272,49 @@ class AndroidWebSocketClient {
             val connected = connectFuture?.get(10, TimeUnit.SECONDS) ?: false
             if (!connected) {
                 disconnect()
-                scheduleReconnect()
                 return false
             }
 
+            Timber.i("WebSocket握手成功，等待登录ACK确认")
+
             // 添加通道关闭监听器
             channel?.closeFuture()?.addListener {
+                if (generation != connectionGeneration.get()) {
+                    return@addListener
+                }
+                val connectedRecently = lastConnectedAtMs > 0L && (System.currentTimeMillis() - lastConnectedAtMs) < 2000L
+                if (connectedRecently && !isManualDisconnect) {
+                    Timber.i("WebSocket刚连接后快速断开，忽略本次自动重连")
+                    return@addListener
+                }
                 if (!isManualDisconnect) {
                     connectionListener?.onDisconnected()
-                    scheduleReconnect()
                 }
             }
 
+            awaitingLoginAck = true
             sendBinary(buildLoginPayload(token))
+
+            val loginConfirmed = try {
+                loginAckFuture?.get(10, TimeUnit.SECONDS) ?: false
+            } catch (_: TimeoutException) {
+                Timber.w("WebSocket登录ACK等待超时，10秒内未收到成功ACK")
+                false
+            } catch (_: Exception) {
+                Timber.w("WebSocket登录ACK等待异常结束")
+                false
+            }
+
+            if (!loginConfirmed) {
+                Timber.w("WebSocket登录确认失败或超时，准备断开并重连")
+                disconnect()
+                return false
+            }
+
             startHeartbeat()
             reconnectDelay = 1000L // 重置重连延迟
+            lastConnectedAtMs = System.currentTimeMillis()
+            Timber.i("WebSocket登录确认成功，连接建立完成")
             connectionListener?.onConnected()
             true
         } catch (e: Exception) {
@@ -407,39 +479,12 @@ class AndroidWebSocketClient {
         }
     }
 
-    /**
-     * 调度重连任务
-     */
-    private fun scheduleReconnect() {
-        if (isManualDisconnect || reconnectJob?.isActive == true) return
-
-        reconnectJob = scope.launch(start = CoroutineStart.DEFAULT) {
-            delay(reconnectDelay)
-            if (!isManualDisconnect && channel?.isActive != true) {
-                // 尝试重连
-                currentToken?.let { token ->
-                    val success = connect(
-                        token = token,
-                        ownUserId = currentUserId,
-                        onMessage = onMessageCallback ?: {},
-                        onStatusUpdate = onStatusUpdateCallback ?: { _, _ -> },
-                        onAuthFailed = onAuthFailedCallback,
-                        listener = connectionListener
-                    )
-                    if (success) {
-                        reconnectDelay = 1000L // 重连成功，重置延迟
-                    } else {
-                        // 重连失败，指数退避
-                        reconnectDelay = (reconnectDelay * 2).coerceAtMost(maxReconnectDelay)
-                        scheduleReconnect()
-                    }
-                }
-            }
-        }
-    }
-
     fun disconnect() {
         isManualDisconnect = true
+        lastConnectedAtMs = 0L
+        awaitingLoginAck = false
+        loginAckFuture?.cancel(true)
+        loginAckFuture = null
         heartbeatJob?.cancel()
         reconnectJob?.cancel()
         heartbeatJob = null
@@ -461,7 +506,9 @@ class AndroidWebSocketClient {
                 scope.cancel()
             } catch (_: Exception) {}
             scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-            connectionListener?.onDisconnected()
+            if (!isManualDisconnect) {
+                connectionListener?.onDisconnected()
+            }
         }
     }
 

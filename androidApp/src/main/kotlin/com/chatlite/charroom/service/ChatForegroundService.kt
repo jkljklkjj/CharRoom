@@ -88,7 +88,7 @@ class ChatForegroundService : Service() {
         isRunning = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         try {
-            Chat.logoutAndDisconnect()
+            Chat.stop()
         } catch (_: Exception) {
             // 忽略断开异常
         }

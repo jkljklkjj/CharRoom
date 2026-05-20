@@ -26,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -240,12 +241,17 @@ class NetworkRepository private constructor() {
                 // 非用户主动断开时自动重连
                 if (currentToken != null && currentUserId != 0) {
                     Timber.i("WebSocket意外断开，启动自动重连")
-                    reconnect()
+                    reconnect("connection_closed")
                 }
             }
 
             override fun onAuthFailed(reason: String) {
                 isConnected = false
+                reconnectJob?.cancel()
+                reconnectAttempts = 0
+                currentToken = null
+                currentUserId = 0
+                Timber.w("WebSocket认证失败，停止自动重连: {}", reason)
                 onAuthFailed?.invoke(reason)
             }
         }
@@ -495,23 +501,43 @@ class NetworkRepository private constructor() {
     private val initialReconnectDelay = 1000L // 初始重连延迟1秒
     private val maxReconnectDelay = 30000L // 最大重连延迟30秒
     private var reconnectAttempts = 0 // 当前重连尝试次数
+    private var currentReconnectDelay = initialReconnectDelay // 当前重连延迟
     private var reconnectJob: kotlinx.coroutines.Job? = null // 重连任务
 
     /**
      * 网络恢复时自动重连（带指数退避）
      */
-    fun reconnect() {
+    fun reconnect(triggerSource: String = "manual") {
         if (currentToken == null || currentUserId == 0 || isConnected) {
+            Timber.i("跳过重连: trigger=$triggerSource, token或用户信息无效，或已连接")
             return
         }
 
-        // 取消之前的重连任务
+        if (reconnectJob?.isActive == true) {
+            Timber.i("跳过重连: trigger=$triggerSource, 已有重连任务在执行, 当前attempt=$reconnectAttempts, 当前delay=${currentReconnectDelay}ms")
+            return
+        }
+
+        // 取消之前的重连任务并从当前状态继续/重置
         reconnectJob?.cancel()
+        if (reconnectAttempts <= 0) {
+            currentReconnectDelay = initialReconnectDelay
+        }
 
         reconnectJob = scope.launch {
-            while (reconnectAttempts < maxReconnectAttempts && !isConnected) {
+            var attempt = reconnectAttempts
+            var delayMs = currentReconnectDelay
+
+            while (attempt < maxReconnectAttempts && !isConnected) {
                 try {
-                    Timber.i("尝试重连WebSocket，第 ${reconnectAttempts + 1}/$maxReconnectAttempts 次")
+                    Timber.i("重连调度: trigger=$triggerSource, 第 ${attempt + 1}/$maxReconnectAttempts 次, 等待 ${delayMs}ms 后重试")
+
+                    delay(delayMs)
+
+                    if (isConnected || currentToken == null || currentUserId == 0) {
+                        Timber.i("重连中止: trigger=$triggerSource, 连接状态已变化(isConnected=$isConnected, tokenValid=${currentToken != null}, userId=$currentUserId)")
+                        break
+                    }
 
                     val success = connectWebSocket(
                         token = currentToken!!,
@@ -521,29 +547,40 @@ class NetworkRepository private constructor() {
                         onAuthFailed = onAuthFailedCallback
                     )
 
+                        Timber.i("重连结果: trigger=$triggerSource, 第 ${attempt + 1}/$maxReconnectAttempts 次, success=$success")
+
                     if (success) {
                         Timber.i("WebSocket重连成功")
                         reconnectAttempts = 0 // 重连成功，重置重试次数
+                        currentReconnectDelay = initialReconnectDelay
+                        reconnectJob = null
                         return@launch
                     } else {
                         Timber.w("WebSocket重连失败，等待重试")
-                        reconnectAttempts++
-                        val delay = minOf(initialReconnectDelay * (1 shl reconnectAttempts), maxReconnectDelay)
-                        delay(delay)
+                        attempt++
+                        reconnectAttempts = attempt
+                        delayMs = minOf(initialReconnectDelay * (1 shl attempt), maxReconnectDelay)
+                        currentReconnectDelay = delayMs
                     }
+                } catch (e: CancellationException) {
+                    Timber.i("WebSocket重连任务已取消: trigger=$triggerSource, attempt=${attempt + 1}")
+                    break
                 } catch (e: Exception) {
-                    Timber.e(e, "WebSocket重连异常")
-                    reconnectAttempts++
-                    val delay = minOf(initialReconnectDelay * (1 shl reconnectAttempts), maxReconnectDelay)
-                    delay(delay)
+                    Timber.e(e, "WebSocket重连异常: trigger=$triggerSource, 第 ${attempt + 1}/$maxReconnectAttempts 次")
+                    attempt++
+                    reconnectAttempts = attempt
+                    delayMs = minOf(initialReconnectDelay * (1 shl attempt), maxReconnectDelay)
+                    currentReconnectDelay = delayMs
                 }
             }
 
-            if (reconnectAttempts >= maxReconnectAttempts) {
-                Timber.e("WebSocket重连次数超过上限，停止重连")
+            if (attempt >= maxReconnectAttempts) {
+                Timber.e("WebSocket重连次数超过上限，停止重连: trigger=$triggerSource")
                 // 可以通知上层重连失败
                 onAuthFailedCallback?.invoke("网络连接失败，请检查网络后重试")
             }
+
+            reconnectJob = null
         }
     }
 
@@ -553,6 +590,7 @@ class NetworkRepository private constructor() {
     fun onNetworkDisconnected() {
         isConnected = false
         reconnectAttempts = 0 // 重置重连次数
+        currentReconnectDelay = initialReconnectDelay
         reconnectJob?.cancel() // 取消正在进行的重连任务
         // 可以通知UI层网络已断开
     }
@@ -562,7 +600,7 @@ class NetworkRepository private constructor() {
      */
     fun ensureConnected() {
         if (!isConnected) {
-            reconnect()
+            reconnect("ensure_connected")
         }
     }
 
@@ -581,25 +619,11 @@ class NetworkRepository private constructor() {
     }
 
     /**
-     * 应用完全退出时调用：发送登出消息后断开连接，保留登录凭证
+     * 应用完全退出时调用：仅断开连接，不发送登出消息
      */
     suspend fun onAppQuit() {
         timber.log.Timber.i("应用完全退出，执行退出清理流程")
-        if (isConnected && currentUserId != 0) {
-            timber.log.Timber.i("正在发送登出消息通知服务器，用户ID: $currentUserId")
-            // 先发送登出消息通知服务器
-            val sent = sendLogout(currentUserId.toString())
-            if (sent) {
-                timber.log.Timber.i("登出消息发送成功")
-            } else {
-                timber.log.Timber.w("登出消息发送失败")
-            }
-            // 短暂延迟确保消息发送完成
-            kotlinx.coroutines.delay(100)
-        } else {
-            timber.log.Timber.i("未连接或未登录，无需发送登出消息")
-        }
-        timber.log.Timber.i("断开WebSocket连接")
+        timber.log.Timber.i("跳过logout，直接断开WebSocket连接")
         disconnectWebSocket()
         timber.log.Timber.i("应用退出清理完成")
     }
@@ -610,6 +634,7 @@ class NetworkRepository private constructor() {
     fun clearConnectionInfo() {
         reconnectJob?.cancel() // 取消重连任务
         reconnectAttempts = 0 // 重置重连次数
+        currentReconnectDelay = initialReconnectDelay
         currentToken = null
         currentUserId = 0
         onMessageCallback = null

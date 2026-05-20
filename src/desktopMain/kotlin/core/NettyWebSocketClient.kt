@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -700,6 +701,8 @@ object NettyWebSocketClient : WebSocketClientProvider {
 
     // 防止重复启动连接
     private val connecting = AtomicBoolean(false)
+    // 连接代数，用于忽略旧连接的 closeFuture 回调
+    private val connectionGeneration = AtomicInteger(0)
 
     // 持有 event loop group，便于在连接关闭时正确释放
     @Volatile
@@ -1211,6 +1214,8 @@ object NettyWebSocketClient : WebSocketClientProvider {
      * 内部连接方法，供重连使用
      */
     private fun startInternal() {
+        val generation = connectionGeneration.incrementAndGet()
+
         // 先关闭现有连接
         if (::channel.isInitialized && channel.isActive) {
             runCatching { channel.close().sync() }
@@ -1326,6 +1331,10 @@ object NettyWebSocketClient : WebSocketClientProvider {
             // 监听连接关闭
             channel.closeFuture().addListener {
                 AppLog.i({ "连接已关闭" })
+                if (generation != connectionGeneration.get()) {
+                    AppLog.i({ "忽略旧连接的关闭回调" })
+                    return@addListener
+                }
                 _isServerConnected.value = false
                 heartbeatJob?.cancel()
 
