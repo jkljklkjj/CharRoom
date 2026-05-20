@@ -393,7 +393,7 @@ fun ChatScreen(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(14.dp).statusBarsPadding().imePadding()) {
+    Column(modifier = Modifier.fillMaxSize().padding(14.dp).statusBarsPadding()) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
@@ -951,7 +951,7 @@ fun ChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Column {
+        Column(modifier = Modifier.imePadding()) {
             // 引用回复预览栏
             ReplyPreviewBar(
                 replyToMessage = replyToMessage,

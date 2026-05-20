@@ -317,7 +317,7 @@ fun GroupChatScreen(
         )
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(14.dp).statusBarsPadding().imePadding()) {
+    Column(modifier = modifier.fillMaxSize().padding(14.dp).statusBarsPadding()) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
@@ -817,7 +817,7 @@ fun GroupChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Column {
+        Column(modifier = Modifier.imePadding()) {
             // 引用回复预览栏
             replyToMessage?.let { msg ->
                 // 将GroupMessage转换为Message适配公共组件

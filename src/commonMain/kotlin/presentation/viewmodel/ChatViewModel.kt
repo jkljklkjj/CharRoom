@@ -4,6 +4,7 @@ import core.Chat
 import core.GlobalApiService
 import core.LocalChatHistoryStore
 import core.MsgType
+import core.ServerConfig.AGENT_ASSISTANT_ID
 import core.buildChatPayload
 import core.buildGroupChatPayload
 import core.state.ChatState
@@ -13,6 +14,7 @@ import data.repository.ChatRepository
 import data.repository.GlobalChatRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -423,14 +425,6 @@ open class ChatViewModel(
             return
         }
 
-        if (!Chat.isConnected()) {
-            println("[ChatViewModel] 错误：WebSocket未连接，消息发送失败")
-            coroutineScope.launch {
-                onDone()
-            }
-            return
-        }
-
         try {
             val timestamp = System.currentTimeMillis()
             val messageId = MessageIdGenerator.generateMessageId(currentUserId, messageText + fileUrl.orEmpty(), timestamp)
@@ -442,7 +436,7 @@ open class ChatViewModel(
                 sender = true,
                 receiverId = user.id,
                 timestamp = timestamp,
-                isSent = false, // 初始状态为未发送
+                isSent = true, // 先乐观显示为已发送，失败时再回退
                 messageId = messageId,
                 replyToMessageId = replyToMessageId,
                 replyToContent = replyToContent,
@@ -480,11 +474,26 @@ open class ChatViewModel(
                 expectedResponses = 1
             ) { success, responses ->
                 println("[ChatViewModel] WebSocket消息发送结果: $success, messageId: $messageId")
-                // 更新消息发送状态
                 coroutineScope.launch {
-                    updateMessageSentStatus(messageId, success)
-                    println("[ChatViewModel] 消息状态已更新，success: $success, messageId: $messageId")
-                    onDone()
+                    if (success) {
+                        updateMessageSentStatus(messageId, true)
+                        println("[ChatViewModel] 消息状态已更新，success: $success, messageId: $messageId")
+                        onDone()
+                    } else {
+                        onDone()
+                        delay(1500)
+                        Chat.send(
+                            payload = payload,
+                            type = MsgType.CHAT,
+                            targetClientId = user.id.toString(),
+                            expectedResponses = 1
+                        ) { retrySuccess, _ ->
+                            coroutineScope.launch {
+                                updateMessageSentStatus(messageId, retrySuccess)
+                                println("[ChatViewModel] 消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
+                            }
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -523,14 +532,6 @@ open class ChatViewModel(
             return
         }
 
-        if (!Chat.isConnected()) {
-            println("[ChatViewModel] 错误：WebSocket未连接，群消息发送失败")
-            coroutineScope.launch {
-                onDone()
-            }
-            return
-        }
-
         try {
             val currentUser = chatState.users.value.find { it.id == currentUserId }
             if (currentUser == null) {
@@ -551,7 +552,7 @@ open class ChatViewModel(
                 text = messageText,
                 senderId = currentUserId,
                 timestamp = timestamp,
-                isSent = false, // 初始状态为未发送
+                isSent = true, // 先乐观显示为已发送，失败时再回退
                 messageId = messageId,
                 replyToMessageId = replyToMessageId,
                 replyToContent = replyToContent,
@@ -588,11 +589,26 @@ open class ChatViewModel(
                 expectedResponses = 1
             ) { success, responses ->
                 println("[ChatViewModel] WebSocket群消息发送结果: $success, messageId: $messageId")
-                // 更新消息发送状态
                 coroutineScope.launch {
-                    updateGroupMessageSentStatus(messageId, success)
-                    println("[ChatViewModel] 群消息状态已更新，success: $success, messageId: $messageId")
-                    onDone()
+                    if (success) {
+                        updateGroupMessageSentStatus(messageId, true)
+                        println("[ChatViewModel] 群消息状态已更新，success: $success, messageId: $messageId")
+                        onDone()
+                    } else {
+                        onDone()
+                        delay(1500)
+                        Chat.send(
+                            payload = payload,
+                            type = MsgType.GROUP_CHAT,
+                            targetClientId = group.id.toString(),
+                            expectedResponses = 1
+                        ) { retrySuccess, _ ->
+                            coroutineScope.launch {
+                                updateGroupMessageSentStatus(messageId, retrySuccess)
+                                println("[ChatViewModel] 群消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
+                            }
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -638,7 +654,7 @@ open class ChatViewModel(
             val privateMessages = chatState.messages.value
             val groupMessages = chatState.groupMessages.value
             LocalChatHistoryStore.save(accountId, privateMessages, groupMessages)
-            println("[ChatViewModel] 聊天历史已保存到本地，私聊消息: ${privateMessages.size}条, 群聊消息: ${groupMessages.size}条")
+//            println("[ChatViewModel] 聊天历史已保存到本地，私聊消息: ${privateMessages.size}条, 群聊消息: ${groupMessages.size}条")
         } catch (e: Exception) {
             println("[ChatViewModel] 保存聊天历史到本地失败: ${e.message}")
             e.printStackTrace()

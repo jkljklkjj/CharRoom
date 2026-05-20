@@ -429,6 +429,11 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                     }
                 }
 
+                MsgType.ACK.wire -> {
+                    // ACK消息不需要处理，直接忽略，避免未知类型错误
+                    AppLog.d{"收到ACK确认消息"}
+                }
+
                 else -> {
                     // ignore other proto wrapper types
                 }
@@ -558,6 +563,10 @@ class CustomWebSocketHandler : SimpleChannelInboundHandler<Any>(Any::class.java)
                             it.onGroupMessageReceived(groupId, userId, senderName, messageContent, timestamp)
                         }
                     }
+                }
+                "ack" -> {
+                    // ACK消息不需要处理，直接忽略，避免未知类型错误
+                    AppLog.d{"收到ACK确认消息"}
                 }
                 else -> {
                     println("Unknown message type: $messageType")
@@ -923,7 +932,7 @@ object NettyWebSocketClient : WebSocketClientProvider {
                              AppLog.d{"WebSocket消息发送成功"}
                             // 非阻塞等待响应（带超时），避免阻塞 Netty 事件循环线程
                              try {
-                                val timeoutSeconds = if (type == MsgType.HEARTBEAT) 5L else 30L
+                                val timeoutSeconds = if (type == MsgType.HEARTBEAT) 5L else 10L
                                 val timeoutTask = channel.eventLoop().schedule({
                                     try {
                                         if (!responseHandler.responseFuture.isDone) {

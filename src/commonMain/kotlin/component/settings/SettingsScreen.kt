@@ -1,5 +1,6 @@
 package component.settings
 
+import core.AppLog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -112,8 +113,9 @@ fun SettingsScreen(
             }
             is UpdateState.Failed -> {
                 showUpdateProgressDialog = false
+                // 检查更新失败不弹出窗口，静默处理
                 updateError = state.error
-                showUpdateDialog = true
+                AppLog.w({ "检查更新失败: ${state.error}" })
             }
             is UpdateState.NoUpdate -> {
                 updateError = "当前已是最新版本"

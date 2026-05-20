@@ -109,14 +109,15 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-extended:1.9.0'
     debugImplementation 'androidx.compose.ui:ui-tooling:1.10.6'
 
-    // Netty WebSocket client - 只引入需要的模块，减小体积
-    implementation 'io.netty:netty-codec-http:4.1.112.Final'
-    implementation 'io.netty:netty-handler:4.1.112.Final'
-    implementation 'io.netty:netty-transport:4.1.112.Final'
-    implementation 'io.netty:netty-codec:4.1.112.Final'
-    implementation 'io.netty:netty-buffer:4.1.112.Final'
-    implementation 'io.netty:netty-common:4.1.112.Final'
-    implementation 'io.netty:netty-resolver:4.1.112.Final'
+    // Netty WebSocket client - keep the Android module aligned with the
+    // version used elsewhere in the project to avoid runtime mismatch issues.
+    implementation 'io.netty:netty-codec-http:4.2.5.Final'
+    implementation 'io.netty:netty-handler:4.2.5.Final'
+    implementation 'io.netty:netty-transport:4.2.5.Final'
+    implementation 'io.netty:netty-codec:4.2.5.Final'
+    implementation 'io.netty:netty-buffer:4.2.5.Final'
+    implementation 'io.netty:netty-common:4.2.5.Final'
+    implementation 'io.netty:netty-resolver:4.2.5.Final'
 
     // Ktor HTTP client (Android)
     implementation 'io.ktor:ktor-client-core:3.4.3'
