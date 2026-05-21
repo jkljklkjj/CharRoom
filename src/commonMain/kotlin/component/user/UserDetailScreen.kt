@@ -1,5 +1,6 @@
 package component.user
 
+import component.AppTopBar
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -89,32 +90,11 @@ fun UserDetailScreen(
 
     Scaffold(
         topBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colors.surface.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp),
-                elevation = 0.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(text = "用户详情", style = MaterialTheme.typography.h6)
-                        Text(
-                            text = "查看资料、状态和联系信息",
-                            style = MaterialTheme.typography.caption,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            }
+            AppTopBar(
+                title = "用户详情",
+                subtitle = "查看资料、状态和联系信息",
+                onBack = onBack
+            )
         }
     ) { padding ->
         Box(

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import component.AppTopBar
 import component.dialog.AvatarCropDialog
 import component.io.FilePicker
 import presentation.viewmodel.GlobalProfileViewModel
@@ -51,32 +52,12 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
-                color = MaterialTheme.colors.surface.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp),
-                elevation = 0.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(text = "个人资料", style = MaterialTheme.typography.h6)
-                        Text(
-                            text = "查看和编辑个人信息",
-                            style = MaterialTheme.typography.caption,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            }
+            AppTopBar(
+                title = "个人资料",
+                subtitle = "查看和编辑个人信息",
+                onBack = onBack,
+                modifier = Modifier.statusBarsPadding()
+            )
         }
     ) { padding ->
         when (uiState) {

@@ -1,5 +1,6 @@
 package component.settings
 
+import component.AppTopBar
 import core.AppLog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -133,34 +134,10 @@ fun SettingsScreen(
             .padding(16.dp)
     ) {
         // 顶部标题栏
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colors.surface.copy(alpha = 0.18f),
-            shape = MaterialTheme.shapes.large,
-            elevation = 0.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MaterialTheme.colors.onBackground,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clickable(onClick = onBackClick)
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = "设置",
-                    style = MaterialTheme.typography.h6,
-                    color = MaterialTheme.colors.onBackground
-                )
-            }
-        }
+        AppTopBar(
+            title = "设置",
+            onBack = onBackClick
+        )
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -205,7 +182,7 @@ fun SettingsScreen(
                 onClick = {
                     showClearHistoryDialog = true
                 },
-                tint = Color(0xFFF44336)
+                tint = MaterialTheme.colors.error
             )
 
             // 清空缓存
@@ -216,7 +193,7 @@ fun SettingsScreen(
                 onClick = {
                     showClearCacheDialog = true
                 },
-                tint = Color(0xFFF44336)
+                tint = MaterialTheme.colors.error
             )
 
             // 退出登录
@@ -227,7 +204,7 @@ fun SettingsScreen(
                 onClick = {
                     showLogoutDialog = true
                 },
-                tint = Color(0xFFF44336)
+                tint = MaterialTheme.colors.error
             )
         }
     }
@@ -247,7 +224,7 @@ fun SettingsScreen(
                         onLogout()
                     },
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color(0xFFF44336),
+                        backgroundColor = MaterialTheme.colors.error,
                         contentColor = Color.White
                     )
                 ) {
@@ -279,7 +256,7 @@ fun SettingsScreen(
                         chatViewModel.clearMessages()
                     },
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color(0xFFF44336),
+                        backgroundColor = MaterialTheme.colors.error,
                         contentColor = Color.White
                     )
                 ) {
@@ -307,7 +284,7 @@ fun SettingsScreen(
                         // 后续实现清空缓存逻辑
                     },
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color(0xFFF44336),
+                        backgroundColor = MaterialTheme.colors.error,
                         contentColor = Color.White
                     )
                 ) {
@@ -358,7 +335,7 @@ fun SettingsScreen(
                             Text("更新内容:\n${version.updateContent}")
                             if (version.forceUpdate) {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("此版本为强制更新，必须安装后才能继续使用", color = Color(0xFFF44336))
+                                Text("此版本为强制更新，必须安装后才能继续使用", color = MaterialTheme.colors.error)
                             }
                         }
                     }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -392,10 +393,10 @@ fun UserAvatar(
         }
         mutableStateOf(cached)
     }
-    
+
     var isAvatarLoading by remember { mutableStateOf(false) }
     val avatarBitmap = avatarBitmapState.value
-    
+
     LaunchedEffect(user.avatarUrl, user.avatarKey) {
         if (!isAvatarLoading && avatarBitmap == null && !user.avatarUrl.isNullOrBlank()) {
             isAvatarLoading = true
@@ -403,7 +404,7 @@ fun UserAvatar(
             isAvatarLoading = false
         }
     }
-    
+
     if (avatarBitmap != null) {
         Image(
             bitmap = avatarBitmap,
@@ -427,6 +428,81 @@ fun UserAvatar(
                 color = Color.White,
                 style = MaterialTheme.typography.caption
             )
+        }
+    }
+}
+
+/**
+ * 统一的页面顶栏组件
+ *
+ * @param title 主标题
+ * @param subtitle 副标题（可选）
+ * @param onBack 返回回调（为 null 时不显示返回按钮）
+ * @param actions 右侧操作按钮（可选）
+ * @param useGradient 是否使用渐变背景（默认 true，与侧边栏/聊天顶栏风格一致）
+ */
+@Composable
+fun AppTopBar(
+    title: String,
+    subtitle: String? = null,
+    onBack: (() -> Unit)? = null,
+    actions: @Composable (RowScope.() -> Unit)? = null,
+    useGradient: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    val isDark = !MaterialTheme.colors.isLight
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = if (useGradient) Color.Transparent else MaterialTheme.colors.surface.copy(alpha = 0.18f),
+        shape = RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp),
+        elevation = 0.dp
+    ) {
+        Box(
+            modifier = if (useGradient) {
+                Modifier
+                    .fillMaxWidth()
+                    .background(chatHeaderBrush(isDark))
+            } else {
+                Modifier.fillMaxWidth()
+            }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colors.onBackground
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.h6,
+                        color = MaterialTheme.colors.onBackground
+                    )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.caption,
+                            color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                if (actions != null) {
+                    Row(content = actions)
+                }
+            }
         }
     }
 }

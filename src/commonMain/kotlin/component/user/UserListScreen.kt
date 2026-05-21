@@ -237,7 +237,7 @@ fun UserList(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .align(Alignment.TopEnd)
-                                        .background(Color(0xFFF44336), CircleShape)
+                                        .background(MaterialTheme.colors.error, CircleShape)
                                 )
                             }
                         }
@@ -334,7 +334,7 @@ fun UserList(
                                 modifier = Modifier
                                     .size(8.dp)
                                     .background(
-                                        color = if (user.online == true) Color(0xFF2E7D32) else Color(0xFF9E9E9E),
+                                        color = if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1),
                                         shape = CircleShape
                                     )
                             )
@@ -418,7 +418,7 @@ fun UserList(
                                 if (unreadCount > 0) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Surface(
-                                        color = Color(0xFFF44336),
+                                        color = MaterialTheme.colors.error,
                                         shape = CircleShape,
                                         elevation = 0.dp
                                     ) {

@@ -101,8 +101,8 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        window.statusBarColor = "#F98701".toColorInt()
-        window.navigationBarColor = "#F98701".toColorInt()
+        window.statusBarColor = "#D78345".toColorInt()
+        window.navigationBarColor = "#D78345".toColorInt()
         WindowCompat.getInsetsController(window, window.decorView)?.isAppearanceLightStatusBars = false
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 

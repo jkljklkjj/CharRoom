@@ -1,5 +1,7 @@
 package component.chat
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -215,47 +218,49 @@ fun ChatApp(
                 }
             }
             when {
-                // 手机端布局：单页切换
+                // 手机端布局：单页切换 + 滑动动画
                 isSmallScreen -> {
-                    if (selectedChatTarget == null) {
-                        Column(modifier = Modifier.fillMaxSize()) {
+                    AnimatedContent(
+                        targetState = selectedChatTarget,
+                        transitionSpec = {
+                            if (targetState != null) {
+                                // 进入聊天：从右侧滑入
+                                slideInHorizontally(tween(250)) { it } + fadeIn(tween(200)) togetherWith
+                                    slideOutHorizontally(tween(250)) { -it / 3 } + fadeOut(tween(150))
+                            } else {
+                                // 返回列表：从左侧滑入
+                                slideInHorizontally(tween(250)) { -it / 3 } + fadeIn(tween(200)) togetherWith
+                                    slideOutHorizontally(tween(250)) { it } + fadeOut(tween(150))
+                            }
+                        },
+                        contentKey = { it?.id ?: -1 }
+                    ) { chatTarget ->
+                        if (chatTarget == null) {
                             UserList(
-                                selectedUserId = selectedChatTarget?.id,
+                                selectedUserId = null,
                                 onOpenSearch = { showAddUserDialog = true },
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
                                 onOpenProfile = { showProfileScreen = true },
-                                onUserClick = { user ->
-                                    chatViewModel.selectedUser = user
-                                },
+                                onUserClick = { user -> chatViewModel.selectedUser = user },
                                 onUserLongClick = { user ->
-                                    // 点击/长按头像都打开用户详情页面
                                     selectedDetailUserId = user.id
                                     showUserDetailScreen = true
                                 },
                                 refreshTrigger = pendingRefreshTrigger,
                                 chatViewModel = chatViewModel
                             )
-                        }
-                    } else {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            key(selectedChatTarget!!.id) {
+                        } else {
+                            key(chatTarget.id) {
                                 ChatScreen(
                                     chatViewModel = chatViewModel,
-                                    user = selectedChatTarget!!,
+                                    user = chatTarget,
                                     onAvatarClick = { user ->
-                                        // 点击对方头像，打开用户详情页
                                         selectedDetailUserId = user.id
                                         showUserDetailScreen = true
                                     },
-                                    onMyAvatarClick = {
-                                        // 点击自己头像，打开个人资料页
-                                        showProfileScreen = true
-                                    },
-                                    onBackClick = {
-                                        // 返回用户列表
-                                        chatViewModel.selectedUser = null
-                                    }
+                                    onMyAvatarClick = { showProfileScreen = true },
+                                    onBackClick = { chatViewModel.selectedUser = null }
                                 )
                             }
                         }
@@ -264,7 +269,6 @@ fun ChatApp(
                 // 桌面端/平板布局：左右分栏
                 else -> {
                     Row(modifier = Modifier.fillMaxSize()) {
-                        // 左侧用户列表
                         Box(modifier = Modifier.width(320.dp).fillMaxSize()) {
                             UserList(
                                 selectedUserId = selectedChatTarget?.id,
@@ -272,11 +276,8 @@ fun ChatApp(
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
                                 onOpenProfile = { showProfileScreen = true },
-                                onUserClick = { user ->
-                                    chatViewModel.selectedUser = user
-                                },
+                                onUserClick = { user -> chatViewModel.selectedUser = user },
                                 onUserLongClick = { user ->
-                                    // 点击/长按头像都打开用户详情页面
                                     selectedDetailUserId = user.id
                                     showUserDetailScreen = true
                                 },
@@ -290,7 +291,6 @@ fun ChatApp(
                             color = MaterialTheme.colors.onSurface.copy(alpha = 0.1f)
                         )
 
-                        // 右侧聊天区域
                         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                             if (selectedChatTarget != null) {
                                 key(selectedChatTarget!!.id) {
@@ -298,20 +298,16 @@ fun ChatApp(
                                         chatViewModel = chatViewModel,
                                         user = selectedChatTarget!!,
                                         onAvatarClick = { user ->
-                                            // 点击对方头像，打开用户详情页
                                             selectedDetailUserId = user.id
                                             showUserDetailScreen = true
                                         },
-                                        onMyAvatarClick = {
-                                            // 点击自己头像，打开个人资料页
-                                            showProfileScreen = true
-                                        }
+                                        onMyAvatarClick = { showProfileScreen = true }
                                     )
                                 }
                             } else {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = androidx.compose.ui.Alignment.Center
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     androidx.compose.material.Text(
                                         text = "选择一个联系人开始聊天",
@@ -347,12 +343,19 @@ fun ChatApp(
                 )
             }
 
-            // 我的资料页面（独立页面，非弹窗）
-            if (showProfileScreen) {
+            // 全屏覆盖页面：从底部滑入
+            val slideUpSpec = tween<IntOffset>(280)
+            val fadeSpec = tween<Float>(200)
+
+            // 我的资料页面
+            AnimatedVisibility(
+                visible = showProfileScreen,
+                enter = slideInVertically(slideUpSpec) { it } + fadeIn(fadeSpec),
+                exit = slideOutVertically(slideUpSpec) { it } + fadeOut(fadeSpec)
+            ) {
                 ProfileScreen(
                     onBack = { showProfileScreen = false },
                     onProfileUpdated = {
-                        // 刷新用户列表
                         chatViewModel.loadContacts()
                         showProfileScreen = false
                     }
@@ -360,7 +363,11 @@ fun ChatApp(
             }
 
             // 设置界面
-            if (showSettingsScreen) {
+            AnimatedVisibility(
+                visible = showSettingsScreen,
+                enter = slideInVertically(slideUpSpec) { it } + fadeIn(fadeSpec),
+                exit = slideOutVertically(slideUpSpec) { it } + fadeOut(fadeSpec)
+            ) {
                 SettingsScreen(
                     chatViewModel = chatViewModel,
                     onBackClick = { showSettingsScreen = false },
@@ -376,27 +383,28 @@ fun ChatApp(
             }
 
             // 用户详情页
-            if (showUserDetailScreen && selectedDetailUserId != null) {
-                UserDetailScreen(
-                    chatViewModel = chatViewModel,
-                    userId = selectedDetailUserId!!,
-                    onBack = {
-                        showUserDetailScreen = false
-                        selectedDetailUserId = null
-                    },
-                    onAddFriend = {
-                        // 已由详情页把目标联系人补入本地列表，这里不再强制拉全量，避免把临时联系人刷新掉
-                    },
-                    onStartChat = {
-                        // 关闭详情页，打开与该用户的聊天界面
-                        showUserDetailScreen = false
-                        val targetUser = chatViewModel.usersFlow.value.find { it.id == selectedDetailUserId }
-                        targetUser?.let {
-                            chatViewModel.selectedUser = it
+            AnimatedVisibility(
+                visible = showUserDetailScreen && selectedDetailUserId != null,
+                enter = slideInVertically(slideUpSpec) { it } + fadeIn(fadeSpec),
+                exit = slideOutVertically(slideUpSpec) { it } + fadeOut(fadeSpec)
+            ) {
+                if (selectedDetailUserId != null) {
+                    UserDetailScreen(
+                        chatViewModel = chatViewModel,
+                        userId = selectedDetailUserId!!,
+                        onBack = {
+                            showUserDetailScreen = false
+                            selectedDetailUserId = null
+                        },
+                        onAddFriend = {},
+                        onStartChat = {
+                            showUserDetailScreen = false
+                            val targetUser = chatViewModel.usersFlow.value.find { it.id == selectedDetailUserId }
+                            targetUser?.let { chatViewModel.selectedUser = it }
+                            selectedDetailUserId = null
                         }
-                        selectedDetailUserId = null
-                    }
-                )
+                    )
+                }
             }
         }
     }
