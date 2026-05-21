@@ -52,7 +52,7 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
                 color = MaterialTheme.colors.surface.copy(alpha = 0.18f),
                 shape = RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp),
                 elevation = 0.dp

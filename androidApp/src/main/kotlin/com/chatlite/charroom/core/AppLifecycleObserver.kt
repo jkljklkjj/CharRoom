@@ -25,20 +25,6 @@ object AppLifecycleObserver : Application.ActivityLifecycleCallbacks {
     private val APP_QUIT_DELAY = 30000L // 退出延迟30秒，避免锁屏误判
     private var quitCheckJob: kotlinx.coroutines.Job? = null
 
-    /**
-     * 检查前台服务是否正在运行
-     */
-    private fun isForegroundServiceRunning(context: Context): Boolean {
-        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        @Suppress("DEPRECATION")
-        for (service in activityManager.getRunningServices(Integer.MAX_VALUE)) {
-            if (com.chatlite.charroom.service.ChatForegroundService::class.java.name == service.service.className) {
-                return service.foreground
-            }
-        }
-        return false
-    }
-
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
 
     override fun onActivityStarted(activity: Activity) {
@@ -57,20 +43,23 @@ object AppLifecycleObserver : Application.ActivityLifecycleCallbacks {
         activityCount--
         updateForegroundState()
 
-        // 如果所有Activity都销毁了，启动退出检测
+        // 如果所有 Activity 都销毁了，启动退出检测
         if (activityCount == 0) {
             quitCheckJob = CoroutineScope(Dispatchers.IO).launch {
                 delay(APP_QUIT_DELAY)
-                // 延迟后仍然没有Activity，且前台服务未运行，说明用户真的退出App了
-                if (activityCount == 0 && !isForegroundServiceRunning(application)) {
+                // 延迟后检查 activityCount 和 isAppInForeground
+                // 如果 activityCount 仍然为 0 且 isAppInForeground 为 false，说明用户真的退出 App 了
+                if (activityCount == 0 && !isAppInForeground) {
                     Timber.i("应用完全退出，执行清理流程")
                     try {
-                        // 通过Koin获取AndroidChatViewModel执行清理
+                        // 通过 Koin 获取 AndroidChatViewModel 执行清理
                         val chatViewModel: AndroidChatViewModel? = GlobalContext.get().getOrNull()
                         chatViewModel?.onAppQuit()
                     } catch (e: Exception) {
                         Timber.e(e, "应用退出清理失败")
                     }
+                } else {
+                    Timber.i("应用只是暂时进入后台或锁屏，不清理连接")
                 }
             }
         }

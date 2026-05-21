@@ -46,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
 import ChatWindow from '../components/ChatWindow.vue'
@@ -55,21 +55,15 @@ import chatSocket from '../services/chatSocket'
 import api from '../api'
 
 function normalizeTimestamp(raw) {
-  if (raw == null || raw === '') {
-    return new Date().toISOString()
-  }
-  if (typeof raw === 'number') {
-    return new Date(raw).toISOString()
-  }
+  if (raw == null || raw === '') return new Date().toISOString()
+  if (typeof raw === 'number') return new Date(raw).toISOString()
   if (typeof raw === 'string') {
     const numeric = Number(raw)
     if (!Number.isNaN(numeric) && String(numeric) === raw.trim()) {
       return new Date(numeric).toISOString()
     }
     const parsed = new Date(raw)
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString()
-    }
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString()
   }
   return new Date().toISOString()
 }
@@ -84,93 +78,103 @@ const currentView = ref('list') // 'list' | 'chat'
 const currentChatName = ref('')
 const showSettings = ref(false)
 
-// 监听窗口大小变化
 function handleResize() {
   isMobile.value = window.innerWidth < 768
-  // 横屏时自动切回双栏布局
   if (!isMobile.value) {
     currentView.value = 'list'
   }
 }
 
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-
-  // 页面加载时从localStorage恢复登录状态
-  const savedToken = localStorage.getItem('charroom_token')
-  const savedRefreshToken = localStorage.getItem('charroom_refreshToken')
-  const savedAccountId = localStorage.getItem('charroom_accountId')
-  if (savedToken && savedAccountId) {
-    store.setToken(savedToken)
-    store.setRefreshToken(savedRefreshToken || '')
-    store.setAccountId(savedAccountId)
-
-    // 验证token有效性，无效会自动刷新
-    api.validateToken().then(validated => {
-      if (!validated) {
-        // token无效，清除状态
-        logout()
-      } else {
-        // 验证成功，标记登录状态有效
-        store.setLoginValid(true)
-        // 加载好友列表
-        api.getFriends().then(friends => {
-          store.setUsers(friends || [])
-        })
-        // 建立WebSocket连接
-        chatSocket.connect(WS_URL, savedToken, savedAccountId, {
-          onopen: () => console.log('ws restored'),
-          onmessage: (msg) => {
-            // msg is decoded MessageWrapper object
-            console.log('📩 收到原始消息:', msg)
-            try {
-              if (msg.type === 'chat' && msg.chat) {
-                console.log('💬 收到聊天消息:', msg.chat)
-                const m = {
-                  user: String(msg.chat.userId || 'unknown'), // 确保userId是字符串类型
-                  text: msg.chat.content,
-                  time: normalizeTimestamp(msg.chat.timestamp),
-                  targetId: msg.chat.targetClientId // 保留目标ID用于调试
-                }
-                store.addMessage(m)
-              } else if (msg.type === 'groupChat' && msg.groupChat) {
-                console.log('👥 收到群聊消息:', msg.groupChat)
-                const gm = {
-                  user: String(msg.groupChat.userId), // 确保userId是字符串类型
-                  text: msg.groupChat.content,
-                  time: normalizeTimestamp(msg.groupChat.timestamp),
-                  groupId: msg.groupChat.targetClientId
-                }
-                store.addGroupMessage(gm)
-              } else if (msg.clientId !== undefined && msg.online !== undefined) {
-                // 处理用户在线状态更新
-                const clientId = parseInt(msg.clientId)
-                const online = msg.online
-                console.log(`👤 收到用户在线状态更新: userId=${clientId}, online=${online}`)
-                store.updateUserOnlineStatus(clientId, online)
-              }
-            } catch (e) {
-              console.error('❌ 处理 incoming 消息失败', e)
-            }
-          },
-          onclose: () => console.log('ws closed'),
-          onerror: (e) => console.error('ws error', e),
-          onAuthFailed: (reason) => {
-            console.error('🔑 认证失败:', reason)
-            logout()
-          }
-        })
-      }
-    }).catch(() => {
-      // 验证过程出错，清除状态
-      logout()
-    })
+/** 处理 WebSocket 收到的消息 */
+function handleIncomingMessage(msg) {
+  try {
+    if (msg.type === 'chat' && msg.chat) {
+      store.addMessage({
+        user: String(msg.chat.userId || 'unknown'),
+        text: msg.chat.content,
+        time: normalizeTimestamp(msg.chat.timestamp),
+        targetId: msg.chat.targetClientId
+      })
+    } else if (msg.type === 'groupChat' && msg.groupChat) {
+      store.addGroupMessage({
+        user: String(msg.groupChat.userId),
+        text: msg.groupChat.content,
+        time: normalizeTimestamp(msg.groupChat.timestamp),
+        groupId: msg.groupChat.targetClientId
+      })
+    } else if (msg.clientId !== undefined && msg.online !== undefined) {
+      store.updateUserOnlineStatus(parseInt(msg.clientId), msg.online)
+    }
+  } catch (e) {
+    console.error('处理消息失败', e)
   }
-})
+}
 
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-})
+/** 建立 WebSocket 连接 */
+function connectWebSocket(token, accountId) {
+  chatSocket.connect(WS_URL, token, String(accountId), {
+    onmessage: handleIncomingMessage,
+    onAuthFailed: () => logout()
+  })
+}
+
+/** 清除本地登录状态 */
+function clearAuth() {
+  localStorage.removeItem('charroom_token')
+  localStorage.removeItem('charroom_refreshToken')
+  localStorage.removeItem('charroom_accountId')
+  store.setToken('')
+  store.setRefreshToken('')
+  store.setAccountId('')
+  store.setLoginValid(false)
+}
+
+function logout() {
+  chatSocket.close()
+  store.clearAll()
+  clearAuth()
+  store.setSelectedChat(null)
+  showSettings.value = false
+}
+
+/** 保存登录凭证到本地 */
+function persistTokens(accessToken, refreshToken) {
+  try {
+    localStorage.setItem('charroom_token', accessToken)
+    localStorage.setItem('charroom_refreshToken', refreshToken || '')
+  } catch (_e) { /* ignore */ }
+}
+
+/** 获取当前用户信息并标记登录有效 */
+async function initUserSession(accessToken, refreshToken) {
+  store.setToken(accessToken)
+  store.setRefreshToken(refreshToken || '')
+
+  const userRes = await api.getCurrentUser()
+  if (!userRes?.id) {
+    clearAuth()
+    return false
+  }
+
+  store.setAccountId(userRes.id)
+  store.setLoginValid(true)
+  persistTokens(accessToken, refreshToken)
+  localStorage.setItem('charroom_accountId', String(userRes.id))
+
+  const friends = await api.getFriends()
+  store.setUsers(friends || [])
+
+  connectWebSocket(accessToken, userRes.id)
+  return true
+}
+
+/** 登录成功回调 */
+async function onLogged(tokens) {
+  const accessToken = tokens?.accessToken || ''
+  const refreshToken = tokens?.refreshToken || ''
+  if (!accessToken) return
+  await initUserSession(accessToken, refreshToken)
+}
 
 // 选中用户，切换到聊天视图
 function onUserSelected(user) {
@@ -180,7 +184,6 @@ function onUserSelected(user) {
   }
 }
 
-// 返回好友列表
 function backToList() {
   currentView.value = 'list'
   store.setSelectedChat(null)
@@ -190,208 +193,54 @@ function closeSettings() {
   showSettings.value = false
 }
 
-function logout() {
-  chatSocket.close()
-  store.clearAll()
-  store.setToken('')
-  store.setRefreshToken('')
-  store.setAccountId('')
-  store.setSelectedChat(null)
-  store.setLoginValid(false)
-  localStorage.removeItem('charroom_token')
-  localStorage.removeItem('charroom_refreshToken')
-  localStorage.removeItem('charroom_accountId')
-  showSettings.value = false
-}
-
-async function onLogged(tokens) {
-  const accessToken = tokens?.accessToken || ''
-  const refreshToken = tokens?.refreshToken || ''
-  if (!accessToken) return
-  store.setToken(accessToken)
-  store.setRefreshToken(refreshToken)
-  // 登录后获取当前用户信息并设置accountId
-  const userRes = await api.getCurrentUser()
-  if (userRes && userRes.id) {
-    store.setAccountId(userRes.id)
-    // 登录成功，标记登录状态有效
-    store.setLoginValid(true)
-    try {
-      localStorage.setItem('charroom_token', accessToken)
-      localStorage.setItem('charroom_refreshToken', refreshToken)
-      localStorage.setItem('charroom_accountId', String(userRes.id))
-    } catch (_e) {
-      // ignore localStorage failures
-    }
-  }
-  // 登录后加载好友列表
-  const friends = await api.getFriends()
-  store.setUsers(friends)
-  // 登录后立即建立 websocket 连接
-  chatSocket.connect(WS_URL, accessToken, store.state.accountId, {
-    onopen: () => console.log('ws open'),
-    onmessage: (msg) => {
-      // msg is decoded MessageWrapper object
-      console.log('📩 收到原始消息:', msg)
-      try {
-        if (msg.type === 'chat' && msg.chat) {
-          console.log('💬 收到聊天消息:', msg.chat)
-          const m = {
-            user: String(msg.chat.userId || 'unknown'), // 确保userId是字符串类型
-            text: msg.chat.content,
-            time: normalizeTimestamp(msg.chat.timestamp),
-            targetId: msg.chat.targetClientId // 保留目标ID用于调试
-          }
-          console.log('📝 构造消息对象:', m)
-          console.log('📍 当前选中的聊天ID:', store.state.selectedChatId)
-          store.addMessage(m)
-          console.log('💾 当前消息列表:', store.state.messages)
-
-          // 测试过滤逻辑
-          if (store.state.selectedChatId) {
-            const selectedId = String(store.state.selectedChatId)
-            const shouldShow = String(m.user) === selectedId || String(m.targetId) === selectedId
-            console.log(`🔍 消息是否应该显示: ${shouldShow} (m.user=${m.user}, m.targetId=${m.targetId}, selectedId=${selectedId})`)
-          }
-        } else if (msg.type === 'groupChat' && msg.groupChat) {
-          console.log('👥 收到群聊消息:', msg.groupChat)
-          const gm = {
-            user: String(msg.groupChat.userId), // 确保userId是字符串类型
-            text: msg.groupChat.content,
-            time: normalizeTimestamp(msg.groupChat.timestamp),
-            groupId: msg.groupChat.targetClientId
-          }
-          store.addGroupMessage(gm)
-        } else if (msg.type === 'heartbeat') {
-          console.log('❤️ 收到 heartbeat 心跳消息，忽略同步展示')
-        } else {
-          console.log('ℹ️ 收到其他类型消息:', msg.type)
-        }
-      } catch (e) {
-        console.error('❌ 处理 incoming 消息失败', e)
-      }
-    },
-    onclose: () => console.log('ws close'),
-    onerror: (e) => console.error('ws error', e),
-    onAuthFailed: (reason) => {
-      console.log('🔑 认证失败:', reason)
-      // 清除本地凭证并跳回登录页
-      logout()
-    }
-  })
-}
-
+// 页面加载时恢复登录状态
 onMounted(async () => {
-  // 页面挂载时可做进一步初始化（如尝试恢复 token）
-  const storedToken = store.state.token || localStorage.getItem('charroom_token')
-  const storedRefreshToken = store.state.refreshToken || localStorage.getItem('charroom_refreshToken') || ''
-  const storedAccountId = localStorage.getItem('charroom_accountId')
-  if (storedToken) {
-    store.setToken(storedToken)
-    store.setRefreshToken(storedRefreshToken)
-    if (storedAccountId) {
-      store.setAccountId(storedAccountId)
-    }
+  window.addEventListener('resize', handleResize)
 
-    // 先验证token有效性，再获取用户信息
-    let activeToken = storedToken
-    let validatedToken = await api.validateToken()
-    if (!validatedToken && storedRefreshToken) {
-      const refreshed = await api.refreshToken(storedRefreshToken)
-      if (refreshed && refreshed.accessToken) {
-        activeToken = refreshed.accessToken
-        store.setToken(refreshed.accessToken)
-        store.setRefreshToken(refreshed.refreshToken || '')
-        try {
-          localStorage.setItem('charroom_token', refreshed.accessToken)
-          localStorage.setItem('charroom_refreshToken', refreshed.refreshToken || '')
-        } catch (_e) {
-          // ignore localStorage failures
-        }
-        validatedToken = await api.validateToken()
-      }
-    }
+  const savedToken = localStorage.getItem('charroom_token')
+  const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
+  const savedAccountId = localStorage.getItem('charroom_accountId')
 
-    if (validatedToken) {
-      const userRes = await api.getCurrentUser()
-      if (userRes && userRes.id) {
-        store.setAccountId(userRes.id)
-        try {
-          localStorage.setItem('charroom_token', activeToken)
-          localStorage.setItem('charroom_refreshToken', store.state.refreshToken || '')
-          localStorage.setItem('charroom_accountId', String(userRes.id))
-        } catch (_e) {
-          // ignore localStorage failures
-        }
-        // 自动恢复连接
-        chatSocket.connect(WS_URL, activeToken, store.state.accountId, {
-          onopen: () => console.log('ws restored'),
-          onmessage: (msg) => {
-            console.log('📩 恢复连接收到原始消息:', msg)
-            try {
-              if (msg.type === 'chat' && msg.chat) {
-                console.log('💬 恢复连接收到聊天消息:', msg.chat)
-                const m = {
-                  user: String(msg.chat.userId || 'unknown'),
-                  text: msg.chat.content,
-                  time: normalizeTimestamp(msg.chat.timestamp),
-                  targetId: msg.chat.targetClientId
-                }
-                console.log('📝 恢复连接构造消息对象:', m)
-                store.addMessage(m)
-                console.log('💾 恢复连接后消息列表:', store.state.messages)
-              } else if (msg.type === 'groupChat' && msg.groupChat) {
-                console.log('👥 恢复连接收到群聊消息:', msg.groupChat)
-                const gm = {
-                  user: String(msg.groupChat.userId),
-                  text: msg.groupChat.content,
-                  time: normalizeTimestamp(msg.groupChat.timestamp),
-                  groupId: msg.groupChat.targetClientId
-                }
-                store.addGroupMessage(gm)
-              } else if (msg.type === 'heartbeat') {
-                console.log('❤️ 恢复连接收到 heartbeat 心跳消息，忽略同步展示')
-              } else {
-                console.log('ℹ️ 恢复连接收到其他类型消息:', msg.type)
-              }
-            } catch (e) {
-              console.error('❌ 恢复连接处理消息失败', e)
-            }
-          },
-          onAuthFailed: (reason) => {
-            console.log('🔑 恢复连接认证失败:', reason)
-            // 清除本地凭证并跳回登录页
-            logout()
-          }
-        })
-      } else {
-        localStorage.removeItem('charroom_token')
-        localStorage.removeItem('charroom_refreshToken')
-        localStorage.removeItem('charroom_accountId')
-        store.setToken('')
-        store.setRefreshToken('')
-        store.setAccountId('')
-      }
-    } else {
-      localStorage.removeItem('charroom_token')
-      localStorage.removeItem('charroom_refreshToken')
-      localStorage.removeItem('charroom_accountId')
-      store.setToken('')
-      store.setRefreshToken('')
-      store.setAccountId('')
+  if (!savedToken || !savedAccountId) return
+
+  store.setToken(savedToken)
+  store.setRefreshToken(savedRefreshToken)
+  store.setAccountId(savedAccountId)
+
+  // 验证 token，失效则尝试刷新
+  let activeToken = savedToken
+  let validated = await api.validateToken()
+
+  if (!validated && savedRefreshToken) {
+    const refreshed = await api.refreshToken(savedRefreshToken)
+    if (refreshed?.accessToken) {
+      activeToken = refreshed.accessToken
+      store.setToken(refreshed.accessToken)
+      store.setRefreshToken(refreshed.refreshToken || '')
+      persistTokens(refreshed.accessToken, refreshed.refreshToken)
+      validated = await api.validateToken()
     }
   }
 
-  // 页面关闭时主动发送登出消息
+  if (validated) {
+    await initUserSession(activeToken, store.state.refreshToken)
+  } else {
+    clearAuth()
+  }
+
+  // 页面关闭时发送登出消息
   window.addEventListener('beforeunload', () => {
     if (store.state.token) {
-      // 发送登出消息
       chatSocket.sendWrapper({
         type: 'logout',
         logout: { userId: String(store.state.accountId) }
       }).catch(() => {})
     }
   })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
