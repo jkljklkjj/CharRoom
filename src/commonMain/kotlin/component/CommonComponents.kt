@@ -405,29 +405,35 @@ fun UserAvatar(
         }
     }
 
-    if (avatarBitmap != null) {
-        Image(
-            bitmap = avatarBitmap,
-            contentDescription = "用户头像",
-            modifier = Modifier
-                .size(size)
-                .clip(CircleShape)
-                .clickable { onClick?.invoke() }
-        )
-    } else {
-        Box(
-            modifier = Modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(MaterialTheme.colors.primary)
-                .clickable { onClick?.invoke() },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = user.username.firstOrNull()?.toString() ?: "U",
-                color = Color.White,
-                style = MaterialTheme.typography.caption
+    // 使用 Crossfade 实现平滑过渡，避免闪动
+    Crossfade(
+        targetState = avatarBitmap,
+        animationSpec = tween(200, easing = FastOutSlowInEasing)
+    ) { bitmap ->
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = "用户头像",
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .clickable { onClick?.invoke() }
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colors.primary)
+                    .clickable { onClick?.invoke() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = user.username.firstOrNull()?.toString() ?: "U",
+                    color = Color.White,
+                    style = MaterialTheme.typography.caption
+                )
+            }
         }
     }
 }

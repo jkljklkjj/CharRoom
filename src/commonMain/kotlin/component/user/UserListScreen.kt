@@ -275,6 +275,27 @@ fun UserList(
                 items = filteredUsers,
                 key = { it.id }
             ) { user ->
+                // 交错动画：每个列表项有不同的延迟
+                val itemIndex = filteredUsers.indexOf(user)
+                var itemVisible by remember(user.id) { mutableStateOf(false) }
+
+                LaunchedEffect(user.id) {
+                    kotlinx.coroutines.delay(itemIndex * 30L) // 每项延迟30ms
+                    itemVisible = true
+                }
+
+                AnimatedVisibility(
+                    visible = itemVisible,
+                    enter = fadeIn(
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    ) + slideInHorizontally(
+                        initialOffsetX = { -it / 4 }, // 从左侧滑入
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                ) {
                 val displayName = buildDisplayName(user)
                 val subtitle = buildSubtitle(user, allMessages, allGroupMessages)
                 val unreadCount = conversationStates[user.id]?.unreadCount ?: 0
@@ -330,9 +351,18 @@ fun UserList(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (showOnlineDot(user)) {
+                            val pulseScale = if (user.online == true) {
+                                rememberPulseAnimation()
+                            } else {
+                                1f
+                            }
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
+                                    .graphicsLayer {
+                                        scaleX = pulseScale
+                                        scaleY = pulseScale
+                                    }
                                     .background(
                                         color = if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1),
                                         shape = CircleShape
@@ -434,6 +464,7 @@ fun UserList(
                         }
                     }
                 }
+                } // 结束 AnimatedVisibility
             }
         }
     }

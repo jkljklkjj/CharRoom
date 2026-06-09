@@ -164,6 +164,49 @@ fun ChatScreen(
     onMyAvatarClick: (() -> Unit)? = null, // 点击自己头像回调
     onBackClick: (() -> Unit)? = null // 点击返回按钮回调
 ) {
+    // 添加进入动画，避免闪动
+    var isReady by remember(user.id) { mutableStateOf(false) }
+    LaunchedEffect(user.id) {
+        kotlinx.coroutines.delay(50) // 短暂延迟让界面准备好
+        isReady = true
+    }
+
+    // 使用 Crossfade 实现平滑过渡
+    Crossfade(
+        targetState = isReady,
+        animationSpec = tween(150, easing = FastOutSlowInEasing)
+    ) { ready ->
+        if (ready) {
+            ChatScreenContent(
+                chatViewModel = chatViewModel,
+                user = user,
+                onAvatarClick = onAvatarClick,
+                onMyAvatarClick = onMyAvatarClick,
+                onBackClick = onBackClick
+            )
+        } else {
+            // 加载状态：显示占位符
+            Box(
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colors.primary,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatScreenContent(
+    chatViewModel: ChatViewModel,
+    user: User,
+    onAvatarClick: ((User) -> Unit)? = null,
+    onMyAvatarClick: (() -> Unit)? = null,
+    onBackClick: (() -> Unit)? = null
+) {
     var messageText by remember { mutableStateOf("") }
     // 从ViewModel收集消息状态
     val allMessages by chatViewModel.messagesFlow.collectAsState()
@@ -612,11 +655,19 @@ fun ChatScreen(
 
                     AnimatedVisibility(
                         visible = visible,
-                        enter = if (isNewMessage) fadeIn() + scaleIn(
-                            initialScale = 0.9f,
+                        enter = if (isNewMessage) fadeIn(
+                            animationSpec = tween(200, easing = FastOutSlowInEasing)
+                        ) + scaleIn(
+                            initialScale = 0.85f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessLow
+                                stiffness = Spring.StiffnessMedium
+                            )
+                        ) + slideInVertically(
+                            initialOffsetY = { it / 4 },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
                             )
                         ) else fadeIn(initialAlpha = 1f), // 历史消息无动画直接显示
                         modifier = Modifier
@@ -665,11 +716,13 @@ fun ChatScreen(
                                     modifier = Modifier
                                         .widthIn(max = maxBubbleWidth) // 最大宽度为屏幕的40%，内容短自动适配
                                         .shadow(
-                                            elevation = if (message.sender) 4.dp else 2.dp,
-                                            shape = RoundedCornerShape(18.dp)
+                                            elevation = if (message.sender) 6.dp else 3.dp,
+                                            shape = RoundedCornerShape(18.dp),
+                                            ambientColor = Color.Black.copy(alpha = 0.1f),
+                                            spotColor = Color.Black.copy(alpha = 0.08f)
                                         )
                                         .clip(RoundedCornerShape(18.dp))
-                                        .background(messageBubbleBrush(message.sender, isDarkMode))
+                                        .background(refinedMessageBubbleBrush(message.sender, isDarkMode))
                                         .border(1.dp, bubbleBorderColor, RoundedCornerShape(18.dp))
                                         .combinedClickable(
                                             onClick = {},

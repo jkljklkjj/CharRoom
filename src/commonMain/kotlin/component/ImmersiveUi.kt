@@ -1,8 +1,6 @@
 package component
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +10,7 @@ import androidx.compose.material.darkColors
 import androidx.compose.material.lightColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -142,4 +141,108 @@ fun rememberElasticScale(
         )
     )
     return scale
+}
+
+/**
+ * 消息气泡弹出动画
+ */
+@Composable
+fun rememberBubbleAnimation(): Float {
+    val scale by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        )
+    )
+    return scale
+}
+
+/**
+ * 脉冲动画（用于在线状态指示器）
+ */
+@Composable
+fun rememberPulseAnimation(): Float {
+    val infiniteTransition = rememberInfiniteTransition()
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.8f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+    return pulse
+}
+
+/**
+ * 渐变边框效果
+ */
+fun gradientBorderBrush(isDarkMode: Boolean): Brush {
+    return if (isDarkMode) {
+        Brush.linearGradient(
+            listOf(
+                Color(0xFFE3A16D).copy(alpha = 0.6f),
+                Color(0xFFF0B285).copy(alpha = 0.8f),
+                Color(0xFFE3A16D).copy(alpha = 0.6f)
+            )
+        )
+    } else {
+        Brush.linearGradient(
+            listOf(
+                Color(0xFFCA763A).copy(alpha = 0.4f),
+                Color(0xFFD9894C).copy(alpha = 0.6f),
+                Color(0xFFE9A770).copy(alpha = 0.4f)
+            )
+        )
+    }
+}
+
+/**
+ * 更精致的消息气泡渐变
+ */
+fun refinedMessageBubbleBrush(isMine: Boolean, isDarkMode: Boolean): Brush {
+    return if (isMine) {
+        if (isDarkMode) {
+            Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFC98655),
+                    Color(0xFFB26B37),
+                    Color(0xFF93572A)
+                ),
+                center = androidx.compose.ui.geometry.Offset(0.3f, 0.3f),
+                radius = 300f
+            )
+        } else {
+            Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFF0C8A0),
+                    Color(0xFFE7A873),
+                    Color(0xFFD9894D)
+                ),
+                center = androidx.compose.ui.geometry.Offset(0.3f, 0.3f),
+                radius = 300f
+            )
+        }
+    } else {
+        if (isDarkMode) {
+            Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFF352922),
+                    Color(0xFF2B221D)
+                ),
+                center = androidx.compose.ui.geometry.Offset(0.7f, 0.3f),
+                radius = 300f
+            )
+        } else {
+            Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFFF9F5),
+                    Color(0xFFFFF4EA)
+                ),
+                center = androidx.compose.ui.geometry.Offset(0.7f, 0.3f),
+                radius = 300f
+            )
+        }
+    }
 }
