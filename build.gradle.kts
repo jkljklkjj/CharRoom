@@ -86,6 +86,14 @@ sourceSets {
         kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin")
         resources.srcDirs("src/commonMain/resources", "src/desktopMain/resources")
     }
+    create("cli") {
+        kotlin.srcDirs("src/cliMain/kotlin")
+        resources.srcDirs("src/commonMain/resources", "src/cliMain/resources")
+        dependencies {
+            implementation(sourceSets.main.get().output)
+            implementation(sourceSets.main.get().compileClasspath)
+        }
+    }
     test {
         kotlin.srcDirs("src/commonTest/kotlin", "src/desktopTest/kotlin", "src/androidUnitTest/kotlin")
         dependencies {
@@ -326,6 +334,32 @@ tasks.register("runDesktopProguard") {
     group = "distribution"
     description = "Run the local desktop ProGuard step"
     dependsOn("customProguardReleaseJars")
+}
+
+// CLI 可执行 Fat JAR 任务
+tasks.register<Jar>("cliJar") {
+    description = "Build CLI chat client executable fat JAR"
+    group = "cli"
+    archiveBaseName.set("chatlite-cli")
+    archiveVersion.set("1.0.0")
+
+    from(sourceSets.named("cli").get().output)
+    from(sourceSets.main.get().output)
+    from(sourceSets.named("cli").get().allSource)
+
+    // 打包全部运行时依赖
+    from({
+        configurations["cliRuntimeClasspath"].filter { it.name.endsWith(".jar") }.map { zipTree(it) }
+    }) {
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/*.EC")
+        exclude("META-INF/*.kotlin_module")
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes["Main-Class"] = "CliMainKt"
+    }
+    dependsOn(tasks.named("compileKotlin"))
 }
 
 // Do not run custom ProGuard automatically on every JAR build in CI.
