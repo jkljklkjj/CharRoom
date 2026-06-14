@@ -238,7 +238,7 @@ tasks.register("buildTrimmedMsi") {
 
             // 重新打包MSI
             delete(file("build/compose/binaries/main-release/msi/chatlite-1.0.0.msi"))
-            exec {
+            project.exec {
                 workingDir = rootProject.projectDir
                 if (System.getProperty("os.name").contains("Windows", ignoreCase = true)) {
                     commandLine("gradlew.bat", "--rerun-tasks", "packageReleaseMsi")

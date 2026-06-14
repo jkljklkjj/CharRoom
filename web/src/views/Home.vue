@@ -278,7 +278,7 @@ async function handleAccept(requesterId, idx) {
     // remove from list
     friendRequests.value.splice(idx, 1)
   } else {
-    alert('接受失败')
+    window.$toast.error('接受失败')
   }
 }
 
@@ -415,8 +415,13 @@ onMounted(() => {
 
 .btn.ghost {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   color: #fff;
+  transition: all 0.2s ease;
+}
+.btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.8);
 }
 
 .hero-highlights {
@@ -634,6 +639,8 @@ onMounted(() => {
   .hero {
     padding: 32px 16px;
     margin: 0 12px 20px;
+    background-image: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 60%);
+    background-size: auto;
   }
   .hero-inner {
     flex-direction: column;
@@ -703,11 +710,19 @@ onMounted(() => {
   .cta {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
   .btn {
     text-align: center;
     margin-right: 0;
+    padding: 12px 16px;
+  }
+  .btn.primary {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  .btn.ghost {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.7);
   }
 }
 
@@ -725,6 +740,7 @@ onMounted(() => {
   .hero {
     margin: 0 12px 16px;
     padding: 24px 16px;
+    background-image: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 60%);
   }
   .hero-title {
     font-size: 22px;

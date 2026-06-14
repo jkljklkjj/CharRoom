@@ -195,20 +195,29 @@ function saveGroupMessage(message) {
 }
 
 function loadConversation(id, isGroup = false) {
-  if (!state.accountId || !id) {
+  console.log('🟢 loadConversation 调用, id=', id, 'isGroup=', isGroup)
+  if (!id) {
     state.selectedChatId = null
     state.messages = []
     state.groupMessages = []
+    console.log('🟢 !id 分支, selectedChatId 重置为 null')
     return
   }
   state.selectedChatId = id
   clearConversationUnread(id)
-  if (isGroup) {
-    state.messages = []
-    state.groupMessages = loadGroupConversation(state.accountId, Math.abs(Number(id)))
+  console.log('🟢 已设置 selectedChatId=', state.selectedChatId)
+  if (state.accountId) {
+    if (isGroup) {
+      state.messages = []
+      state.groupMessages = loadGroupConversation(state.accountId, Math.abs(Number(id)))
+    } else {
+      state.groupMessages = []
+      state.messages = loadPrivateConversation(state.accountId, id)
+    }
   } else {
+    // accountId为空时，只设置选中ID，不加载历史消息
+    state.messages = []
     state.groupMessages = []
-    state.messages = loadPrivateConversation(state.accountId, id)
   }
 }
 

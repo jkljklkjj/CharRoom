@@ -1,6 +1,12 @@
 <template>
   <div class="app-wrap">
-    <LoginRegister v-if="!store.state.token" @logged="onLogged" />
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-wrap">
+      <div class="loading-spinner"></div>
+      <p>正在验证登录状态...</p>
+    </div>
+
+    <LoginRegister v-else-if="!store.state.token || !store.state.loginValid" @logged="onLogged" />
 
     <div v-else class="app-main" :class="{ 'mobile-view': isMobile }">
       <!-- 移动端视图 -->
@@ -38,6 +44,14 @@
           <button class="close-settings" @click="closeSettings">×</button>
         </div>
         <div class="settings-body">
+          <div class="settings-item">
+            <label>主题设置</label>
+            <div class="theme-options">
+              <button :class="{ active: theme === 'auto' }" @click="setTheme('auto')">自动</button>
+              <button :class="{ active: theme === 'light' }" @click="setTheme('light')">浅色</button>
+              <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')">深色</button>
+            </div>
+          </div>
           <button class="logout-btn" @click="logout">退出登录</button>
         </div>
       </div>
@@ -77,6 +91,28 @@ const isMobile = ref(window.innerWidth < 768)
 const currentView = ref('list') // 'list' | 'chat'
 const currentChatName = ref('')
 const showSettings = ref(false)
+const loading = ref(true) // 登录状态验证中
+
+// 主题设置
+const theme = ref(localStorage.getItem('theme') || 'auto') // auto, light, dark
+
+function setTheme(newTheme) {
+  theme.value = newTheme
+  localStorage.setItem('theme', newTheme)
+  applyTheme(newTheme)
+}
+
+function applyTheme(theme) {
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark')
+  } else if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light')
+  } else {
+    // 自动跟随系统
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
+  }
+}
 
 function handleResize() {
   isMobile.value = window.innerWidth < 768
@@ -197,11 +233,28 @@ function closeSettings() {
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
 
+  // 初始化主题
+  applyTheme(theme.value)
+  // 监听系统主题变化
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  const handleSystemThemeChange = () => {
+    if (theme.value === 'auto') {
+      applyTheme('auto')
+    }
+  }
+  mediaQuery.addEventListener('change', handleSystemThemeChange)
+  onUnmounted(() => {
+    mediaQuery.removeEventListener('change', handleSystemThemeChange)
+  })
+
   const savedToken = localStorage.getItem('charroom_token')
   const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
   const savedAccountId = localStorage.getItem('charroom_accountId')
 
-  if (!savedToken || !savedAccountId) return
+  if (!savedToken || !savedAccountId) {
+    loading.value = false
+    return
+  }
 
   store.setToken(savedToken)
   store.setRefreshToken(savedRefreshToken)
@@ -228,6 +281,8 @@ onMounted(async () => {
     clearAuth()
   }
 
+  loading.value = false
+
   // 页面关闭时发送登出消息
   window.addEventListener('beforeunload', () => {
     if (store.state.token) {
@@ -245,6 +300,35 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.loading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #f8f9fa;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #ff7a33;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-wrap p {
+  margin-top: 16px;
+  color: #666;
+  font-size: 14px;
+}
+
 .app-wrap{height:100vh;display:flex;flex-direction:column}
 .app-main{display:flex;flex:1;min-height:0}
 .sidebar{width:260px;border-right:1px solid rgba(0,0,0,0.04);background:var(--bg)}
@@ -273,7 +357,7 @@ onUnmounted(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: #fff;
+    background: var(--bg);
     display: flex;
     flex-direction: column;
     z-index: 10;
@@ -369,5 +453,38 @@ onUnmounted(() => {
 
 .logout-btn:hover {
   background: #e04747;
+}
+
+/* 主题设置样式 */
+.settings-item {
+  margin-bottom: 20px;
+}
+.settings-item label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.theme-options {
+  display: flex;
+  gap: 8px;
+}
+.theme-options button {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.theme-options button.active {
+  border-color: var(--accent-2);
+  background: var(--accent-2);
+  color: white;
+}
+.theme-options button:hover {
+  opacity: 0.9;
 }
 </style>

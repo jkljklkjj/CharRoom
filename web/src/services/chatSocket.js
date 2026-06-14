@@ -74,7 +74,7 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
           console.log('📤 正在发送登录消息，token长度:', token.length)
           const result = await sendWrapper({
             type: 'login',
-            login: { targetClientId: token }
+            login: { token: token }
           })
           console.log('✅ 登录消息发送结果:', result)
         } catch (err) {
@@ -176,6 +176,13 @@ export function connect(wsUrl, token, userId, { onopen, onmessage, onclose, oner
         console.log(`👤 收到用户在线状态更新: userId=${clientId}, online=${online}`)
         // 这里不需要额外处理，直接传给上层Vuex/store更新状态即可
         // 上层会负责更新用户列表中的在线状态
+      }
+
+      // 新消息系统通知
+      if (processedData.type === 'chat' && processedData.chat) {
+        showNotification(processedData.chat)
+      } else if (processedData.type === 'groupChat' && processedData.groupChat) {
+        showNotification(processedData.groupChat, true)
       }
     }
 
@@ -415,6 +422,57 @@ export function readyState() {
 
 export function isConnected() {
   return socket && socket.readyState === WebSocket.OPEN
+}
+
+/**
+ * 新消息系统通知
+ * @param {Object} message 消息对象
+ * @param {Boolean} isGroup 是否为群聊消息
+ */
+function showNotification(message, isGroup = false) {
+  // 页面可见时不弹通知
+  if (document.visibilityState === 'visible') return
+
+  // 没有通知权限，先申请
+  if (!('Notification' in window)) return
+  if (Notification.permission !== 'granted') {
+    Notification.requestPermission()
+    return
+  }
+
+  const userId = currentUserId ? String(currentUserId) : ''
+  const senderId = String(message.userId || '')
+  // 自己发的消息不弹通知
+  if (senderId === userId) return
+
+  let title = isGroup ? '群聊消息' : '新消息'
+  let body = message.content || '收到一条新消息'
+
+  // 显示通知
+  const notification = new Notification(title, {
+    body: body,
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    tag: isGroup ? `group-${message.targetClientId}` : `user-${senderId}`, // 同一会话的消息合并
+    renotify: true,
+    silent: false
+  })
+
+  // 点击通知跳转到对应聊天
+  notification.onclick = () => {
+    window.focus()
+    notification.close()
+    // 可以在这里添加跳转到对应聊天的逻辑
+  }
+}
+
+// 页面加载时申请通知权限
+if ('Notification' in window && Notification.permission === 'default') {
+  // 延迟到用户交互后再申请，避免被浏览器拦截
+  document.addEventListener('click', function requestNotificationPermission() {
+    Notification.requestPermission()
+    document.removeEventListener('click', requestNotificationPermission)
+  }, { once: true })
 }
 
 export default { connect, sendWrapper, sendAck, close, readyState, isConnected, sanitizeMessage }

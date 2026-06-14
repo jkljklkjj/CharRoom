@@ -34,7 +34,7 @@ let cooldownTimer = null
 onMounted(() => {
   const pending = store.state.pendingRegister
   if (!pending || !pending.email || !pending.password) {
-    alert('未检测到待验证的注册信息，返回登录')
+    window.$toast.warning('未检测到待验证的注册信息，返回登录')
     router.push({ name: 'WebApp' })
     return
   }
@@ -56,14 +56,14 @@ onBeforeUnmount(() => {
 })
 
 async function submit() {
-  if (!code.value) { alert('请输入验证码'); return }
+  if (!code.value) { window.$toast.warning('请输入验证码'); return }
   const id = await api.verifyRegister(email.value, code.value, password)
   if (id && id !== -1) {
-    alert('验证通过，注册成功，请登录')
+    window.$toast.success('验证通过，注册成功，请登录')
     store.clearPendingRegister()
     router.push({ name: 'WebApp' })
   } else {
-    alert('验证码错误或注册失败')
+    window.$toast.error('验证码错误或注册失败')
   }
 }
 
@@ -75,9 +75,9 @@ async function resend() {
     // 本地记录冷却到期时间（120s）并启动倒计时
     try { localStorage.setItem('verify:email:cooldown:' + email.value, String(Date.now() + 120000)); } catch (e) {}
     startCooldown(120)
-    alert('验证码已重新发送')
+    window.$toast.success('验证码已重新发送')
   } else {
-    alert('发送失败')
+    window.$toast.error('发送失败')
   }
 }
 

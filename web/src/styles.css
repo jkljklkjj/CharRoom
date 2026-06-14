@@ -5,8 +5,102 @@
   --accent-2:#ff7a33;
   --muted:#666;
   --surface-border: rgba(0,0,0,0.04);
+  --text-primary: #222;
+  --text-secondary: #666;
+  --bubble-bg: #f5f5f5;
 }
-body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans CJK SC",sans-serif;background:var(--bg);color:#222;margin:0;overflow-x:hidden}
+
+/* 深色主题 */
+[data-theme="dark"] {
+  --bg:#1a1a1a;
+  --panel:#2d2d2d;
+  --accent-1:#ff9966;
+  --accent-2:#ff7a33;
+  --muted:#999;
+  --surface-border: rgba(255,255,255,0.08);
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --bubble-bg: #3d3d3d;
+}
+body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans CJK SC",sans-serif;background:var(--bg);color:var(--text-primary);margin:0;overflow-x:hidden}
+
+/* ==========================================
+   移动端原生体验适配
+   ========================================== */
+
+/* 1. 安全区域适配：刘海屏、灵动岛、底部手势条 */
+body {
+  /* 顶部安全区域（刘海/灵动岛） */
+  padding-top: env(safe-area-inset-top, 0);
+  /* 底部安全区域（手势条） */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  /* 左右安全区域（曲面屏圆角） */
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+/* 2. 触摸体验优化 */
+* {
+  /* 禁用长按选择/复制，提升应用感 */
+  user-select: none;
+  /* 禁用点击高亮效果 */
+  -webkit-tap-highlight-color: transparent;
+  /* 禁止双击缩放 */
+  touch-action: manipulation;
+  /* 平滑滚动 */
+  scroll-behavior: smooth;
+}
+
+/* 3. iOS弹性滚动优化 */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 4. 按钮/可点击元素原生反馈 */
+button,
+[role="button"],
+.clickable {
+  /* 点击缩小反馈 */
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+button:active,
+[role="button"]:active,
+.clickable:active {
+  transform: scale(0.96);
+  opacity: 0.9;
+}
+
+/* 5. 输入框特殊处理 */
+input, textarea, [contenteditable] {
+  /* 输入框允许选择文本 */
+  user-select: text;
+  /* 移除默认输入框样式 */
+  outline: none;
+}
+
+/* 6. 禁止图片拖拽 */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* 7. 滚动条美化（移动端隐藏） */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
 .container{max-width:1000px;margin:0 auto;padding:20px}
 
 /* 移动端取消容器内边距 */

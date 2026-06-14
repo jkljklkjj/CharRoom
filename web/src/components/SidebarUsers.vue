@@ -119,7 +119,9 @@ function initials(name) {
 }
 
 function select(u) {
+  console.log('🔵 SidebarUsers.select 触发, u.id=', u.id, 'type=', typeof u.id)
   store.setSelectedChat(u.id)
+  console.log('🔵 setSelectedChat 之后, store.state.selectedChatId=', store.state.selectedChatId)
   emit('user-selected', u)
 
   // 点击用户时，主动查询该用户的在线状态（排除AI助手和群组）
@@ -138,7 +140,7 @@ function select(u) {
 function onAdd() {
   const account = prompt('输入对方账号（数字ID或邮箱）以添加为好友')
   if (!account) return
-  api.addFriend(account).then(ok => { if (ok) alert('已发送好友请求') })
+  api.addFriend(account).then(ok => { if (ok) window.$toast.success('已发送好友请求') })
 }
 
 function openSettings() {
@@ -162,25 +164,25 @@ async function loadFriendRequests() {
 async function handleAccept(userId) {
   const ok = await api.acceptFriend(userId)
   if (ok) {
-    alert('已同意好友申请')
+    window.$toast.success('已同意好友申请')
     // 移除已处理的申请
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
     // 刷新好友列表
     const friends = await api.getFriends()
     store.setUsers(friends)
   } else {
-    alert('操作失败，请重试')
+    window.$toast.error('操作失败，请重试')
   }
 }
 
 async function handleReject(userId) {
   const ok = await api.rejectFriend(userId)
   if (ok) {
-    alert('已拒绝好友申请')
+    window.$toast.info('已拒绝好友申请')
     // 移除已处理的申请
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
   } else {
-    alert('操作失败，请重试')
+    window.$toast.error('操作失败，请重试')
   }
 }
 

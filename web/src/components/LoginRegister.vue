@@ -40,19 +40,19 @@ async function doAction() {
 }
 
 async function doLogin() {
-  if (!account.value || !password.value) { alert('请填写账号和密码'); return }
+  if (!account.value || !password.value) { window.$toast.warning('请填写账号和密码'); return }
   const tokens = await api.login(account.value, password.value)
   if (tokens && tokens.accessToken) {
     store.setToken(tokens.accessToken)
     store.setRefreshToken(tokens.refreshToken || '')
     emit('logged', tokens)
   } else {
-    alert('登录失败，请检查账号密码')
+    window.$toast.error('登录失败，请检查账号密码')
   }
 }
 
 async function doRegister() {
-  if (!account.value || !password.value) { alert('请填写邮箱与密码'); return }
+  if (!account.value || !password.value) { window.$toast.warning('请填写邮箱与密码'); return }
   // 发送验证码到邮箱，跳转到验证码输入页
   const sent = await api.sendVerifyCode(account.value)
   if (sent) {
@@ -61,7 +61,7 @@ async function doRegister() {
     store.setPendingRegister({ email: account.value, password: password.value })
     router.push({ name: 'Verify' })
   } else {
-    alert('发送验证码失败，请稍后重试')
+    window.$toast.error('发送验证码失败，请稍后重试')
   }
 }
 </script>
