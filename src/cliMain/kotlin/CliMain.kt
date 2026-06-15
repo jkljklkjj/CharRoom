@@ -1,234 +1,161 @@
 import core.ApiEndpoints
 import core.agentChat
-import data.repository.AuthState
+import core.NettyWebSocketClient
+import core.QuicClientImpl
+import core.WebSocketClientProvider
+import core.state.AuthState
+import core.state.GlobalAppState
+import data.datasource.local.LocalDataSourceImpl
 import data.repository.GlobalAuthRepository
 import data.repository.GlobalChatRepository
 import kotlinx.coroutines.*
 
 fun main(args: Array<String>) = runBlocking {
-    val cli = ChatLiteCli(args)
-    cli.run()
+    ChatLiteCli(args).run()
 }
 
 class ChatLiteCli(private val args: Array<String>) {
 
-    private var serverUrl = "http://127.0.0.1:8088"
+    private var serverUrl = "https://chatlite.xin"
     private var username = ""
     private var password = ""
-    private var token = ""
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val localDataSource = LocalDataSourceImpl()
+    private var useQuic = true
+    private var transport: WebSocketClientProvider = NettyWebSocketClient
 
     suspend fun run() {
         parseArgs()
         printWelcome()
 
-        if (username.isNotBlank() && password.isNotBlank()) {
-            loginAutomatically()
-        } else {
-            promptInteractiveLogin()
+        // 登录：优先命令行参数 → 自动登录（读 ~/.qingliao/auth.txt） → 交互式
+        val loggedIn = loginWithArgs()
+            || tryAutoLogin()
+            || interactiveLogin()
+
+        if (!loggedIn) { println("认证失败，退出"); scope.cancel(); return }
+
+        val token = GlobalAppState.currentToken ?: run { println("认证状态异常"); scope.cancel(); return }
+
+        println("登录成功，欢迎使用轻聊命令行客户端！输入 /help 查看所有命令")
+
+        // 传输层选择: QUIC (默认) 或 WebSocket
+        showWsStatus()
+        if (token.isNotBlank()) {
+            transport = if (useQuic) {
+                println("[QUIC] 使用 QUIC 协议")
+                QuicClientImpl()
+            } else {
+                println("[WS] 使用 WebSocket 协议")
+                NettyWebSocketClient
+            }
+            transport.addMessageReceiveListener(object : core.MessageReceiveListener {
+                override fun onPrivateMessageReceived(senderId: Int, msg: String, timestamp: Long) {
+                    println("\n💬 [用户 $senderId]: $msg"); print("> ")
+                }
+                override fun onGroupMessageReceived(gid: Int, sid: Int, name: String, msg: String, ts: Long) {
+                    println("\n👥 [群 $gid $name]: $msg"); print("> ")
+                }
+            })
+            transport.addAuthStateListener { reason ->
+                println("\n⚠️ 登录失效: $reason")
+            }
+            try {
+                transport.start()
+                println(if (useQuic) "[QUIC] 连接完成" else "[WS] 连接完成")
+            } catch (e: Exception) { println(if (useQuic) "[QUIC] $e" else "[WS] $e") }
         }
 
-        if (token.isBlank()) {
-            println("认证失败，退出")
-            return
-        }
+        // 加载联系人
+        try { println("已加载 ${GlobalChatRepository.fetchFriends().size} 个联系人") } catch (_: Exception) {}
 
-        println("登录成功，欢迎使用轻聊命令行客户端！")
-        println("输入 /help 查看所有命令")
-
-        startMessageListener()
-        enterReplLoop()
-
+        // 命令循环
+        enterReplLoop(token)
+        transport.logoutAndDisconnect()
         scope.cancel()
         println("再见")
+    }
+
+    private suspend fun loginWithArgs(): Boolean {
+        if (username.isBlank() || password.isBlank()) return false
+        print("登录 $username ... ")
+        val r = GlobalAuthRepository.login(username, password, rememberMe = true)
+        val ok = r is AuthState.Authenticated
+        println(if (ok) "OK" else "FAIL")
+        return ok
+    }
+
+    private suspend fun tryAutoLogin(): Boolean {
+        val acct = localDataSource.getSavedAccount() ?: return false
+        print("自动登录 $acct ... ")
+        GlobalAuthRepository.init()
+        val ok = GlobalAppState.authState.value is AuthState.Authenticated
+        println(if (ok) "OK" else "FAIL（清除旧凭证）")
+        if (!ok) localDataSource.clearAuth()
+        return ok
+    }
+
+    private suspend fun interactiveLogin(): Boolean {
+        print("账号: "); username = readLine()?.trim().orEmpty()
+        if (username.isBlank()) return false
+        print("密码: "); password = System.console()?.readPassword()?.concatToString() ?: readLine().orEmpty()
+        return loginWithArgs()
+    }
+
+    // ---- 以下为 CLI 特有的命令处理 ----
+
+    private fun enterReplLoop(token: String) = runBlocking {
+        while (true) {
+            print("> ")
+            val line = readLine() ?: break
+            val t = line.trim(); if (t.isBlank()) continue
+            when {
+                t.startsWith("/ai ") -> handleAi(token, t.removePrefix("/ai ").trim())
+                t == "/friend list" -> { val f = GlobalChatRepository.fetchFriends(); println("好友(${f.size}): ${f.joinToString { "${it.id}:${it.username}" }}") }
+                t.startsWith("/friend add ") -> { val ok = GlobalChatRepository.addFriend(t.removePrefix("/friend add ").trim()); println(if (ok) "OK" else "FAIL") }
+                t.startsWith("/friend accept ") -> { val ok = GlobalChatRepository.acceptFriend(t.removePrefix("/friend accept ").trim()); println(if (ok) "OK" else "FAIL") }
+                t.startsWith("/friend reject ") -> { val ok = GlobalChatRepository.rejectFriend(t.removePrefix("/friend reject ").trim()); println(if (ok) "OK" else "FAIL") }
+                t == "/group list" -> { val g = GlobalChatRepository.fetchGroups(); println("群组(${g.size}): ${g.joinToString { "${it.id}:${it.username}" }}") }
+                t.startsWith("/group join ") -> { val ok = GlobalChatRepository.addGroup(t.removePrefix("/group join ").trim()); println(if (ok) "OK" else "FAIL") }
+                t == "/status" -> showWsStatus()
+                t == "/help" -> printHelp()
+                t == "/exit" || t == "/quit" -> break
+                else -> handleAi(token, t)
+            }
+        }
+    }
+
+    private suspend fun handleAi(token: String, content: String) {
+        print("AI 思考中... ")
+        println(agentChat(token, content, stream = false))
+    }
+
+    private fun showWsStatus() {
+        val proto = if (useQuic) "QUIC" else "WebSocket"
+        println("服务器: $serverUrl | $proto: ${if (transport.isConnected()) "🟢已连接" else "🔴未连接"} | 用户: ${GlobalAppState.currentAccount ?: "-"}")
+    }
+
+    private fun printHelp() {
+        println("""命令: /ai <text> | /friend list|add|accept|reject | /group list|join | /status | /help | /exit""".trimIndent())
     }
 
     private fun parseArgs() {
         var i = 0
         while (i < args.size) {
             when (args[i]) {
-                "--server" -> { serverUrl = args.getOrElse(i + 1) { serverUrl }; i++ }
+                "--server" -> { serverUrl = args.getOrElse(i + 1) { serverUrl }.removeSuffix("/"); ApiEndpoints.setBaseUrl(serverUrl + "/api"); i++ }
                 "--username" -> { username = args.getOrElse(i + 1) { "" }; i++ }
                 "--password" -> { password = args.getOrElse(i + 1) { "" }; i++ }
+                "--quic" -> { useQuic = true }
+                "--no-quic" -> { useQuic = false }
             }
             i++
         }
-        ApiEndpoints.baseUrl = serverUrl.removeSuffix("/")
     }
 
     private fun printWelcome() {
         println("=".repeat(50))
-        println("     ChatLite CLI v1.0")
-        println("     Server: $serverUrl")
+        println("     ChatLite CLI v1.0 — Server: $serverUrl")
         println("=".repeat(50))
-    }
-
-    private suspend fun loginAutomatically() {
-        print("正在登录 $username ... ")
-        val state = GlobalAuthRepository.login(username, password, rememberMe = true)
-        if (state is AuthState.Authenticated) {
-            token = state.accessToken
-            println("OK")
-        } else {
-            println("FAIL " + (state as? AuthState.Error)?.message)
-        }
-    }
-
-    private suspend fun promptInteractiveLogin() {
-        print("账号: ")
-        username = readLine()?.trim().orEmpty()
-        print("密码: ")
-        password = System.console()?.readPassword()?.concatToString() ?: readLine().orEmpty()
-        print("登录中... ")
-        val state = GlobalAuthRepository.login(username, password, rememberMe = false)
-        if (state is AuthState.Authenticated) {
-            token = state.accessToken
-            println("OK")
-        } else {
-            println("FAIL " + (state as? AuthState.Error)?.message)
-        }
-    }
-
-    private fun startMessageListener() {
-        println("CLI 模式使用纯 REST API")
-    }
-
-    private suspend fun enterReplLoop() {
-        while (true) {
-            print("> ")
-            val line = readLine() ?: break
-            val trimmed = line.trim()
-            if (trimmed.isBlank()) continue
-            when {
-                trimmed.startsWith("/ai ") -> handleAi(trimmed.removePrefix("/ai ").trim())
-                trimmed == "/friend list" -> handleFriendList()
-                trimmed.startsWith("/friend add ") -> handleAddFriend(trimmed.removePrefix("/friend add ").trim())
-                trimmed.startsWith("/friend remove ") -> handleRemoveFriend(trimmed.removePrefix("/friend remove ").trim())
-                trimmed == "/friend requests" -> handleFriendRequests()
-                trimmed.startsWith("/friend accept ") -> handleAcceptFriend(trimmed.removePrefix("/friend accept ").trim())
-                trimmed.startsWith("/friend reject ") -> handleRejectFriend(trimmed.removePrefix("/friend reject ").trim())
-                trimmed == "/group list" -> handleGroupList()
-                trimmed.startsWith("/group join ") -> handleJoinGroup(trimmed.removePrefix("/group join ").trim())
-                trimmed.startsWith("/group leave ") -> handleLeaveGroup(trimmed.removePrefix("/group leave ").trim())
-                trimmed == "/group requests" -> handleGroupRequests()
-                trimmed.startsWith("/group accept ") -> handleAcceptGroup(trimmed.removePrefix("/group accept ").trim())
-                trimmed.startsWith("/group reject ") -> handleRejectGroup(trimmed.removePrefix("/group reject ").trim())
-                trimmed == "/help" -> printHelp()
-                trimmed == "/exit" || trimmed == "/quit" -> break
-                else -> handleAi(trimmed)
-            }
-        }
-    }
-
-    private suspend fun handleAi(content: String) {
-        print("AI 思考中... ")
-        val resp = agentChat(token, content, stream = false)
-        println("\r$resp")
-    }
-
-    private suspend fun handleFriendList() {
-        val friends = GlobalChatRepository.fetchFriends()
-        println("好友列表 (共 ${friends.size}):")
-        friends.forEachIndexed { idx, u ->
-            println("  ${idx + 1}. id=${u.id} name=${u.nickname}")
-        }
-    }
-
-    private suspend fun handleAddFriend(account: String) {
-        print("添加好友 $account ... ")
-        val ok = GlobalChatRepository.addFriend(token, account)
-        if (ok) println("OK") else println("FAIL")
-    }
-
-    private suspend fun handleRemoveFriend(idStr: String) {
-        print("删除好友 $idStr ... 注意: 后端暂留接口占位实现")
-        println(" OK")
-    }
-
-    private suspend fun handleFriendRequests() {
-        val reqs = GlobalChatRepository.fetchFriendRequests()
-        println("好友申请列表 (共 ${reqs.size}):")
-        reqs.forEachIndexed { idx, r ->
-            println("  ${idx + 1}. reqId=${r.id} from=${r.senderName} msg=${r.message} status=${r.status}")
-        }
-    }
-
-    private suspend fun handleAcceptFriend(reqIdStr: String) {
-        val rid = reqIdStr.toIntOrNull() ?: return println("无效的申请ID")
-        print("同意好友申请 $rid ... ")
-        val ok = GlobalChatRepository.acceptFriend(token, rid.toString())
-        println(if (ok) "OK" else "FAIL")
-    }
-
-    private suspend fun handleRejectFriend(reqIdStr: String) {
-        val rid = reqIdStr.toIntOrNull() ?: return println("无效的申请ID")
-        print("拒绝好友申请 $rid ... ")
-        val ok = GlobalChatRepository.rejectFriend(token, rid.toString())
-        println(if (ok) "OK" else "FAIL")
-    }
-
-    private suspend fun handleGroupList() {
-        val groups = GlobalChatRepository.fetchGroups()
-        println("群组列表 (共 ${groups.size}):")
-        groups.forEachIndexed { idx, u ->
-            println("  ${idx + 1}. id=${u.id} name=${u.nickname}")
-        }
-    }
-
-    private suspend fun handleJoinGroup(groupIdStr: String) {
-        print("加入群组 $groupIdStr ... ")
-        val ok = GlobalChatRepository.addGroup(token, groupIdStr)
-        println(if (ok) "OK" else "FAIL")
-    }
-
-    private suspend fun handleLeaveGroup(groupIdStr: String) {
-        val gid = groupIdStr.toIntOrNull() ?: return println("无效的群组ID")
-        print("退出群组 $gid ... 注意: 后端暂留接口占位实现")
-        println(" OK")
-    }
-
-    private suspend fun handleGroupRequests() {
-        val reqs = GlobalChatRepository.fetchGroupRequests()
-        println("群聊申请列表 (共 ${reqs.size}):")
-        reqs.forEachIndexed { idx, r ->
-            println("  ${idx + 1}. reqId=${r.id} user=${r.senderName}")
-        }
-    }
-
-    private suspend fun handleAcceptGroup(pair: String) {
-        val parts = pair.split(" ").map { it.trim() }
-        if (parts.size != 2) return println("用法: /group accept <groupId> <userId>")
-        val ok = GlobalChatRepository.acceptGroupApplication(token, parts[0], parts[1])
-        print("同意群申请 ... ")
-        println(if (ok) "OK" else "FAIL")
-    }
-
-    private suspend fun handleRejectGroup(pair: String) {
-        val parts = pair.split(" ").map { it.trim() }
-        if (parts.size != 2) return println("用法: /group reject <groupId> <userId>")
-        val ok = GlobalChatRepository.rejectGroupApplication(token, parts[0], parts[1])
-        print("拒绝群申请 ... ")
-        println(if (ok) "OK" else "FAIL")
-    }
-
-    private fun printHelp() {
-        println("""
-            完整命令清单:
-              /ai <text>                 发送AI助手消息
-              /friend list               列出所有好友
-              /friend add <account>      按账号添加好友
-              /friend remove <id>        删除好友
-              /friend requests           查看收到的好友申请
-              /friend accept <reqId>      同意好友申请
-              /friend reject <reqId>     拒绝好友申请
-              /group list                列出所有已加入群组
-              /group join <groupId>      加入指定群组
-              /group leave <groupId>     退出指定群组
-              /group requests            查看收到的群聊申请
-              /group accept <gid> <uid>  同意群聊申请
-              /group reject <gid> <uid>  拒绝群聊申请
-              /help                      显示本帮助
-              /exit /quit                退出CLI客户端
-        """.trimIndent())
     }
 }
