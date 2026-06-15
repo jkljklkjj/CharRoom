@@ -1,7 +1,12 @@
 package core
 
 object ApiEndpoints {
-    private const val BASE = "https://${ServerConfig.SERVER_IP}/api"
+    private var _customBase: String? = null
+    private val BASE get() = _customBase ?: "https://${ServerConfig.SERVER_IP}/api"
+
+    fun setBaseUrl(url: String) {
+        _customBase = url.removeSuffix("/")
+    }
 
     const val LOGIN = "/user/login"
     const val REFRESH_TOKEN = "/user/refreshToken"

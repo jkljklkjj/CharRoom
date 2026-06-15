@@ -12,7 +12,7 @@ object ServerConfig {
     const val SPRING_SERVER_PORT = 80
 
     // QUIC 配置
-    var QUIC_PORT = 8080
+    var QUIC_PORT = 9443
     var QUIC_ALPN = "custom"
 
     /**

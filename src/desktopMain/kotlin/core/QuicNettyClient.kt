@@ -122,14 +122,15 @@ class QuicNettyClient {
      */
     fun openStream(): Long {
         val qCh = quicChannel ?: throw IllegalStateException("Not connected")
-        val stream = qCh.newStreamBootstrap()
+        val f = qCh.newStreamBootstrap()
             .type(QuicStreamType.BIDIRECTIONAL)
             .handler(QuicStreamInitializer { streamId, data ->
                 listener?.onStreamFrame(streamId, data)
             })
             .create()
-            .awaitUninterruptibly()
-            .getNow()!!
+        f.awaitUninterruptibly()
+        val stream = f.getNow()
+        if (stream == null) throw f.cause() ?: RuntimeException("QUIC 流创建失败")
 
         streams[stream.streamId()] = stream
         log.debug("QUIC 新流打开: streamId={}", stream.streamId())
