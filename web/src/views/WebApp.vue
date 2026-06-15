@@ -45,6 +45,19 @@
         </div>
         <div class="settings-body">
           <div class="settings-item">
+            <div class="transport-info">
+              <label>传输协议</label>
+              <div class="transport-badge" :class="currentTransport">
+                {{ currentTransport === 'wt' ? 'WebTransport (QUIC)' : 'WebSocket (WSS)' }}
+              </div>
+              <button class="transport-toggle" @click="toggleTransport">
+                切换为 {{ currentTransport === 'wt' ? 'WebSocket' : 'WebTransport' }}
+              </button>
+              <div v-if="wtSupported" class="wt-supported">✅ 浏览器支持 WebTransport</div>
+              <div v-else class="wt-unsupported">⚠️ 浏览器不支持 WebTransport</div>
+            </div>
+          </div>
+          <div class="settings-item">
             <label>主题设置</label>
             <div class="theme-options">
               <button :class="{ active: theme === 'auto' }" @click="setTheme('auto')">自动</button>
@@ -65,7 +78,9 @@ import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import { useStore } from '../store'
-import chatSocket from '../services/chatSocket'
+import chatSocket, { setTransportType, getTransportType } from '../services/chatSocket'
+import { configureTransport, isWebTransportSupported } from '../services/transport/TransportFactory'
+import siteConfig from '../siteConfig'
 import api from '../api'
 
 function normalizeTimestamp(raw) {
@@ -92,6 +107,10 @@ const currentView = ref('list') // 'list' | 'chat'
 const currentChatName = ref('')
 const showSettings = ref(false)
 const loading = ref(true) // 登录状态验证中
+
+// 传输层状态
+const currentTransport = ref('ws')
+const wtSupported = ref(false)
 
 // 主题设置
 const theme = ref(localStorage.getItem('theme') || 'auto') // auto, light, dark
@@ -147,7 +166,7 @@ function handleIncomingMessage(msg) {
 }
 
 /** 建立 WebSocket 连接 */
-function connectWebSocket(token, accountId) {
+function connectChat(token, accountId) {
   chatSocket.connect(WS_URL, token, String(accountId), {
     onmessage: handleIncomingMessage,
     onAuthFailed: () => logout()
@@ -200,7 +219,7 @@ async function initUserSession(accessToken, refreshToken) {
   const friends = await api.getFriends()
   store.setUsers(friends || [])
 
-  connectWebSocket(accessToken, userRes.id)
+  connectChat(accessToken, userRes.id)
   return true
 }
 
@@ -210,6 +229,17 @@ async function onLogged(tokens) {
   const refreshToken = tokens?.refreshToken || ''
   if (!accessToken) return
   await initUserSession(accessToken, refreshToken)
+}
+
+// 切换传输协议
+function toggleTransport() {
+  const newType = currentTransport.value === 'wt' ? 'ws' : 'wt'
+  setTransportType(newType)
+  currentTransport.value = newType
+  chatSocket.close()
+  if (store.state.token && store.state.accountId) {
+    connectChat(store.state.token, store.state.accountId)
+  }
 }
 
 // 选中用户，切换到聊天视图
@@ -231,6 +261,14 @@ function closeSettings() {
 
 // 页面加载时恢复登录状态
 onMounted(async () => {
+  // 初始化传输配置
+  wtSupported.value = isWebTransportSupported()
+  const transportConfig = siteConfig.TRANSPORT || {}
+  configureTransport({
+    preferWebTransport: transportConfig.preferWebTransport !== false,
+  })
+  setTransportType(wtSupported.value && transportConfig.preferWebTransport !== false ? 'auto' : 'ws')
+  currentTransport.value = wtSupported.value ? 'wt' : 'ws'
   window.addEventListener('resize', handleResize)
 
   // 初始化主题
@@ -453,6 +491,61 @@ onUnmounted(() => {
 
 .logout-btn:hover {
   background: #e04747;
+}
+
+/* 传输层 UI */
+.transport-info label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.transport-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.transport-badge.wt {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.transport-badge.ws {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.transport-toggle {
+  display: block;
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: var(--panel);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.transport-toggle:hover {
+  opacity: 0.8;
+}
+
+.wt-supported {
+  font-size: 12px;
+  color: #059669;
+  margin-top: 4px;
+}
+
+.wt-unsupported {
+  font-size: 12px;
+  color: #d97706;
+  margin-top: 4px;
 }
 
 /* 主题设置样式 */

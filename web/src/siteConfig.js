@@ -3,6 +3,16 @@ const siteConfig = {
 	ICP_NUMBER: '粤ICP备2026049055号',
 	RELEASE_BASE: 'https://github.com/jkljklkjj/CharRoom/releases/latest',
 	BUCKET_URL: 'https://dl.chatlite.xin/cloud-disk/',
+
+	// WebTransport/QUIC 传输配置
+	TRANSPORT: {
+		preferWebTransport: true,
+		autoDowngrade: true,
+		webTransportPath: '/.well-known/webtransport',
+		webSocketPath: '/ws',
+		port: 8080
+	},
+
 	INSTALLER_URLS: {
         android: `https://dl.chatlite.xin/cloud-disk/chatlite.apk`,
         linux: `https://dl.chatlite.xin/cloud-disk/chatlite.deb`,
