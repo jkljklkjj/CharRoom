@@ -115,7 +115,7 @@ class QuicClientImpl : WebSocketClientProvider {
                     val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
                     when (wrapper.type) {
                         MsgType.CHAT.wire -> {
-                            if (wrapper.hasChat) {
+                            if (wrapper.hasChat()) {
                                 val chat = wrapper.chat
                                 val senderId = chat.userId.toIntOrNull() ?: return@forEach
                                 val text = chat.content
@@ -124,7 +124,7 @@ class QuicClientImpl : WebSocketClientProvider {
                             }
                         }
                         MsgType.GROUP_CHAT.wire -> {
-                            if (wrapper.hasGroupChat) {
+                            if (wrapper.hasGroupChat()) {
                                 val gc = wrapper.groupChat
                                 val groupId = gc.targetClientId.toIntOrNull() ?: return@forEach
                                 val senderId = gc.userId.toIntOrNull() ?: return@forEach
@@ -135,7 +135,7 @@ class QuicClientImpl : WebSocketClientProvider {
                             }
                         }
                         MsgType.AGENT_CHAT_STREAM.wire -> {
-                            if (wrapper.hasChat) {
+                            if (wrapper.hasChat()) {
                                 val chat = wrapper.chat
                                 val messageId = chat.messageId
                                 val fullContent = chat.content

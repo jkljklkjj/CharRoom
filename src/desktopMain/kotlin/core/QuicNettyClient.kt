@@ -66,7 +66,6 @@ class QuicNettyClient {
                 .sslContext(sslCtx)
                 .maxIdleTimeout(30000, TimeUnit.MILLISECONDS)
                 .initialCongestionWindowPackets(2)
-                .streamHandler(streamInitializer)
                 .build()
         } catch (e: Exception) {
             log.error("Failed to create QUIC client codec", e)
@@ -80,8 +79,10 @@ class QuicNettyClient {
             Bootstrap()
                 .group(elGroup)
                 .channel(NioDatagramChannel::class.java)
-                .handler(ChannelInitializer<Channel> { ch ->
-                    ch.pipeline().addLast(codec)
+                .handler(object : ChannelInitializer<Channel>() {
+                    override fun initChannel(ch: Channel) {
+                        ch.pipeline().addLast(codec)
+                    }
                 })
                 .bind(0)  // 随机本地端口
                 .sync()
