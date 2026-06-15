@@ -11,6 +11,10 @@ object ServerConfig {
     const val NETTY_SERVER_PORT = 80
     const val SPRING_SERVER_PORT = 80
 
+    // QUIC 配置
+    var QUIC_PORT = 8080
+    var QUIC_ALPN = "custom"
+
     /**
      * 全局认证令牌，已废弃，请使用GlobalAppState.currentToken或者通过参数传递token
      */

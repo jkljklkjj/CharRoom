@@ -56,6 +56,9 @@ dependencies {
     implementation("io.netty:netty-codec:4.2.5.Final")
     implementation("io.netty:netty-codec-http:4.2.5.Final")
     implementation("io.netty:netty-handler:4.2.5.Final")
+    // Netty QUIC (与后端 QUIC 协议兼容)
+    implementation("io.netty.incubator:netty-incubator-codec-classes-quic:0.0.75.Final")
+    implementation("io.netty.incubator:netty-incubator-codec-native-quic:0.0.75.Final:linux-x86_64")
     implementation("org.jboss.marshalling:jboss-marshalling:2.3.0")
     implementation("org.jboss.marshalling:jboss-marshalling-river:2.3.0")
     implementation("org.slf4j:slf4j-api:2.0.17")
@@ -83,16 +86,9 @@ dependencies {
 // 源集配置
 sourceSets {
     main {
-        kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin")
+        kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin", "src/cliMain/kotlin")
         resources.srcDirs("src/commonMain/resources", "src/desktopMain/resources")
-    }
-    create("cli") {
-        kotlin.srcDirs("src/cliMain/kotlin")
-        resources.srcDirs("src/commonMain/resources", "src/cliMain/resources")
-        dependencies {
-            implementation(sourceSets.main.get().output)
-            implementation(sourceSets.main.get().compileClasspath)
-        }
+        kotlin.exclude("**/component/**", "**/chat/**", "**/settings/**", "**/user/**", "**/Main.kt", "**/App.kt")
     }
     test {
         kotlin.srcDirs("src/commonTest/kotlin", "src/desktopTest/kotlin", "src/androidUnitTest/kotlin")
@@ -343,13 +339,12 @@ tasks.register<Jar>("cliJar") {
     archiveBaseName.set("chatlite-cli")
     archiveVersion.set("1.0.0")
 
-    from(sourceSets.named("cli").get().output)
     from(sourceSets.main.get().output)
-    from(sourceSets.named("cli").get().allSource)
+    from(sourceSets.main.get().allSource)
 
     // 打包全部运行时依赖
     from({
-        configurations["cliRuntimeClasspath"].filter { it.name.endsWith(".jar") }.map { zipTree(it) }
+        configurations["runtimeClasspath"].filter { it.name.endsWith(".jar") }.map { zipTree(it) }
     }) {
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/*.EC")
         exclude("META-INF/*.kotlin_module")
