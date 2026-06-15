@@ -103,12 +103,17 @@ class QuicNettyClient {
         address: InetSocketAddress,
         streamHandler: QuicStreamInitializer
     ): QuicChannel {
-        return QuicChannel.newBootstrap(udpChannel)
+        val f: io.netty.util.concurrent.Future<QuicChannel> = QuicChannel.newBootstrap(udpChannel)
             .streamHandler(streamHandler)
             .remoteAddress(address)
             .connect()
-            .awaitUninterruptibly()
-            .getNow()!!
+
+        val done = f.awaitUninterruptibly(10, TimeUnit.SECONDS)
+        if (!done) throw RuntimeException("QUIC 连接超时 (${address})")
+
+        val channel = f.getNow()
+        if (channel == null) throw f.cause() ?: RuntimeException("QUIC 连接失败")
+        return channel
     }
 
     /**

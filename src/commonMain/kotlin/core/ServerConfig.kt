@@ -6,7 +6,7 @@ object ServerConfig {
     const val AGENT_ASSISTANT_ID = 900000001
     const val AGENT_ASSISTANT_NAME = "AI助手"
 
-    const val SERVER_IP: String = "chatlite.xin"
+    var SERVER_IP: String = "chatlite.xin"
 
     const val NETTY_SERVER_PORT = 80
     const val SPRING_SERVER_PORT = 80

@@ -76,7 +76,8 @@ class QuicClientImpl : WebSocketClientProvider {
             }
         }
 
-        scope.launch {
+        // 阻塞等待 QUIC 连接建立完成（CLI 期望 start() 是同步的）
+        kotlinx.coroutines.runBlocking {
             try {
                 transport.connect(this@QuicClientImpl.host, this@QuicClientImpl.port)
             } catch (e: Exception) {
