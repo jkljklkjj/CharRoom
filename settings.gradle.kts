@@ -31,8 +31,8 @@ pluginManagement {
         kotlin("jvm").version(extra["kotlin.version"] as String)
         id("org.jetbrains.compose").version(extra["compose.version"] as String)
         id("org.jetbrains.kotlin.plugin.compose").version(extra["kotlin.version"] as String)
-        // Kotlin 2.3.x 需要 AGP >= 8.2.2
-        id("com.android.application").version("8.2.2")
+        // Kotlin 2.3.x 需要 AGP >= 8.2.2。升级以满足依赖版本要求
+        id("com.android.application").version("8.9.1")
         id("org.jetbrains.kotlin.android").version(extra["kotlin.version"] as String)
     }
 }
@@ -54,7 +54,7 @@ buildscript {
     dependencies {
         // Match the AGP version used in pluginManagement so the buildscript
         // classpath can be resolved from Google / Maven Central.
-        classpath("com.android.tools.build:gradle:8.2.2")
+        classpath("com.android.tools.build:gradle:8.9.1")
     }
 }
 
