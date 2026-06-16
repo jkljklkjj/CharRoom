@@ -125,10 +125,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
 
-            // 资源混淆
+            // 资源混淆（noCompress 保留 png/jpg/jpeg 不压缩）
             androidResources {
                 noCompress 'png', 'jpg', 'jpeg'
-                additionalParameters "--enable-resource-obfuscation"
             }
 
             // 只保留 arm64-v8a 架构，减小 APK 体积
