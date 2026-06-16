@@ -42,11 +42,8 @@ android {
     buildFeatures {
         compose true
     }
-    composeOptions {
-        // 使用 org.jetbrains.kotlin.plugin.compose 后，此值可省略
-        // 但保留以兼容 AGP 8.x 的 checks
-        kotlinCompilerExtensionVersion = androidComposeVersion
-    }
+    // composeOptions block 不需要 — Kotlin 2.x 的 org.jetbrains.kotlin.plugin.compose
+    // 已自动管理 Compose 编译器版本映射
 
     packaging {
         resources {
