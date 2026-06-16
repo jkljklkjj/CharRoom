@@ -117,7 +117,7 @@ export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose
   try {
     const finalUrl = transportType === 'wt' || (transportType === 'auto' && isWebTransportSupported())
       // WebTransport 走 quic.chatlite.xin:9443 直连（绕过 Cloudflare）
-      ? buildWebTransportUrl('quic.chatlite.xin', 443)
+      ? buildWebTransportUrl('quic.chatlite.xin', 9443)
       : wsUrl
 
     await transport.connect(finalUrl, token)
