@@ -13,6 +13,8 @@ plugins {
 }
 
 def composeVersion = project.findProperty("compose.lib.version") ?: '1.10.6'
+// AndroidX Compose 版本（与 JetBrains Compose Multiplatform 版本号不同）
+def androidComposeVersion = '1.7.6'
 def activityComposeVersion = '1.13.0'
 
 // Keep the Android block as before
@@ -41,8 +43,9 @@ android {
         compose true
     }
     composeOptions {
-        // Keep this aligned with the Compose UI/Material versions used below.
-        kotlinCompilerExtensionVersion = composeVersion
+        // 使用 org.jetbrains.kotlin.plugin.compose 后，此值可省略
+        // 但保留以兼容 AGP 8.x 的 checks
+        kotlinCompilerExtensionVersion = androidComposeVersion
     }
 
     packaging {
@@ -61,6 +64,9 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
+            // Glassmorphism.kt uses expect declarations - not supported in non-KMP module.
+            // Actual implementations are in androidMain/Glassmorphism.android.kt
+            java.exclude('**/Glassmorphism.kt')
             java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
@@ -150,11 +156,11 @@ repositories {
 dependencies {
     implementation 'androidx.core:core-ktx:1.18.0'
     implementation "androidx.activity:activity-compose:$activityComposeVersion"
-    implementation "androidx.compose.ui:ui:$composeVersion"
-    implementation "androidx.compose.material:material:$composeVersion"
-    implementation "androidx.compose.animation:animation:$composeVersion"
-    debugImplementation "androidx.compose.ui:ui-tooling:$composeVersion"
-    debugImplementation "androidx.compose.ui:ui-tooling-preview:$composeVersion"
+    implementation "androidx.compose.ui:ui:$androidComposeVersion"
+    implementation "androidx.compose.material:material:$androidComposeVersion"
+    implementation "androidx.compose.animation:animation:$androidComposeVersion"
+    debugImplementation "androidx.compose.ui:ui-tooling:$androidComposeVersion"
+    debugImplementation "androidx.compose.ui:ui-tooling-preview:$androidComposeVersion"
     // AppCompat is required by the styles in androidApp/src/main/res/values/styles.xml
     implementation 'androidx.appcompat:appcompat:1.7.1'
     // Material components (optional) — keep for themes and widgets
