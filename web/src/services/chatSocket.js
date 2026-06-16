@@ -335,20 +335,13 @@ async function handleMessage(rawData) {
 
   // 处理服务端响应
   if (processedData && typeof processedData === 'object') {
-    // 带 success 字段的响应
+    // 任何来自服务端的成功消息都视为心跳有效
+    lastHeartbeatResponseTime = Date.now()
+
+    // 带 success 字段的响应（ResponseMessage / AckMessage）
     if (processedData.success !== undefined) {
       if (processedData.success) {
-        if (processedData.message === 'heartbeat') {
-          lastHeartbeatResponseTime = Date.now()
-          if (heartbeatTimeoutTimer) {
-            clearTimeout(heartbeatTimeoutTimer)
-            heartbeatTimeoutTimer = null
-          }
-          return
-        } else {
-          lastHeartbeatResponseTime = Date.now()
-          flushQueue()
-        }
+        flushQueue()
       } else {
         const msg = (processedData.message || '').toLowerCase()
         if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
@@ -360,9 +353,9 @@ async function handleMessage(rawData) {
       }
     }
 
-    // 服务端主动心跳
-    if (processedData.type === 'heartbeat' || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
-      lastHeartbeatResponseTime = Date.now()
+    // 服务端主动心跳 / ACK
+    if (processedData.type === 'heartbeat' || processedData.type === 'ack'
+        || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
       sendWrapper({
         type: 'heartbeat',
         heartbeat: { timestamp: Date.now() }
