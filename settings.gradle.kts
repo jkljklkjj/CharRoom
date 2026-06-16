@@ -54,7 +54,7 @@ buildscript {
     dependencies {
         // Match the AGP version used in pluginManagement so the buildscript
         // classpath can be resolved from Google / Maven Central.
-        classpath("com.android.tools.build:gradle:8.13.2")
+        classpath("com.android.tools.build:gradle:8.7.3")
     }
 }
 
