@@ -8,7 +8,7 @@ buildscript {
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:7.4.2")
+        classpath("com.android.tools.build:gradle:8.7.3")
         classpath("com.guardsquare:proguard-gradle:7.8.2")
     }
 }
@@ -116,10 +116,8 @@ compose.desktop {
             "-Dconsole.encoding=UTF-8"
         )
 
-        // 使用JDK 21
-        javaHome = javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }.get().metadata.installationPath.asFile.absolutePath
+        // 使用当前 JDK 构建桌面包（无需工具链，兼容 Java 21+）
+        javaHome = System.getProperty("java.home")
 
         buildTypes {
             release {

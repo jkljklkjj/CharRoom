@@ -31,9 +31,8 @@ pluginManagement {
         kotlin("jvm").version(extra["kotlin.version"] as String)
         id("org.jetbrains.compose").version(extra["compose.version"] as String)
         id("org.jetbrains.kotlin.plugin.compose").version(extra["kotlin.version"] as String)
-        // Use AGP 8.2.2 which is compatible with the Kotlin Gradle plugin in
-        // this project (Kotlin 2.3.x requires AGP >= 8.2.2).
-        id("com.android.application").version("8.2.2")
+        // Kotlin 2.3.x 需要 AGP >= 8.2.2。升级到 8.7.3 以支持 R8 optimization 块
+        id("com.android.application").version("8.7.3")
         id("org.jetbrains.kotlin.android").version(extra["kotlin.version"] as String)
     }
 }

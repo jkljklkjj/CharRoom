@@ -125,6 +125,18 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
 
+            // R8 全模式优化（需要 AGP >= 8.7）
+            optimization {
+                enabled = true
+                keepRuleOptimizations = true
+                unboxEnumOptimization = true
+                classInlining = true
+                finalClassInline = true
+                methodInlining = true
+                lambdaMerging = true
+                stringConcatenationOptimization = true
+            }
+
             // 资源混淆
             androidResources {
                 noCompress 'png', 'jpg', 'jpeg'
