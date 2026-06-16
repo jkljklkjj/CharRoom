@@ -8,6 +8,9 @@ object ServerConfig {
 
     var SERVER_IP: String = "chatlite.xin"
 
+    // QUIC/Netty 服务端地址（可与 REST API 地址不同，如 quic.chatlite.xin）
+    var QUIC_HOST: String = "quic.chatlite.xin"
+
     const val NETTY_SERVER_PORT = 80
     const val SPRING_SERVER_PORT = 80
 

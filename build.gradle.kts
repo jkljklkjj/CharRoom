@@ -352,7 +352,7 @@ tasks.register<Jar>("cliJar") {
     manifest {
         attributes["Main-Class"] = "CliMainKt"
     }
-    dependsOn(tasks.named("compileKotlin"))
+    dependsOn(tasks.named("compileKotlin"), ":proto:jar")
 }
 
 // Do not run custom ProGuard automatically on every JAR build in CI.

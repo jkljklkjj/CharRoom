@@ -36,7 +36,7 @@ class QuicClientImpl : WebSocketClientProvider {
     internal val authStateListeners = mutableListOf<AuthStateListener>()
 
     // 连接配置
-    private var host: String = ServerConfig.SERVER_IP
+    private var host: String = ServerConfig.QUIC_HOST
     private var port: Int = ServerConfig.QUIC_PORT
 
     data class PendingMessage(
@@ -49,7 +49,7 @@ class QuicClientImpl : WebSocketClientProvider {
      * 建立 QUIC 连接并启动登录流程。
      */
     override fun start(host: String?, port: Int?) {
-        this.host = host ?: ServerConfig.SERVER_IP
+        this.host = host ?: ServerConfig.QUIC_HOST
         this.port = port ?: ServerConfig.QUIC_PORT
 
         transport.listener = object : QuicNettyClient.Listener {

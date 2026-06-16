@@ -146,10 +146,15 @@ class ChatLiteCli(private val args: Array<String>) {
                 "--server" -> {
                     serverUrl = args.getOrElse(i + 1) { serverUrl }.removeSuffix("/")
                     ApiEndpoints.setBaseUrl(serverUrl + "/api")
-                    // 从 URL 中提取 host 作为 QUIC 默认地址
-                    val host = try { java.net.URI(serverUrl).host ?: serverUrl } catch (_: Exception) { serverUrl }
-                    core.ServerConfig.SERVER_IP = host
-                    core.ServerConfig.QUIC_PORT = 9443
+                    i++
+                }
+                "--quic-host" -> {
+                    val qhost = args.getOrElse(i + 1) { "" }
+                    if (qhost.isNotBlank()) core.ServerConfig.QUIC_HOST = qhost
+                    i++
+                }
+                "--quic-port" -> {
+                    core.ServerConfig.QUIC_PORT = args.getOrElse(i + 1) { "9443" }.toIntOrNull() ?: 9443
                     i++
                 }
                 "--quic-host" -> {
