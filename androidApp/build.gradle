@@ -61,6 +61,7 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
+            java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }
@@ -123,6 +124,33 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
+
+            // R8 全模式优化
+            optimization {
+                enabled = true
+                keepRuleOptimizations = true
+                unboxEnumOptimization = true
+                classInlining = true
+                finalClassInline = true
+                methodInlining = true
+                lambdaMerging = true
+                stringConcatenationOptimization = true
+            }
+
+            // 资源混淆
+            androidResources {
+                noCompress 'png', 'jpg', 'jpeg'
+                additionalParameters "--enable-resource-obfuscation"
+            }
+
+            // 只保留 arm64-v8a 架构，减小 APK 体积
+            ndk {
+                abiFilters 'arm64-v8a'
+            }
+
+            debuggable false
+            jniDebuggable false
+            renderscriptDebuggable false
         }
     }
 }
@@ -137,6 +165,7 @@ dependencies {
     implementation "androidx.activity:activity-compose:$activityComposeVersion"
     implementation "androidx.compose.ui:ui:$composeVersion"
     implementation "androidx.compose.material:material:$composeVersion"
+    implementation "androidx.compose.animation:animation:$composeVersion"
     debugImplementation "androidx.compose.ui:ui-tooling:$composeVersion"
     debugImplementation "androidx.compose.ui:ui-tooling-preview:$composeVersion"
     // AppCompat is required by the styles in androidApp/src/main/res/values/styles.xml
