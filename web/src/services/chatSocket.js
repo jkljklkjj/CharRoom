@@ -71,6 +71,9 @@ export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose
   const host = urlObj ? urlObj.hostname : 'chatlite.xin'
   const port = urlObj ? (urlObj.port || '443') : '443'
 
+  // 检测浏览器 WebTransport 支持情况
+  console.log(`🔍 WebTransport 支持: ${isWebTransportSupported() ? '✅ 支持' : '❌ 不支持'}`)
+
   // 创建合适的传输层
   transport = createTransport({
     forceWebSocket: transportType === 'ws'
