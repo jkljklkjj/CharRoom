@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
  * Android 平台的毛玻璃效果实现
  * 使用 RenderEffect 实现真正的模糊效果
  */
-actual fun Modifier.glassmorphism(
+fun Modifier.glassmorphism(
     blurRadius: Float,
     backgroundColor: Color
 ): Modifier = this
@@ -37,7 +37,7 @@ actual fun Modifier.glassmorphism(
  * Android 平台的柔和阴影效果实现
  * 使用 drawBehind 绘制多层阴影
  */
-actual fun Modifier.softShadow(
+fun Modifier.softShadow(
     elevation: Float,
     color: Color
 ): Modifier = this.drawBehind {
@@ -61,7 +61,7 @@ actual fun Modifier.softShadow(
  * Android 平台的动态模糊背景实现
  */
 @Composable
-actual fun DynamicBlurBackground(
+fun DynamicBlurBackground(
     content: @Composable () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
