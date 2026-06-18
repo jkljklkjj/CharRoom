@@ -116,8 +116,8 @@ export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose
   // 建立连接
   try {
     const finalUrl = transportType === 'wt' || (transportType === 'auto' && isWebTransportSupported())
-      // WebTransport 走 quic.chatlite.xin:9443 直连（绕过 Cloudflare）
-      ? buildWebTransportUrl('quic.chatlite.xin', 9443)
+      // WebTransport 走 quic.chatlite.xin:443 直连（标准 HTTPS 端口）
+      ? buildWebTransportUrl('quic.chatlite.xin', 443)
       : wsUrl
 
     await transport.connect(finalUrl, token)
@@ -339,15 +339,18 @@ async function handleMessage(rawData) {
     lastHeartbeatResponseTime = Date.now()
 
     // 带 success 字段的响应（ResponseMessage / AckMessage）
-    if (processedData.success !== undefined) {
-      if (processedData.success) {
+    // protobuf 结构: { type, response: { success, message } }
+    const isSuccess = processedData.success
+      || (processedData.response && processedData.response.success)
+    if (isSuccess !== undefined) {
+      if (isSuccess) {
         flushQueue()
       } else {
-        const msg = (processedData.message || '').toLowerCase()
+        const msg = (processedData.response ? processedData.response.message : processedData.message || '').toLowerCase()
         if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
           console.log('🔑 认证失败，停止重连')
           stopReconnect = true
-          handlers.onAuthFailed(processedData.message)
+          handlers.onAuthFailed(msg)
         }
         return
       }
@@ -356,6 +359,11 @@ async function handleMessage(rawData) {
     // 服务端主动心跳 / ACK
     if (processedData.type === 'heartbeat' || processedData.type === 'ack'
         || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
+      // ACK 只更新心跳时间，不用再发心跳给服务端（避免循环）
+      if (processedData.type === 'ack') {
+        lastHeartbeatResponseTime = Date.now()
+        return
+      }
       sendWrapper({
         type: 'heartbeat',
         heartbeat: { timestamp: Date.now() }

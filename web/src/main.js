@@ -2,6 +2,11 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import './styles.css'
+import ToastGlobal from './components/Toast.vue'
+
+// 全局挂载 Toast（独立实例，始终存在）
+document.body.insertAdjacentHTML('beforeend', '<div id="app-toast"></div>')
+createApp(ToastGlobal).mount('#app-toast')
 
 const app = createApp(App).use(router).mount('#app')
 
