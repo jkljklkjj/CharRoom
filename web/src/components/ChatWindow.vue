@@ -323,7 +323,7 @@ function send(){
     store.addMessage(m)
   }
 
-  chatSocket.sendWrapper(wrapper).catch(()=>{})
+  chatSocket.sendWrapper(wrapper).catch(e => console.warn("send failed:", e.message))
   text.value = ''
   // 滚动到底部
   scrollToBottom()

@@ -407,7 +407,7 @@ async function handleMessage(rawData) {
       }
 
       if (isChatOrGroupMessage) {
-        sendAck(messageId).catch(() => {})
+        sendAck(messageId).catch(e => console.warn("sendAck failed:", e))
       }
     }
   }
