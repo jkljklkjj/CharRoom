@@ -356,18 +356,10 @@ async function handleMessage(rawData) {
       }
     }
 
-    // 服务端主动心跳 / ACK
+    // 心跳/ACK 响应 — 更新心跳时间，不发新心跳（避免循环）
     if (processedData.type === 'heartbeat' || processedData.type === 'ack'
         || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
-      // ACK 只更新心跳时间，不用再发心跳给服务端（避免循环）
-      if (processedData.type === 'ack') {
-        lastHeartbeatResponseTime = Date.now()
-        return
-      }
-      sendWrapper({
-        type: 'heartbeat',
-        heartbeat: { timestamp: Date.now() }
-      }).catch(() => {})
+      lastHeartbeatResponseTime = Date.now()
       return
     }
 
