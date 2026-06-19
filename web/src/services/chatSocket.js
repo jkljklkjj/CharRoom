@@ -305,7 +305,9 @@ function scheduleReconnect(wsUrl, token, userId) {
 
   reconnectTimer = setTimeout(() => {
     if (!stopReconnect) {
-      connect(wsUrl, token, userId, handlers)
+      connect(wsUrl, token, userId, handlers).catch(() => {
+        isReconnecting = false
+      })
       currentReconnectDelay = Math.min(currentReconnectDelay * 2, maxReconnectDelay)
     }
   }, currentReconnectDelay)

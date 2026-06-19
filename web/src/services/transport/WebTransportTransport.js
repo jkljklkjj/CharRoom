@@ -42,8 +42,12 @@ export class WebTransportTransport extends ChatTransport {
       // 创建 WebTransport 连接
       this._transport = new WebTransport(url)
 
-      // 等待连接就绪（QUIC 握手 + HTTP/3 协商完成）
-      await this._transport.ready
+      // 等待连接就绪（QUIC 握手 + HTTP/3 协商完成），15s 超时
+      const TIMEOUT_MS = 15000
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('WebTransport 连接超时')), TIMEOUT_MS)
+      )
+      await Promise.race([this._transport.ready, timeoutPromise])
       console.log('✅ WebTransportTransport 连接成功:', url)
 
       // 创建主双向流（用于控制消息 + 聊天消息）
@@ -134,6 +138,8 @@ export class WebTransportTransport extends ChatTransport {
       }
     } finally {
       this._readerActive = false
+      // 通知上层连接已关闭（触发重连）
+      if (this._onclose) this._onclose()
     }
   }
 
