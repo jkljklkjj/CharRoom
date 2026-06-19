@@ -18,6 +18,7 @@ let maxReconnectDelay = 30000
 let isReconnecting = false
 let stopReconnect = false
 let currentUserId = null
+let loggedIn = false
 let transportType = 'ws'      // 'ws' | 'wt' | 'auto'
 const MAX_QUEUE_SIZE = 1000
 const MAX_MESSAGE_CACHE = 1000
@@ -181,6 +182,7 @@ export async function sendWrapper(wrapperObj) {
  * 刷新消息队列。
  */
 function flushQueue() {
+  if (!loggedIn) return
   if (pendingQueue.length === 0) return
 
   console.log('发送队列中的消息，共', pendingQueue.length, '条')
@@ -346,6 +348,7 @@ async function handleMessage(rawData) {
       || (processedData.response && processedData.response.success)
     if (isSuccess !== undefined) {
       if (isSuccess) {
+        loggedIn = true
         flushQueue()
       } else {
         const msg = (processedData.response ? processedData.response.message : processedData.message || '').toLowerCase()

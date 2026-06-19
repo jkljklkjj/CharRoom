@@ -82,7 +82,10 @@ export class WebTransportTransport extends ChatTransport {
     }
 
     try {
-      this._streamWriter.write(data)
+      this._streamWriter.write(data).catch(e => {
+        console.error('WebTransportTransport 发送异常:', e)
+        if (this._onerror) this._onerror(e)
+      })
       return true
     } catch (e) {
       console.error('WebTransportTransport 发送异常:', e)
