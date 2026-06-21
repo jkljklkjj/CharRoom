@@ -1,6 +1,6 @@
 import { encodeMessage, decodeMessage } from '../proto'
 import DOMPurify from 'dompurify'
-import { createTransport, configureTransport, buildWebTransportUrl, buildWebSocketUrl, isWebTransportSupported } from './transport/TransportFactory'
+import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
 
 // ── 内部变量 ────────────────────────────────────
 
@@ -19,7 +19,6 @@ let isReconnecting = false
 let stopReconnect = false
 let currentUserId = null
 let loggedIn = false
-let transportType = 'ws'      // 'ws' | 'wt' | 'auto'
 const MAX_QUEUE_SIZE = 1000
 const MAX_MESSAGE_CACHE = 1000
 const receivedMessageIds = new Set()
@@ -41,14 +40,18 @@ const messageIdQueue = []
  * @param {Function} [callbacks.onAuthFailed]
  * @returns {Promise<ChatTransport>}
  */
-export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed } = {}) {
-  console.log('🔌 尝试建立连接:', { wsUrl, hasToken: !!token, userId })
+export async function connect(hostname, port, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed } = {}) {
+  console.log('🔌 尝试建立连接:', { hostname, port, hasToken: !!token, userId })
 
   if (!token || typeof token !== 'string' || token.trim() === '') {
     console.error('❌ 连接失败：token为空')
     stopReconnect = true
     if (onAuthFailed) onAuthFailed('token不能为空')
     throw new Error('聊天连接失败：认证凭证为空')
+  }
+
+  if (!isWebTransportSupported()) {
+    throw new Error('当前浏览器不支持 WebTransport (QUIC)')
   }
 
   stopReconnect = false
@@ -67,18 +70,8 @@ export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose
     transport = null
   }
 
-  // 从 wsUrl 中提取 host 和 port
-  const urlObj = tryParseUrl(wsUrl)
-  const host = urlObj ? urlObj.hostname : 'chatlite.xin'
-  const port = urlObj ? (urlObj.port || '443') : '443'
-
-  // 检测浏览器 WebTransport 支持情况
-  console.log(`🔍 WebTransport 支持: ${isWebTransportSupported() ? '✅ 支持' : '❌ 不支持'}`)
-
-  // 创建合适的传输层
-  transport = createTransport({
-    forceWebSocket: transportType === 'ws'
-  })
+  // 创建 WebTransport 传输层
+  transport = createTransport()
 
   // 设置事件回调
   transport.onopen = () => {
@@ -103,7 +96,7 @@ export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose
     stopHeartbeat()
 
     if (!stopReconnect && !isReconnecting) {
-      scheduleReconnect(wsUrl, token, currentUserId)
+      scheduleReconnect(hostname, port, token, currentUserId)
     }
 
     if (handlers.onclose) handlers.onclose(event)
@@ -116,21 +109,11 @@ export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose
 
   // 建立连接
   try {
-    const finalUrl = transportType === 'wt' || (transportType === 'auto' && isWebTransportSupported())
-      // WebTransport 走 quic.chatlite.xin 直连，端口与 wsUrl 一致
-      ? buildWebTransportUrl('quic.chatlite.xin', port)
-      : wsUrl
-
+    const finalUrl = buildWebTransportUrl(hostname, port)
     await transport.connect(finalUrl, token)
     return transport
   } catch (e) {
     console.error('❌ 连接失败:', e)
-    // 如果 WebTransport 失败，自动降级到 WebSocket
-    if (transportType === 'auto' && isWebTransportSupported()) {
-      console.log('🔄 WebTransport 连接失败，降级到 WebSocket')
-      transportType = 'ws'
-      return connect(wsUrl, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed })
-    }
     throw e
   }
 }
@@ -243,23 +226,6 @@ export function isConnected() {
   return transport !== null && transport.isConnected()
 }
 
-/**
- * 设置传输类型偏好。
- * @param {'auto'|'wt'|'ws'} type
- */
-export function setTransportType(type) {
-  transportType = type
-}
-
-/**
- * 获取当前传输类型。
- * @returns {string}
- */
-export function getTransportType() {
-  if (!transport) return 'none'
-  return transport.constructor.name === 'WebTransportTransport' ? 'wt' : 'ws'
-}
-
 // ── 心跳 ────────────────────────────────────────
 
 function startHeartbeat() {
@@ -299,7 +265,7 @@ function stopHeartbeat() {
 
 // ── 重连 ────────────────────────────────────────
 
-function scheduleReconnect(wsUrl, token, userId) {
+function scheduleReconnect(hostname, port, token, userId) {
   if (reconnectTimer) clearTimeout(reconnectTimer)
 
   isReconnecting = true
@@ -307,7 +273,7 @@ function scheduleReconnect(wsUrl, token, userId) {
 
   reconnectTimer = setTimeout(() => {
     if (!stopReconnect) {
-      connect(wsUrl, token, userId, handlers).catch(() => {
+      connect(hostname, port, token, userId, handlers).catch(() => {
         isReconnecting = false
       })
       currentReconnectDelay = Math.min(currentReconnectDelay * 2, maxReconnectDelay)
@@ -470,14 +436,4 @@ if ('Notification' in window && Notification.permission === 'default') {
   }, { once: true })
 }
 
-// ── 工具 ────────────────────────────────────────
-
-function tryParseUrl(url) {
-  try {
-    return new URL(url)
-  } catch {
-    return null
-  }
-}
-
-export default { connect, sendWrapper, sendAck, close, readyState, isConnected, sanitizeMessage, setTransportType, getTransportType }
+export default { connect, sendWrapper, sendAck, close, readyState, isConnected, sanitizeMessage }
