@@ -117,8 +117,8 @@ export async function connect(wsUrl, token, userId, { onopen, onmessage, onclose
   // 建立连接
   try {
     const finalUrl = transportType === 'wt' || (transportType === 'auto' && isWebTransportSupported())
-      // WebTransport 走 quic.chatlite.xin:443 直连（标准 HTTPS 端口）
-      ? buildWebTransportUrl('quic.chatlite.xin', 443)
+      // WebTransport 走 quic.chatlite.xin 直连，端口与 wsUrl 一致
+      ? buildWebTransportUrl('quic.chatlite.xin', port)
       : wsUrl
 
     await transport.connect(finalUrl, token)
