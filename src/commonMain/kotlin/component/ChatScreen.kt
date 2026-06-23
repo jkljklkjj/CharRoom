@@ -256,9 +256,16 @@ private fun ChatScreenContent(
             }
         }
     }
+    // 只保留最新 100 条消息（类似 QQ 展示策略）
+    val displayMessages by remember {
+        derivedStateOf {
+            val msgs = filteredMessages
+            if (msgs.size > 100) msgs.subList(msgs.size - 100, msgs.size) else msgs
+        }
+    }
     var isSending by remember { mutableStateOf(false) }
     val listState = remember(user.id) {
-        LazyListState(filteredMessages.lastIndex.coerceAtLeast(0), 0)
+        LazyListState(displayMessages.lastIndex.coerceAtLeast(0), 0)
     }
     val inputFocusRequester = remember { FocusRequester() }
     var isInputFocused by remember { mutableStateOf(false) }
@@ -266,11 +273,11 @@ private fun ChatScreenContent(
 
     // 当输入法弹起时（IME 可见），稍等布局稳定后贴底最新消息，解决键盘弹起后气泡未跟随的问题
     LaunchedEffect(imeVisible) {
-        if (imeVisible && filteredMessages.isNotEmpty()) {
+        if (imeVisible && displayMessages.isNotEmpty()) {
             // 等待系统布局/动画稳定
             delay(100)
             runCatching {
-                listState.animateScrollToItem(filteredMessages.lastIndex)
+                listState.animateScrollToItem(displayMessages.lastIndex)
             }
         }
     }
@@ -306,24 +313,25 @@ private fun ChatScreenContent(
     var hasInitializedScroll by remember(user.id) { mutableStateOf(false) }
     var isViewportReady by remember(user.id) { mutableStateOf(false) }
 
-    // 智能自动滚动：首次进入时先定位到底部，后续仅在当前接近底部时跟随新消息滚动
-    LaunchedEffect(filteredMessages.size) {
-        if (filteredMessages.isEmpty()) return@LaunchedEffect
-
-        if (!hasInitializedScroll) {
-            hasInitializedScroll = true
-            kotlinx.coroutines.delay(16)
+    // 智能自动滚动：只显示最新 N 条，初始定位到底部（类似 QQ）
+    // 首次进入时不滚动动画，直接定位到底部
+    LaunchedEffect(user.id) {
+        // 等待列表布局完成
+        kotlinx.coroutines.delay(100)
+        if (filteredMessages.isNotEmpty()) {
             runCatching {
                 listState.scrollToItem(filteredMessages.lastIndex)
             }
-            isViewportReady = true
-            return@LaunchedEffect
         }
+        isViewportReady = true
+    }
+
+    // 新消息到达时，仅在接近底部时跟随滚动
+    LaunchedEffect(filteredMessages.size) {
+        if (!isViewportReady || filteredMessages.isEmpty()) return@LaunchedEffect
 
         val lastIndex = filteredMessages.size - 1
         val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-
-        // 判断是否接近底部（最后一条可见，或者距离最后一条小于3条）
         val isNearBottom = lastVisibleIndex >= lastIndex - 3
 
         if (isNearBottom) {
@@ -617,7 +625,7 @@ private fun ChatScreenContent(
                 }
 
                 itemsIndexed(
-                    items = filteredMessages,
+                    items = displayMessages,
                     key = { index, message -> "${message.messageId}_$index" }
                 ) { index, message ->
                     // 显示日期分隔线
