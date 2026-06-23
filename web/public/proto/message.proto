@@ -37,10 +37,6 @@ message ChatMessage {
     optional string fileUrl = 11;          // 文件/图片URL
     optional string fileName = 12;         // 文件名称
     optional int64 fileSize = 13;          // 文件大小
-
-    // 消息序列号（增量同步用）
-    optional int64 seqId = 14;             // 会话级单调递增序列号
-    optional string conversationId = 15;   // 会话ID（格式: "user:{uid1}:{uid2}"）
 }
 
 // 群聊消息
@@ -61,10 +57,6 @@ message GroupChatMessage {
     optional string fileUrl = 10;          // 文件/图片URL
     optional string fileName = 11;         // 文件名称
     optional int64 fileSize = 12;          // 文件大小
-
-    // 消息序列号（增量同步用）
-    optional int64 seqId = 13;             // 群聊级单调递增序列号
-    optional string conversationId = 14;   // 会话ID（格式: "group:{gid}"）
 }
 
 // 客户端行为描述

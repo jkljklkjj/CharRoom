@@ -26,8 +26,10 @@ export function createTransport() {
   return new WebTransportTransport()
 }
 
-export function buildWebTransportUrl(host, port) {
-  return `https://${host}:${port}/.well-known/webtransport`
+export function buildWebTransportUrl(host, port, token) {
+  let url = `https://${host}:${port}/.well-known/webtransport`
+  if (token) url += `?token=${encodeURIComponent(token)}`
+  return url
 }
 
 export default { createTransport, configureTransport, isWebTransportSupported }

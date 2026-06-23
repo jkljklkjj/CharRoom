@@ -75,13 +75,12 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 
   // 设置事件回调
   transport.onopen = () => {
-    console.log('✅ 连接成功，准备登录')
+    console.log('✅ 连接成功')
     isReconnecting = false
     currentReconnectDelay = 1000
 
     // 发送登录消息
     sendLogin(token)
-
     // 启动心跳
     startHeartbeat()
     if (handlers.onopen) handlers.onopen()
@@ -109,7 +108,7 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 
   // 建立连接
   try {
-    const finalUrl = buildWebTransportUrl(hostname, port)
+    const finalUrl = buildWebTransportUrl(hostname, port, token)
     await transport.connect(finalUrl, token)
     return transport
   } catch (e) {
