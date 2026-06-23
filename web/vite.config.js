@@ -3,6 +3,18 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['vue', 'vue-router'],
+          'proto': ['protobufjs', 'long'],
+          'ui': ['dompurify']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 400
+  },
   plugins: [
     vue(),
     VitePWA({
