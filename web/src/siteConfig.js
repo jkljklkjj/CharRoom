@@ -10,7 +10,7 @@ const siteConfig = {
 		autoDowngrade: true,
 		webTransportPath: '/.well-known/webtransport',
 		webSocketPath: '/ws',
-		port: 8080
+		port: 443
 	},
 
 	INSTALLER_URLS: {
