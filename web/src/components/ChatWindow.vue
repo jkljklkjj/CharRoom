@@ -160,31 +160,49 @@ const isMobile = computed(() => {
 // 当前会话的消息列表（私聊或群聊）
 const currentMessages = computed(() => {
   if (currentChatId.value == null) return []
-  return isGroupChat.value ? store.state.groupMessages : store.state.messages
+  const msgs = isGroupChat.value ? store.state.groupMessages : store.state.messages
+  // 只保留最新 100 条（类似 QQ），消除大量消息时的滚动开销
+  return msgs.length > 100 ? msgs.slice(msgs.length - 100) : msgs
 })
 
 
-function scrollToBottom() {
+let _scrollInit = false
+
+// QQ 式滚动：首次定位到底部（无动画），后续仅当接近底部时跟随
+function scrollToBottom(animate = false) {
   nextTick(() => {
-    setTimeout(() => {
-      if (msgList.value) {
-        // 直接设置滚动位置，加上额外的像素偏移确保完全到底
-        msgList.value.scrollTop = msgList.value.scrollHeight + 100
-      }
-      // 再次确认滚动
-      setTimeout(() => {
-        if (msgList.value) {
-          msgList.value.scrollTop = msgList.value.scrollHeight + 100
-        }
-      }, 100)
-    }, 100)
+    const el = msgList.value
+    if (!el) return
+    const target = el.scrollHeight + 100
+    if (animate) {
+      el.scrollTo({ top: target, behavior: 'smooth' })
+    } else {
+      el.scrollTop = target
+    }
   })
 }
 
-// 切换会话或新消息到来时滚动到底部
-watch([currentChatId, currentMessages], () => {
-  scrollToBottom()
-}, { deep: true })
+// 首次进入：直接定位到底部，无动画
+watch(currentChatId, () => {
+  _scrollInit = false
+  scrollToBottom(false)
+}, { immediate: true })
+
+// 新消息到达：仅在接近底部时跟随（无动画）
+watch(currentMessages, (msgs, oldMsgs) => {
+  const el = msgList.value
+  if (!el) return
+  if (!_scrollInit) {
+    _scrollInit = true
+    scrollToBottom(false)
+    return
+  }
+  // 在底部附近才跟随
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200
+  if (nearBottom) {
+    scrollToBottom(true)
+  }
+}, { deep: false })
 
 // 相对时间格式化
 function formatRelativeTime(t) {
