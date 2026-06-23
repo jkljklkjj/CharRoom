@@ -131,3 +131,22 @@ Web 端使用的 proto 文件位于 `web/public/proto/message.proto`（前端单
 - `jvmToolchain(21)` — Gradle 自动发现 JDK 21
 - `jvmTarget = JVM_21` — 编译目标
 - VS Code 配置指向 `/usr/lib/jvm/java-21-openjdk-amd64`
+
+**重要**：系统默认可能为 Java 25，Gradle 不兼容。所有 Gradle 命令必须通过 Java 21 运行：
+
+```bash
+# 编译 Kotlin 公共代码
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew compileKotlin
+
+# 运行桌面应用
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew run
+
+# 生成 protobuf 代码
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew :proto:generateProto
+
+# 打包
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew customJar
+
+# 运行测试
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew test
+```

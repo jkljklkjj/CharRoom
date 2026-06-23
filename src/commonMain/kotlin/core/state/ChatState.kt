@@ -134,7 +134,8 @@ class ChatState(
     }
 
     /**
-     * 按当前顺序合并联系人列表，同时更新已有条目的最新字段并移除已不存在的联系人
+     * 全量替换联系人列表（保留顺序）。
+     * 触发全量重组，仅用于初始加载。
      */
     suspend fun replaceUsersPreservingOrder(newUsers: List<User>) = mutex.withLock {
         val currentUsers = _users.value
@@ -154,6 +155,35 @@ class ChatState(
 
         if (mergedUsers != currentUsers) {
             _users.value = mergedUsers
+        }
+    }
+
+    /**
+     * 增量合并联系人列表。
+     * 只更新有变化的字段，不重建列表。
+     * Compose LazyColumn + key 可保持 item 复用。
+     */
+    suspend fun mergeUsers(incoming: List<User>) = mutex.withLock {
+        if (incoming.isEmpty()) return@withLock
+        val current = _users.value.toMutableList()
+        val existingMap = current.associateBy { it.id }.toMutableMap()
+        var changed = false
+
+        for (user in incoming) {
+            val existing = existingMap[user.id]
+            if (existing == null) {
+                existingMap[user.id] = user
+                changed = true
+            } else if (existing.online != user.online
+                    || existing.username != user.username
+                    || existing.avatarUrl != user.avatarUrl) {
+                existingMap[user.id] = user
+                changed = true
+            }
+        }
+
+        if (changed) {
+            _users.value = existingMap.values.toList()
         }
     }
 

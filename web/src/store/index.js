@@ -7,6 +7,8 @@ const state = reactive({
   messages: [],
   groupMessages: [],
   conversationStates: {},
+  // 每个会话已同步到的 seqId（用于增量拉取）
+  conversationSeqIds: {},
   token: '',
   refreshToken: '',
   accountId: '',
@@ -44,6 +46,30 @@ function normalizeTimeValue(value) {
   if (typeof value === 'number') return value
   const parsed = Date.parse(value)
   return Number.isNaN(parsed) ? 0 : parsed
+}
+
+// ── seqId 持久化 ──────────────────────────────────────────
+
+function persistConversationSeqIds() {
+  try {
+    if (state.accountId) {
+      localStorage.setItem(`charroom_seqids_${state.accountId}`, JSON.stringify(state.conversationSeqIds))
+    }
+  } catch (_) {}
+}
+
+function restoreConversationSeqIds() {
+  try {
+    if (state.accountId) {
+      const raw = localStorage.getItem(`charroom_seqids_${state.accountId}`)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (typeof parsed === 'object' && parsed !== null) {
+          state.conversationSeqIds = parsed
+        }
+      }
+    }
+  } catch (_) {}
 }
 
 function loadConversationPreview(accountId, conversationId) {
@@ -228,11 +254,125 @@ function setAccountId(id) {
   state.messages = []
   state.groupMessages = []
   state.conversationStates = {}
+  state.conversationSeqIds = {}
   rebuildConversationStates()
+  restoreConversationSeqIds()
+}
+
+// ── seqId 跟踪 ───────────────────────────────────────────
+
+/**
+ * 获取会话的已同步 seqId。
+ * @param {string} conversationId
+ * @returns {number}
+ */
+function getConversationSeqId(conversationId) {
+  const key = String(conversationId)
+  return state.conversationSeqIds[key] || 0
+}
+
+/**
+ * 更新会话的已同步 seqId（取最大值，防止回退）。
+ * @param {string} conversationId
+ * @param {number} seqId
+ */
+function setConversationSeqId(conversationId, seqId) {
+  const key = String(conversationId)
+  const current = state.conversationSeqIds[key] || 0
+  if (seqId > current) {
+    state.conversationSeqIds = {
+      ...state.conversationSeqIds,
+      [key]: seqId
+    }
+    persistConversationSeqIds()
+  }
 }
 function setUsers(list) {
   state.users = list
   rebuildConversationStates()
+}
+
+/**
+ * 增量合并用户列表。
+ * 保留已有对象的引用，只更新变化的字段。
+ * Vue 可以复用 DOM 节点，避免整个列表重建。
+ */
+function mergeUsers(incoming) {
+  if (!Array.isArray(incoming)) return
+
+  const existingById = new Map(state.users.map(u => [u.id, u]))
+  let changed = false
+
+  for (const user of incoming) {
+    const existing = existingById.get(user.id)
+    if (!existing) {
+      // 新增用户
+      existingById.set(user.id, { ...user })
+      changed = true
+    } else {
+      // 只更新有变化的字段（保留引用）
+      let modified = false
+      if (existing.online !== user.online) { existing.online = user.online; modified = true }
+      if (existing.username !== user.username) { existing.username = user.username; modified = true }
+      if (existing.status !== user.status) { existing.status = user.status; modified = true }
+      if (existing.avatarUrl !== user.avatarUrl) { existing.avatarUrl = user.avatarUrl; modified = true }
+      if (existing.signature !== user.signature) { existing.signature = user.signature; modified = true }
+      if (modified) changed = true
+    }
+  }
+
+  // 检查是否有已删除的好友
+  const incomingIds = new Set(incoming.map(u => u.id))
+  for (const [id, _u] of existingById) {
+    if (!incomingIds.has(id) && id > 0) { // 跳过 AI 助手等特殊用户
+      existingById.delete(id)
+      changed = true
+    }
+  }
+
+  if (changed) {
+    state.users = Array.from(existingById.values())
+    // 懒惰重建，不阻塞渲染
+    setTimeout(() => rebuildConversationStates(), 0)
+  }
+}
+
+/**
+ * 持久化好友列表到 localStorage（用于启动时快速恢复）。
+ */
+function cacheUsers(users) {
+  try {
+    if (state.accountId) {
+      const key = `charroom_users_${state.accountId}`
+      localStorage.setItem(key, JSON.stringify({
+        version: Date.now(),
+        users: users.map(u => ({
+          id: u.id,
+          username: u.username,
+          online: u.online,
+          status: u.status,
+          avatarUrl: u.avatarUrl,
+          signature: u.signature
+        }))
+      }))
+    }
+  } catch (_) { /* localStorage 满时静默失败 */ }
+}
+
+/**
+ * 从 localStorage 恢复缓存的好友列表。
+ */
+function loadCachedUsers() {
+  try {
+    if (state.accountId) {
+      const raw = localStorage.getItem(`charroom_users_${state.accountId}`)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && Array.isArray(parsed.users)) return parsed.users
+      }
+    }
+  } catch (_) { /* ignore */ }
+  return []
 }
 function addUser(u) {
   if (!state.users.some(x => x.id === u.id)) {
@@ -287,17 +427,49 @@ function setSelectedChat(id) {
   loadConversation(id, Number(id) < 0)
   clearConversationUnread(id)
 }
+/**
+ * 头像缓存（内存 + localStorage）。
+ * key = avatarUrl, value = data:URL base64
+ */
+const avatarCache = new Map()
+
+function getCachedAvatar(url) {
+  if (!url) return null
+  if (avatarCache.has(url)) return avatarCache.get(url)
+  try {
+    const key = `charroom_avatar_${btoa(url).slice(0, 40)}`
+    const cached = localStorage.getItem(key)
+    if (cached) {
+      avatarCache.set(url, cached)
+      return cached
+    }
+  } catch (_) {}
+  return null
+}
+
+function setCachedAvatar(url, dataUrl) {
+  if (!url || !dataUrl) return
+  avatarCache.set(url, dataUrl)
+  try {
+    const key = `charroom_avatar_${btoa(url).slice(0, 40)}`
+    localStorage.setItem(key, dataUrl)
+  } catch (_) {}
+}
+
 function clearAll() {
   if (state.accountId) {
     const prefix = buildAccountPrefix(state.accountId)
     Object.keys(localStorage)
       .filter(key => key.startsWith(prefix))
       .forEach(key => localStorage.removeItem(key))
+    // 清理 seqId
+    try { localStorage.removeItem(`charroom_seqids_${state.accountId}`) } catch (_) {}
   }
   state.users = []
   state.messages = []
   state.groupMessages = []
   state.conversationStates = {}
+  state.conversationSeqIds = {}
 }
 function setPendingRegister(obj) { state.pendingRegister = obj }
 function clearPendingRegister() { state.pendingRegister = null }
@@ -321,7 +493,14 @@ export function useStore() {
     rebuildConversationStates,
     updateConversationState,
     clearConversationUnread,
-    setLoginValid
+    setLoginValid,
+    getConversationSeqId,
+    setConversationSeqId,
+    mergeUsers,
+    cacheUsers,
+    loadCachedUsers,
+    getCachedAvatar,
+    setCachedAvatar
   }
 }
 

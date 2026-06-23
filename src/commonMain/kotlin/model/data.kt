@@ -43,7 +43,9 @@ data class Message(
     val messageType: MessageType = MessageType.TEXT, // 消息类型
     val fileUrl: String? = null,          // 文件/图片URL
     val fileName: String? = null,         // 文件名称
-    val fileSize: Long? = null            // 文件大小
+    val fileSize: Long? = null,            // 文件大小
+    val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
+    val conversationId: String = ""        // 会话ID
 ) {
     /**
      * 复制消息并更新发送状态
@@ -62,7 +64,9 @@ data class Message(
         messageType = messageType,
         fileUrl = fileUrl,
         fileName = fileName,
-        fileSize = fileSize
+        fileSize = fileSize,
+        seqId = seqId,
+        conversationId = conversationId
     )
 }
 
@@ -81,7 +85,9 @@ data class GroupMessage(
     val messageType: MessageType = MessageType.TEXT, // 消息类型
     val fileUrl: String? = null,          // 文件/图片URL
     val fileName: String? = null,         // 文件名称
-    val fileSize: Long? = null            // 文件大小
+    val fileSize: Long? = null,            // 文件大小
+    val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
+    val conversationId: String = ""        // 会话ID
 ) {
     /**
      * 复制消息并更新发送状态
@@ -100,7 +106,9 @@ data class GroupMessage(
         messageType = messageType,
         fileUrl = fileUrl,
         fileName = fileName,
-        fileSize = fileSize
+        fileSize = fileSize,
+        seqId = seqId,
+        conversationId = conversationId
     )
 }
 

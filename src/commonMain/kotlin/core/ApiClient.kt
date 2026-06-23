@@ -527,6 +527,32 @@ suspend fun getOfflineMessages(token: String): List<Message> {
 }
 
 /**
+ * 增量同步消息（基于 seqId 游标）。
+ * @return SyncMessagesResult 包含消息列表和下一个游标
+ */
+@Serializable
+data class SyncMessagesResult(
+    val messages: List<Message> = emptyList(),
+    val nextSeqId: Long = 0L,
+    val hasMore: Boolean = false
+)
+
+suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int = 50): SyncMessagesResult {
+    val requestBody = buildJsonObject {
+        put("conversationId", conversationId)
+        put("lastSeqId", lastSeqId)
+        put("limit", limit)
+    }
+    val response = sendRequest<SyncMessagesResult>(
+        path = ApiEndpoints.SYNC_MESSAGES,
+        method = "POST",
+        body = requestBody,
+        token = token
+    )
+    return response.data ?: SyncMessagesResult()
+}
+
+/**
  * 发送邮箱更新验证码
  */
 suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean {

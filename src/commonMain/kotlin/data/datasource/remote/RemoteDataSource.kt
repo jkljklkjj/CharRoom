@@ -81,6 +81,11 @@ interface RemoteDataSource {
     suspend fun getOfflineMessages(token: String): List<Message>
 
     /**
+     * 增量同步消息
+     */
+    suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int = 50): core.SyncMessagesResult
+
+    /**
      * 发送邮箱更新验证码
      */
     suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean

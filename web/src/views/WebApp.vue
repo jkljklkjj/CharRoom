@@ -205,8 +205,15 @@ async function initUserSession(accessToken, refreshToken) {
   persistTokens(accessToken, refreshToken)
   localStorage.setItem('charroom_accountId', String(userRes.id))
 
+  // 好友列表增量更新：先展示缓存，再静默 merge
+  const cached = store.loadCachedUsers()
+  if (cached.length > 0) {
+    store.mergeUsers(cached)  // 即时呈现缓存
+  }
+
   const friends = await api.getFriends()
-  store.setUsers(friends || [])
+  store.mergeUsers(friends || [])   // 静默 merge，不重建 DOM
+  store.cacheUsers(friends || [])   // 缓存到 localStorage
 
   connectChat(accessToken, userRes.id)
   return true

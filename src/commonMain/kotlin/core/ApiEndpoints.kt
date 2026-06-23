@@ -27,6 +27,7 @@ object ApiEndpoints {
     const val USER_DETAIL = "/user/get"
     const val GROUP_DETAIL = "/group/get/detail"
     const val OFFLINE = "/message/getOfflineMessage"
+    const val SYNC_MESSAGES = "/sync/messages"
     const val AGENT_NL = "/agent/nl"
     const val AGENT_NL_STREAM = "/agent/nl/stream"
     const val FILE_UPLOAD = "/file/upload"

@@ -117,6 +117,14 @@ class ChatRepository(
     }
 
     /**
+     * 增量同步消息（基于 seqId 游标）。
+     */
+    suspend fun syncMessages(conversationId: String, lastSeqId: Long, limit: Int = 50): core.SyncMessagesResult {
+        val token = authRepository.getCurrentToken() ?: return core.SyncMessagesResult()
+        return remoteDataSource.syncMessages(token, conversationId, lastSeqId, limit)
+    }
+
+    /**
      * 分页获取离线消息
      */
     suspend fun getOfflineMessagesPage(page: Int = 0, pageSize: Int = 50): List<Message> {

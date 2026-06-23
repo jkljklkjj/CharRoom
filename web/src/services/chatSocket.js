@@ -276,7 +276,11 @@ function scheduleReconnect(hostname, port, token, userId) {
       connect(hostname, port, token, userId, handlers).catch(() => {
         isReconnecting = false
       })
-      currentReconnectDelay = Math.min(currentReconnectDelay * 2, maxReconnectDelay)
+      // 指数退避 + jitter 随机化，避免重连风暴
+      currentReconnectDelay = Math.min(
+        currentReconnectDelay * 2 + Math.random() * 1000,
+        maxReconnectDelay
+      )
     }
   }, currentReconnectDelay)
 }

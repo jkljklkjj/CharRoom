@@ -180,6 +180,19 @@ export async function getOfflineMessages() {
   return body || []
 }
 
+/**
+ * 增量同步消息（基于 seqId 游标）。
+ */
+export async function syncMessages(conversationId, lastSeqId, limit = 50) {
+  const { ok, body } = await safeFetch(`${API_BASE}/sync/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId, lastSeqId, limit })
+  })
+  if (!ok || !body?.data) return { messages: [], nextSeqId: lastSeqId, hasMore: false }
+  return body.data
+}
+
 export async function addFriend(account) {
   const { ok } = await safeFetch(`${API_BASE}/friend/add`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account })
@@ -324,6 +337,7 @@ export default {
   getGroupDetail,
   callAgentStream,
   sendVerifyCode,
-  verifyRegister
-  ,refreshToken
+  verifyRegister,
+  refreshToken,
+  syncMessages
 }

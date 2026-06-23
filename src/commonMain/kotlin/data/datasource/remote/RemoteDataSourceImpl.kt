@@ -67,6 +67,10 @@ class RemoteDataSourceImpl : RemoteDataSource {
         return core.getOfflineMessages(token)
     }
 
+    override suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int): core.SyncMessagesResult {
+        return core.syncMessages(token, conversationId, lastSeqId, limit)
+    }
+
     override suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean {
         return core.sendEmailUpdateVerifyCode(token, email)
     }
