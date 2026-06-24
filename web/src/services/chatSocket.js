@@ -108,7 +108,7 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 
   // 建立连接
   try {
-    const finalUrl = buildWebTransportUrl(hostname, port, token)
+    const finalUrl = buildWebTransportUrl(hostname, port)
     await transport.connect(finalUrl, token)
     return transport
   } catch (e) {
