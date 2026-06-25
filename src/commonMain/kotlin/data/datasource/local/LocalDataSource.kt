@@ -5,87 +5,87 @@ import model.Message
 import model.User
 
 /**
- * 本地数据源接口
- * 定义所有本地存储操作
+ * Local data source interface
+ * Defines all local storage operations
  */
 interface LocalDataSource {
     /**
-     * 保存认证信息
+     * Save auth credentials
      */
     suspend fun saveAuth(account: String, accessToken: String, refreshToken: String)
 
     /**
-     * 获取保存的账号
+     * Get saved account
      */
     suspend fun getSavedAccount(): String?
 
     /**
-     * 获取保存的访问令牌
+     * Get saved access token
      */
     suspend fun getSavedAccessToken(): String?
 
     /**
-     * 获取保存的刷新令牌
+     * Get saved refresh token
      */
     suspend fun getSavedRefreshToken(): String?
 
     /**
-     * 清除认证信息
+     * Clear auth credentials
      */
     suspend fun clearAuth()
 
     /**
-     * 保存用户信息
+     * Save user profile
      */
     suspend fun saveUserProfile(user: User)
 
     /**
-     * 获取本地保存的用户信息
+     * Get locally saved user profile
      */
     suspend fun getUserProfile(): User?
 
     /**
-     * 保存好友列表
+     * Save friend list
      */
     suspend fun saveFriends(friends: List<User>)
 
     /**
-     * 获取本地保存的好友列表
+     * Get locally saved friend list
      */
     suspend fun getFriends(): List<User>
 
     /**
-     * 保存群组列表
+     * Save group list
      */
     suspend fun saveGroups(groups: List<User>)
 
     /**
-     * 获取本地保存的群组列表
+     * Get locally saved group list
      */
     suspend fun getGroups(): List<User>
 
     /**
-     * 保存私聊消息
+     * Save private messages
      */
     suspend fun saveMessages(messages: List<Message>)
 
     /**
-     * 获取本地保存的私聊消息
+     * Get locally saved private messages
      */
     suspend fun getMessages(userId: Int): List<Message>
 
     /**
-     * 保存群聊消息
+     * Save group messages
      */
     suspend fun saveGroupMessages(messages: List<GroupMessage>)
 
     /**
-     * 获取本地保存的群聊消息
+     * Get locally saved group messages
      */
     suspend fun getGroupMessages(groupId: Int): List<GroupMessage>
 
     /**
-     * 清除所有本地数据
+     * Clear all local data
      */
     suspend fun clearAll()
 }

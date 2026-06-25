@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import component.AppTopBar
 import component.dialog.AvatarCropDialog
 import component.io.FilePicker
+import com.chatlite.i18n.LocalStrings
 import presentation.viewmodel.GlobalProfileViewModel
 import presentation.viewmodel.ProfileUiState
 import presentation.viewmodel.ProfileViewModel
@@ -48,13 +49,15 @@ fun ProfileScreen(
         viewModel.loadUserProfile()
     }
 
+    val s = LocalStrings.current
+
     val currentUser = (uiState as? ProfileUiState.Success)?.user
 
     Scaffold(
         topBar = {
             AppTopBar(
-                title = "个人资料",
-                subtitle = "查看和编辑个人信息",
+                title = s["profile.title"],
+                subtitle = s["profile.subtitle"],
                 onBack = onBack,
                 modifier = Modifier.statusBarsPadding()
             )
@@ -111,11 +114,11 @@ fun ProfileScreen(
                                 ) {
                                     Column {
                                         Text(
-                                            text = if (viewModel.isEditing.value) "编辑资料" else "个人信息",
+                                            text = if (viewModel.isEditing.value) s["profile.edit.title"] else s["profile.title"],
                                             style = MaterialTheme.typography.h6
                                         )
                                         Text(
-                                            text = if (viewModel.isEditing.value) "修改后记得保存" else "点击编辑后可以更新资料",
+                                            text = if (viewModel.isEditing.value) s["profile.edit.reminder"] else s["profile.edit.click.hint"],
                                             style = MaterialTheme.typography.caption,
                                             color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                         )
@@ -127,7 +130,7 @@ fun ProfileScreen(
                                             modifier = Modifier.height(40.dp),
                                             shape = RoundedCornerShape(14.dp)
                                         ) {
-                                            Text("编辑资料")
+                                            Text(s["profile.edit"])
                                         }
                                     } else {
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -136,7 +139,7 @@ fun ProfileScreen(
                                                 modifier = Modifier.height(40.dp),
                                                 shape = RoundedCornerShape(14.dp)
                                             ) {
-                                                Text("取消")
+                                                Text(s["profile.cancel"])
                                             }
                                             Button(
                                                 onClick = { viewModel.saveProfile(onSuccess = onProfileUpdated) },
@@ -151,9 +154,9 @@ fun ProfileScreen(
                                                         strokeWidth = 2.dp
                                                     )
                                                     Spacer(modifier = Modifier.width(8.dp))
-                                                    Text("保存中...")
+                                                    Text(s["profile.saving"])
                                                 } else {
-                                                    Text("保存修改")
+                                                    Text(s["profile.save"])
                                                 }
                                             }
                                         }
@@ -182,7 +185,7 @@ fun ProfileScreen(
                                             FilePicker.pickImage { bytes, fileName ->
                                                 val maxSize = 500 * 1024 // 500KB
                                                 if (bytes.size > maxSize) {
-                                                    viewModel.errorMessage.value = "图片大小不能超过 500KB，将自动压缩"
+                                                    viewModel.errorMessage.value = s["profile.avatar.size.limit"]
                                                 }
                                                 selectedImageBytes = bytes
                                                 selectedImageFileName = fileName
@@ -207,7 +210,7 @@ fun ProfileScreen(
                                         ) {
                                             Image(
                                                 bitmap = viewModel.avatarBitmap.value!!,
-                                                contentDescription = "头像",
+                                                contentDescription = s["user.avatar"],
                                                 modifier = Modifier
                                                     .fillMaxSize()
                                                     .clip(CircleShape)
@@ -222,7 +225,7 @@ fun ProfileScreen(
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
-                                                    text = "更换头像",
+                                                    text = s["profile.change.avatar"],
                                                     color = Color.White,
                                                     style = MaterialTheme.typography.subtitle2
                                                 )
@@ -240,7 +243,7 @@ fun ProfileScreen(
                                 if (viewModel.isEditing.value) {
                                     Spacer(modifier = Modifier.height(10.dp))
                                     Text(
-                                        text = "点击头像可上传新头像",
+                                        text = s["profile.avatar.hint"],
                                         style = MaterialTheme.typography.caption,
                                         color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                     )
@@ -251,7 +254,7 @@ fun ProfileScreen(
                                         shape = RoundedCornerShape(999.dp)
                                     ) {
                                         Text(
-                                            text = if (currentUser?.phone.isNullOrBlank()) "资料未完善" else "资料已完善",
+                                            text = if (currentUser?.phone.isNullOrBlank()) s["profile.incomplete"] else s["profile.complete"],
                                             style = MaterialTheme.typography.caption,
                                             color = MaterialTheme.colors.secondary,
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -269,13 +272,13 @@ fun ProfileScreen(
                             elevation = 0.dp
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
-                                Text(text = "基本信息", style = MaterialTheme.typography.subtitle1)
+                                Text(text = s["profile.basic.info"], style = MaterialTheme.typography.subtitle1)
                                 Spacer(modifier = Modifier.height(14.dp))
 
                                 OutlinedTextField(
                                     value = viewModel.username.value,
                                     onValueChange = { viewModel.username.value = it },
-                                    label = { Text("用户名") },
+                                    label = { Text(s["profile.username"]) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     enabled = viewModel.isEditing.value,
@@ -291,7 +294,7 @@ fun ProfileScreen(
                                 OutlinedTextField(
                                     value = viewModel.signature.value,
                                     onValueChange = { viewModel.signature.value = it },
-                                    label = { Text("个性签名") },
+                                    label = { Text(s["profile.signature"]) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = false,
                                     maxLines = 2,
@@ -308,7 +311,7 @@ fun ProfileScreen(
                                 OutlinedTextField(
                                     value = viewModel.phone.value,
                                     onValueChange = { viewModel.phone.value = it },
-                                    label = { Text("手机号码") },
+                                    label = { Text(s["profile.phone"]) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -330,14 +333,14 @@ fun ProfileScreen(
                             elevation = 0.dp
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
-                                Text(text = "邮箱与安全", style = MaterialTheme.typography.subtitle1)
+                                Text(text = s["profile.email.security"], style = MaterialTheme.typography.subtitle1)
                                 Spacer(modifier = Modifier.height(14.dp))
 
                                 if (!viewModel.isEditing.value) {
                                     OutlinedTextField(
                                         value = viewModel.email.value,
                                         onValueChange = {},
-                                        label = { Text("当前邮箱") },
+                                        label = { Text(s["profile.current.email"]) },
                                         modifier = Modifier.fillMaxWidth(),
                                         singleLine = true,
                                         enabled = false,
@@ -349,7 +352,7 @@ fun ProfileScreen(
                                     )
                                 } else {
                                     Text(
-                                        text = "修改邮箱",
+                                        text = s["profile.change.email"],
                                         style = MaterialTheme.typography.subtitle2,
                                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                                     )
@@ -360,7 +363,7 @@ fun ProfileScreen(
                                         OutlinedTextField(
                                             value = viewModel.newEmail.value,
                                             onValueChange = { viewModel.newEmail.value = it },
-                                            label = { Text("新邮箱地址") },
+                                            label = { Text(s["profile.new.email"]) },
                                             modifier = Modifier.weight(1f),
                                             singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -387,7 +390,7 @@ fun ProfileScreen(
                                             } else if (viewModel.emailVerifyCountdown.value > 0) {
                                                 Text("${viewModel.emailVerifyCountdown.value}s")
                                             } else {
-                                                Text("发送验证码")
+                                                Text(s["profile.send.code"])
                                             }
                                         }
                                     }
@@ -397,7 +400,7 @@ fun ProfileScreen(
                                         OutlinedTextField(
                                             value = viewModel.emailVerifyCode.value,
                                             onValueChange = { viewModel.emailVerifyCode.value = it },
-                                            label = { Text("邮箱验证码") },
+                                            label = { Text(s["profile.email.verify.code"]) },
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -422,9 +425,9 @@ fun ProfileScreen(
                                 elevation = 0.dp
                             ) {
                                 Column(modifier = Modifier.padding(18.dp)) {
-                                    Text(text = "修改密码", style = MaterialTheme.typography.subtitle1)
+                                    Text(text = s["profile.change.password"], style = MaterialTheme.typography.subtitle1)
                                     Text(
-                                        text = "不修改请留空",
+                                        text = s["profile.password.leave.blank"],
                                         style = MaterialTheme.typography.caption,
                                         color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                     )
@@ -434,7 +437,7 @@ fun ProfileScreen(
                                     OutlinedTextField(
                                         value = viewModel.currentPassword.value,
                                         onValueChange = { viewModel.currentPassword.value = it },
-                                        label = { Text("当前密码") },
+                                        label = { Text(s["profile.current.password"]) },
                                         modifier = Modifier.fillMaxWidth(),
                                         singleLine = true,
                                         visualTransformation = PasswordVisualTransformation(),
@@ -452,7 +455,7 @@ fun ProfileScreen(
                                         OutlinedTextField(
                                             value = viewModel.newPassword.value,
                                             onValueChange = { viewModel.newPassword.value = it },
-                                            label = { Text("新密码") },
+                                            label = { Text(s["profile.new.password"]) },
                                             modifier = Modifier.weight(1f).padding(end = 6.dp),
                                             singleLine = true,
                                             visualTransformation = PasswordVisualTransformation(),
@@ -467,7 +470,7 @@ fun ProfileScreen(
                                         OutlinedTextField(
                                             value = viewModel.confirmPassword.value,
                                             onValueChange = { viewModel.confirmPassword.value = it },
-                                            label = { Text("确认密码") },
+                                            label = { Text(s["profile.confirm.password"]) },
                                             modifier = Modifier.weight(1f).padding(start = 6.dp),
                                             singleLine = true,
                                             visualTransformation = PasswordVisualTransformation(),
@@ -502,7 +505,7 @@ fun ProfileScreen(
                                     if (viewModel.errorMessage.value.isNotBlank()) {
                                         Icon(
                                             imageVector = Icons.Default.Error,
-                                            contentDescription = "错误",
+                                            contentDescription = s["profile.error"],
                                             tint = MaterialTheme.colors.error,
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -515,7 +518,7 @@ fun ProfileScreen(
                                     } else {
                                         Icon(
                                             imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = "成功",
+                                            contentDescription = s["profile.success"],
                                             tint = MaterialTheme.colors.secondary,
                                             modifier = Modifier.size(20.dp)
                                         )

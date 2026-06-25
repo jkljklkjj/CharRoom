@@ -3,7 +3,7 @@
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-wrap">
       <div class="loading-spinner"></div>
-      <p>正在验证登录状态...</p>
+      <p>{{ $t('app.loading') }}</p>
     </div>
 
     <LoginRegister v-else-if="!store.state.token || !store.state.loginValid" @logged="onLogged" />
@@ -23,7 +23,7 @@
         <div class="chat-view" v-if="currentView === 'chat'">
           <!-- 移动端顶部栏 -->
           <div class="mobile-header">
-            <button class="back-btn" @click="backToList">← 返回</button>
+            <button class="back-btn" @click="backToList">{{ $t('app.back') }}</button>
             <div class="chat-title">{{ currentChatName }}</div>
           </div>
           <ChatWindow class="chat" />
@@ -40,25 +40,33 @@
     <div v-if="showSettings" class="settings-overlay" @click.self="closeSettings">
       <div class="settings-dialog">
         <div class="settings-header">
-          <h3>设置</h3>
+          <h3>{{ $t('app.settings.title') }}</h3>
           <button class="close-settings" @click="closeSettings">×</button>
         </div>
         <div class="settings-body">
           <div class="settings-item">
             <div class="transport-info">
-              <label>传输协议</label>
-              <div class="transport-badge wt">WebTransport (QUIC)</div>
+              <label>{{ $t('app.settings.transportLabel') }}</label>
+              <div class="transport-badge wt">{{ $t('app.settings.transportValue') }}</div>
             </div>
           </div>
           <div class="settings-item">
-            <label>主题设置</label>
+            <label>{{ $t('app.settings.themeLabel') }}</label>
             <div class="theme-options">
-              <button :class="{ active: theme === 'auto' }" @click="setTheme('auto')">自动</button>
-              <button :class="{ active: theme === 'light' }" @click="setTheme('light')">浅色</button>
-              <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')">深色</button>
+              <button :class="{ active: theme === 'auto' }" @click="setTheme('auto')">{{ $t('app.settings.themeAuto') }}</button>
+              <button :class="{ active: theme === 'light' }" @click="setTheme('light')">{{ $t('app.settings.themeLight') }}</button>
+              <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')">{{ $t('app.settings.themeDark') }}</button>
             </div>
           </div>
-          <button class="logout-btn" @click="logout">退出登录</button>
+          <div class="settings-item">
+            <label>{{ $t('app.settings.languageLabel') }}</label>
+            <div class="theme-options">
+              <button :class="{ active: locale === 'zh-CN' }" @click="switchLang('zh-CN')">{{ $t('app.settings.languageZh') }}</button>
+              <button :class="{ active: locale === 'en' }" @click="switchLang('en')">{{ $t('app.settings.languageEn') }}</button>
+              <button :class="{ active: locale === 'ja' }" @click="switchLang('ja')">日本語</button>
+            </div>
+          </div>
+          <button class="logout-btn" @click="logout">{{ $t('app.settings.logout') }}</button>
         </div>
       </div>
     </div>
@@ -67,6 +75,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
 import ChatWindow from '../components/ChatWindow.vue'
@@ -90,6 +99,7 @@ function normalizeTimestamp(raw) {
 }
 
 const store = useStore()
+const { t, locale } = useI18n()
 
 // 移动端适配
 const isMobile = ref(window.innerWidth < 768)
@@ -105,6 +115,12 @@ function setTheme(newTheme) {
   theme.value = newTheme
   localStorage.setItem('theme', newTheme)
   applyTheme(newTheme)
+}
+
+function switchLang(lang) {
+  locale.value = lang
+  localStorage.setItem('locale', lang)
+  document.documentElement.lang = lang
 }
 
 function applyTheme(theme) {
@@ -230,7 +246,7 @@ async function onLogged(tokens) {
 // 选中用户，切换到聊天视图
 function onUserSelected(user) {
   if (isMobile.value) {
-    currentChatName.value = user.name || user.account || user.username || `用户 ${user.id}`
+    currentChatName.value = user.name || user.account || user.username || t('chat.userPrefix', { id: user.id })
     currentView.value = 'chat'
   }
 }

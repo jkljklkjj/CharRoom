@@ -1,5 +1,6 @@
 package component
 
+import com.chatlite.i18n.currentStrings
 import component.io.FilePickerProvider
 
 import androidx.compose.runtime.Composable
@@ -23,7 +24,7 @@ object DesktopFilePicker : FilePickerProvider {
     override fun pickImage(onResult: (ByteArray, String) -> Unit) {
         val fileChooser = JFileChooser()
         fileChooser.fileFilter = FileNameExtensionFilter(
-            "图片文件", "jpg", "jpeg", "png", "gif", "bmp"
+            currentStrings["file.picker.image"], "jpg", "jpeg", "png", "gif", "bmp"
         )
         val result = fileChooser.showOpenDialog(null)
         if (result == JFileChooser.APPROVE_OPTION) {

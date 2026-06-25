@@ -44,6 +44,9 @@ data class ApiResponse<T>(
     val isSuccess: Boolean get() = code == 0
 }
 
+/** 后端 StatusCode.FORBIDDEN — 群组加入需要管理员审核 */
+const val GROUP_JOIN_PENDING_CODE = 1005
+
 // 全局Json配置
 val json = Json {
     ignoreUnknownKeys = true // 忽略未知字段
@@ -469,20 +472,19 @@ suspend fun addFriend(token: String, account: String): Boolean {
 
 /**
  * 加入群组
+ * @return 完整响应，包含 code/message/data。code=1005 表示需要审核（群组需管理员批准）
  */
-suspend fun addGroup(token: String, groupId: String): Boolean {
+suspend fun addGroup(token: String, groupId: String): ApiResponse<Unit> {
     val requestBody = buildJsonObject {
         put("groupId", groupId)
     }
 
-    val response = sendRequest<Unit>(
+    return sendRequest<Unit>(
         path = ApiEndpoints.GROUP_ADD,
         method = "POST",
         body = requestBody,
         token = token
     )
-
-    return response.isSuccess
 }
 
 /**

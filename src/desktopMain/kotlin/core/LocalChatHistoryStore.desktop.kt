@@ -1,5 +1,6 @@
 package core
 
+import com.chatlite.i18n.currentStrings
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -280,7 +281,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         return if (isGroup) {
             GroupMessage(
                 groupId = json.path("receiverId").asInt(0).let { if (it < 0) -it else it },
-                senderName = json.path("senderName").asText("未知用户"),
+                senderName = json.path("senderName").asText(currentStrings["contact.unknown"]),
                 text = json.path("content").asText(""),
                 senderId = json.path("senderId").asInt(0),
                 timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),

@@ -1,5 +1,6 @@
 package core
 
+import com.chatlite.i18n.currentStrings
 import core.model.AppVersionInfo
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -44,7 +45,7 @@ class AppUpdateManagerImpl : AppUpdateManager {
 
             when {
                 result == null -> {
-                    _updateState.value = UpdateState.Failed("检查更新失败")
+                    _updateState.value = UpdateState.Failed(currentStrings["update.check.failed"])
                 }
                 result.hasUpdate && result.latestVersion != null -> {
                     _updateState.value = UpdateState.Available(result.latestVersion)
@@ -58,7 +59,7 @@ class AppUpdateManagerImpl : AppUpdateManager {
                 }
             }
         } catch (e: Exception) {
-            _updateState.value = UpdateState.Failed("检查更新失败: ${e.message}")
+            _updateState.value = UpdateState.Failed(currentStrings["update.check.failed.with.error"].format(e.message))
         }
     }
 
@@ -103,7 +104,7 @@ class AppUpdateManagerImpl : AppUpdateManager {
                 if (versionInfo.md5 != null) {
                     val fileMd5 = calculateMD5(outputFile)
                     if (!fileMd5.equals(versionInfo.md5, ignoreCase = true)) {
-                        _updateState.value = UpdateState.Failed("安装包校验失败")
+                        _updateState.value = UpdateState.Failed(currentStrings["update.verification.failed"])
                         return@launch
                     }
                 }
@@ -111,7 +112,7 @@ class AppUpdateManagerImpl : AppUpdateManager {
                 _updateState.value = UpdateState.Downloaded(outputFile.absolutePath, versionInfo)
             } catch (e: Exception) {
                 if (e !is kotlinx.coroutines.CancellationException) {
-                    _updateState.value = UpdateState.Failed("下载失败: ${e.message}")
+                    _updateState.value = UpdateState.Failed(currentStrings["update.download.failed"].format(e.message))
                 }
             }
         }
@@ -131,11 +132,11 @@ class AppUpdateManagerImpl : AppUpdateManager {
                     // 退出当前应用
                     System.exit(0)
                 } else {
-                    _updateState.value = UpdateState.Failed("安装包不存在")
+                    _updateState.value = UpdateState.Failed(currentStrings["update.package.not.found"])
                 }
             }
         } catch (e: Exception) {
-            _updateState.value = UpdateState.Failed("安装失败: ${e.message}")
+            _updateState.value = UpdateState.Failed(currentStrings["update.install.failed"].format(e.message))
         }
     }
 

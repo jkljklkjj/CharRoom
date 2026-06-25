@@ -61,9 +61,16 @@ class ApiService(private val authToken: String? = null) {
     }
 
     /**
-     * 加入群组
+     * 加入群组（仅返回是否成功）
      */
     suspend fun addGroup(groupId: String): Boolean {
+        return core.addGroup(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId).isSuccess
+    }
+
+    /**
+     * 加入群组（返回完整响应，包含 code/message，可用于区分"需要审核"状态）
+     */
+    suspend fun addGroupWithResponse(groupId: String): ApiResponse<Unit> {
         return core.addGroup(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId)
     }
 
@@ -345,6 +352,14 @@ class ApiService(private val authToken: String? = null) {
         @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).addGroup(groupId)"))
         suspend fun addGroup(groupId: String): Boolean {
             return GlobalAppState.currentToken?.let { ApiService(it).addGroup(groupId) } ?: false
+        }
+
+        /**
+         * 加入群组（返回完整响应）
+         */
+        suspend fun addGroupWithResponse(groupId: String): ApiResponse<Unit> {
+            val token = GlobalAppState.currentToken ?: return ApiResponse(code = -1, message = "No auth token")
+            return ApiService(token).addGroupWithResponse(groupId)
         }
 
         /**

@@ -20,20 +20,22 @@ import androidx.compose.ui.unit.dp
 import core.loadImageBitmapFromUrl
 import model.User
 import kotlinx.coroutines.launch
+import com.chatlite.i18n.LocalStrings
 
 /**
- * 用户详情弹窗
+ * User detail dialog
  */
 @Composable
 fun UserDetailDialog(
     user: User,
     onDismiss: () -> Unit,
-    onSendMessage: (() -> Unit)? = null // 发送消息按钮回调，可选
+    onSendMessage: (() -> Unit)? = null // send message callback, optional
 ) {
     var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     val scope = rememberCoroutineScope()
+    val s = LocalStrings.current
 
-    // 加载头像
+    // Load avatar
     LaunchedEffect(user.avatarUrl, user.avatarKey) {
         scope.launch {
             user.avatarUrl?.let { url ->
@@ -52,12 +54,12 @@ fun UserDetailDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("用户信息")
+                Text(s["user.dialog.title"])
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier.size(24.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "关闭")
+                    Icon(Icons.Default.Close, contentDescription = s["user.dialog.close"])
                 }
             }
         },
@@ -85,7 +87,7 @@ fun UserDetailDialog(
                             if (avatarBitmap != null) {
                                 Image(
                                     bitmap = avatarBitmap!!,
-                                    contentDescription = "头像",
+                                    contentDescription = s["user.avatar"],
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
@@ -113,9 +115,9 @@ fun UserDetailDialog(
                         ) {
                             Text(
                                 text = when (user.online) {
-                                    true -> "在线"
-                                    false -> "离线"
-                                    else -> "未知状态"
+                                    true -> s["user.dialog.online"]
+                                    false -> s["user.dialog.offline"]
+                                    else -> s["user.dialog.unknown.status"]
                                 },
                                 style = MaterialTheme.typography.caption,
                                 color = if (user.online == true) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
@@ -146,7 +148,7 @@ fun UserDetailDialog(
                     elevation = 0.dp
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        DetailDialogRow("用户ID", user.id.toString())
+                        DetailDialogRow(s["user.dialog.user.id"], user.id.toString())
                     }
                 }
             }
@@ -161,7 +163,7 @@ fun UserDetailDialog(
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("发消息")
+                    Text(s["user.dialog.send.message"])
                 }
             }
         },
@@ -172,7 +174,7 @@ fun UserDetailDialog(
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("关闭")
+                    Text(s["user.dialog.close"])
                 }
             }
         } else {

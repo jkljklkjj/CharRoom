@@ -52,7 +52,7 @@ class RemoteDataSourceImpl : RemoteDataSource {
     }
 
     override suspend fun addGroup(token: String, groupId: String): Boolean {
-        return core.addGroup(token, groupId)
+        return core.addGroup(token, groupId).isSuccess
     }
 
     override suspend fun getUserDetail(token: String, userId: String): User? {

@@ -1,5 +1,6 @@
 import { encodeMessage, decodeMessage } from '../proto'
 import DOMPurify from 'dompurify'
+import i18n from '../i18n'
 import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
 
 // ── 内部变量 ────────────────────────────────────
@@ -46,12 +47,12 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
   if (!token || typeof token !== 'string' || token.trim() === '') {
     console.error('❌ 连接失败：token为空')
     stopReconnect = true
-    if (onAuthFailed) onAuthFailed('token不能为空')
-    throw new Error('聊天连接失败：认证凭证为空')
+    if (onAuthFailed) onAuthFailed(i18n.global.t('error.tokenEmpty'))
+    throw new Error(i18n.global.t('error.connectionFailed'))
   }
 
   if (!isWebTransportSupported()) {
-    throw new Error('当前浏览器不支持 WebTransport (QUIC)')
+    throw new Error(i18n.global.t('error.webTransportNotSupported'))
   }
 
   stopReconnect = false
@@ -121,11 +122,34 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
  * 发送登录消息（通过传输层）。
  * @param {string} token
  */
+/**
+ * 获取或生成本地设备 ID（持久化到 localStorage）
+ */
+function getDeviceId() {
+  const key = 'charroom_device_id'
+  let id = localStorage.getItem(key)
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+    localStorage.setItem(key, id)
+  }
+  return id
+}
+
+/** 判断当前设备类型 */
+function getDeviceType() {
+  // Web 端固定为 "web"；KMP 客户端（Android/iOS/Desktop）自行设值
+  return 'web'
+}
+
 async function sendLogin(token) {
   try {
     const result = await sendWrapper({
       type: 'login',
-      login: { token: token }
+      login: {
+        token: token,
+        device_type: getDeviceType(),
+        device_id: getDeviceId()
+      }
     })
     console.log('📤 登录消息已发送, 结果:', result)
   } catch (err) {
@@ -413,8 +437,8 @@ function showNotification(message, isGroup = false) {
   const senderId = String(message.userId || '')
   if (senderId === userId) return
 
-  const title = isGroup ? '群聊消息' : '新消息'
-  const body = message.content || '收到一条新消息'
+  const title = i18n.global.t(isGroup ? 'notification.groupMessage' : 'notification.newMessage')
+  const body = message.content || i18n.global.t('notification.body')
 
   const notification = new Notification(title, {
     body,

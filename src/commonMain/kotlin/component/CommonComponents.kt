@@ -31,6 +31,7 @@ import core.loadImageBitmapWithCache
 import core.getCachedImage
 import model.Message
 import model.User
+import com.chatlite.i18n.LocalStrings
 
 /**
  * 消息长按菜单
@@ -47,10 +48,11 @@ fun MessageLongPressMenu(
     onReply: () -> Unit
 ) {
     if (!expanded) return
+    val s = LocalStrings.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("消息操作") },
+        title = { Text(s["message.actions"]) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // 消息预览
@@ -82,9 +84,9 @@ fun MessageLongPressMenu(
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "复制", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.ContentCopy, contentDescription = s["message.copy"], modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("复制消息", style = MaterialTheme.typography.body1)
+                        Text(s["message.copy"], style = MaterialTheme.typography.body1)
                     }
 
                     Row(
@@ -97,9 +99,9 @@ fun MessageLongPressMenu(
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Reply, contentDescription = "回复", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Reply, contentDescription = s["message.reply"], modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("回复消息", style = MaterialTheme.typography.body1)
+                        Text(s["message.reply"], style = MaterialTheme.typography.body1)
                     }
 
                     Row(
@@ -112,9 +114,9 @@ fun MessageLongPressMenu(
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Forward, contentDescription = "转发", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Forward, contentDescription = s["message.forward"], modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("转发消息", style = MaterialTheme.typography.body1)
+                        Text(s["message.forward"], style = MaterialTheme.typography.body1)
                     }
 
                     if (isSelf) {
@@ -130,13 +132,13 @@ fun MessageLongPressMenu(
                         ) {
                             Icon(
                                 Icons.Default.Delete,
-                                contentDescription = "删除",
+                                contentDescription = s["message.delete"],
                                 modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colors.error
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                "删除消息",
+                                s["message.delete"],
                                 style = MaterialTheme.typography.body1,
                                 color = MaterialTheme.colors.error
                             )
@@ -147,7 +149,7 @@ fun MessageLongPressMenu(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(s["message.cancel"])
             }
         }
     )
@@ -162,6 +164,7 @@ fun ReplyPreviewBar(
     senderName: String,
     onCancel: () -> Unit
 ) {
+    val s = LocalStrings.current
     if (replyToMessage == null) return
 
     Surface(
@@ -177,7 +180,7 @@ fun ReplyPreviewBar(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "回复 $senderName",
+                    text = s["chat.reply.to"].format(senderName),
                     style = MaterialTheme.typography.caption,
                     color = MaterialTheme.colors.primary
                 )
@@ -193,7 +196,7 @@ fun ReplyPreviewBar(
                 onClick = onCancel,
                 modifier = Modifier.size(24.dp)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "取消回复", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, contentDescription = s["message.cancel.reply"], modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -259,12 +262,13 @@ fun ForwardSelectDialog(
     onDismiss: () -> Unit,
     onForward: (User) -> Unit
 ) {
+    val s = LocalStrings.current
     val userList by remember(users) { mutableStateOf(users.filter { it.id > 0 }) }
     var selectedUser by remember { mutableStateOf<User?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择转发对象") },
+        title = { Text(s["message.forward.select"]) },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                 if (userList.isEmpty()) {
@@ -272,7 +276,7 @@ fun ForwardSelectDialog(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("暂无联系人", color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f))
+                        Text(s["message.forward.no.contacts"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f))
                     }
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -331,7 +335,7 @@ fun ForwardSelectDialog(
                                         style = MaterialTheme.typography.body1
                                     )
                                     Text(
-                                        text = if (user.online == true) "在线" else "离线",
+                                        text = if (user.online == true) s["user.detail.online"] else s["user.detail.offline"],
                                         style = MaterialTheme.typography.caption,
                                         color = if (user.online == true) {
                                             MaterialTheme.colors.secondary
@@ -344,7 +348,7 @@ fun ForwardSelectDialog(
                                 if (isSelected) {
                                     Icon(
                                         Icons.Default.Check,
-                                        contentDescription = "已选择",
+                                        contentDescription = s["message.forward.selected"],
                                         tint = MaterialTheme.colors.primary
                                     )
                                 }
@@ -366,12 +370,12 @@ fun ForwardSelectDialog(
                 },
                 enabled = selectedUser != null
             ) {
-                Text("确定")
+                Text(s["message.forward.confirm"])
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(s["message.cancel"])
             }
         }
     )
@@ -386,6 +390,7 @@ fun UserAvatar(
     size: Dp = 40.dp,
     onClick: (() -> Unit)? = null
 ) {
+    val s = LocalStrings.current
     // 在 remember 中立即从缓存加载，避免闪动
     val avatarBitmapState = remember(user.id) {
         // 先从缓存同步读取
@@ -416,7 +421,7 @@ fun UserAvatar(
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = "用户头像",
+                contentDescription = s["user.avatar"],
                 modifier = Modifier
                     .size(size)
                     .clip(CircleShape)
@@ -459,6 +464,7 @@ fun AppTopBar(
     useGradient: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val s = LocalStrings.current
     val isDark = !MaterialTheme.colors.isLight
 
     Surface(
@@ -486,7 +492,7 @@ fun AppTopBar(
                     IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = s["chat.back"],
                             tint = MaterialTheme.colors.onBackground
                         )
                     }

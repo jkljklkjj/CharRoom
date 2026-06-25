@@ -24,6 +24,7 @@ import core.loadImageBitmapWithCache
 import kotlinx.coroutines.launch
 import model.User
 import presentation.viewmodel.ChatViewModel
+import com.chatlite.i18n.LocalStrings
 
 /**
  * 个人资料对话框
@@ -36,6 +37,7 @@ fun UserProfileDialog(
 ) {
     var currentUser by remember { mutableStateOf<User?>(null) }
     var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    val s = LocalStrings.current
     var isEditing by remember { mutableStateOf(false) }
     var username by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -97,12 +99,12 @@ fun UserProfileDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(if (isEditing) "编辑个人资料" else "个人信息")
+                Text(if (isEditing) s["user.profile.edit.title"] else s["user.profile.view.title"])
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier.size(24.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "关闭")
+                    Icon(Icons.Default.Close, contentDescription = s["user.profile.close"])
                 }
             }
         },
@@ -125,12 +127,12 @@ fun UserProfileDialog(
                     if (avatarBitmap != null) {
                         Image(
                             bitmap = avatarBitmap!!,
-                            contentDescription = "头像",
+                            contentDescription = s["user.avatar"],
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
                         Text(
-                            text = currentUser?.username?.firstOrNull()?.toString() ?: "我",
+                            text = currentUser?.username?.firstOrNull()?.toString() ?: s["chat.me"],
                             style = MaterialTheme.typography.h4,
                             color = MaterialTheme.colors.primary
                         )
@@ -145,7 +147,7 @@ fun UserProfileDialog(
                         ) {
                             Icon(
                                 Icons.Default.Edit,
-                                contentDescription = "更换头像",
+                                contentDescription = s["user.profile.change.avatar"],
                                 tint = Color.White,
                                 modifier = Modifier.size(32.dp)
                             )
@@ -161,7 +163,7 @@ fun UserProfileDialog(
                         TextField(
                             value = username,
                             onValueChange = { username = it },
-                            label = { Text("用户名") },
+                            label = { Text(s["user.profile.username"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading
                         )
@@ -171,7 +173,7 @@ fun UserProfileDialog(
                         TextField(
                             value = phone,
                             onValueChange = { phone = it },
-                            label = { Text("手机号") },
+                            label = { Text(s["user.profile.phone"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading
                         )
@@ -181,7 +183,7 @@ fun UserProfileDialog(
                         TextField(
                             value = signature,
                             onValueChange = { signature = it },
-                            label = { Text("个性签名") },
+                            label = { Text(s["user.profile.signature"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading,
                             maxLines = 3
@@ -192,7 +194,7 @@ fun UserProfileDialog(
                         TextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text("新密码（留空不修改）") },
+                            label = { Text(s["user.profile.password.hint"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading,
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
@@ -203,7 +205,7 @@ fun UserProfileDialog(
                         TextField(
                             value = confirmPassword,
                             onValueChange = { confirmPassword = it },
-                            label = { Text("确认新密码") },
+                            label = { Text(s["user.profile.confirm.password"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading && password.isNotBlank(),
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
@@ -212,7 +214,7 @@ fun UserProfileDialog(
 
                         if (password.isNotBlank() && password != confirmPassword) {
                             Text(
-                                text = "两次输入的密码不一致",
+                                text = s["user.profile.password.mismatch"],
                                 color = MaterialTheme.colors.error,
                                 style = MaterialTheme.typography.caption,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -224,7 +226,7 @@ fun UserProfileDialog(
                     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         // 用户名
                         Text(
-                            text = currentUser?.username ?: "加载中...",
+                            text = currentUser?.username ?: s["user.profile.loading"],
                             style = MaterialTheme.typography.h6,
                             textAlign = TextAlign.Center
                         )
@@ -234,7 +236,7 @@ fun UserProfileDialog(
                         // 用户ID
                         currentUser?.id?.let { id ->
                             Text(
-                                text = "账号 ID: $id",
+                                text = s["user.profile.account.id"].format(id),
                                 style = MaterialTheme.typography.caption,
                                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                                 modifier = Modifier.padding(top = 4.dp)
@@ -247,7 +249,7 @@ fun UserProfileDialog(
                         currentUser?.signature?.takeIf { it.isNotBlank() }?.let { sig ->
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = "个性签名",
+                                    text = s["user.profile.signature"],
                                     style = MaterialTheme.typography.subtitle2,
                                     color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                                 )
@@ -268,7 +270,7 @@ fun UserProfileDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "手机号",
+                                    text = s["user.profile.phone"],
                                     style = MaterialTheme.typography.caption,
                                     color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                 )
@@ -304,7 +306,7 @@ fun UserProfileDialog(
                             modifier = Modifier.weight(1f),
                             enabled = !isLoading
                         ) {
-                            Text("取消")
+                            Text(s["user.profile.cancel"])
                         }
 
                         Button(
@@ -319,7 +321,7 @@ fun UserProfileDialog(
                                     color = MaterialTheme.colors.onPrimary
                                 )
                             } else {
-                                Text("保存")
+                                Text(s["user.profile.save"])
                             }
                         }
                     }
@@ -329,7 +331,7 @@ fun UserProfileDialog(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading && currentUser != null
                     ) {
-                        Text("编辑资料")
+                        Text(s["user.profile.edit"])
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -346,7 +348,7 @@ fun UserProfileDialog(
                     ) {
                         Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("退出登录")
+                        Text(s["user.profile.logout"])
                     }
                 }
             }

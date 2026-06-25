@@ -15,7 +15,7 @@
           </div>
           <div class="bubble-col">
             <div class="meta">
-              <span class="sender">{{ m.user === 'you' ? '我' : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : '群聊') }}</span>
+              <span class="sender">{{ m.user === 'you' ? $t('chat.myself') : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : $t('chat.groupChat')) }}</span>
               <span class="time">{{ formatRelativeTime(m.time) }}</span>
             </div>
             <!-- 图片消息 -->
@@ -39,15 +39,15 @@
 
     <!-- 消息上下文菜单 -->
     <div v-if="showContextMenu" class="context-menu" :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }">
-      <div class="menu-item" @click="copyMessage">复制内容</div>
-      <div class="menu-item" @click="shareMessage" v-if="canShare">分享</div>
-      <div class="menu-item" @click="replyMessage">回复</div>
-      <div class="menu-item danger" v-if="selectedMessage?.user === 'you'" @click="deleteMessage">删除</div>
+      <div class="menu-item" @click="copyMessage">{{ $t('chat.context.copy') }}</div>
+      <div class="menu-item" @click="shareMessage" v-if="canShare">{{ $t('chat.context.share') }}</div>
+      <div class="menu-item" @click="replyMessage">{{ $t('chat.context.reply') }}</div>
+      <div class="menu-item danger" v-if="selectedMessage?.user === 'you'" @click="deleteMessage">{{ $t('chat.context.delete') }}</div>
     </div>
 
     <!-- 未选中好友时的占位 -->
     <div class="empty-placeholder" v-if="currentChatId === null">
-      <div class="placeholder-text">👆 请在左侧选择一个联系人开始聊天</div>
+      <div class="placeholder-text">{{ $t('chat.selectContactHint') }}</div>
     </div>
 
     <!-- 输入框：只要选中会话就显示 -->
@@ -62,19 +62,19 @@
     >
       <!-- 拖拽提示 -->
       <div v-if="isDragOver" class="drag-overlay">
-        <div class="drag-tip">📁 松开发送文件</div>
+        <div class="drag-tip">{{ $t('chat.dragTip') }}</div>
       </div>
 
       <form class="composer" @submit.prevent="send">
         <textarea
           v-model="text"
           ref="messageInput"
-          placeholder="输入消息，支持粘贴图片/拖拽文件发送..."
+          :placeholder="$t('chat.inputPlaceholder')"
           rows="1"
           @keydown.enter.exact.prevent="send"
           @input="autoResize"
         ></textarea>
-        <button class="send" type="submit">发送</button>
+        <button class="send" type="submit">{{ $t('chat.send') }}</button>
       </form>
     </div>
   </div>
@@ -82,10 +82,12 @@
 
 <script setup>
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
 
 const store = useStore()
+const { t } = useI18n()
 const text = ref('')
 const msgList = ref(null)
 const messageInput = ref(null)
@@ -144,12 +146,12 @@ const isGroupChat = computed(() => {
 
 const currentChatTitle = computed(() => {
   if (currentChatUser.value) {
-    return currentChatUser.value.name || currentChatUser.value.account || currentChatUser.value.username || `用户 ${currentChatUser.value.id}`
+    return currentChatUser.value.name || currentChatUser.value.account || currentChatUser.value.username || t('chat.userPrefix', { id: currentChatUser.value.id })
   }
   if (isGroupChat.value) {
-    return '群聊'
+    return t('chat.groupChat')
   }
-  return '请选择一个联系人开始聊天'
+  return t('chat.selectContact')
 })
 
 // 判断是否为移动端
@@ -215,12 +217,12 @@ function formatRelativeTime(t) {
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
 
-  if (seconds < 10) return '刚刚'
-  if (seconds < 60) return `${seconds}秒前`
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days === 1) return '昨天'
-  if (days < 7) return `${days}天前`
+  if (seconds < 10) return t('time.justNow')
+  if (seconds < 60) return t('time.secondsAgo', { n: seconds })
+  if (minutes < 60) return t('time.minutesAgo', { n: minutes })
+  if (hours < 24) return t('time.hoursAgo', { n: hours })
+  if (days === 1) return t('time.yesterday')
+  if (days < 7) return t('time.daysAgo', { n: days })
 
   // 超过 7 天显示绝对时间
   const month = time.getMonth() + 1
@@ -259,7 +261,7 @@ function extractImageUrl(text) {
 
 function extractImageAlt(text) {
   const match = text.match(/!\[(.*?)\]\((.*)\)/)
-  return match ? match[1] : '图片'
+  return match ? match[1] : t('chat.imageAlt')
 }
 
 function openImagePreview(url) {
@@ -274,7 +276,7 @@ function isFileMessage(text) {
 
 function extractFileName(text) {
   const match = text.match(/📎 (.*?) \(/)
-  return match ? match[1] : '未知文件'
+  return match ? match[1] : t('chat.unknownFile')
 }
 
 function extractFileSize(text) {
@@ -481,7 +483,7 @@ function closeContextMenu() {
 function copyMessage() {
   if (!selectedMessage.value) return
   navigator.clipboard.writeText(selectedMessage.value.text).then(() => {
-    console.log('消息复制成功')
+    console.log('Message copied successfully')
   })
   closeContextMenu()
 }
@@ -492,10 +494,10 @@ async function shareMessage() {
   try {
     await navigator.share({
       text: selectedMessage.value.text,
-      title: '来自轻聊的消息'
+      title: t('chat.shareTitle')
     })
   } catch (err) {
-    console.log('分享取消或失败:', err)
+    console.log('Share cancelled or failed:', err)
   }
   closeContextMenu()
 }
@@ -504,8 +506,8 @@ async function shareMessage() {
 function replyMessage() {
   if (!selectedMessage.value) return
   // 在输入框中引用要回复的内容
-  const sender = selectedMessage.value.user === 'you' ? '我' : (currentChatUser.value?.name || currentChatUser.value?.username || '对方')
-  text.value = `回复 ${sender}: \n${selectedMessage.value.text}\n---\n`
+  const sender = selectedMessage.value.user === 'you' ? t('chat.myself') : (currentChatUser.value?.name || currentChatUser.value?.username || t('chat.myself'))
+  text.value = t('chat.replyPrefix', { sender }) + `: \n${selectedMessage.value.text}\n---\n`
   messageInput.value?.focus()
   // 移动光标到末尾
   if (messageInput.value) {

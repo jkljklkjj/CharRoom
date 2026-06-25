@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.chatlite.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.awt.image.BufferedImage
@@ -65,6 +66,7 @@ object DesktopAvatarCropDialog : AvatarCropDialogProvider {
     ) {
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     val scope = rememberCoroutineScope()
+    val s = LocalStrings.current
 
     // 图片变换参数
     var scale by remember { mutableStateOf(1f) }
@@ -118,12 +120,12 @@ object DesktopAvatarCropDialog : AvatarCropDialogProvider {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "头像裁剪",
+                        text = s["crop.title"],
                         style = MaterialTheme.typography.h6,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭")
+                        Icon(Icons.Default.Close, contentDescription = s["crop.close"])
                     }
                 }
 
@@ -223,7 +225,7 @@ object DesktopAvatarCropDialog : AvatarCropDialogProvider {
 
                         Image(
                             bitmap = bitmap,
-                            contentDescription = "待裁剪头像",
+                            contentDescription = s["crop.description"],
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -332,7 +334,7 @@ object DesktopAvatarCropDialog : AvatarCropDialogProvider {
                             backgroundColor = MaterialTheme.colors.surface
                         )
                     ) {
-                        Text("取消")
+                        Text(s["crop.cancel"])
                     }
                     Button(
                         onClick = {
@@ -399,9 +401,9 @@ object DesktopAvatarCropDialog : AvatarCropDialogProvider {
                         )
                     ) {
                         if (isCropping) {
-                            Text("处理中...")
+                            Text(s["crop.processing"])
                         } else {
-                            Text("确认")
+                            Text(s["crop.confirm"])
                         }
                     }
                 }

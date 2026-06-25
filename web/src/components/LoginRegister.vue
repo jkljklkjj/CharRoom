@@ -1,17 +1,17 @@
 <template>
   <div class="login-wrap">
     <div class="panel">
-        <h3>{{ isRegister ? '注册' : '登录' }}</h3>
+        <h3>{{ isRegister ? $t('login.register') : $t('login.login') }}</h3>
         <form @submit.prevent="doAction">
-          <label v-if="isRegister">邮箱</label>
-          <label v-else>邮箱或用户ID</label>
-          <input v-model="account" :placeholder="isRegister ? '请输入邮箱' : '请输入邮箱或用户ID'" />
-          <label>密码</label>
-          <input type="password" v-model="password" placeholder="密码" />
+          <label v-if="isRegister">{{ $t('login.emailLabel') }}</label>
+          <label v-else>{{ $t('login.emailOrIdLabel') }}</label>
+          <input v-model="account" :placeholder="isRegister ? $t('login.emailPlaceholder') : $t('login.emailOrIdPlaceholder')" />
+          <label>{{ $t('login.passwordLabel') }}</label>
+          <input type="password" v-model="password" :placeholder="$t('login.passwordPlaceholder')" />
 
           <div class="actions">
-            <button class="primary" type="submit">{{ isRegister ? '创建账号' : '登录' }}</button>
-            <button type="button" class="toggle-mode" @click="toggleMode">{{ isRegister ? '已有账号？去登录' : '没有账号？创建' }}</button>
+            <button class="primary" type="submit">{{ isRegister ? $t('login.createAccount') : $t('login.login') }}</button>
+            <button type="button" class="toggle-mode" @click="toggleMode">{{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}</button>
           </div>
         </form>
       </div>
@@ -21,9 +21,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { useStore } from '../store'
 
+const { t } = useI18n()
 const account = ref('')
 const password = ref('')
 const isRegister = ref(false)
@@ -40,19 +42,19 @@ async function doAction() {
 }
 
 async function doLogin() {
-  if (!account.value || !password.value) { window.$toast.warning('请填写账号和密码'); return }
+  if (!account.value || !password.value) { window.$toast.warning(t('login.pleaseFillAccountPassword')); return }
   const tokens = await api.login(account.value, password.value)
   if (tokens && tokens.accessToken) {
     store.setToken(tokens.accessToken)
     store.setRefreshToken(tokens.refreshToken || '')
     emit('logged', tokens)
   } else {
-    window.$toast.error('登录失败，请检查账号密码')
+    window.$toast.error(t('login.checkAccountPassword'))
   }
 }
 
 async function doRegister() {
-  if (!account.value || !password.value) { window.$toast.warning('请填写邮箱与密码'); return }
+  if (!account.value || !password.value) { window.$toast.warning(t('login.pleaseFillEmailPassword')); return }
   // 发送验证码到邮箱，跳转到验证码输入页
   const sent = await api.sendVerifyCode(account.value)
   if (sent) {
@@ -61,7 +63,7 @@ async function doRegister() {
     store.setPendingRegister({ email: account.value, password: password.value })
     router.push({ name: 'Verify' })
   } else {
-    window.$toast.error('发送验证码失败，请稍后重试')
+    window.$toast.error(t('login.verificationSentFailed'))
   }
 }
 </script>

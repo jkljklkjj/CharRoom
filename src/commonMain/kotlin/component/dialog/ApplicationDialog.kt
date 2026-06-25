@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import core.ApiService
 import core.loadImageBitmapFromUrl
 import kotlinx.coroutines.Dispatchers
+import com.chatlite.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import model.User
@@ -47,6 +48,7 @@ fun ApplicationDialog(
     var isLoading by remember { mutableStateOf(true) }
     var processingUserId by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
+    val s = LocalStrings.current
 
     // 加载所有申请
     suspend fun loadAllApplications() {
@@ -70,12 +72,12 @@ fun ApplicationDialog(
     }
 
     val emptyText = when (selectedTab) {
-        ApplicationType.GROUP -> "暂无待处理的群聊申请"
-        ApplicationType.FRIEND -> "暂无待处理的好友申请"
+        ApplicationType.GROUP -> s["application.empty.group"]
+        ApplicationType.FRIEND -> s["application.empty.friend"]
     }
     val applyDescription = when (selectedTab) {
-        ApplicationType.GROUP -> "申请加入群聊"
-        ApplicationType.FRIEND -> "申请添加你为好友"
+        ApplicationType.GROUP -> s["application.desc.group"]
+        ApplicationType.FRIEND -> s["application.desc.friend"]
     }
 
     fun handleAction(userId: Int, accept: Boolean) {
@@ -109,7 +111,7 @@ fun ApplicationDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("申请管理") },
+        title = { Text(s["application.title"]) },
         text = {
             Column(modifier = Modifier.widthIn(max = 350.dp)) {
                 // Tab切换栏
@@ -122,7 +124,7 @@ fun ApplicationDialog(
                         onClick = { selectedTab = ApplicationType.FRIEND },
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("好友申请")
+                                Text(s["application.tab.friend"])
                                 if (friendApplications.isNotEmpty()) {
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Badge { Text(friendApplications.size.toString()) }
@@ -135,7 +137,7 @@ fun ApplicationDialog(
                         onClick = { selectedTab = ApplicationType.GROUP },
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("群聊申请")
+                                Text(s["application.tab.group"])
                                 if (groupApplications.isNotEmpty()) {
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Badge { Text(groupApplications.size.toString()) }
@@ -244,7 +246,7 @@ fun ApplicationDialog(
                                                 backgroundColor = MaterialTheme.colors.error
                                             )
                                         ) {
-                                            Text("拒绝")
+                                            Text(s["application.reject"])
                                         }
 
                                         Button(
@@ -258,7 +260,7 @@ fun ApplicationDialog(
                                                     color = MaterialTheme.colors.onPrimary
                                                 )
                                             } else {
-                                                Text("同意")
+                                                Text(s["application.accept"])
                                             }
                                         }
                                     }
@@ -271,7 +273,7 @@ fun ApplicationDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("关闭")
+                Text(s["application.close"])
             }
         }
     )

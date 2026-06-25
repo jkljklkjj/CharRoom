@@ -24,6 +24,7 @@ import core.ApiService
 import core.getCachedImage
 import core.loadImageBitmapFromUrl
 import model.User
+import com.chatlite.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import presentation.viewmodel.ChatViewModel
 
@@ -46,6 +47,7 @@ fun UserDetailScreen(
     var successMessage by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val s = LocalStrings.current
 
     // 加载用户信息
     LaunchedEffect(userId) {
@@ -80,9 +82,9 @@ fun UserDetailScreen(
                         chatViewModel.updateUsers(currentUsers + targetUser)
                     }
                 }
-                successMessage = "好友申请已发送，可以先发个招呼消息"
+                successMessage = s["user.detail.friend.request.sent"]
             } else {
-                errorMessage = "好友申请发送失败，请稍后重试"
+                errorMessage = s["user.detail.friend.request.failed"]
             }
             isAddingFriend = false
         }
@@ -91,8 +93,8 @@ fun UserDetailScreen(
     Scaffold(
         topBar = {
             AppTopBar(
-                title = "用户详情",
-                subtitle = "查看资料、状态和联系信息",
+                title = s["user.detail.title"],
+                subtitle = s["user.detail.subtitle"],
                 onBack = onBack
             )
         }
@@ -140,7 +142,7 @@ fun UserDetailScreen(
                                     if (avatarBitmap != null) {
                                         Image(
                                             bitmap = avatarBitmap!!,
-                                            contentDescription = "头像",
+                                            contentDescription = s["user.avatar"],
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     } else {
@@ -176,12 +178,12 @@ fun UserDetailScreen(
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     DetailBadge(
-                                        text = if (u.online == true) "在线" else "离线",
+                                        text = if (u.online == true) s["user.detail.online"] else s["user.detail.offline"],
                                         backgroundColor = if (u.online == true) MaterialTheme.colors.secondary.copy(alpha = 0.14f) else MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
                                         contentColor = if (u.online == true) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface.copy(alpha = 0.72f)
                                     )
                                     DetailBadge(
-                                        text = if (isFriend) "已是好友" else "非好友",
+                                        text = if (isFriend) s["user.detail.is.friend"] else s["user.detail.not.friend"],
                                         backgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.12f),
                                         contentColor = MaterialTheme.colors.primary
                                     )
@@ -193,32 +195,32 @@ fun UserDetailScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        DetailCard(title = "资料") {
-                            InfoRow(label = "用户ID", value = u.id.toString())
+                        DetailCard(title = s["user.detail.profile"]) {
+                            InfoRow(label = s["user.detail.user.id"], value = u.id.toString())
 
                             if (isFriend) {
                                 u.email?.takeIf { it.isNotBlank() }?.let { email ->
                                     DetailDivider()
-                                    InfoRow(label = "邮箱", value = email)
+                                    InfoRow(label = s["user.detail.email"], value = email)
                                 }
                                 u.phone?.takeIf { it.isNotBlank() }?.let { phone ->
                                     DetailDivider()
-                                    InfoRow(label = "电话", value = phone)
+                                    InfoRow(label = s["user.detail.phone"], value = phone)
                                 }
                             }
 
                             DetailDivider()
                             InfoRow(
-                                label = "在线状态",
-                                value = if (u.online == true) "在线" else "离线",
+                                label = s["user.detail.status"],
+                                value = if (u.online == true) s["user.detail.online"] else s["user.detail.offline"],
                                 valueColor = if (u.online == true) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                             )
 
                             u.createdAt?.let { timestamp ->
                                 DetailDivider()
                                 InfoRow(
-                                    label = "注册时间",
-                                    value = java.text.SimpleDateFormat("yyyy年MM月dd日", java.util.Locale.getDefault())
+                                    label = s["user.detail.registered"],
+                                    value = java.text.SimpleDateFormat(s["chat.date.format"], java.util.Locale.getDefault())
                                         .format(java.util.Date(timestamp))
                                 )
                             }
@@ -226,7 +228,7 @@ fun UserDetailScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        DetailCard(title = "操作") {
+                        DetailCard(title = s["user.detail.actions"]) {
                             if (!isFriend && successMessage.isBlank()) {
                                 Button(
                                     onClick = { addFriend() },
@@ -241,9 +243,9 @@ fun UserDetailScreen(
                                             strokeWidth = 2.dp
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("发送中...")
+                                        Text(s["user.detail.add.friend.sending"])
                                     } else {
-                                        Text("添加好友")
+                                        Text(s["user.detail.add.friend"])
                                     }
                                 }
                             } else {
@@ -254,7 +256,7 @@ fun UserDetailScreen(
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = RoundedCornerShape(14.dp)
                                 ) {
-                                    Text(if (isFriend) "发消息" else "发招呼消息")
+                                    Text(if (isFriend) s["user.detail.send.message"] else s["user.detail.send.greeting"])
                                 }
                             }
                         }
@@ -291,7 +293,7 @@ fun UserDetailScreen(
                     }
                 } ?: run {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("用户不存在")
+                        Text(s["user.detail.not.found"])
                     }
                 }
             }

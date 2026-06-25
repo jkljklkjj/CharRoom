@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import model.Message
 import model.User
 import presentation.viewmodel.ChatViewModel
+import com.chatlite.i18n.LocalStrings
 import component.settings.SettingsScreen
 
 /**
@@ -62,6 +63,7 @@ fun ChatApp(
 ) {
     val scaffoldState = rememberScaffoldState(snackbarHostState = SnackbarHostState())
     val scope = rememberCoroutineScope()
+    val s = LocalStrings.current
     // 方案B：每个屏幕使用独立ViewModel实例，但共享全局ChatState数据源
     val chatViewModel = remember { ChatViewModel(chatState = GlobalChatState) }
 
@@ -311,7 +313,7 @@ fun ChatApp(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     androidx.compose.material.Text(
-                                        text = "选择一个联系人开始聊天",
+                                        text = s["app.select.contact"],
                                         style = MaterialTheme.typography.h6,
                                         color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
                                     )
@@ -330,7 +332,7 @@ fun ChatApp(
                         showAddUserDialog = false
                         pendingRefreshTrigger++
                         scope.launch {
-                            scaffoldState.snackbarHostState.showSnackbar("添加成功")
+                            scaffoldState.snackbarHostState.showSnackbar(s["dialog.add.success"])
                         }
                     }
                 )

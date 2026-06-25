@@ -9,10 +9,11 @@ import data.datasource.remote.RemoteDataSourceImpl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.chatlite.i18n.currentStrings
 
 /**
- * 认证Repository
- * 处理认证相关业务逻辑，协调远程和本地数据源
+ * Authentication Repository
+ * Handles authentication business logic, coordinates remote and local data sources
  */
 class AuthRepository(
     private val remoteDataSource: RemoteDataSource,
@@ -22,7 +23,7 @@ class AuthRepository(
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     /**
-     * 初始化：尝试自动登录
+     * Initialize: attempt auto login
      */
     suspend fun init() {
         val savedToken = localDataSource.getSavedAccessToken()
@@ -37,12 +38,12 @@ class AuthRepository(
         _authState.value = AuthState.Loading
 
         try {
-            // 尝试验证token
+            // Try to validate token
             val validated = remoteDataSource.validateToken(savedToken)
             if (validated != null && validated.accessToken.isNotBlank()) {
-                // token有效，更新本地存储
+                // Token is valid, update local storage
                 localDataSource.saveAuth(savedAccount, validated.accessToken, validated.refreshToken)
-                // 获取用户信息
+                // Get user profile
                 val userProfile = remoteDataSource.getUserInfo(validated.accessToken)
                 val authState = AuthState.Authenticated(
                     account = savedAccount,
@@ -51,17 +52,17 @@ class AuthRepository(
                     userProfile = userProfile
                 )
                 _authState.value = authState
-                // 同步到GlobalAppState
+                // Sync to GlobalAppState
                 GlobalAppState.updateAuthState(authState)
                 return
             }
 
-            // token无效，尝试刷新
+            // Token is invalid, try to refresh
             if (!savedRefreshToken.isNullOrBlank()) {
                 val refreshed = remoteDataSource.refreshToken(savedRefreshToken)
                 if (refreshed != null && refreshed.accessToken.isNotBlank()) {
                     localDataSource.saveAuth(savedAccount, refreshed.accessToken, refreshed.refreshToken)
-                    // 获取用户信息
+                    // Get user profile
                     val userProfile = remoteDataSource.getUserInfo(refreshed.accessToken)
                     val authState = AuthState.Authenticated(
                         account = savedAccount,
@@ -70,25 +71,25 @@ class AuthRepository(
                         userProfile = userProfile
                     )
                     _authState.value = authState
-                    // 同步到GlobalAppState
+                    // Sync to GlobalAppState
                     GlobalAppState.updateAuthState(authState)
                     return
                 }
             }
 
-            // 刷新失败，清除本地存储
+            // Refresh failed, clear local storage
             localDataSource.clearAuth()
-            _authState.value = AuthState.Error("自动登录失败，请重新登录")
+            _authState.value = AuthState.Error(currentStrings["auth.auto.login.failed"])
         } catch (e: Exception) {
-            // 捕获自动登录异常，避免崩溃
+            // Catch auto-login exception to avoid crash
             localDataSource.clearAuth()
-            val errorMessage = e.message ?: "网络连接失败"
-            _authState.value = AuthState.Error("自动登录失败: $errorMessage")
+            val errorMessage = e.message ?: currentStrings["auth.network.failed"]
+            _authState.value = AuthState.Error(currentStrings["auth.auto.login.error"].format(errorMessage))
         }
     }
 
     /**
-     * 登录
+     * Login
      */
     suspend fun login(account: String, password: String, rememberMe: Boolean = false): AuthState {
         _authState.value = AuthState.Loading
@@ -96,9 +97,9 @@ class AuthRepository(
         return try {
             val result = remoteDataSource.login(account, password)
             if (result != null && result.accessToken.isNotBlank()) {
-                // 登录成功，保存到本地
+                // Login successful, save locally
                 localDataSource.saveAuth(account, result.accessToken, result.refreshToken)
-                // 获取用户信息
+                // Get user profile
                 val userProfile = remoteDataSource.getUserInfo(result.accessToken)
                 val authState = AuthState.Authenticated(
                     account = account,
@@ -107,49 +108,49 @@ class AuthRepository(
                     userProfile = userProfile
                 )
                 _authState.value = authState
-                // 同步到GlobalAppState
+                // Sync to GlobalAppState
                 GlobalAppState.updateAuthState(authState)
                 authState
             } else {
-                val errorState = AuthState.Error("登录失败，请检查账号或密码")
+                val errorState = AuthState.Error(currentStrings["auth.login.failed"])
                 _authState.value = errorState
                 errorState
             }
         } catch (e: Exception) {
-            // 捕获所有登录异常，避免崩溃
-            val errorMessage = e.message ?: "网络连接失败，请检查网络后重试"
-            val errorState = AuthState.Error("登录失败: $errorMessage")
+            // Catch all login exceptions to avoid crash
+            val errorMessage = e.message ?: currentStrings["auth.network.retry"]
+            val errorState = AuthState.Error(currentStrings["auth.login.error"].format(errorMessage))
             _authState.value = errorState
             errorState
         }
     }
 
     /**
-     * 注册
+     * Register
      */
     suspend fun register(username: String, password: String): Result<Int> {
         val result = remoteDataSource.register(username, password)
         return if (result != -1) {
             Result.success(result)
         } else {
-            Result.failure(Exception("注册失败，请稍后重试"))
+            Result.failure(Exception(currentStrings["auth.register.failed"]))
         }
     }
 
     /**
-     * 验证注册（与网页端逻辑一致）
+     * Verify registration (consistent with web logic)
      */
     suspend fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = ""): Result<Int> {
         val result = remoteDataSource.verifyRegister(username, password, email, verifyCode)
         return if (result != -1) {
             Result.success(result)
         } else {
-            Result.failure(Exception("注册失败，请稍后重试"))
+            Result.failure(Exception(currentStrings["auth.register.failed"]))
         }
     }
 
     /**
-     * 发送注册验证码
+     * Send registration verification code
      */
     suspend fun sendRegisterVerifyCode(email: String): Result<Boolean> {
         return try {
@@ -157,7 +158,7 @@ class AuthRepository(
             if (success) {
                 Result.success(true)
             } else {
-                Result.failure(Exception("验证码发送失败"))
+                Result.failure(Exception(currentStrings["auth.code.send.failed"]))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -165,29 +166,29 @@ class AuthRepository(
     }
 
     /**
-     * 退出登录
+     * Logout
      */
     suspend fun logout() {
         localDataSource.clearAuth()
         _authState.value = AuthState.Unauthenticated
-        // 同步到GlobalAppState
+        // Sync to GlobalAppState
         GlobalAppState.clearAuth()
     }
 
     /**
-     * 获取当前认证状态
+     * Get current auth state
      */
     fun getCurrentAuthState(): AuthState = _authState.value
 
     /**
-     * 获取当前token
+     * Get current token
      */
     fun getCurrentToken(): String? {
         return (_authState.value as? AuthState.Authenticated)?.accessToken
     }
 
     /**
-     * 获取当前账号
+     * Get current account
      */
     fun getCurrentAccount(): String? {
         return (_authState.value as? AuthState.Authenticated)?.account
@@ -195,7 +196,7 @@ class AuthRepository(
 }
 
 /**
- * 全局单例，兼容旧代码
+ * Global singleton, compatible with legacy code
  */
 val GlobalAuthRepository = AuthRepository(
     remoteDataSource = RemoteDataSourceImpl(),

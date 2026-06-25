@@ -16,6 +16,7 @@ import presentation.viewmodel.GlobalChatViewModel
 import java.awt.Toolkit
 import java.awt.TrayIcon
 import java.util.prefs.Preferences
+import com.chatlite.i18n.currentStrings
 import component.BackHandlerImpl
 import component.DesktopBackHandler
 import component.DesktopFilePicker
@@ -107,16 +108,16 @@ fun main() = application {
         // UnsupportedOperationException on some JDKs/platforms.
         menu = {
             Item(
-                text = "打开主窗口",
+                text = currentStrings["tray.open.window"],
                 onClick = { isWindowVisible = true }
             )
             Item(
-                text = "新消息通知",
-                onClick = { /* 打开通知设置 */ }
+                text = currentStrings["tray.notifications"],
+                onClick = { /* open notification settings */ }
             )
             Separator()
             Item(
-                text = "退出",
+                text = currentStrings["tray.quit"],
                 onClick = ::exitApplication
             )
         },
@@ -138,7 +139,7 @@ fun main() = application {
                 // 最小化到托盘而不是退出
                 isWindowVisible = false
             },
-            title = "轻聊",
+            title = currentStrings["app.name"],
             state = windowState,
             icon = painterResource("icons/ic_launcher.svg")
         ) {
@@ -162,7 +163,7 @@ class DesktopNotificationManager : MessageReceiveListener {
         // 初始化系统托盘图标
         trayIcon = try {
             val image = Toolkit.getDefaultToolkit().getImage(javaClass.getResource("/icons/ic_notification.png"))
-            TrayIcon(image, "轻聊").apply {
+            TrayIcon(image, currentStrings["app.name"]).apply {
                 isImageAutoSize = true
             }
         } catch (_: Exception) {
@@ -178,14 +179,14 @@ class DesktopNotificationManager : MessageReceiveListener {
 
     override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long) {
         val sender = GlobalChatViewModel.usersFlow.value.find { it.id == senderId }
-        val senderName = sender?.username ?: "陌生人"
-        showNotification("新消息", "$senderName: $message")
+        val senderName = sender?.username ?: currentStrings["tray.stranger"]
+        showNotification(currentStrings["tray.new.message"], "$senderName: $message")
     }
 
     override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long) {
         val group = GlobalChatViewModel.usersFlow.value.find { it.id == -groupId }
-        val groupName = group?.username ?: "群组"
-        showNotification("群消息 - $groupName", "$senderName: $message")
+        val groupName = group?.username ?: currentStrings["tray.group"]
+        showNotification(currentStrings["tray.group.message"].format(groupName), "$senderName: $message")
     }
 
     /**

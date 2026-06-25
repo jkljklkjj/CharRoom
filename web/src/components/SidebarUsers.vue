@@ -1,7 +1,7 @@
 <template>
   <div class="users-wrap">
     <div class="users-header">
-      <div class="title">联系人</div>
+      <div class="title">{{ $t('sidebar.title') }}</div>
       <div class="header-actions">
         <button class="friend-requests-btn" @click="toggleFriendRequests" :class="{hasRequests: friendRequests.length > 0}">
           📩
@@ -16,7 +16,7 @@
       <input
         v-model="searchQuery"
         type="search"
-        placeholder="搜索好友 / 群聊，支持名称或账号"
+        :placeholder="$t('sidebar.searchPlaceholder')"
       />
     </div>
 
@@ -24,11 +24,11 @@
     <div v-if="showFriendRequests" class="friend-requests-modal" @click.self="toggleFriendRequests">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>好友申请</h3>
+          <h3>{{ $t('sidebar.frTitle') }}</h3>
           <button class="close-btn" @click="toggleFriendRequests">×</button>
         </div>
         <div class="modal-body">
-          <div v-if="friendRequests.length === 0" class="empty">暂无好友申请</div>
+          <div v-if="friendRequests.length === 0" class="empty">{{ $t('sidebar.frEmpty') }}</div>
           <ul v-else class="request-list">
             <li v-for="req in friendRequests" :key="req.id" class="request-item">
               <div class="request-info">
@@ -36,12 +36,12 @@
                 <div v-else class="avatar">{{ initials(req.username) }}</div>
                 <div class="request-meta">
                   <div class="name">{{ req.username }}</div>
-                  <div class="desc">账号: {{ req.id }} 申请添加你为好友</div>
+                  <div class="desc">{{ $t('sidebar.frAccount') }}{{ req.id }} {{ $t('sidebar.frAddFriend') }}</div>
                 </div>
               </div>
               <div class="request-actions">
-                <button class="accept-btn" @click="handleAccept(req.id)">同意</button>
-                <button class="reject-btn" @click="handleReject(req.id)">拒绝</button>
+                <button class="accept-btn" @click="handleAccept(req.id)">{{ $t('sidebar.frAccept') }}</button>
+                <button class="reject-btn" @click="handleReject(req.id)">{{ $t('sidebar.frReject') }}</button>
               </div>
             </li>
           </ul>
@@ -58,7 +58,7 @@
             <div class="name">{{ u.name || u.account || u.username }}</div>
             <span v-if="u.preview.unreadCount > 0" class="unread-badge">{{ u.preview.unreadCount > 99 ? '99+' : u.preview.unreadCount }}</span>
           </div>
-          <div class="sub">{{ u.status || '在线' }}</div>
+          <div class="sub">{{ u.status || $t('sidebar.online') }}</div>
         </div>
       </li>
     </ul>
@@ -67,6 +67,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import api from '../api'
 import chatSocket from '../services/chatSocket'
@@ -74,6 +75,7 @@ import chatSocket from '../services/chatSocket'
 const emit = defineEmits(['user-selected', 'open-settings'])
 
 const store = useStore()
+const { t } = useI18n()
 const showFriendRequests = ref(false)
 const friendRequests = ref([])
 const searchQuery = ref('')
@@ -119,9 +121,9 @@ function initials(name) {
 }
 
 function select(u) {
-  console.log('🔵 SidebarUsers.select 触发, u.id=', u.id, 'type=', typeof u.id)
+  console.log('SidebarUsers.select triggered, u.id=', u.id, 'type=', typeof u.id)
   store.setSelectedChat(u.id)
-  console.log('🔵 setSelectedChat 之后, store.state.selectedChatId=', store.state.selectedChatId)
+  console.log('setSelectedChat after, store.state.selectedChatId=', store.state.selectedChatId)
   emit('user-selected', u)
 
   // 点击用户时，主动查询该用户的在线状态（排除AI助手和群组）
@@ -132,15 +134,15 @@ function select(u) {
         targetClientId: u.id.toString()
       }
     }).catch(err => {
-      console.warn('发送在线状态查询失败:', err)
+      console.warn('Failed to query online status:', err)
     })
   }
 }
 
 function onAdd() {
-  const account = prompt('输入对方账号（数字ID或邮箱）以添加为好友')
+  const account = prompt(t('sidebar.addFriendPrompt'))
   if (!account) return
-  api.addFriend(account).then(ok => { if (ok) window.$toast.success('已发送好友请求') })
+  api.addFriend(account).then(ok => { if (ok) window.$toast.success(t('sidebar.frSent')) })
 }
 
 function openSettings() {
@@ -157,32 +159,32 @@ function toggleFriendRequests() {
 
 async function loadFriendRequests() {
   const requests = await api.getFriendRequests()
-  console.log('获取到的好友请求原始数据:', requests)
+  console.log('Friend requests raw data:', requests)
   friendRequests.value = requests
 }
 
 async function handleAccept(userId) {
   const ok = await api.acceptFriend(userId)
   if (ok) {
-    window.$toast.success('已同意好友申请')
+    window.$toast.success(t('sidebar.frAccepted'))
     // 移除已处理的申请
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
     // 刷新好友列表
     const friends = await api.getFriends()
     store.setUsers(friends)
   } else {
-    window.$toast.error('操作失败，请重试')
+    window.$toast.error(t('sidebar.frAcceptFailed'))
   }
 }
 
 async function handleReject(userId) {
   const ok = await api.rejectFriend(userId)
   if (ok) {
-    window.$toast.info('已拒绝好友申请')
+    window.$toast.info(t('sidebar.frRejected'))
     // 移除已处理的申请
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
   } else {
-    window.$toast.error('操作失败，请重试')
+    window.$toast.error(t('sidebar.frRejectFailed'))
   }
 }
 

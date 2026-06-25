@@ -1,5 +1,7 @@
 package component.settings
 
+import com.chatlite.i18n.LocalStrings
+import com.chatlite.i18n.Strings
 import component.AppTopBar
 import core.AppLog
 import androidx.compose.foundation.background
@@ -57,19 +59,19 @@ import kotlinx.coroutines.launch
 import presentation.viewmodel.ChatViewModel
 
 /**
- * 平台类型
+ * Platform type
  */
 enum class Platform {
     ANDROID, DESKTOP, WEB
 }
 
 /**
- * 当前平台，由各平台初始化时设置
+ * Current platform, set by each platform during initialization
  */
 lateinit var CurrentPlatform: Platform
 
 /**
- * 设置界面
+ * Settings screen
  */
 @Composable
 fun SettingsScreen(
@@ -78,6 +80,7 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     onProfileClick: () -> Unit = {}
 ) {
+    val s = LocalStrings.current
     val coroutineScope = rememberCoroutineScope()
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
@@ -87,7 +90,7 @@ fun SettingsScreen(
     var latestVersionInfo: AppVersionInfo? by remember { mutableStateOf(null) }
     var updateError: String? by remember { mutableStateOf(null) }
 
-    // 监听更新状态
+    // Listen for update state
     val updateState by GlobalAppUpdateManager.updateState.collectAsState()
 
     LaunchedEffect(updateState) {
@@ -101,25 +104,25 @@ fun SettingsScreen(
             }
             is UpdateState.Downloaded -> {
                 showUpdateProgressDialog = false
-                // 询问是否安装
+                // Ask whether to install
                 if (state.versionInfo.forceUpdate) {
-                    // 强制更新直接安装
+                    // Force update installs directly
                     launch(Dispatchers.IO) {
                         GlobalAppUpdateManager.installUpdate(state.filePath)
                     }
                 } else {
-                    // 弹出确认安装对话框
+                    // Show confirm install dialog
                     showUpdateDialog = true
                 }
             }
             is UpdateState.Failed -> {
                 showUpdateProgressDialog = false
-                // 检查更新失败不弹出窗口，静默处理
+                // Silent failure, no popup
                 updateError = state.error
-                AppLog.w({ "检查更新失败: ${state.error}" })
+                AppLog.w({ "Check for update failed: ${state.error}" })
             }
             is UpdateState.NoUpdate -> {
-                updateError = "当前已是最新版本"
+                updateError = s["settings.up.to.date"]
                 showUpdateDialog = true
             }
             else -> {}
@@ -129,38 +132,38 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colors.background) // 完全不透明背景，作为独立窗口
+            .background(MaterialTheme.colors.background)
             .statusBarsPadding()
             .padding(16.dp)
     ) {
-        // 顶部标题栏
+        // Top bar title
         AppTopBar(
-            title = "设置",
+            title = s["settings.title"],
             onBack = onBackClick
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 设置选项列表
+        // Settings options list
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 个人资料
+            // Profile
             SettingItem(
                 icon = Icons.Default.Person,
-                title = "个人资料",
-                subtitle = "查看和编辑个人信息",
+                title = s["settings.profile"],
+                subtitle = s["settings.profile.subtitle"],
                 onClick = onProfileClick
             )
 
-            // 检查更新
+            // Check for updates
             SettingItem(
                 icon = Icons.Default.SystemUpdate,
-                title = "检查更新",
-                subtitle = "当前版本 v${AppConfig.VERSION_NAME} (${AppConfig.VERSION_CODE})",
+                title = s["settings.check.update"],
+                subtitle = s["settings.version"].format(AppConfig.VERSION_NAME, AppConfig.VERSION_CODE),
                 onClick = {
-                    // 启动协程检查更新
+                    // Launch coroutine to check for updates
                     coroutineScope.launch(Dispatchers.IO) {
                         GlobalAppUpdateManager.checkForUpdates(
                             platform = when (CurrentPlatform) {
@@ -174,33 +177,33 @@ fun SettingsScreen(
                 }
             )
 
-            // 清空聊天记录
+            // Clear chat history
             SettingItem(
                 icon = Icons.Default.Delete,
-                title = "清空聊天记录",
-                subtitle = "删除所有本地聊天消息",
+                title = s["settings.clear.history"],
+                subtitle = s["settings.clear.history.subtitle"],
                 onClick = {
                     showClearHistoryDialog = true
                 },
                 tint = MaterialTheme.colors.error
             )
 
-            // 清空缓存
+            // Clear cache
             SettingItem(
                 icon = Icons.Default.Delete,
-                title = "清空缓存",
-                subtitle = "删除头像、图片等缓存文件",
+                title = s["settings.clear.cache"],
+                subtitle = s["settings.clear.cache.subtitle"],
                 onClick = {
                     showClearCacheDialog = true
                 },
                 tint = MaterialTheme.colors.error
             )
 
-            // 退出登录
+            // Logout
             SettingItem(
                 icon = Icons.Default.Logout,
-                title = "退出登录",
-                subtitle = "退出当前账号",
+                title = s["settings.logout"],
+                subtitle = s["settings.logout.subtitle"],
                 onClick = {
                     showLogoutDialog = true
                 },
@@ -209,17 +212,17 @@ fun SettingsScreen(
         }
     }
 
-    // 退出登录确认对话框
+    // Logout confirmation dialog
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("退出登录") },
-            text = { Text("确定要退出当前账号吗？") },
+            title = { Text(s["settings.logout"]) },
+            text = { Text(s["settings.logout.confirm"]) },
             confirmButton = {
                 Button(
                     onClick = {
                         showLogoutDialog = false
-                        // 清除本地数据
+                        // Clear local data
                         chatViewModel.clear()
                         onLogout()
                     },
@@ -228,28 +231,28 @@ fun SettingsScreen(
                         contentColor = Color.White
                     )
                 ) {
-                    Text("退出")
+                    Text(s["settings.logout.confirm.button"])
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("取消")
+                    Text(s["settings.cancel"])
                 }
             }
         )
     }
 
-    // 清空聊天记录确认对话框
+    // Clear chat history confirmation dialog
     if (showClearHistoryDialog) {
         AlertDialog(
             onDismissRequest = { showClearHistoryDialog = false },
-            title = { Text("清空聊天记录") },
-            text = { Text("确定要删除所有本地聊天记录吗？此操作不可恢复。") },
+            title = { Text(s["settings.clear.history"]) },
+            text = { Text(s["settings.clear.history.confirm"]) },
             confirmButton = {
                 Button(
                     onClick = {
                         showClearHistoryDialog = false
-                        // 清除本地聊天记录
+                        // Clear local chat history
                         GlobalAppState.currentUserId?.toString()?.let { accountId ->
                             LocalChatHistoryStore.clear(accountId)
                         }
@@ -260,62 +263,62 @@ fun SettingsScreen(
                         contentColor = Color.White
                     )
                 ) {
-                    Text("清空")
+                    Text(s["settings.clear"])
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearHistoryDialog = false }) {
-                    Text("取消")
+                    Text(s["settings.cancel"])
                 }
             }
         )
     }
 
-    // 清空缓存确认对话框
+    // Clear cache confirmation dialog
     if (showClearCacheDialog) {
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
-            title = { Text("清空缓存") },
-            text = { Text("确定要删除所有缓存文件吗？头像、图片等会重新下载。") },
+            title = { Text(s["settings.clear.cache"]) },
+            text = { Text(s["settings.clear.cache.confirm"]) },
             confirmButton = {
                 Button(
                     onClick = {
                         showClearCacheDialog = false
-                        // 后续实现清空缓存逻辑
+                        // Cache clearing logic will be implemented later
                     },
                     colors = ButtonDefaults.buttonColors(
                         backgroundColor = MaterialTheme.colors.error,
                         contentColor = Color.White
                     )
                 ) {
-                    Text("清空")
+                    Text(s["settings.clear"])
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearCacheDialog = false }) {
-                    Text("取消")
+                    Text(s["settings.cancel"])
                 }
             }
         )
     }
 
-    // 更新提示对话框
+    // Update notification dialog
     if (showUpdateDialog) {
         AlertDialog(
             onDismissRequest = {
                 showUpdateDialog = false
                 updateError = null
                 if (latestVersionInfo?.forceUpdate == true) {
-                    // 强制更新不能关闭
+                    // Force update cannot be dismissed
                     return@AlertDialog
                 }
             },
             title = {
                 Text(
                     when {
-                        updateError != null -> "更新提示"
-                        latestVersionInfo != null -> "发现新版本 v${latestVersionInfo?.versionName}"
-                        else -> "检查更新"
+                        updateError != null -> s["settings.update.title"]
+                        latestVersionInfo != null -> s["settings.update.found"].format(latestVersionInfo?.versionName ?: "")
+                        else -> s["settings.update.checking"]
                     }
                 )
             },
@@ -327,20 +330,20 @@ fun SettingsScreen(
                     latestVersionInfo != null -> {
                         val version = latestVersionInfo!!
                         Column {
-                            Text("新版本大小: ${formatFileSize(version.fileSize)}")
+                            Text(s["settings.update.size"].format(formatFileSize(s, version.fileSize)))
                             if (version.releaseTime != null) {
-                                Text("发布时间: ${version.releaseTime}")
+                                Text(s["settings.update.release.time"].format(version.releaseTime))
                             }
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("更新内容:\n${version.updateContent}")
+                            Text(s["settings.update.content"].format(version.updateContent))
                             if (version.forceUpdate) {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("此版本为强制更新，必须安装后才能继续使用", color = MaterialTheme.colors.error)
+                                Text(s["settings.update.force"], color = MaterialTheme.colors.error)
                             }
                         }
                     }
                     else -> {
-                        Text("检查更新中...")
+                        Text(s["settings.update.checking.dots"])
                     }
                 }
             },
@@ -351,7 +354,7 @@ fun SettingsScreen(
                             showUpdateDialog = false
                             updateError = null
                         }) {
-                            Text("确定")
+                            Text(s["settings.confirm"])
                         }
                     }
                     latestVersionInfo != null -> {
@@ -367,7 +370,7 @@ fun SettingsScreen(
                                         }
                                     }
                                 ) {
-                                    Text("立即安装")
+                                    Text(s["settings.update.install"])
                                 }
                             }
                             else -> {
@@ -379,7 +382,7 @@ fun SettingsScreen(
                                         }
                                     }
                                 ) {
-                                    Text(if (version.forceUpdate) "强制更新" else "立即更新")
+                                    Text(if (version.forceUpdate) s["settings.update.force.update"] else s["settings.update.now"])
                                 }
                             }
                         }
@@ -395,14 +398,14 @@ fun SettingsScreen(
                         },
                         enabled = latestVersionInfo?.forceUpdate != true
                     ) {
-                        Text("稍后再说")
+                        Text(s["settings.update.later"])
                     }
                 }
             }
         )
     }
 
-    // 更新进度对话框
+    // Update progress dialog
     if (showUpdateProgressDialog) {
         val downloadState = updateState as? UpdateState.Downloading
         AlertDialog(
@@ -412,14 +415,14 @@ fun SettingsScreen(
                     GlobalAppUpdateManager.cancelDownload()
                 }
             },
-            title = { Text("下载更新中") },
+            title = { Text(s["settings.update.downloading"]) },
             text = {
                 Column {
                     val progress = downloadState?.progress ?: 0
                     val total = downloadState?.total ?: 0
-                    Text("已下载: $progress% (${formatFileSize(progress.toLong() * total / 100)}/${formatFileSize(total)})")
+                    Text(s["settings.update.downloaded"].format(progress.toInt(), formatFileSize(s, progress.toLong() * total / 100), formatFileSize(s, total)))
                     Spacer(modifier = Modifier.height(8.dp))
-                    // 简单进度条
+                    // Simple progress bar
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -442,7 +445,7 @@ fun SettingsScreen(
                         showUpdateProgressDialog = false
                         GlobalAppUpdateManager.cancelDownload()
                     }) {
-                        Text("取消")
+                        Text(s["settings.cancel"])
                     }
                 }
             }
@@ -451,11 +454,11 @@ fun SettingsScreen(
 }
 
 /**
- * 格式化文件大小
+ * Format file size to human-readable string
  */
-private fun formatFileSize(size: Long): String {
+private fun formatFileSize(s: Strings, size: Long): String {
     return when {
-        size <= 0 -> "未知"
+        size <= 0 -> s["settings.file.size.unknown"]
         size < 1024 -> "$size B"
         size < 1024 * 1024 -> "%.1f KB".format(size / 1024.0)
         size < 1024 * 1024 * 1024 -> "%.1f MB".format(size / (1024.0 * 1024))
@@ -464,7 +467,7 @@ private fun formatFileSize(size: Long): String {
 }
 
 /**
- * 设置项组件
+ * Settings item component
  */
 @Composable
 private fun SettingItem(
@@ -488,7 +491,7 @@ private fun SettingItem(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 图标
+            // Icon
             Box(
                 modifier = Modifier
                     .size(40.dp)

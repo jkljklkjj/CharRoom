@@ -103,6 +103,9 @@ import core.ServerConfig
 import core.loadImageBitmapWithCache
 import core.state.GlobalAppState
 import presentation.viewmodel.ChatViewModel
+import com.chatlite.i18n.LocalStrings
+import com.chatlite.i18n.Strings
+import com.chatlite.i18n.currentStrings
 
 /**
  * 发送消息
@@ -211,6 +214,7 @@ private fun ChatScreenContent(
     onMyAvatarClick: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null
 ) {
+    val s = LocalStrings.current
     var messageText by remember { mutableStateOf("") }
     // 从ViewModel收集消息状态
     val allMessages by chatViewModel.messagesFlow.collectAsState()
@@ -247,7 +251,7 @@ private fun ChatScreenContent(
             userMessages.filter { message ->
                 if (query.isBlank()) return@filter true
                 val senderName = if (message.sender) {
-                    currentUser?.username ?: "我"
+                    currentUser?.username ?: s["chat.me"]
                 } else {
                     user.username
                 }
@@ -353,7 +357,7 @@ private fun ChatScreenContent(
             messageText = text,
             replyToMessageId = replyToMessage?.messageId,
             replyToContent = replyToMessage?.message,
-            replyToSender = if (replyToMessage?.sender == true) "我" else user.username,
+            replyToSender = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
             onDone = {
                 scope.launch {
                     isSending = false
@@ -400,7 +404,7 @@ private fun ChatScreenContent(
                         fileSize = bytes.size.toLong(),
                         replyToMessageId = replyToMessage?.messageId,
                         replyToContent = replyToMessage?.message,
-                        replyToSender = if (replyToMessage?.sender == true) "我" else user.username,
+                        replyToSender = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
                         onDone = {
                             replyToMessage = null
                         }
@@ -440,7 +444,7 @@ private fun ChatScreenContent(
                         fileSize = fileSize,
                         replyToMessageId = replyToMessage?.messageId,
                         replyToContent = replyToMessage?.message,
-                        replyToSender = if (replyToMessage?.sender == true) "我" else user.username,
+                        replyToSender = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
                         onDone = {
                             replyToMessage = null
                         }
@@ -503,7 +507,7 @@ private fun ChatScreenContent(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回",
+                                contentDescription = s["chat.back"],
                                 tint = MaterialTheme.colors.onBackground
                             )
                         }
@@ -535,7 +539,7 @@ private fun ChatScreenContent(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = if (user.online == true) "实时在线会话" else if (user.online == false) "离线留言模式" else "状态同步中",
+                            text = if (user.online == true) s["chat.status.online"] else if (user.online == false) s["chat.status.offline"] else s["chat.status.syncing"],
                             style = MaterialTheme.typography.caption,
                             color = MaterialTheme.colors.onBackground.copy(alpha = 0.72f)
                         )
@@ -616,7 +620,7 @@ private fun ChatScreenContent(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "没有更早的消息了",
+                                text = s["chat.no.earlier.messages"],
                                 style = MaterialTheme.typography.caption,
                                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                             )
@@ -704,7 +708,7 @@ private fun ChatScreenContent(
                                 if (message.sender && !message.isSent) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "重发",
+                                        contentDescription = s["chat.resend"],
                                         tint = MaterialTheme.colors.secondary,
                                         modifier = Modifier
                                             .size(20.dp)
@@ -767,7 +771,7 @@ private fun ChatScreenContent(
                                                     modifier = Modifier.padding(8.dp)
                                                 ) {
                                                     Text(
-                                                        text = "回复 ${message.replyToSender.orEmpty()}",
+                                                        text = s["chat.reply.to"].format(message.replyToSender.orEmpty()),
                                                         style = MaterialTheme.typography.caption,
                                                         color = MaterialTheme.colors.primary,
                                                         maxLines = 1
@@ -801,7 +805,7 @@ private fun ChatScreenContent(
                                                     imageBitmap?.let { bitmap ->
                                                         Image(
                                                             bitmap = bitmap,
-                                                            contentDescription = "图片",
+                                                            contentDescription = s["chat.image"],
                                                             modifier = Modifier
                                                                 .fillMaxWidth()
                                                                 .heightIn(max = 200.dp)
@@ -827,7 +831,7 @@ private fun ChatScreenContent(
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.AttachFile,
-                                                        contentDescription = "文件",
+                                                        contentDescription = s["chat.file"],
                                                         tint = bubbleTextColor,
                                                         modifier = Modifier.size(24.dp)
                                                     )
@@ -894,7 +898,7 @@ private fun ChatScreenContent(
                     if (message.sender && !message.isSent) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             Text(
-                                text = "发送失败，点击图标重试",
+                                text = s["chat.send.failed"],
                                 style = MaterialTheme.typography.caption,
                                 color = MaterialTheme.colors.error
                             )
@@ -925,7 +929,7 @@ private fun ChatScreenContent(
             // 引用回复预览栏
             ReplyPreviewBar(
                 replyToMessage = replyToMessage,
-                senderName = if (replyToMessage?.sender == true) "我" else user.username,
+                senderName = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
                 onCancel = { replyToMessage = null }
             )
 
@@ -948,7 +952,7 @@ private fun ChatScreenContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.EmojiEmotions,
-                                contentDescription = "表情",
+                                contentDescription = s["chat.emoji"],
                                 tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                             )
                         }
@@ -972,7 +976,7 @@ private fun ChatScreenContent(
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.AttachFile,
-                                    contentDescription = "附件",
+                                    contentDescription = s["chat.attachment"],
                                     tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                                 )
                             }
@@ -1006,7 +1010,7 @@ private fun ChatScreenContent(
                                         false
                                     }
                                 },
-                            placeholder = { Text("说点有趣的...", color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
+                            placeholder = { Text(s["chat.placeholder"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
                             colors = TextFieldDefaults.textFieldColors(
                                 backgroundColor = Color.Transparent,
                                 focusedIndicatorColor = Color.Transparent,
@@ -1037,7 +1041,7 @@ private fun ChatScreenContent(
                                 disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
                             )
                         ) {
-                            Text(if (isSending) "发送中..." else "发送")
+                            Text(if (isSending) s["chat.sending"] else s["chat.send"])
                         }
                     }
 
@@ -1094,10 +1098,10 @@ private fun formatDate(timestamp: Long): String {
         val nowDay = sdfDay.format(nowDate)
 
         return when {
-            msgDay == nowDay -> "今天"
-            msgDay == sdfDay.format(java.util.Date(now - 86400000)) -> "昨天"
+            msgDay == nowDay -> currentStrings["chat.today"]
+            msgDay == sdfDay.format(java.util.Date(now - 86400000)) -> currentStrings["chat.yesterday"]
             else -> {
-                val sdf = java.text.SimpleDateFormat("yyyy年MM月dd日", java.util.Locale.getDefault())
+                val sdf = java.text.SimpleDateFormat(currentStrings["chat.date.format"], java.util.Locale.getDefault())
                 sdf.format(msgDate)
             }
         }

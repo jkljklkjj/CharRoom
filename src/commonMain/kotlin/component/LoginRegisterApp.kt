@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.chatlite.i18n.LocalStrings
 
 /**
  * 登录或注册界面
@@ -41,6 +42,9 @@ fun LoginRegisterApp(
     var verifyCode by remember { mutableStateOf("") } // 注册模式下验证码
     var isSendingCode by remember { mutableStateOf(false) } // 验证码发送中状态
     var countdownTime by remember { mutableStateOf(0) } // 倒计时秒数
+    var isSuccessMessage by remember { mutableStateOf(false) }
+
+    val s = LocalStrings.current
 
     // 观察认证状态
     val authState by authViewModel.authState.collectAsState()
@@ -51,7 +55,7 @@ fun LoginRegisterApp(
     fun handleLogout() {
         authViewModel.logout()
         password = ""
-        message = "已退出登录"
+        message = s["login.logged.out"]
     }
 
     // 只在首次组合时初始化ViewModel，尝试自动登录
@@ -65,7 +69,7 @@ fun LoginRegisterApp(
             val savedAccount = authViewModel.getCurrentAccount()
             if (!savedAccount.isNullOrBlank()) {
                 account = savedAccount
-                message = "已填充上次使用的账号"
+                message = s["login.account.restored"]
             }
         }
     }
@@ -99,8 +103,9 @@ fun LoginRegisterApp(
         else -> {
             // 根据认证状态更新提示消息
             LaunchedEffect(authState) {
+                isSuccessMessage = false
                 message = when (authState) {
-                    is core.state.AuthState.Loading -> "正在登录..."
+                    is core.state.AuthState.Loading -> s["login.logging.in"]
                     is core.state.AuthState.Error -> (authState as core.state.AuthState.Error).message
                     else -> message
                 }
@@ -113,21 +118,21 @@ fun LoginRegisterApp(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(text = if (isLogin) "登录" else "注册", style = MaterialTheme.typography.h4)
+                Text(text = if (isLogin) s["login.title"] else s["register.title"], style = MaterialTheme.typography.h4)
                 Spacer(modifier = Modifier.height(16.dp))
                 TextField(
                     value = if (isLogin) account else username,
                     onValueChange = {
                         if (isLogin) account = it else username = it
                     },
-                    label = { Text(if (isLogin) "账号" else "用户名") },
+                    label = { Text(if (isLogin) s["login.account"] else s["login.username"]) },
                     enabled = !isSubmitting
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 TextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("密码") },
+                    label = { Text(s["login.password"]) },
                     visualTransformation = PasswordVisualTransformation(),
                     enabled = !isSubmitting
                 )
@@ -138,7 +143,7 @@ fun LoginRegisterApp(
                     TextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text("邮箱") },
+                        label = { Text(s["login.email"]) },
                         enabled = !isSubmitting
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -150,7 +155,7 @@ fun LoginRegisterApp(
                         TextField(
                             value = verifyCode,
                             onValueChange = { verifyCode = it },
-                            label = { Text("验证码") },
+                            label = { Text(s["login.verify.code"]) },
                             enabled = !isSubmitting,
                             modifier = Modifier.weight(1f)
                         )
@@ -158,14 +163,14 @@ fun LoginRegisterApp(
                         Button(
                             onClick = {
                                 if (email.isBlank()) {
-                                    message = "请先输入邮箱地址"
+                                    message = s["login.please.enter.email"]
                                     return@Button
                                 }
                                 // 发送验证码
                                 isSendingCode = true
                                 authViewModel.sendRegisterVerifyCode(email) { result ->
                                     result.onSuccess {
-                                        message = "验证码已发送，请注意查收"
+                                        message = s["login.code.sent"]
                                         // 开始60秒倒计时
                                         countdownTime = 60
                                         scope.launch {
@@ -176,7 +181,7 @@ fun LoginRegisterApp(
                                             isSendingCode = false
                                         }
                                     }.onFailure {
-                                        message = "验证码发送失败: ${it.message}"
+                                        message = s["login.code.send.failed"].format(it.message)
                                         isSendingCode = false
                                     }
                                 }
@@ -185,9 +190,9 @@ fun LoginRegisterApp(
                             modifier = Modifier.height(56.dp)
                         ) {
                             Text(
-                                if (countdownTime > 0) "${countdownTime}s后重新发送"
-                                else if (isSendingCode) "发送中..."
-                                else "发送验证码"
+                                if (countdownTime > 0) s["login.send.code.resend"].format(countdownTime)
+                                else if (isSendingCode) s["login.send.code.sending"]
+                                else s["login.send.code"]
                             )
                         }
                     }
@@ -197,7 +202,7 @@ fun LoginRegisterApp(
                 if (isLogin) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it }, enabled = !isSubmitting)
-                        Text(text = "记住账号")
+                        Text(text = s["login.remember.me"])
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                 }
@@ -211,7 +216,7 @@ fun LoginRegisterApp(
                             val acc = account.trim()
                             val pwd = password.trim()
                             if (acc.isEmpty() || pwd.isEmpty()) {
-                                message = "账号和密码不能为空"
+                                message = s["login.account.password.empty"]
                                 return@Button
                             }
 
@@ -224,15 +229,15 @@ fun LoginRegisterApp(
                             val code = verifyCode.trim()
 
                             if (name.isEmpty() || pwd.isEmpty()) {
-                                message = "用户名和密码不能为空"
+                                message = s["login.username.password.empty"]
                                 return@Button
                             }
                             if (emailText.isEmpty()) {
-                                message = "邮箱不能为空"
+                                message = s["login.email.empty"]
                                 return@Button
                             }
                             if (code.isEmpty()) {
-                                message = "验证码不能为空"
+                                message = s["login.code.empty"]
                                 return@Button
                             }
 
@@ -240,19 +245,20 @@ fun LoginRegisterApp(
                             authViewModel.verifyRegister(name, pwd, emailText, code) { result ->
                                 result.onSuccess { accountId ->
                                     account = accountId.toString()
-                                    message = "注册成功，您的账号是 $accountId"
+                                    message = s["login.register.success"].format(accountId)
+                                    isSuccessMessage = true
                                     isLogin = true
                                     password = ""
                                     email = ""
                                     verifyCode = ""
                                 }.onFailure {
-                                    message = "注册失败: ${it.message ?: "请稍后重试"}"
+                                    message = s["login.register.failed"].format(it.message ?: s["login.retry.later"])
                                 }
                             }
                         }
                     }
                 ) {
-                    Text(text = if (isSubmitting) "处理中..." else if (isLogin) "登录" else "注册")
+                    Text(text = if (isSubmitting) s["login.processing"] else if (isLogin) s["login.title"] else s["register.title"])
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(
@@ -275,12 +281,12 @@ fun LoginRegisterApp(
                     },
                     enabled = !isSubmitting
                 ) {
-                    Text(text = if (isLogin) "切换到注册" else "切换到登录")
+                    Text(text = if (isLogin) s["login.switch.to.register"] else s["register.switch.to.login"])
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = message,
-                    color = if (message.contains("成功")) Color(0xFF2E7D32) else MaterialTheme.colors.error
+                    color = if (isSuccessMessage) Color(0xFF2E7D32) else MaterialTheme.colors.error
                 )
             }
         }

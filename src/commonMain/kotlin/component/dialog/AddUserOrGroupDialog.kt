@@ -11,7 +11,9 @@ import core.Action
 import core.ActionLogger
 import core.ActionType
 import core.ApiService
+import core.GROUP_JOIN_PENDING_CODE
 import kotlinx.coroutines.launch
+import com.chatlite.i18n.LocalStrings
 import presentation.viewmodel.ChatViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,18 +29,20 @@ fun AddUserOrGroupDialog(
     var account by remember { mutableStateOf("") }
     var isUser by remember { mutableStateOf(true) }
     var responseMessage by remember { mutableStateOf<String?>(null) }
+    var isResponseSuccess by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val s = LocalStrings.current
 
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
-        title = { Text("添加好友或群组") },
+        title = { Text(s["dialog.add.title"]) },
         text = {
             Column {
                 TextField(
                     value = account,
                     onValueChange = { account = it },
-                    label = { Text("账号/群号") },
+                    label = { Text(s["dialog.add.account"]) },
                     singleLine = true,
                     enabled = !isSubmitting
                 )
@@ -48,22 +52,19 @@ fun AddUserOrGroupDialog(
                         selected = isUser,
                         onClick = { if (!isSubmitting) isUser = true }
                     )
-                    Text("用户")
+                    Text(s["dialog.add.user"])
                     Spacer(modifier = Modifier.width(16.dp))
                     RadioButton(
                         selected = !isUser,
                         onClick = { if (!isSubmitting) isUser = false }
                     )
-                    Text("群组")
+                    Text(s["dialog.add.group"])
                 }
                 responseMessage?.let {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = it,
-                        color = when (it) {
-                            "添加成功" -> Color(0xFF2E7D32)
-                            else -> Color.Red
-                        }
+                        color = if (isResponseSuccess) Color(0xFF2E7D32) else Color.Red
                     )
                 }
             }
@@ -73,17 +74,17 @@ fun AddUserOrGroupDialog(
                 enabled = !isSubmitting,
                 onClick = {
                     if (account.isBlank()) {
-                        responseMessage = "账号不能为空"
+                        responseMessage = s["dialog.add.account.empty"]
                         return@Button
                     }
                     // 支持数字账号或邮箱格式
                     val isNumeric = account.all { it.isDigit() }
                     val isEmail = account.contains("@") && account.contains(".")
                     if (!isNumeric && !isEmail && isUser) {
-                        responseMessage = "请输入数字账号或邮箱"
+                        responseMessage = s["dialog.add.account.invalid"]
                         return@Button
                     } else if (!isNumeric && !isUser) {
-                        responseMessage = "请输入数字群号"
+                        responseMessage = s["dialog.add.group.id.invalid"]
                         return@Button
                     }
                     scope.launch {
@@ -102,16 +103,14 @@ fun AddUserOrGroupDialog(
                         }
                         isSubmitting = true
                         responseMessage = null
-                        val success = withContext(Dispatchers.IO) {
-                            if (isUser) {
-                                ApiService.addFriend(account)
-                            } else {
-                                ApiService.addGroup(account)
-                            }
-                        }
+                        isResponseSuccess = false
 
                         if (isUser) {
-                            responseMessage = if (success) "添加成功" else "添加失败"
+                            val success = withContext(Dispatchers.IO) {
+                                ApiService.addFriend(account)
+                            }
+                            isResponseSuccess = success
+                            responseMessage = if (success) s["dialog.add.success"] else s["dialog.add.failed"]
                             if (success) {
                                 val detailUser = withContext(Dispatchers.IO) {
                                     ApiService.getUserDetail(account)
@@ -125,10 +124,14 @@ fun AddUserOrGroupDialog(
                                 }
                             }
                         } else {
+                            val response = withContext(Dispatchers.IO) {
+                                ApiService.addGroupWithResponse(account)
+                            }
                             // 加群处理：区分直接加入和需要审核的情况
                             when {
-                                success -> {
-                                    responseMessage = "加入群聊成功"
+                                response.isSuccess -> {
+                                    isResponseSuccess = true
+                                    responseMessage = s["dialog.add.group.success"]
                                     val detailGroup = withContext(Dispatchers.IO) {
                                         ApiService.getGroupDetail(account)
                                     }
@@ -141,22 +144,24 @@ fun AddUserOrGroupDialog(
                                         }
                                     }
                                 }
-                                responseMessage?.contains("审核") == true -> {
-                                    // 服务器返回需要审核的提示
-                                    responseMessage = "申请已发送，等待管理员同意"
+                                response.code == GROUP_JOIN_PENDING_CODE -> {
+                                    // 需要群主/管理员审核
+                                    isResponseSuccess = true
+                                    responseMessage = s["dialog.add.group.pending"]
                                 }
                                 else -> {
-                                    responseMessage = "加入群聊失败"
+                                    isResponseSuccess = false
+                                    responseMessage = s["dialog.add.group.failed"]
                                 }
                             }
                         }
                         isSubmitting = false
                     }
                 }
-            ) { Text(if (isSubmitting) "添加中..." else "添加") }
+            ) { Text(if (isSubmitting) s["dialog.add.adding"] else s["dialog.add.button"]) }
         },
         dismissButton = {
-            Button(onClick = { if (!isSubmitting) onDismiss() }, enabled = !isSubmitting) { Text("取消") }
+            Button(onClick = { if (!isSubmitting) onDismiss() }, enabled = !isSubmitting) { Text(s["dialog.add.cancel"]) }
         }
     )
 }

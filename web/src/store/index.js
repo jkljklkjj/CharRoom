@@ -1,4 +1,5 @@
 import { reactive, readonly } from 'vue'
+import i18n from '../i18n'
 
 const STORAGE_PREFIX = 'charroom_chat_history_'
 
@@ -162,7 +163,7 @@ function loadPrivateConversation(accountId, chatId) {
     const items = JSON.parse(raw)
     return Array.isArray(items) ? items : []
   } catch (e) {
-    console.warn('加载私聊历史失败', e)
+    console.warn('Failed to load private chat history', e)
     return []
   }
 }
@@ -176,7 +177,7 @@ function loadGroupConversation(accountId, groupId) {
     const items = JSON.parse(raw)
     return Array.isArray(items) ? items : []
   } catch (e) {
-    console.warn('加载群聊历史失败', e)
+    console.warn('Failed to load group chat history', e)
     return []
   }
 }
@@ -202,7 +203,7 @@ function savePrivateMessage(message) {
     existing.push(message)
     localStorage.setItem(buildPrivateHistoryKey(state.accountId, chatId), JSON.stringify(existing))
   } catch (e) {
-    console.warn('保存私聊消息失败', e)
+    console.warn('Failed to save private message', e)
   }
 }
 
@@ -216,22 +217,22 @@ function saveGroupMessage(message) {
     existing.push(message)
     localStorage.setItem(buildGroupHistoryKey(state.accountId, message.groupId), JSON.stringify(existing))
   } catch (e) {
-    console.warn('保存群聊消息失败', e)
+    console.warn('Failed to save group message', e)
   }
 }
 
 function loadConversation(id, isGroup = false) {
-  console.log('🟢 loadConversation 调用, id=', id, 'isGroup=', isGroup)
+  console.log('loadConversation called, id=', id, 'isGroup=', isGroup)
   if (!id) {
     state.selectedChatId = null
     state.messages = []
     state.groupMessages = []
-    console.log('🟢 !id 分支, selectedChatId 重置为 null')
+    console.log('id is falsy, selectedChatId reset to null')
     return
   }
   state.selectedChatId = id
   clearConversationUnread(id)
-  console.log('🟢 已设置 selectedChatId=', state.selectedChatId)
+  console.log('selectedChatId set to', state.selectedChatId)
   if (state.accountId) {
     if (isGroup) {
       state.messages = []
@@ -390,7 +391,7 @@ function updateUserOnlineStatus(userId, online) {
       return {
         ...user,
         online: online,
-        status: online ? '在线' : '离线'
+        status: online ? i18n.global.t('sidebar.online') : i18n.global.t('sidebar.offline')
       }
     }
     return user

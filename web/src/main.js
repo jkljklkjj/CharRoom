@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import i18n from './i18n'
 import './styles.css'
 import ToastGlobal from './components/Toast.vue'
 
@@ -8,7 +9,7 @@ import ToastGlobal from './components/Toast.vue'
 document.body.insertAdjacentHTML('beforeend', '<div id="app-toast"></div>')
 createApp(ToastGlobal).mount('#app-toast')
 
-const app = createApp(App).use(router).mount('#app')
+const app = createApp(App).use(router).use(i18n).mount('#app')
 
 // PWA Service Worker 注册
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

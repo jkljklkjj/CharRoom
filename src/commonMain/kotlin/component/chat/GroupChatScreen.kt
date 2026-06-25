@@ -101,6 +101,8 @@ import component.chatHeaderBrush
 import component.messageBubbleBrush
 import component.rememberElasticScale
 import component.sidebarHeaderBrush
+import com.chatlite.i18n.LocalStrings
+import com.chatlite.i18n.currentStrings
 import core.GlobalApiService
 import core.state.GlobalAppState
 import model.Message
@@ -198,6 +200,7 @@ fun GroupChatScreen(
 
     var hasInitializedScroll by remember(group.id) { mutableStateOf(false) }
     var isViewportReady by remember(group.id) { mutableStateOf(false) }
+    val s = LocalStrings.current
 
     fun submitMessage() {
         val text = messageText.trim()
@@ -363,7 +366,7 @@ fun GroupChatScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "群聊会话",
+                            text = s["groupChat.title"],
                             style = MaterialTheme.typography.caption,
                             color = MaterialTheme.colors.onBackground.copy(alpha = 0.72f)
                         )
@@ -377,7 +380,7 @@ fun GroupChatScreen(
         TextField(
             value = historyQuery,
             onValueChange = { historyQuery = it },
-            placeholder = { Text(text = "搜索本地群聊历史，支持消息内容和发送者") },
+            placeholder = { Text(text = s["chat.search.group.history"]) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp),
@@ -444,7 +447,7 @@ fun GroupChatScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "没有更早的消息了",
+                                text = s["chat.no.earlier.messages"],
                                 style = MaterialTheme.typography.caption,
                                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                             )
@@ -527,7 +530,7 @@ fun GroupChatScreen(
                                 if (isMine && !message.isSent) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "重发",
+                                        contentDescription = s["chat.resend"],
                                         tint = MaterialTheme.colors.secondary,
                                         modifier = Modifier
                                             .size(20.dp)
@@ -635,7 +638,7 @@ fun GroupChatScreen(
                                                     modifier = Modifier.padding(8.dp)
                                                 ) {
                                                     Text(
-                                                        text = "回复 ${message.replyToSender.orEmpty()}",
+                                                        text = s["chat.reply.to"].format(message.replyToSender.orEmpty()),
                                                         style = MaterialTheme.typography.caption,
                                                         color = MaterialTheme.colors.primary,
                                                         maxLines = 1
@@ -669,7 +672,7 @@ fun GroupChatScreen(
                                                     imageBitmap?.let { bitmap ->
                                                         Image(
                                                             bitmap = bitmap,
-                                                            contentDescription = "图片",
+                                                            contentDescription = s["chat.image"],
                                                             modifier = Modifier
                                                                 .fillMaxWidth()
                                                                 .heightIn(max = 200.dp)
@@ -695,7 +698,7 @@ fun GroupChatScreen(
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.AttachFile,
-                                                        contentDescription = "文件",
+                                                        contentDescription = s["chat.file"],
                                                         tint = bubbleTextColor,
                                                         modifier = Modifier.size(24.dp)
                                                     )
@@ -737,7 +740,7 @@ fun GroupChatScreen(
                                     if (myAvatar != null) {
                                         Image(
                                             bitmap = myAvatar!!,
-                                            contentDescription = "我的头像",
+                                            contentDescription = s["user.my.avatar"],
                                             modifier = Modifier
                                                 .size(32.dp)
                                                 .clip(CircleShape)
@@ -760,7 +763,7 @@ fun GroupChatScreen(
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = currentUser?.username?.firstOrNull()?.toString() ?: "我",
+                                                text = currentUser?.username?.firstOrNull()?.toString() ?: s["chat.me"],
                                                 color = Color.White,
                                                 style = MaterialTheme.typography.caption
                                             )
@@ -812,7 +815,7 @@ fun GroupChatScreen(
                     if (isMine && !message.isSent) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             Text(
-                                text = "发送失败，点击图标重试",
+                                text = s["chat.send.failed"],
                                 style = MaterialTheme.typography.caption,
                                 color = MaterialTheme.colors.error
                             )
@@ -896,7 +899,7 @@ fun GroupChatScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.EmojiEmotions,
-                                contentDescription = "表情",
+                                contentDescription = s["chat.emoji"],
                                 tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                             )
                         }
@@ -920,7 +923,7 @@ fun GroupChatScreen(
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.AttachFile,
-                                    contentDescription = "附件",
+                                    contentDescription = s["chat.attachment"],
                                     tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                                 )
                             }
@@ -953,7 +956,7 @@ fun GroupChatScreen(
                                         false
                                     }
                                 },
-                            placeholder = { Text("说点有趣的...", color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
+                            placeholder = { Text(s["chat.placeholder"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
                             colors = TextFieldDefaults.textFieldColors(
                                 backgroundColor = Color.Transparent,
                                 focusedIndicatorColor = Color.Transparent,
@@ -984,7 +987,7 @@ fun GroupChatScreen(
                                 disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
                             )
                         ) {
-                            Text(if (isSending) "发送中..." else "发送")
+                            Text(if (isSending) s["chat.sending"] else s["chat.send"])
                         }
                     }
 
@@ -1094,10 +1097,10 @@ private fun formatDate(timestamp: Long): String {
         val nowDay = sdfDay.format(nowDate)
 
         return when {
-            msgDay == nowDay -> "今天"
-            msgDay == sdfDay.format(java.util.Date(now - 86400000)) -> "昨天"
+            msgDay == nowDay -> currentStrings["chat.today"]
+            msgDay == sdfDay.format(java.util.Date(now - 86400000)) -> currentStrings["chat.yesterday"]
             else -> {
-                val sdf = java.text.SimpleDateFormat("yyyy年MM月dd日", java.util.Locale.getDefault())
+                val sdf = java.text.SimpleDateFormat(currentStrings["chat.date.format"], java.util.Locale.getDefault())
                 sdf.format(msgDate)
             }
         }

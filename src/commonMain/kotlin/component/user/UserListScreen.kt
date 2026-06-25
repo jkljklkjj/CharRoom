@@ -64,6 +64,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.chatlite.i18n.LocalStrings
+import com.chatlite.i18n.currentStrings
 import core.Action
 import core.ActionLogger
 import core.ActionType
@@ -77,7 +79,7 @@ import presentation.viewmodel.ChatViewModel
 import androidx.compose.runtime.collectAsState
 
 /**
- * 左侧用户和群组列表边栏
+ * Left sidebar showing user and group list
  */
 @OptIn(ExperimentalFoundationApi::class)
 
@@ -87,19 +89,20 @@ fun UserList(
     selectedUserId: Int? = null,
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenApplications: () -> Unit = {}, // 打开统一申请管理界面
-    onOpenProfile: () -> Unit = {}, // 打开个人信息页面
+    onOpenApplications: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
     onUserClick: (User) -> Unit,
-    onUserLongClick: ((User) -> Unit)? = null, // 长按用户头像回调
-    refreshTrigger: Long = 0L // 外部触发刷新的触发器，值变化时刷新申请列表
+    onUserLongClick: ((User) -> Unit)? = null,
+    refreshTrigger: Long = 0L // external trigger to refresh, value changes refresh application list
 ) {
-    // 是否有未处理的申请（好友或群聊）
+    // Whether there are pending applications (friend or group)
     var hasPendingApplications by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    // 当前用户信息和头像
+    // Current user info and avatar
     var currentUser by remember { mutableStateOf<User?>(null) }
     var currentUserAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    val s = LocalStrings.current
     val userListState by chatViewModel.usersFlow.collectAsState()
     val conversationStates by chatViewModel.conversationStatesFlow.collectAsState()
     val allMessages by chatViewModel.messagesFlow.collectAsState()
@@ -127,21 +130,21 @@ fun UserList(
         }
     }
 
-    // 检查是否有未处理的申请（仅主动调用时执行）
+    // Check for pending applications (only on explicit invocation)
     suspend fun refreshPendingApplications() {
         val groupRequests = ApiService.fetchGroupRequests()
         val friendRequests = ApiService.fetchFriendRequests()
         hasPendingApplications = groupRequests.isNotEmpty() || friendRequests.isNotEmpty()
     }
 
-    // 首次启动时检查一次，之后不再自动轮询
+    // Check once on first launch, no auto-polling afterward
     LaunchedEffect(Unit) {
         scope.launch {
             refreshPendingApplications()
         }
     }
 
-    // 外部触发刷新时执行
+    // Execute when external trigger refreshes
     LaunchedEffect(refreshTrigger) {
         if (refreshTrigger > 0) {
             scope.launch {
@@ -150,7 +153,7 @@ fun UserList(
         }
     }
 
-    // 点击申请管理按钮时主动刷新一次
+    // Refresh once when application button is clicked
     fun handleOpenApplications() {
         scope.launch {
             refreshPendingApplications()
@@ -160,7 +163,7 @@ fun UserList(
 
     val onlineCount = userListState.count { it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
 
-    // 首次进入时只补充当前用户信息和头像，联系人列表由 ChatApp 统一加载
+    // On first entry, only load current user info and avatar; contact list loaded by ChatApp
     LaunchedEffect(Unit) {
         scope.launch {
             currentUser = GlobalApiService.getCurrentUserProfile()
@@ -186,7 +189,7 @@ fun UserList(
                     .padding(horizontal = 12.dp, vertical = 12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 当前用户头像，点击进入个人信息
+                    // Current user avatar, click to open profile
                     Surface(
                         modifier = Modifier
                             .size(36.dp)
@@ -198,12 +201,12 @@ fun UserList(
                             if (currentUserAvatar != null) {
                                 Image(
                                     bitmap = currentUserAvatar!!,
-                                    contentDescription = "个人信息",
+                                    contentDescription = s["user.avatar"],
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
                                 Text(
-                                    text = currentUser?.username?.firstOrNull()?.toString() ?: "我",
+                                    text = currentUser?.username?.firstOrNull()?.toString() ?: s["chat.me"],
                                     color = Color.White,
                                     style = MaterialTheme.typography.subtitle1
                                 )
@@ -215,13 +218,13 @@ fun UserList(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "聊天室",
+                            text = s["contact.list.title"],
                             style = MaterialTheme.typography.h6,
                             color = Color.White
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "在线 $onlineCount 人 · 共 ${userListState.size} 个会话",
+                            text = s["contact.list.online.count"].format(onlineCount, userListState.size),
                             style = MaterialTheme.typography.caption,
                             color = Color.White.copy(alpha = 0.86f)
                         )
@@ -229,14 +232,14 @@ fun UserList(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ElasticHeaderAction(
                             icon = Icons.Default.Search,
-                            contentDescription = "搜索/添加好友",
+                            contentDescription = s["contact.search.add"],
                             onClick = onOpenSearch
                         )
-                        // 统一申请管理入口，有任意未处理申请时显示红点
+                        // Unified application management entry, shows red dot when pending
                         Box {
                             ElasticHeaderAction(
                                 icon = Icons.Default.Notifications,
-                                contentDescription = "申请管理",
+                                contentDescription = s["contact.applications"],
                                 onClick = ::handleOpenApplications
                             )
                             if (hasPendingApplications) {
@@ -250,7 +253,7 @@ fun UserList(
                         }
                         ElasticHeaderAction(
                             icon = Icons.Default.Settings,
-                            contentDescription = "设置",
+                            contentDescription = s["settings.title"],
                             onClick = onOpenSettings
                         )
                     }
@@ -263,7 +266,7 @@ fun UserList(
         TextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text(text = "搜索好友 / 群聊，支持名称或账号") },
+            placeholder = { Text(text = s["contact.search"]) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp),
@@ -282,12 +285,12 @@ fun UserList(
                 items = filteredUsers,
                 key = { it.id }
             ) { user ->
-                // 交错动画：每个列表项有不同的延迟
+                // Staggered animation: each item has different delay
                 val itemIndex = filteredUsers.indexOf(user)
                 var itemVisible by remember(user.id) { mutableStateOf(false) }
 
                 LaunchedEffect(user.id) {
-                    kotlinx.coroutines.delay(itemIndex * 30L) // 每项延迟30ms
+                    kotlinx.coroutines.delay(itemIndex * 30L) // 30ms delay per item
                     itemVisible = true
                 }
 
@@ -296,7 +299,7 @@ fun UserList(
                     enter = fadeIn(
                         animationSpec = tween(200, easing = FastOutSlowInEasing)
                     ) + slideInHorizontally(
-                        initialOffsetX = { -it / 4 }, // 从左侧滑入
+                        initialOffsetX = { -it / 4 }, // slide in from left
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioMediumBouncy,
                             stiffness = Spring.StiffnessMedium
@@ -336,13 +339,13 @@ fun UserList(
                                 )
                             } catch (_: Exception) {
                             }
-                            // 点击用户时，主动查询该用户的在线状态
+                            // When clicking a user, proactively query online status
                             if (Chat.isServerConnected && user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
-                                // 构造CHECK消息查询用户在线状态
+                                // Build CHECK message to query user online status
                                 val checkPayload = buildCheckPayload(user.id.toString())
                                 Chat.send(checkPayload, MsgType.CHECK, user.id.toString(), 1) { success, _ ->
                                     if (success) {
-                                        println("[UserList] 已发送在线状态查询请求: user=${user.id}")
+                                        println("[UserList] Online status check sent: user=${user.id}")
                                     }
                                 }
                             }
@@ -389,17 +392,17 @@ fun UserList(
                             }
                         }
 
-                        // 头像点击/长按处理
+                        // Avatar click/long-press handling
                         val avatarModifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
                             .combinedClickable(
                                 onClick = {
-                                    // 点击头像也可以查看详情
+                                    // Click avatar to view details
                                     onUserLongClick?.invoke(user)
                                 },
                                 onLongClick = {
-                                    // 长按头像查看详情
+                                    // Long-press avatar to view details
                                     onUserLongClick?.invoke(user)
                                 }
                             )
@@ -471,7 +474,7 @@ fun UserList(
                         }
                     }
                 }
-                } // 结束 AnimatedVisibility
+                } // End AnimatedVisibility
             }
         }
     }
@@ -513,9 +516,9 @@ private fun buildDisplayName(user: User): String {
         return user.username
     }
     return when (user.online) {
-        true -> "${user.username} · 在线"
-        false -> "${user.username} · 离线"
-        null -> "${user.username} · 状态同步中"
+        true -> "${user.username}${currentStrings["contact.online"]}"
+        false -> "${user.username}${currentStrings["contact.offline"]}"
+        null -> "${user.username}${currentStrings["contact.syncing"]}"
     }
 }
 
@@ -529,14 +532,14 @@ private fun buildSubtitle(
     groupMessages: List<model.GroupMessage>
 ): String {
     if (ServerConfig.isAgentAssistant(user.id)) {
-        return "智能灵感助手，来点有趣的话题"
+        return currentStrings["contact.ai.assistant"]
     }
 
     if (user.id < 0) {
         val groupId = -user.id
         val last = groupMessages.lastOrNull { it.groupId == groupId }
         return if (last == null) {
-            "暂无群消息"
+            currentStrings["contact.no.group.messages"]
         } else {
             "${last.senderName}: ${last.text.take(24)}"
         }
@@ -544,9 +547,9 @@ private fun buildSubtitle(
 
     val last = messages.lastOrNull { it.senderId == user.id || it.receiverId == user.id }
     return if (last == null) {
-        if (user.online == true) "在线" else "暂无消息"
+        if (user.online == true) currentStrings["chat.status.online"] else currentStrings["contact.no.messages"]
     } else {
-        if (last.sender) "我: ${last.message.take(24)}" else "${user.username}: ${last.message.take(24)}"
+        if (last.sender) currentStrings["contact.me.prefix"].format(last.message.take(24)) else "${user.username}: ${last.message.take(24)}"
     }
 }
 

@@ -1,16 +1,20 @@
 <template>
   <div class="verify-wrap">
     <div class="panel">
-      <h3>邮箱验证码验证</h3>
-      <p v-if="email">已向 <strong>{{ email }}</strong> 发送验证码，请输入验证码完成注册。</p>
-      <p v-else>未检测到待验证信息，正在跳转…</p>
-      <input v-model="code" placeholder="输入验证码" />
+      <h3>{{ $t('verify.title') }}</h3>
+      <i18n-t v-if="email" keypath="verify.sentTo" tag="p">
+        <template #email>
+          <strong>{{ email }}</strong>
+        </template>
+      </i18n-t>
+      <p v-else>{{ $t('verify.noPending') }}</p>
+      <input v-model="code" :placeholder="$t('verify.placeholder')" />
 
       <div class="actions">
-        <button class="primary" @click="submit">验证并注册</button>
+        <button class="primary" @click="submit">{{ $t('verify.submit') }}</button>
         <button class="toggle-mode" :disabled="cooldown > 0" @click="resend">
-          <span v-if="cooldown <= 0">重新发送验证码</span>
-          <span v-else>重新发送验证码（{{ cooldown }}s）</span>
+          <span v-if="cooldown <= 0">{{ $t('verify.resend') }}</span>
+          <span v-else>{{ $t('verify.resendCooldown', { seconds: cooldown }) }}</span>
         </button>
       </div>
     </div>
@@ -20,9 +24,11 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { useStore } from '../store'
 
+const { t } = useI18n()
 const code = ref('')
 const router = useRouter()
 const store = useStore()
@@ -34,7 +40,7 @@ let cooldownTimer = null
 onMounted(() => {
   const pending = store.state.pendingRegister
   if (!pending || !pending.email || !pending.password) {
-    window.$toast.warning('未检测到待验证的注册信息，返回登录')
+    window.$toast.warning(t('verify.noPendingInfo'))
     router.push({ name: 'WebApp' })
     return
   }
@@ -56,14 +62,14 @@ onBeforeUnmount(() => {
 })
 
 async function submit() {
-  if (!code.value) { window.$toast.warning('请输入验证码'); return }
+  if (!code.value) { window.$toast.warning(t('verify.inputCode')); return }
   const id = await api.verifyRegister(email.value, code.value, password)
   if (id && id !== -1) {
-    window.$toast.success('验证通过，注册成功，请登录')
+    window.$toast.success(t('verify.success'))
     store.clearPendingRegister()
     router.push({ name: 'WebApp' })
   } else {
-    window.$toast.error('验证码错误或注册失败')
+    window.$toast.error(t('verify.failed'))
   }
 }
 
@@ -75,9 +81,9 @@ async function resend() {
     // 本地记录冷却到期时间（120s）并启动倒计时
     try { localStorage.setItem('verify:email:cooldown:' + email.value, String(Date.now() + 120000)); } catch (e) {}
     startCooldown(120)
-    window.$toast.success('验证码已重新发送')
+    window.$toast.success(t('verify.codeResent'))
   } else {
-    window.$toast.error('发送失败')
+    window.$toast.error(t('verify.sendFailed'))
   }
 }
 

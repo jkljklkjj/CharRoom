@@ -47,6 +47,77 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" href="/src/assets/logo.svg" />
+    <script>
+      // ── 前端静态 SEO i18n ──────────────────────────────────────────
+      // 在 Vue 应用挂载前运行，读取 localStorage 或浏览器语言，
+      // 更新 document.documentElement.lang、title、meta 标签和 JSON-LD。
+      (function () {
+        var locale = localStorage.getItem('locale')
+          || (navigator.language.startsWith('zh') ? 'zh-CN' :
+              navigator.language.startsWith('ja') ? 'ja' : 'en')
+        var isZh = locale === 'zh-CN'
+        var isJa = locale === 'ja'
+
+        var seo = {
+          lang: isZh ? 'zh-CN' : isJa ? 'ja' : 'en',
+          title: isZh
+            ? '轻聊 - 轻量、智能、跨平台的实时聊天'
+            : isJa
+            ? 'ChatLite - 軽量、スマート、クロスプラットフォームチャット'
+            : 'ChatLite - Lightweight, Smart, Cross-Platform Chat',
+          description: isZh
+            ? '轻聊是一个轻量、智能、跨平台的实时聊天应用，支持高效沟通、群聊协作与智能对话体验。'
+            : isJa
+            ? 'ChatLiteは軽量でスマートなクロスプラットフォームリアルタイムチャットアプリ。効率的なコミュニケーション、グループコラボレーション、AI対話を提供します。'
+            : 'ChatLite is a lightweight, smart, cross-platform real-time chat app for efficient communication, group collaboration, and AI-powered conversations.',
+          keywords: isZh
+            ? '轻聊,实时聊天,群聊,智能聊天,跨平台聊天,聊天应用'
+            : isJa
+            ? 'ChatLite,リアルタイムチャット,グループチャット,スマートチャット,クロスプラットフォームチャット,メッセージアプリ'
+            : 'ChatLite,real-time chat,group chat,smart chat,cross-platform chat,messaging app',
+          brand: isZh ? '轻聊' : isJa ? 'ChatLite' : 'ChatLite',
+          ogLocale: isZh ? 'zh_CN' : isJa ? 'ja_JP' : 'en_US',
+          inLanguage: isZh ? 'zh-CN' : isJa ? 'ja' : 'en'
+        }
+
+        // 更新 html lang
+        document.documentElement.lang = seo.lang
+
+        // 更新 title
+        document.title = seo.title
+
+        // 更新 meta 标签（按 name / property 查找）
+        function setMeta(attr, value, content) {
+          var el = document.querySelector('meta[' + attr + '="' + value + '"]')
+          if (el) el.setAttribute('content', content)
+        }
+
+        setMeta('name', 'description', seo.description)
+        setMeta('name', 'keywords', seo.keywords)
+        setMeta('name', 'apple-mobile-web-app-title', seo.brand)
+        setMeta('name', 'application-name', seo.brand)
+        setMeta('property', 'og:site_name', seo.brand)
+        setMeta('property', 'og:locale', seo.ogLocale)
+        setMeta('property', 'og:title', seo.title)
+        setMeta('property', 'og:description', seo.description)
+        setMeta('name', 'twitter:title', seo.title)
+        setMeta('name', 'twitter:description', seo.description)
+
+        // 更新 JSON-LD schema.org
+        var scriptLd = document.querySelector('script[type="application/ld+json"]')
+        if (scriptLd) {
+          try {
+            var ld = JSON.parse(scriptLd.textContent)
+            ld.name = seo.brand
+            ld.description = seo.description
+            ld.inLanguage = seo.inLanguage
+            scriptLd.textContent = JSON.stringify(ld, null, 2)
+          } catch (e) {
+            // JSON-LD 解析失败时静默处理
+          }
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>
