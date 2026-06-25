@@ -121,9 +121,19 @@ message AckMessage {
     optional bool online = 5;       // 是否在线 (用于CheckMessage响应)
 }
 
+// 视频通话信令消息
+message VideoCallMessage {
+    string type = 1;          // offer | answer | ice_candidate | hangup | reject | busy
+    string callerId = 2;      // 主叫用户ID
+    string calleeId = 3;      // 被叫用户ID
+    string sdp = 4;           // SDP offer/answer
+    string iceCandidate = 5;  // ICE候选
+    string roomId = 6;        // 通话房间ID
+}
+
 // 通用消息包装器
 message MessageWrapper {
-    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout, agentChatStream, ack, response
+    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout, agentChatStream, ack, response, videoCall
 
     oneof payload {
         LoginMessage login = 2;
@@ -136,6 +146,7 @@ message MessageWrapper {
         AgentStreamMessage agentStream = 8;
         AckMessage ack = 10;
         ResponseMessage response = 11;
+        VideoCallMessage videoCall = 12;
     }
 }
 

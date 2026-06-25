@@ -324,6 +324,18 @@ val zhStrings = Strings(
         "update.install.failed" to "安装失败: %s",
 
         // ── Common ──
+                // ── Video / Audio Call ──
+        "call.calling" to "正在呼叫 %s…",
+        "call.accept" to "接听",
+        "call.reject" to "拒绝",
+        "call.hangup" to "挂断",
+        "call.ended" to "通话已结束",
+        "call.ended.remote" to "对方已挂断",
+        "call.ended.reject" to "对方已拒绝",
+        "call.busy" to "对方忙",
+        "call.cancel" to "取消",
+        "call.video.btn" to "视频通话",
+        "call.incoming" to "%s 邀请你视频通话",
         "common.unknown.error" to "未知错误"
     )
 )
@@ -629,6 +641,18 @@ val enStrings = Strings(
         "update.install.failed" to "Installation failed: %s",
 
         // ── Common ──
+                // ── Video / Audio Call ──
+        "call.calling" to "Calling %s…",
+        "call.accept" to "Accept",
+        "call.reject" to "Reject",
+        "call.hangup" to "Hang Up",
+        "call.ended" to "Call ended",
+        "call.ended.remote" to "Remote party hung up",
+        "call.ended.reject" to "Call was rejected",
+        "call.busy" to "Remote party is busy",
+        "call.cancel" to "Cancel",
+        "call.video.btn" to "Video Call",
+        "call.incoming" to "%s is calling you",
         "common.unknown.error" to "Unknown error"
     )
 )
@@ -934,6 +958,18 @@ val jaStrings = Strings(
         "update.install.failed" to "インストールに失敗しました: %s",
 
         // ── Common ──
+                // ── Video / Audio Call ──
+        "call.calling" to "発信中 %s…",
+        "call.accept" to "応答",
+        "call.reject" to "拒否",
+        "call.hangup" to "切電",
+        "call.ended" to "通話が終了しました",
+        "call.ended.remote" to "相手が切断しました",
+        "call.ended.reject" to "相手が拒否しました",
+        "call.busy" to "相手は通話中です",
+        "call.cancel" to "キャンセル",
+        "call.video.btn" to "ビデオ通話",
+        "call.incoming" to "%s から着信中",
         "common.unknown.error" to "不明なエラー"
     )
 )

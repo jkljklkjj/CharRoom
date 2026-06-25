@@ -77,6 +77,9 @@ dependencies {
     implementation("io.insert-koin:koin-core:4.2.0-RC1")
     implementation("io.insert-koin:koin-compose:4.2.0-RC1")
 
+    // WebRTC 视频通话（跨桌面端 + Android）
+    implementation("dev.onvoid.webrtc:webrtc-java:0.14.0")
+
     // 桌面端特有依赖
     implementation("io.ktor:ktor-client-cio:3.4.3")
     implementation(compose.desktop.currentOs)

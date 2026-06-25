@@ -169,7 +169,8 @@ fun ChatScreen(
     user: User,
     onAvatarClick: ((User) -> Unit)? = null, // 点击消息头像回调
     onMyAvatarClick: (() -> Unit)? = null, // 点击自己头像回调
-    onBackClick: (() -> Unit)? = null // 点击返回按钮回调
+    onBackClick: (() -> Unit)? = null, // 点击返回按钮回调
+    onVideoCallClick: ((String) -> Unit)? = null // 点击视频通话按钮回调
 ) {
     // 添加进入动画，避免闪动
     var isReady by remember(user.id) { mutableStateOf(false) }
@@ -189,7 +190,8 @@ fun ChatScreen(
                 user = user,
                 onAvatarClick = onAvatarClick,
                 onMyAvatarClick = onMyAvatarClick,
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                onVideoCallClick = onVideoCallClick
             )
         } else {
             // 加载状态：显示占位符
@@ -212,7 +214,8 @@ private fun ChatScreenContent(
     user: User,
     onAvatarClick: ((User) -> Unit)? = null,
     onMyAvatarClick: (() -> Unit)? = null,
-    onBackClick: (() -> Unit)? = null
+    onBackClick: (() -> Unit)? = null,
+    onVideoCallClick: ((String) -> Unit)? = null
 ) {
     val s = LocalStrings.current
     var messageText by remember { mutableStateOf("") }
@@ -542,6 +545,17 @@ private fun ChatScreenContent(
                             text = if (user.online == true) s["chat.status.online"] else if (user.online == false) s["chat.status.offline"] else s["chat.status.syncing"],
                             style = MaterialTheme.typography.caption,
                             color = MaterialTheme.colors.onBackground.copy(alpha = 0.72f)
+                        )
+                    }
+
+                    // 视频通话按钮
+                    IconButton(
+                        onClick = { onVideoCallClick?.invoke(user.id) },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Text(
+                            text = "📹",
+                            contentDescription = s["call.video.btn"]
                         )
                     }
                 }
