@@ -204,6 +204,8 @@ suspend fun loginTokens(account: String, password: String): LoginTokenBundle? {
     val requestBody = buildJsonObject {
         put("account", account)
         put("password", password)
+        put("deviceType", ServerConfig.DEVICE_TYPE)
+        put("deviceId", generateDeviceId())
     }
 
     val response = sendRequest<LoginTokenBundle>(

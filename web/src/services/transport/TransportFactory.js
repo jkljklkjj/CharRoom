@@ -4,7 +4,7 @@
  * 使用 WebTransport (QUIC + HTTP/3) 作为唯一传输层。
  * WebTransport API 不可用时抛出异常。
  */
-import { WebTransportTransport } from './WebTransportTransport'
+import { WebTransport } from './WebTransport'
 
 let _config = {
   webTransportUrl: null,
@@ -23,7 +23,7 @@ export function createTransport() {
     throw new Error('当前浏览器不支持 WebTransport (QUIC)')
   }
   console.log('🔀 TransportFactory: 使用 WebTransport (QUIC)')
-  return new WebTransportTransport()
+  return new WebTransport()
 }
 
 export function buildWebTransportUrl(host, port) {

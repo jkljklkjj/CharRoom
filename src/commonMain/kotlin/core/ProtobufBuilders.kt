@@ -5,15 +5,30 @@ import com.chatlite.proto.MessageProtos
 /**
  * 构建登录消息
  */
-fun buildLoginPayload(token: String?): ByteArray {
+fun buildLoginPayload(token: String?, deviceType: String = ServerConfig.DEVICE_TYPE, deviceId: String = generateDeviceId()): ByteArray {
     val login = MessageProtos.LoginMessage.newBuilder()
         .setToken(token ?: "")
+        .setDeviceType(deviceType)
+        .setDeviceId(deviceId)
         .build()
     return MessageProtos.MessageWrapper.newBuilder()
         .setType(MsgType.LOGIN.wire)
         .setLogin(login)
         .build()
         .toByteArray()
+}
+
+private var cachedDeviceId: String? = null
+
+/**
+ * 生成或返回缓存的设备 ID（进程生命周期内持久）。
+ * KMP 桌面端暂不持久化到文件，每次启动重新生成。
+ */
+fun generateDeviceId(): String {
+    if (cachedDeviceId == null) {
+        cachedDeviceId = java.util.UUID.randomUUID().toString()
+    }
+    return cachedDeviceId!!
 }
 
 /**

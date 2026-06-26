@@ -2,8 +2,8 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <!-- 移动端视口配置：禁止缩放、适配安全区域、原生体验 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <!-- 移动端视口配置：允许缩放（无障碍要求 maximum-scale >= 5） -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0, viewport-fit=cover" />
     <!-- PWA 相关配置 -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -38,7 +38,28 @@
         "name": "轻聊",
         "url": "https://www.chatlite.xin/",
         "description": "轻聊是一个轻量、智能、跨平台的实时聊天应用，支持高效沟通、群聊协作与智能对话体验。",
-        "inLanguage": "zh-CN"
+        "inLanguage": "zh-CN",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://www.chatlite.xin/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "轻聊",
+        "applicationCategory": "Communication",
+        "operatingSystem": "Web, Android, iOS, Desktop",
+        "description": "轻聊是一个轻量、智能、跨平台的实时聊天应用，支持私聊、群聊和AI智能对话。",
+        "url": "https://www.chatlite.xin/",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "CNY"
+        }
       }
     </script>
     <title>轻聊 - 轻量、智能、跨平台的实时聊天</title>
@@ -120,7 +141,7 @@
     </script>
   </head>
   <body>
-    <div id="app"></div>
+    <main id="app"></main>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

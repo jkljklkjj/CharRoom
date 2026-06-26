@@ -207,10 +207,10 @@ watch(currentMessages, (msgs, oldMsgs) => {
 }, { deep: false })
 
 // 相对时间格式化
-function formatRelativeTime(t) {
-  if (!t) return ''
+function formatRelativeTime(ts) {
+  if (!ts) return ''
   const now = new Date()
-  const time = new Date(t)
+  const time = new Date(ts)
   const diff = now - time
   const seconds = Math.floor(diff / 1000)
   const minutes = Math.floor(seconds / 60)
@@ -299,7 +299,7 @@ function getFileIcon(filename) {
 
 // 文本格式化（支持简单的 markdown）
 function formatText(text) {
-  if (!text) return ''
+  if (!text || typeof text !== "string") return ''
   // 转义 HTML 防止 XSS
   const escaped = text
     .replace(/&/g, '&amp;')

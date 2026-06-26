@@ -106,10 +106,23 @@ async function safeFetch(url, options = {}) {
   }
 }
 
+function getDeviceId() {
+  const key = 'charroom_device_id'
+  let id = localStorage.getItem(key)
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+    localStorage.setItem(key, id)
+  }
+  return id
+}
+
+function getDeviceType() { return 'web' }
+
 export async function login(account, password) {
   if (!account || !password) return null
   const { ok, body } = await safeFetch(`${API_BASE}/user/login`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account, password })
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account, password, deviceType: getDeviceType(), deviceId: getDeviceId() })
   })
   if (!ok) return null
 

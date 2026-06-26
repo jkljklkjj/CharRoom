@@ -1,0 +1,46 @@
+# 轻聊 (ChatLite) — 轻量、智能、跨平台的实时聊天
+
+轻聊是一个开源、跨平台的即时通讯应用，支持私聊、群聊、AI 智能对话。  
+官方网站: https://www.chatlite.xin  
+开源仓库: https://github.com/zhenye/CharRoom
+
+## 核心功能
+
+- **私聊** — 一对一实时消息，支持文字、图片、文件
+- **群聊** — 群组聊天，支持群成员管理
+- **AI 助手** — 集成 DeepSeek 大模型，支持流式对话
+- **多平台** — Web (Vue 3) / Desktop (Compose) / Android / CLI
+- **安全传输** — QUIC (HTTP/3) / WebTransport / WebSocket
+- **开源可自部署** — 后端 Spring Boot 4 + Netty + MySQL + Redis + MongoDB + Kafka
+
+## 页面路由
+
+| 路径 | 内容 | 优先级 |
+|------|------|--------|
+| [/](https://www.chatlite.xin/) | 首页 — 产品介绍、功能特性、下载 | 1.0 |
+| [/app](https://www.chatlite.xin/app) | Web 在线聊天应用 | 0.8 |
+| [/verify](https://www.chatlite.xin/verify) | 邮箱验证 | 0.3 |
+| [/faq](https://www.chatlite.xin/faq) | 常见问题 | 0.5 |
+| [/features](https://www.chatlite.xin/features) | 功能特性详解 | 0.6 |
+| [/compare](https://www.chatlite.xin/compare) | 轻聊 vs 微信 vs Telegram 对比 | 0.5 |
+
+## 技术栈
+
+- **前端**: Vue 3 + Vite + Vue Router + vue-i18n + Protobuf.js
+- **后端**: Spring Boot 4.1 + Netty 4.2 (QUIC) + MyBatis-Plus + ShardingSphere
+- **数据库**: MySQL (分片) / Redis / MongoDB / Qdrant (向量)
+- **消息队列**: Kafka
+- **AI**: DeepSeek (langchain4j) + RAG + MCP
+
+## API 文档
+
+- API 基础路径: `https://chatlite.xin/api`
+- WebSocket 端点: `wss://chatlite.xin/ws`
+- WebTransport 端点: `https://quic.chatlite.xin/.well-known/webtransport`
+- Protobuf 协议: `https://chatlite.xin/proto/message.proto`
+
+## 相关链接
+
+- [GitHub 仓库](https://github.com/zhenye/CharRoom)
+- [GitHub Release 下载](https://github.com/zhenye/CharRoom/releases)
+- [ICP 备案](https://beian.miit.gov.cn/)

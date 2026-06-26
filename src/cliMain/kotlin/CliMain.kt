@@ -42,6 +42,7 @@ class ChatLiteCli(private val args: Array<String>) {
         // 传输层选择: QUIC (默认) 或 WebSocket
         showWsStatus()
         if (token.isNotBlank()) {
+            ServerConfig.DEVICE_TYPE = "cli"
             transport = if (useQuic) {
                 println("[QUIC] 使用 QUIC 协议")
                 QuicClientImpl()

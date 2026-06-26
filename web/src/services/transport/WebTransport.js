@@ -1,5 +1,5 @@
 /**
- * WebTransportTransport — 基于 WebTransport (QUIC) 的传输实现。
+ * WebTransport — 基于 WebTransport (QUIC) 的传输实现。
  *
  * 使用浏览器 WebTransport API 通过 QUIC 连接，支持：
  * - 双向流（BidirectionalStream）用于控制流 + 聊天消息
@@ -13,7 +13,7 @@
  */
 import { ChatTransport } from './ChatTransport'
 
-export class WebTransportTransport extends ChatTransport {
+export class WebTransport extends ChatTransport {
   constructor() {
     super()
     this._transport = null
@@ -34,13 +34,13 @@ export class WebTransportTransport extends ChatTransport {
   async connect(url, token) {
     this._url = url
 
-    if (typeof WebTransport === 'undefined') {
+    if (typeof globalThis.WebTransport === 'undefined') {
       throw new Error('浏览器不支持 WebTransport API')
     }
 
     try {
       // 创建 WebTransport 连接
-      this._transport = new WebTransport(url)
+      this._transport = new globalThis.WebTransport(url)
 
       // 等待连接就绪（QUIC 握手 + HTTP/3 协商完成），15s 超时
       const TIMEOUT_MS = 15000
@@ -48,7 +48,7 @@ export class WebTransportTransport extends ChatTransport {
         setTimeout(() => reject(new Error('WebTransport 连接超时')), TIMEOUT_MS)
       )
       await Promise.race([this._transport.ready, timeoutPromise])
-      console.log('✅ WebTransportTransport 连接成功:', url)
+      console.log('✅ WebTransport 连接成功:', url)
 
       // 创建主双向流（用于控制消息 + 聊天消息）
       this._controlStream = await this._transport.createBidirectionalStream()
@@ -66,7 +66,7 @@ export class WebTransportTransport extends ChatTransport {
 
       if (this._onopen) this._onopen()
     } catch (e) {
-      console.error('❌ WebTransportTransport 连接失败:', e)
+      console.error('❌ WebTransport 连接失败:', e)
       throw e
     }
   }
@@ -77,18 +77,18 @@ export class WebTransportTransport extends ChatTransport {
    */
   send(data) {
     if (!this._streamWriter) {
-      console.warn('WebTransportTransport 发送失败: 无可用流')
+      console.warn('WebTransport 发送失败: 无可用流')
       return false
     }
 
     try {
       this._streamWriter.write(data).catch(e => {
-        console.error('WebTransportTransport 发送异常:', e)
+        console.error('WebTransport 发送异常:', e)
         if (this._onerror) this._onerror(e)
       })
       return true
     } catch (e) {
-      console.error('WebTransportTransport 发送异常:', e)
+      console.error('WebTransport 发送异常:', e)
       if (this._onerror) this._onerror(e)
       return false
     }
@@ -108,7 +108,7 @@ export class WebTransportTransport extends ChatTransport {
       this._transport = null
     }
     this._connected = false
-    console.log('WebTransportTransport 已关闭')
+    console.log('WebTransport 已关闭')
   }
 
   isConnected() {
@@ -136,7 +136,7 @@ export class WebTransportTransport extends ChatTransport {
       }
     } catch (e) {
       if (this._readerActive) {
-        console.error('WebTransportTransport 读取异常:', e)
+        console.error('WebTransport 读取异常:', e)
         if (this._onerror) this._onerror(e)
       }
     } finally {
@@ -160,7 +160,7 @@ export class WebTransportTransport extends ChatTransport {
         this._handleIncomingStream(stream)
       }
     } catch (e) {
-      console.debug('WebTransportTransport 入站流监听结束:', e.message)
+      console.debug('WebTransport 入站流监听结束:', e.message)
     }
   }
 
@@ -183,7 +183,7 @@ export class WebTransportTransport extends ChatTransport {
         }
       }
     } catch (e) {
-      console.debug('WebTransportTransport 入站流处理结束:', e.message)
+      console.debug('WebTransport 入站流处理结束:', e.message)
     }
   }
 }

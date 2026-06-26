@@ -38,4 +38,6 @@ object ServerConfig {
         }
 
     fun isAgentAssistant(userId: Int): Boolean = userId == AGENT_ASSISTANT_ID
+
+    var DEVICE_TYPE: String = "desktop"
 }

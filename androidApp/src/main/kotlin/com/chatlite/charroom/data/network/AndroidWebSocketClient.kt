@@ -515,6 +515,8 @@ class AndroidWebSocketClient {
     private fun buildLoginPayload(token: String?): ByteArray {
         val login = MessageProtos.LoginMessage.newBuilder()
             .setToken(token ?: "")
+            .setDeviceType("mobile")
+            .setDeviceId(androidDeviceId)
             .build()
         return MessageProtos.MessageWrapper.newBuilder()
             .setType(MsgType.LOGIN.wire)
@@ -597,9 +599,6 @@ class AndroidWebSocketClient {
             .toByteArray()
     }
 
-    /**
-     * 构建ACK确认消息，通知后端消息已收到
-     */
     private fun buildAckPayload(messageId: String): ByteArray {
         val ack = MessageProtos.AckMessage.newBuilder()
             .setMessageId(messageId)
@@ -609,5 +608,11 @@ class AndroidWebSocketClient {
             .setAck(ack)
             .build()
             .toByteArray()
+    }
+
+    companion object {
+        private val androidDeviceId: String by lazy {
+            java.util.UUID.randomUUID().toString()
+        }
     }
 }
