@@ -341,6 +341,26 @@ export async function callAgentStream(text, onTokenChunk = (chunk) => {}) {
   }
 }
 
+/**
+ * Token 配额 & 购买
+ */
+export async function getTokenQuota() {
+  const res = await safeFetch(`${API_BASE}/agent/quota`, { method: 'GET' })
+  return res.ok ? (res.body?.data || null) : null
+}
+export async function getTokenPrices() {
+  const res = await safeFetch(`${API_BASE}/agent/quota/prices`, { method: 'GET' })
+  return res.ok ? (res.body?.data || null) : null
+}
+export async function purchaseTokens(amountFen) {
+  const res = await safeFetch(`${API_BASE}/agent/quota/purchase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: amountFen })
+  })
+  return res.ok ? (res.body?.data || res.body) : null
+}
+
 export default {
   login,
   register,
@@ -359,5 +379,8 @@ export default {
   sendVerifyCode,
   verifyRegister,
   refreshToken,
-  syncMessages
+  syncMessages,
+  getTokenQuota,
+  getTokenPrices,
+  purchaseTokens
 }

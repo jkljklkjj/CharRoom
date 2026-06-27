@@ -66,11 +66,13 @@
               <button :class="{ active: locale === 'ja' }" @click="switchLang('ja')">日本語</button>
             </div>
           </div>
+          <button class="quota-btn" @click="showQuota = true">{{ $t('app.settings.tokenQuota') }}</button>
           <button class="logout-btn" @click="logout">{{ $t('app.settings.logout') }}</button>
         </div>
       </div>
     </div>
   </div>
+  <TokenQuotaDialog v-if="showQuota" @close="showQuota = false" />
 </template>
 
 <script setup>
@@ -78,6 +80,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
+import TokenQuotaDialog from '../components/TokenQuotaDialog.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
@@ -106,6 +109,7 @@ const isMobile = ref(window.innerWidth < 768)
 const currentView = ref('list') // 'list' | 'chat'
 const currentChatName = ref('')
 const showSettings = ref(false)
+const showQuota = ref(false)
 const loading = ref(true) // 登录状态验证中
 
 // 主题设置
