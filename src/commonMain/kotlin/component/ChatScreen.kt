@@ -170,7 +170,8 @@ fun ChatScreen(
     onAvatarClick: ((User) -> Unit)? = null, // 点击消息头像回调
     onMyAvatarClick: (() -> Unit)? = null, // 点击自己头像回调
     onBackClick: (() -> Unit)? = null, // 点击返回按钮回调
-    onVideoCallClick: ((String) -> Unit)? = null // 点击视频通话按钮回调
+    onVideoCallClick: ((String) -> Unit)? = null, // 点击视频通话按钮回调
+    onUserMenuClick: ((User) -> Unit)? = null // 点击好友菜单回调（查看资料/删除）
 ) {
     // 添加进入动画，避免闪动
     var isReady by remember(user.id) { mutableStateOf(false) }
@@ -191,7 +192,8 @@ fun ChatScreen(
                 onAvatarClick = onAvatarClick,
                 onMyAvatarClick = onMyAvatarClick,
                 onBackClick = onBackClick,
-                onVideoCallClick = onVideoCallClick
+                onVideoCallClick = onVideoCallClick,
+                onUserMenuClick = onUserMenuClick
             )
         } else {
             // 加载状态：显示占位符
@@ -215,7 +217,8 @@ private fun ChatScreenContent(
     onAvatarClick: ((User) -> Unit)? = null,
     onMyAvatarClick: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
-    onVideoCallClick: ((String) -> Unit)? = null
+    onVideoCallClick: ((String) -> Unit)? = null,
+    onUserMenuClick: ((User) -> Unit)? = null
 ) {
     val s = LocalStrings.current
     var messageText by remember { mutableStateOf("") }
@@ -555,6 +558,17 @@ private fun ChatScreenContent(
                     ) {
                         Text(
                             text = "📹",
+                            contentDescription = s["call.video.btn"]
+                        )
+                    }
+
+                    // 好友菜单按钮（查看资料、删除好友）
+                    IconButton(
+                        onClick = { onUserMenuClick?.invoke(user) },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Text(
+                            text = "⋯",
                             contentDescription = s["call.video.btn"]
                         )
                     }

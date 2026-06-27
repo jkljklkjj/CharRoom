@@ -168,6 +168,36 @@ function handleIncomingMessage(msg) {
 }
 
 /** 建立 WebTransport 连接 */
+/** 登录后拉取所有会话的离线消息 */
+async function syncAllConversations() {
+  const friends = store.state.users
+  if (!friends || friends.length === 0) return
+  console.log("📡 拉取离线消息，共", friends.length, "个会话")
+  for (const friend of friends) {
+    const convId = store.state.accountId + ":" + friend.id
+    const seqId = store.getConversationSeqId(convId) || 0
+    try {
+      const result = await api.syncMessages(convId, seqId, 100)
+      if (result.messages && result.messages.length > 0) {
+        console.log("📩 会话", convId, "拉取到", result.messages.length, "条新消息")
+        for (const msg of result.messages) {
+          store.addMessage({
+            user: String(msg.senderId),
+            text: msg.message,
+            time: msg.timestamp,
+            targetId: String(msg.senderId === store.state.accountId ? msg.receiverId : msg.senderId)
+          })
+        }
+        store.setConversationSeqId(convId, result.nextSeqId)
+      }
+    } catch (e) {
+      console.warn("⚠️ 拉取会话", convId, "失败:", e.message)
+    }
+  }
+  console.log("✅ 离线消息拉取完成")
+}
+
+/** 建立 WebTransport 连接 */
 function connectChat(token, accountId) {
   const transportConfig = siteConfig.TRANSPORT || {}
   const host = 'quic.chatlite.xin'
@@ -232,6 +262,7 @@ async function initUserSession(accessToken, refreshToken) {
   store.cacheUsers(friends || [])   // 缓存到 localStorage
 
   connectChat(accessToken, userRes.id)
+  syncAllConversations()
   return true
 }
 

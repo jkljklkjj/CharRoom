@@ -1,25 +1,20 @@
 {
   "app.brand": "轻聊",
-
   "nav.intro": "简介",
   "nav.webApp": "Web 体验",
-
   "header.reward": "打赏",
-
   "home.hero.eyebrow": "精心设计的 UI · 直观高效",
   "home.hero.title": "轻量、安全、跨平台的实时聊天",
   "home.hero.lead": "界面强调信息层次与可读性，优先对话体验，支持离线消息、群聊与智能 Agent 流式集成",
   "home.hero.downloadApk": "下载 APK",
   "home.hero.downloadClient": "下载客户端",
   "home.hero.onlineTry": "在线体验",
-
   "home.hero.highlight1Title": "WebSocket + Protobuf",
   "home.hero.highlight1Sub": "二进制高效传输，实时同步",
   "home.hero.highlight2Title": "精心设计的 UI",
   "home.hero.highlight2Sub": "直观布局、舒适间距与流畅交互反馈",
   "home.hero.highlight3Title": "Agent 集成",
   "home.hero.highlight3Sub": "支持 SSE / 流式响应的智能 Agent",
-
   "home.demo.title": "🤖 智能聊天助手",
   "home.demo.status": "流式响应 · 低延迟",
   "home.demo.userMessage": "帮我总结一下今天没读的消息",
@@ -32,7 +27,6 @@
   "home.demo.contactXiaoMing": "小明",
   "home.demo.contactDesign": "设计组",
   "home.demo.contactProduct": "产品",
-
   "home.features.title": "核心功能",
   "home.features.feature1Title": "私聊 / 群聊",
   "home.features.feature1Desc": "支持一对一、群组与房间，消息持久化与离线同步。",
@@ -40,7 +34,6 @@
   "home.features.feature2Desc": "小巧的协议栈，采用二进制与 Protobuf，运行高效安全。",
   "home.features.feature3Title": "Agent 集成",
   "home.features.feature3Desc": "内置 Agent 接入点，支持流式返回与实时交互。",
-
   "home.downloads.title": "下载",
   "home.downloads.windows": "Windows",
   "home.downloads.linux": "Linux",
@@ -51,7 +44,6 @@
   "home.downloads.dmg": "DMG",
   "home.downloads.apk": "APK",
   "home.downloads.note": "如需查看全部安装包，可前往 GitHub Release",
-
   "home.whyChoose.title": "为什么选择轻聊",
   "home.whyChoose.lead": "不只是另一个聊天工具。轻聊从底层协议到上层交互，为真正在意沟通质量的人重新设计",
   "home.whyChoose.point1Title": "3 倍速消息同步",
@@ -66,10 +58,8 @@
   "home.whyChoose.point5Sub": "Windows、macOS、Linux 原生客户端，Web 端同步体验，无缝切换。",
   "home.whyChoose.point6Title": "开源可自部署",
   "home.whyChoose.point6Sub": "代码完全开源，支持 Docker 一键部署，团队内部私有化即时通讯。",
-
   "footer.copyright": "© 2025 轻聊 · 陈振业",
   "footer.policeRecord": "粤公网安备 44082312345678号",
-
   "reward.title": "打赏作者",
   "reward.authorEmail": "作者邮箱：",
   "reward.copy": "复制",
@@ -78,10 +68,8 @@
   "reward.alipay": "支付宝",
   "reward.wechat": "微信",
   "reward.note": "感谢您的支持，您的支持是我不断优化软件的动力！",
-
   "app.loading": "正在验证登录状态...",
   "app.back": "← 返回",
-
   "app.settings.title": "设置",
   "app.settings.transportLabel": "传输协议",
   "app.settings.transportValue": "WebTransport (QUIC)",
@@ -93,7 +81,6 @@
   "app.settings.languageZh": "中文",
   "app.settings.languageEn": "English",
   "app.settings.logout": "退出登录",
-
   "login.register": "注册",
   "login.login": "登录",
   "login.emailLabel": "邮箱",
@@ -109,7 +96,6 @@
   "login.checkAccountPassword": "登录失败，请检查账号密码",
   "login.pleaseFillEmailPassword": "请填写邮箱与密码",
   "login.verificationSentFailed": "发送验证码失败，请稍后重试",
-
   "verify.title": "邮箱验证码验证",
   "verify.sentTo": "已向 {email} 发送验证码，请输入验证码完成注册。",
   "verify.noPending": "未检测到待验证信息，正在跳转...",
@@ -123,7 +109,6 @@
   "verify.sendFailed": "发送失败",
   "verify.inputCode": "请输入验证码",
   "verify.noPendingInfo": "未检测到待验证的注册信息，返回登录",
-
   "chat.selectContact": "请选择一个联系人开始聊天",
   "chat.selectContactHint": "👆 请在左侧选择一个联系人开始聊天",
   "chat.inputPlaceholder": "输入消息，支持粘贴图片/拖拽文件发送...",
@@ -133,25 +118,19 @@
   "chat.replyPrefix": "回复 {sender}",
   "chat.imageAlt": "图片",
   "chat.unknownFile": "未知文件",
-
   "chat.context.copy": "复制内容",
   "chat.context.share": "分享",
   "chat.context.reply": "回复",
   "chat.context.delete": "删除",
-
   "chat.dragTip": "📁 松开发送文件",
-
   "chat.shareTitle": "来自轻聊的消息",
-
   "chat.userPrefix": "用户 {id}",
-
   "time.justNow": "刚刚",
   "time.secondsAgo": "{n}秒前",
   "time.minutesAgo": "{n}分钟前",
   "time.hoursAgo": "{n}小时前",
   "time.yesterday": "昨天",
   "time.daysAgo": "{n}天前",
-
   "sidebar.title": "联系人",
   "sidebar.searchPlaceholder": "搜索好友 / 群聊，支持名称或账号",
   "sidebar.frTitle": "好友申请",
@@ -168,15 +147,12 @@
   "sidebar.frRejected": "已拒绝好友申请",
   "sidebar.frAcceptFailed": "操作失败，请重试",
   "sidebar.frRejectFailed": "操作失败，请重试",
-
   "notification.groupMessage": "群聊消息",
   "notification.newMessage": "新消息",
   "notification.body": "收到一条新消息",
-
   "error.tokenEmpty": "token不能为空",
   "error.connectionFailed": "聊天连接失败：认证凭证为空",
   "error.webTransportNotSupported": "当前浏览器不支持 WebTransport (QUIC)",
-
   "faq.title": "常见问题 - 轻聊",
   "faq.lead": "关于轻聊的常见问题，涵盖功能、隐私、开源和技术细节。",
   "faq.q1": "轻聊与微信/Telegram 有什么不同？",
@@ -195,7 +171,6 @@
   "faq.a7": "是的，轻聊完全开源。代码托管在 GitHub，你可以自由查看、修改和分发。",
   "faq.q8": "如何联系作者？",
   "faq.a8": "你可以通过项目 GitHub Issues 提交反馈，或发送邮件至作者邮箱（在首页打赏面板可查看）。",
-
   "features.title": "功能特性 - 轻聊",
   "features.lead": "轻聊从底层协议到交互体验，为追求高效沟通的人重新设计。",
   "features.f1Title": "私聊与群聊",
@@ -217,7 +192,6 @@
   "features.f4Desc": "全平台一致体验，无缝切换。",
   "features.f4d1": "Windows / macOS / Linux 原生客户端",
   "features.f4d2": "Web 端与移动端实时同步",
-
   "compare.title": "轻聊 vs 微信 vs Telegram - 功能对比",
   "compare.lead": "了解轻聊与其他聊天软件的差异，找到最适合你的沟通工具。",
   "compare.feature": "功能特性",
@@ -245,5 +219,13 @@
   "compare.r6Us": "✅ 无广告，无跟踪",
   "compare.r6Wx": "❌ 含广告和商业追踪",
   "compare.r6Tg": "✅ 无广告",
-  "compare.note": "数据基于各平台公开信息整理。优缺点因使用场景而异，请根据自身需求选择合适的工具。"
+  "compare.note": "数据基于各平台公开信息整理。优缺点因使用场景而异，请根据自身需求选择合适的工具。",
+  "chat.info": "好友信息",
+  "chat.deleteFriend": "删除好友",
+  "chat.friendId": "账号",
+  "chat.email": "邮箱",
+  "chat.loading": "加载中…",
+  "chat.deleteConfirm": "确定要删除这个好友吗？",
+  "chat.cancel": "取消",
+  "chat.confirmDelete": "确认删除"
 }

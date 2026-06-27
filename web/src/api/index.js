@@ -259,6 +259,13 @@ export async function getUserDetail(id) {
   return body
 }
 
+export async function delFriend(friendId) {
+  const { ok } = await safeFetch(`${API_BASE}/friend/del`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendId })
+  })
+  return ok
+}
+
 export async function getCurrentUser() {
   const { ok, body } = await safeFetch(`${API_BASE}/user/get`, { method: 'GET' })
   if (!ok) return null

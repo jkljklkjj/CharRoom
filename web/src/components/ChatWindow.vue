@@ -1,9 +1,41 @@
 <template>
   <div class="chat-wrap">
     <!-- 聊天顶部：显示当前选中好友名称（移动端隐藏，由外层提供顶部栏） -->
-    <header class="chat-top" v-if="!isMobile">
-      {{ currentChatTitle }}
+    <header class="chat-top" v-if="!isMobile && currentChatId !== null">
+      <span class="chat-top-title">{{ currentChatTitle }}</span>
+      <div class="chat-top-actions" v-if="!isGroupChat">
+        <button class="chat-top-btn" @click="toggleFriendMenu" title="好友操作">⋯</button>
+        <div v-if="showFriendMenu" class="friend-dropdown" @click.stop>
+          <div class="dropdown-item" @click="showFriendInfo">{{ $t('chat.info') }}</div>
+          <div class="dropdown-item danger" @click="confirmDeleteFriend">{{ $t('chat.deleteFriend') }}</div>
+        </div>
+      </div>
     </header>
+
+    <!-- 好友信息弹窗 -->
+    <div v-if="showInfoModal" class="modal-overlay" @click="showInfoModal = false">
+      <div class="modal-content" @click.stop>
+        <button class="modal-close" @click="showInfoModal = false">✕</button>
+        <div class="friend-info" v-if="friendInfo">
+          <img :src="friendInfo.avatar || '/src/assets/logo.svg'" class="info-avatar" />
+          <div class="info-name">{{ friendInfo.name || friendInfo.username || friendInfo.id }}</div>
+          <div class="info-id">{{ $t('chat.friendId') }}: {{ friendInfo.id }}</div>
+          <div class="info-email" v-if="friendInfo.email">{{ $t('chat.email') }}: {{ friendInfo.email }}</div>
+        </div>
+        <div v-else class="friend-info-loading">{{ $t('chat.loading') }}</div>
+      </div>
+    </div>
+
+    <!-- 删除好友确认 -->
+    <div v-if="showDeleteConfirm" class="modal-overlay" @click="showDeleteConfirm = false">
+      <div class="modal-content confirm-dialog" @click.stop>
+        <div class="confirm-text">{{ $t('chat.deleteConfirm') }}</div>
+        <div class="confirm-actions">
+          <button class="btn cancel" @click="showDeleteConfirm = false">{{ $t('chat.cancel') }}</button>
+          <button class="btn danger" @click="doDeleteFriend">{{ $t('chat.confirmDelete') }}</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
     <div class="messages" ref="msgList" v-if="currentChatId !== null">
@@ -109,20 +141,12 @@ function handleResize() {
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
+  document.addEventListener('click', handleClickOutside)
 })
-
-// 处理键盘快捷键
-function handleKeydown(e) {
-  // Ctrl+Enter 发送消息
-  if (e.ctrlKey && e.key === 'Enter') {
-    send()
-    e.preventDefault()
-  }
-}
-
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('click', handleClickOutside)
   clearTimeout(resizeTimer)
 })
 
@@ -143,6 +167,34 @@ const currentChatUser = computed(() => {
 const isGroupChat = computed(() => {
   return currentChatId.value != null && Number(currentChatId.value) < 0
 })
+
+// 好友操作
+const showFriendMenu = ref(false)
+const showInfoModal = ref(false)
+const showDeleteConfirm = ref(false)
+const friendInfo = ref(null)
+
+function toggleFriendMenu() { showFriendMenu.value = !showFriendMenu.value }
+
+function handleClickOutside() { if (showFriendMenu.value) showFriendMenu.value = false }
+
+async function showFriendInfo() {
+  showFriendMenu.value = false; showInfoModal.value = true; friendInfo.value = null
+  if (!currentChatUser.value) return
+  const { getUserDetail } = await import('../api')
+  const data = await getUserDetail(currentChatUser.value.id)
+  friendInfo.value = data?.data || currentChatUser.value
+}
+
+function confirmDeleteFriend() { showFriendMenu.value = false; showDeleteConfirm.value = true }
+
+async function doDeleteFriend() {
+  if (!currentChatUser.value) return
+  const { delFriend } = await import('../api')
+  const ok = await delFriend(currentChatUser.value.id)
+  if (ok) { store.removeUser(currentChatUser.value.id); store.setSelectedChat(null, false) }
+  showDeleteConfirm.value = false
+}
 
 const currentChatTitle = computed(() => {
   if (currentChatUser.value) {
@@ -740,5 +792,137 @@ onMounted(()=>{
 }
 .menu-item.danger:hover {
   background: rgba(255, 71, 87, 0.1);
+}
+
+/* 聊天顶部操作栏 */
+.chat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--surface-border);
+  font-weight: 600;
+}
+.chat-top-title {
+  flex: 1;
+}
+.chat-top-actions {
+  position: relative;
+}
+.chat-top-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+.chat-top-btn:hover {
+  background: var(--surface-border);
+}
+.friend-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--panel);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  min-width: 140px;
+  z-index: 100;
+  overflow: hidden;
+}
+.dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+.dropdown-item:hover {
+  background: var(--surface-border);
+}
+.dropdown-item.danger {
+  color: #ff4757;
+}
+
+/* 模态弹窗 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.modal-content {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 300px;
+  max-width: 400px;
+  position: relative;
+}
+.modal-close {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.friend-info {
+  text-align: center;
+}
+.info-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 12px;
+}
+.info-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.info-id, .info-email {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.friend-info-loading {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 40px 0;
+}
+.confirm-dialog {
+  text-align: center;
+}
+.confirm-text {
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.confirm-actions .btn {
+  padding: 8px 24px;
+  border-radius: 6px;
+  border: 1px solid var(--surface-border);
+  cursor: pointer;
+  font-size: 14px;
+  background: var(--panel);
+  color: var(--text-primary);
+}
+.confirm-actions .btn.danger {
+  background: #ff4757;
+  color: #fff;
+  border-color: #ff4757;
 }
 </style>
