@@ -1,5 +1,7 @@
 package presentation.viewmodel
 
+import core.Throttle
+import core.ThrottleOp
 import core.state.AuthState
 import data.repository.AuthRepository
 import data.repository.GlobalAuthRepository
@@ -16,6 +18,8 @@ class AuthViewModel(
     private val authRepository: AuthRepository = GlobalAuthRepository,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate)
 ) {
+    private val throttle = Throttle()
+
     // 认证状态，暴露给UI层观察
     val authState: StateFlow<AuthState> = authRepository.authState
 
@@ -32,6 +36,7 @@ class AuthViewModel(
      * 登录
      */
     fun login(account: String, password: String, rememberMe: Boolean = false) {
+        if (throttle.shouldThrottle(ThrottleOp.LOGIN, 1000L)) return
         coroutineScope.launch {
             authRepository.login(account, password, rememberMe)
         }
@@ -41,6 +46,7 @@ class AuthViewModel(
      * 注册
      */
     fun register(username: String, password: String, onResult: (Result<Int>) -> Unit) {
+        if (throttle.shouldThrottle(ThrottleOp.REGISTER, 2000L)) return
         coroutineScope.launch {
             val result = authRepository.register(username, password)
             onResult(result)
@@ -51,6 +57,7 @@ class AuthViewModel(
      * 验证注册（与网页端逻辑一致）
      */
     fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = "", onResult: (Result<Int>) -> Unit) {
+        if (throttle.shouldThrottle(ThrottleOp.REGISTER, 2000L)) return
         coroutineScope.launch {
             val result = authRepository.verifyRegister(username, password, email, verifyCode)
             onResult(result)
@@ -61,6 +68,7 @@ class AuthViewModel(
      * 发送注册验证码
      */
     fun sendRegisterVerifyCode(email: String, onResult: (Result<Boolean>) -> Unit) {
+        if (throttle.shouldThrottle(ThrottleOp.SEND_VERIFY_CODE, 3000L)) return
         coroutineScope.launch {
             val result = authRepository.sendRegisterVerifyCode(email)
             onResult(result)

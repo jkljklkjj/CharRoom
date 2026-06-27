@@ -369,11 +369,12 @@ function autoResize() {
   el.style.height = newHeight + 'px'
 }
 
-let _sending = false
+let _sendLock = { private: false, group: false }
 function send(){
-  if(!text.value.trim() || currentChatId.value == null || _sending) return
-  _sending = true
-  setTimeout(() => _sending = false, 500)
+  const key = isGroupChat.value ? 'group' : 'private'
+  if(!text.value.trim() || currentChatId.value == null || _sendLock[key]) return
+  _sendLock[key] = true
+  setTimeout(() => _sendLock[key] = false, 500)
   const m = {
     user: 'you',
     text: text.value,

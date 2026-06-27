@@ -26,6 +26,8 @@ import model.MessageIdGenerator
 import model.MessageType
 import model.User
 import core.state.ConversationPreviewState
+import core.Throttle
+import core.ThrottleOp
 
 private const val AGENT_ASSISTANT_ID = 900000001
 
@@ -444,9 +446,7 @@ open class ChatViewModel(
     /**
      * 发送私聊消息
      */
-    private var lastPrivateSendTime = 0L
-    private var lastGroupSendTime = 0L
-    private val SEND_THROTTLE_MS = 300L
+    private val throttle = Throttle()
 
     open fun sendPrivateMessage(
         user: User,
@@ -460,12 +460,10 @@ open class ChatViewModel(
         replyToSender: String? = null,
         onDone: () -> Unit = {}
     ) {
-        val now = System.currentTimeMillis()
-        if (now - lastPrivateSendTime < SEND_THROTTLE_MS) {
-            onDone()
+        if (throttle.shouldThrottle(ThrottleOp.PRIVATE_SEND)) {
+            coroutineScope.launch { onDone() }
             return
         }
-        lastPrivateSendTime = now
         val currentUserId = GlobalAppState.currentUserId
         println("[ChatViewModel] 准备发送私聊消息，currentUserId: $currentUserId, 接收者: ${user.id}")
 
@@ -577,12 +575,10 @@ open class ChatViewModel(
         replyToSender: String? = null,
         onDone: () -> Unit = {}
     ) {
-        val now = System.currentTimeMillis()
-        if (now - lastGroupSendTime < SEND_THROTTLE_MS) {
-            onDone()
+        if (throttle.shouldThrottle(ThrottleOp.GROUP_SEND)) {
+            coroutineScope.launch { onDone() }
             return
         }
-        lastGroupSendTime = now
         // 获取当前用户信息
         val currentUserId = GlobalAppState.currentUserId
         println("[ChatViewModel] 准备发送群聊消息，currentUserId: $currentUserId, 群组: ${group.id}")
