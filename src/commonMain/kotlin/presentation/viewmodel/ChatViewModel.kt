@@ -299,8 +299,24 @@ open class ChatViewModel(
         coroutineScope.launch {
             val success = chatRepository.addFriend(account)
             if (success) {
-                // 重新加载联系人列表
                 loadContacts()
+            }
+            onResult(success)
+        }
+    }
+
+    /**
+     * 删除好友
+     */
+    fun deleteFriend(friendId: Int, onResult: (Boolean) -> Unit) {
+        coroutineScope.launch {
+            val success = chatRepository.deleteFriend(friendId)
+            if (success) {
+                loadContacts()
+                // 如果当前选中的就是这个好友，取消选中
+                if (_selectedUser.value?.id == friendId) {
+                    _selectedUser.value = null
+                }
             }
             onResult(success)
         }
@@ -428,6 +444,10 @@ open class ChatViewModel(
     /**
      * 发送私聊消息
      */
+    private var lastPrivateSendTime = 0L
+    private var lastGroupSendTime = 0L
+    private val SEND_THROTTLE_MS = 300L
+
     open fun sendPrivateMessage(
         user: User,
         messageText: String,
@@ -440,6 +460,12 @@ open class ChatViewModel(
         replyToSender: String? = null,
         onDone: () -> Unit = {}
     ) {
+        val now = System.currentTimeMillis()
+        if (now - lastPrivateSendTime < SEND_THROTTLE_MS) {
+            onDone()
+            return
+        }
+        lastPrivateSendTime = now
         val currentUserId = GlobalAppState.currentUserId
         println("[ChatViewModel] 准备发送私聊消息，currentUserId: $currentUserId, 接收者: ${user.id}")
 
@@ -551,6 +577,12 @@ open class ChatViewModel(
         replyToSender: String? = null,
         onDone: () -> Unit = {}
     ) {
+        val now = System.currentTimeMillis()
+        if (now - lastGroupSendTime < SEND_THROTTLE_MS) {
+            onDone()
+            return
+        }
+        lastGroupSendTime = now
         // 获取当前用户信息
         val currentUserId = GlobalAppState.currentUserId
         println("[ChatViewModel] 准备发送群聊消息，currentUserId: $currentUserId, 群组: ${group.id}")

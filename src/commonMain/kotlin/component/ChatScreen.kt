@@ -39,6 +39,9 @@ import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.material.TextFieldDefaults
@@ -222,6 +225,7 @@ private fun ChatScreenContent(
 ) {
     val s = LocalStrings.current
     var messageText by remember { mutableStateOf("") }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     // 从ViewModel收集消息状态
     val allMessages by chatViewModel.messagesFlow.collectAsState()
     // 从ViewModel收集用户列表状态
@@ -563,14 +567,41 @@ private fun ChatScreenContent(
                     }
 
                     // 好友菜单按钮（查看资料、删除好友）
-                    IconButton(
-                        onClick = { onUserMenuClick?.invoke(user) },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Text(
-                            text = "⋯",
-                            contentDescription = s["call.video.btn"]
-                        )
+                    Box {
+                        var showMenu by remember { mutableStateOf(false) }
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Text(
+                                text = "⋯",
+                                contentDescription = s["friend.menu.info"]
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    onUserMenuClick?.invoke(user)
+                                }
+                            ) {
+                                Text(s["friend.menu.info"])
+                            }
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    showDeleteConfirm = true
+                                }
+                            ) {
+                                Text(
+                                    s["friend.menu.delete"],
+                                    color = MaterialTheme.colors.error
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1095,6 +1126,35 @@ private fun ChatScreenContent(
                     forwardMessage(message, targetUser)
                 }
                 showForwardDialog = false
+            }
+        )
+    }
+
+    // 删除好友确认对话框
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(s["friend.delete.title"]) },
+            text = { Text(s["friend.delete.confirm"]) },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error),
+                    onClick = {
+                        showDeleteConfirm = false
+                        chatViewModel.deleteFriend(user.id) { success ->
+                            if (success) {
+                                chatViewModel.loadContacts()
+                            }
+                        }
+                    }
+                ) {
+                    Text(s["friend.delete.title"])
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteConfirm = false }) {
+                    Text(s["dialog.add.cancel"])
+                }
             }
         )
     }

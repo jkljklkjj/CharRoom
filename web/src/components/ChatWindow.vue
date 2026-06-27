@@ -192,7 +192,7 @@ async function doDeleteFriend() {
   if (!currentChatUser.value) return
   const { delFriend } = await import('../api')
   const ok = await delFriend(currentChatUser.value.id)
-  if (ok) { store.removeUser(currentChatUser.value.id); store.setSelectedChat(null, false) }
+  if (ok) { store.removeUser(currentChatUser.value.id) }
   showDeleteConfirm.value = false
 }
 
@@ -369,8 +369,11 @@ function autoResize() {
   el.style.height = newHeight + 'px'
 }
 
+let _sending = false
 function send(){
-  if(!text.value.trim() || currentChatId.value == null) return
+  if(!text.value.trim() || currentChatId.value == null || _sending) return
+  _sending = true
+  setTimeout(() => _sending = false, 500)
   const m = {
     user: 'you',
     text: text.value,

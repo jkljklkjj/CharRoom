@@ -36,9 +36,16 @@ const emit = defineEmits(['logged'])
 
 function toggleMode() { isRegister.value = !isRegister.value }
 
+let _submitting = false
 async function doAction() {
-  if (isRegister.value) return await doRegister()
-  return await doLogin()
+  if (_submitting) return
+  _submitting = true
+  try {
+    if (isRegister.value) return await doRegister()
+    return await doLogin()
+  } finally {
+    _submitting = false
+  }
 }
 
 async function doLogin() {

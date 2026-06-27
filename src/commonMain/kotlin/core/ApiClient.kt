@@ -410,6 +410,22 @@ suspend fun sendFriendRequest(token: String, targetUserId: Int, message: String 
 }
 
 /**
+ * 删除好友 — POST /friend/del { friendId }
+ */
+suspend fun deleteFriend(token: String, friendId: Int): Boolean {
+    val requestBody = buildJsonObject {
+        put("friendId", friendId)
+    }
+    val response = sendRequest<Unit>(
+        path = ApiEndpoints.FRIEND_DEL,
+        method = "POST",
+        body = requestBody,
+        token = token
+    )
+    return response.isSuccess
+}
+
+/**
  * 处理好友申请
  */
 suspend fun handleFriendRequest(token: String, requestId: Int, accept: Boolean): Boolean {

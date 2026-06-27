@@ -119,6 +119,10 @@ class RemoteDataSourceImpl : RemoteDataSource {
         return core.rejectFriend(token, requestId)
     }
 
+    override suspend fun deleteFriend(token: String, friendId: Int): Boolean {
+        return core.deleteFriend(token, friendId)
+    }
+
     override suspend fun acceptGroupApplication(token: String, groupId: String, userId: String): Boolean {
         return core.acceptGroupApplication(token, groupId, userId)
     }

@@ -22,6 +22,7 @@ object ApiEndpoints {
     const val GROUP_REQUESTS = "/group/requests"
     const val FRIEND_ACCEPT = "/friend/accept"
     const val FRIEND_REJECT = "/friend/reject"
+    const val FRIEND_DEL = "/friend/del"
     const val GROUP_ACCEPT = "/group/accept"
     const val GROUP_REJECT = "/group/reject"
     const val USER_DETAIL = "/user/get"

@@ -127,6 +127,11 @@ interface RemoteDataSource {
     suspend fun rejectFriend(token: String, requestId: String): Boolean
 
     /**
+     * Delete friend
+     */
+    suspend fun deleteFriend(token: String, friendId: Int): Boolean
+
+    /**
      * Accept group application
      */
     suspend fun acceptGroupApplication(token: String, groupId: String, userId: String): Boolean

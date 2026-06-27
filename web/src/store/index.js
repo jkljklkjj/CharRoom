@@ -381,6 +381,19 @@ function addUser(u) {
     rebuildConversationStates()
   }
 }
+function removeUser(id) {
+  const idx = state.users.findIndex(u => u.id === id)
+  if (idx === -1) return
+  state.users.splice(idx, 1)
+  // 清理该好友的会话状态和消息
+  delete state.conversationStates[id]
+  state.messages = state.messages.filter(m => m.user !== id.toString())
+  // 如果当前选中的就是这个好友，取消选中
+  if (state.selectedChatId === id) {
+    loadConversation(null, false)
+    clearConversationUnread(id)
+  }
+}
 
 /**
  * 更新用户在线状态
@@ -484,6 +497,7 @@ export function useStore() {
     setAccountId,
     setUsers,
     addUser,
+    removeUser,
     addMessage,
     addGroupMessage,
     setSelectedChat,

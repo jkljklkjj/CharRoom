@@ -284,6 +284,14 @@ val zhStrings = Strings(
         "application.accept" to "同意",
         "application.close" to "关闭",
 
+        // ── Friend Actions ──
+        "friend.menu.info" to "好友信息",
+        "friend.menu.delete" to "删除好友",
+        "friend.delete.title" to "删除好友",
+        "friend.delete.confirm" to "确定要删除这个好友吗？",
+        "friend.delete.success" to "已删除好友",
+        "friend.delete.failed" to "删除好友失败",
+
         // ── Avatar Crop Dialog ──
         "crop.title" to "头像裁剪",
         "crop.close" to "关闭",

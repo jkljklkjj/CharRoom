@@ -198,6 +198,14 @@ class ChatRepository(
     }
 
     /**
+     * 删除好友
+     */
+    suspend fun deleteFriend(friendId: Int): Boolean {
+        val token = authRepository.getCurrentToken() ?: return false
+        return remoteDataSource.deleteFriend(token, friendId)
+    }
+
+    /**
      * 同意群聊申请
      */
     suspend fun acceptGroupApplication(groupId: String, userId: String): Boolean {
