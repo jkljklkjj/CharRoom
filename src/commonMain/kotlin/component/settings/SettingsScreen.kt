@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
@@ -78,7 +79,8 @@ fun SettingsScreen(
     chatViewModel: ChatViewModel,
     onBackClick: () -> Unit,
     onLogout: () -> Unit,
-    onProfileClick: () -> Unit = {}
+    onProfileClick: () -> Unit = {},
+    onQuotaClick: () -> Unit = {}
 ) {
     val s = LocalStrings.current
     val coroutineScope = rememberCoroutineScope()
@@ -155,6 +157,14 @@ fun SettingsScreen(
                 title = s["settings.profile"],
                 subtitle = s["settings.profile.subtitle"],
                 onClick = onProfileClick
+            )
+
+            // Token Quota
+            SettingItem(
+                icon = Icons.Default.Star,
+                title = s["settings.token.quota"],
+                subtitle = s["settings.token.quota.subtitle"],
+                onClick = onQuotaClick
             )
 
             // Check for updates

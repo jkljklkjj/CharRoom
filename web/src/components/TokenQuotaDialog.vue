@@ -13,18 +13,19 @@
           <div class="balance-value">{{ quota?.balanceFen ? (quota.balanceFen / 100).toFixed(2) : '0.00' }}<span class="unit">元</span></div>
         </div>
 
-        <!-- 每周免费配额 -->
+        <!-- 每周免费 -->
         <div class="quota-section">
           <h4>{{ $t('quota.weekly') }}</h4>
-          <div class="quota-row">
-            <span class="label">{{ $t('quota.inputTokens') }}</span>
-            <div class="bar-wrap"><div class="bar" :style="{ width: pct(quota?.weeklyInputPct) + '%' }"></div></div>
-            <span class="num">{{ fmt(quota?.weeklyInputUsed) }} / {{ fmt(quota?.weeklyFreeInputLimit) }}</span>
+          <div class="free-row">
+            <span class="free-label">{{ $t('quota.freeRemaining') }}</span>
+            <span class="free-value">{{ quota?.freeRemainingFen ? (quota.freeRemainingFen / 100).toFixed(2) : '0.00' }} 元</span>
           </div>
-          <div class="quota-row">
-            <span class="label">{{ $t('quota.outputTokens') }}</span>
-            <div class="bar-wrap"><div class="bar out" :style="{ width: pct(quota?.weeklyOutputPct) + '%' }"></div></div>
-            <span class="num">{{ fmt(quota?.weeklyOutputUsed) }} / {{ fmt(quota?.weeklyFreeOutputLimit) }}</span>
+          <div class="free-bar-wrap">
+            <div class="free-bar" :style="{ width: freePct + '%' }"></div>
+          </div>
+          <div class="used-row">
+            <span>{{ $t('quota.thisWeekUsed') }}: {{ quota?.weeklyCostFen ? (quota.weeklyCostFen / 100).toFixed(2) : '0.00' }} 元</span>
+            <span>{{ fmt(quota?.weeklyInputUsed) }} in / {{ fmt(quota?.weeklyOutputUsed) }} out</span>
           </div>
         </div>
 
@@ -65,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api from '../api'
 
 const emit = defineEmits(['close'])
@@ -89,7 +90,10 @@ onMounted(async () => {
   loading.value = false
 })
 
-function pct(v) { return Math.min(v || 0, 100) }
+const freePct = computed(() => {
+  if (!quota.value) return 0
+  return Math.min(quota.value.freeRemainingFen / 400 * 100, 100)
+})
 function fmt(n) {
   if (n == null) return '0'
   if (n >= 10000) return (n / 10000).toFixed(1) + '万'
@@ -162,12 +166,12 @@ async function checkPayment() {
 
 .quota-section { margin-bottom: 16px; }
 .quota-section h4 { margin: 0 0 10px; font-size: 14px; }
-.quota-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
-.quota-row .label { min-width: 44px; color: var(--muted, #999); }
-.quota-row .num { white-space: nowrap; min-width: 90px; text-align: right; color: var(--muted, #999); font-size: 12px; }
-.bar-wrap { flex: 1; height: 8px; background: var(--border, #eee); border-radius: 4px; overflow: hidden; }
-.bar { height: 100%; background: var(--accent-1, #4f6ef7); border-radius: 4px; transition: width .3s; }
-.bar.out { background: #e67e22; }
+.free-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+.free-label { color: var(--muted, #999); }
+.free-value { font-weight: 600; color: var(--accent-1, #4f6ef7); }
+.free-bar-wrap { height: 10px; background: var(--border, #eee); border-radius: 5px; overflow: hidden; margin-bottom: 4px; }
+.free-bar { height: 100%; background: linear-gradient(90deg, var(--accent-1, #4f6ef7), #2ecc71); border-radius: 5px; transition: width .3s; }
+.used-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted, #999); }
 
 .purchase-section { border-top: 1px solid var(--border, #eee); padding-top: 16px; }
 .purchase-section h4 { margin: 0 0 6px; font-size: 14px; }

@@ -410,6 +410,56 @@ suspend fun sendFriendRequest(token: String, targetUserId: Int, message: String 
 }
 
 /**
+ * 获取 Token 配额信息
+ */
+suspend fun getTokenQuota(token: String): model.QuotaInfo? {
+    val response = sendRequest<model.QuotaInfo>(
+        path = ApiEndpoints.AGENT_QUOTA,
+        token = token
+    )
+    return if (response.isSuccess) response.body else null
+}
+
+/**
+ * 获取 Token 定价
+ */
+suspend fun getTokenPrices(token: String): model.TokenPrices? {
+    val response = sendRequest<model.TokenPrices>(
+        path = ApiEndpoints.AGENT_QUOTA_PRICES,
+        token = token
+    )
+    return if (response.isSuccess) response.body else null
+}
+
+/**
+ * 购买 Token — 返回下订单结果（含支付二维码/prepayId）
+ */
+suspend fun purchaseTokens(token: String, amountFen: Int): model.PayResult? {
+    val requestBody = buildJsonObject {
+        put("amount", amountFen)
+    }
+    val response = sendRequest<model.PayResult>(
+        path = ApiEndpoints.AGENT_QUOTA_PURCHASE,
+        method = "POST",
+        body = requestBody,
+        token = token
+    )
+    return if (response.isSuccess) response.body else null
+}
+
+/**
+ * 确认支付（测试用 Mock）
+ */
+suspend fun confirmPurchase(token: String, purchaseId: Long): Boolean {
+    val response = sendRequest<Unit>(
+        path = "${ApiEndpoints.AGENT_QUOTA_PURCHASE_CONFIRM}?purchaseId=$purchaseId",
+        method = "POST",
+        token = token
+    )
+    return response.isSuccess
+}
+
+/**
  * 删除好友 — POST /friend/del { friendId }
  */
 suspend fun deleteFriend(token: String, friendId: Int): Boolean {

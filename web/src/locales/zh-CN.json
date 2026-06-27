@@ -85,9 +85,9 @@
 
   "quota.title": "Token 配额",
   "quota.balance": "账户余额",
-  "quota.weekly": "本周免费配额",
-  "quota.inputTokens": "输入",
-  "quota.outputTokens": "输出",
+  "quota.weekly": "本周免费额度",
+  "quota.freeRemaining": "免费剩余",
+  "quota.thisWeekUsed": "本周已用",
   "quota.purchaseTitle": "充值",
   "quota.inputPrice": "输入单价",
   "quota.outputPrice": "输出单价",

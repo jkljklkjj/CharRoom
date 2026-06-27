@@ -48,6 +48,7 @@ import model.User
 import presentation.viewmodel.ChatViewModel
 import com.chatlite.i18n.LocalStrings
 import component.settings.SettingsScreen
+import component.TokenQuotaScreen
 
 /**
  * 聊天主界面
@@ -77,6 +78,7 @@ fun ChatApp(
     var showApplicationDialog by remember { mutableStateOf(false) }
     var showProfileScreen by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
+    var showQuotaScreen by remember { mutableStateOf(false) }
     var pendingRefreshTrigger by remember { mutableStateOf(0L) }
 
     // 用户详情页状态
@@ -381,6 +383,24 @@ fun ChatApp(
                     onProfileClick = {
                         showSettingsScreen = false
                         showProfileScreen = true
+                    },
+                    onQuotaClick = {
+                        showSettingsScreen = false
+                        showQuotaScreen = true
+                    }
+                )
+            }
+
+            // Token 配额页
+            AnimatedVisibility(
+                visible = showQuotaScreen,
+                enter = slideInVertically(slideUpSpec) { it } + fadeIn(fadeSpec),
+                exit = slideOutVertically(slideUpSpec) { it } + fadeOut(fadeSpec)
+            ) {
+                TokenQuotaScreen(
+                    onBack = {
+                        showQuotaScreen = false
+                        showSettingsScreen = true
                     }
                 )
             }
