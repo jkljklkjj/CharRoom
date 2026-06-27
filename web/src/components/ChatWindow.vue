@@ -17,10 +17,11 @@
       <div class="modal-content" @click.stop>
         <button class="modal-close" @click="showInfoModal = false">✕</button>
         <div class="friend-info" v-if="friendInfo">
-          <img :src="friendInfo.avatar || '/src/assets/logo.svg'" class="info-avatar" />
+          <img :src="friendInfo.avatar || '/icons/icon-192x192.png'" class="info-avatar" />
           <div class="info-name">{{ friendInfo.name || friendInfo.username || friendInfo.id }}</div>
           <div class="info-id">{{ $t('chat.friendId') }}: {{ friendInfo.id }}</div>
           <div class="info-email" v-if="friendInfo.email">{{ $t('chat.email') }}: {{ friendInfo.email }}</div>
+          <div class="info-signature" v-if="friendInfo.signature">{{ $t('chat.signature') }}: {{ friendInfo.signature }}</div>
         </div>
         <div v-else class="friend-info-loading">{{ $t('chat.loading') }}</div>
       </div>
@@ -130,12 +131,12 @@ const selectedMessage = ref(null)
 const canShare = ref('share' in navigator)
 
 // 监听窗口大小变化
+const windowWidth = ref(window.innerWidth)
 let resizeTimer = null
 function handleResize() {
-  // 防抖处理
   clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
-    // 触发响应式更新
+    windowWidth.value = window.innerWidth
   }, 100)
 }
 
@@ -208,7 +209,7 @@ const currentChatTitle = computed(() => {
 
 // 判断是否为移动端
 const isMobile = computed(() => {
-  return window.innerWidth < 768
+  return windowWidth.value < 768
 })
 
 // 当前会话的消息列表（私聊或群聊）
@@ -227,11 +228,10 @@ function scrollToBottom(animate = false) {
   nextTick(() => {
     const el = msgList.value
     if (!el) return
-    const target = el.scrollHeight + 100
     if (animate) {
-      el.scrollTo({ top: target, behavior: 'smooth' })
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
     } else {
-      el.scrollTop = target
+      el.scrollTop = el.scrollHeight
     }
   })
 }
@@ -243,7 +243,8 @@ watch(currentChatId, () => {
 }, { immediate: true })
 
 // 新消息到达：仅在接近底部时跟随（无动画）
-watch(currentMessages, (msgs, oldMsgs) => {
+// 通过监听数组长度变化触发，因为 .push() 不改变引用
+watch(() => isGroupChat.value ? store.state.groupMessages.length : store.state.messages.length, () => {
   const el = msgList.value
   if (!el) return
   if (!_scrollInit) {
@@ -256,7 +257,7 @@ watch(currentMessages, (msgs, oldMsgs) => {
   if (nearBottom) {
     scrollToBottom(true)
   }
-}, { deep: false })
+})
 
 // 相对时间格式化
 function formatRelativeTime(ts) {
@@ -385,7 +386,7 @@ function send(){
   const to = currentChatId.value
   const wrapper = isGroupChat.value
     ? {
-        type: 'groupChat',
+        type: 'group_chat',
         groupChat: { targetClientId: String(to), content: m.text, timestamp: m.time }
       }
     : {
@@ -470,7 +471,7 @@ async function handleFileUpload(file) {
 
       const wrapper = isGroupChat.value
         ? {
-            type: 'groupChat',
+            type: 'group_chat',
             groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
           }
         : {
@@ -499,7 +500,7 @@ async function handleFileUpload(file) {
 
     const wrapper = isGroupChat.value
       ? {
-          type: 'groupChat',
+          type: 'group_chat',
           groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
         }
       : {
@@ -585,6 +586,16 @@ function deleteMessage() {
     }
   }
   closeContextMenu()
+}
+
+// 键盘快捷键处理
+function handleKeydown(e) {
+  if (e.key === 'Escape') {
+    showContextMenu.value = false
+    showFriendMenu.value = false
+    showInfoModal.value = false
+    showDeleteConfirm.value = false
+  }
 }
 
 onMounted(()=>{
@@ -893,7 +904,7 @@ onMounted(()=>{
   font-weight: 600;
   margin-bottom: 8px;
 }
-.info-id, .info-email {
+.info-id, .info-email, .info-signature {
   font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: 4px;

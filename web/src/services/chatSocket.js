@@ -369,7 +369,7 @@ async function handleMessage(rawData) {
     // 新消息通知
     if (processedData.type === 'chat' && processedData.chat) {
       showNotification(processedData.chat)
-    } else if (processedData.type === 'groupChat' && processedData.groupChat) {
+    } else if (processedData.type === 'group_chat' && processedData.groupChat) {
       showNotification(processedData.groupChat, true)
     }
   }
@@ -448,6 +448,9 @@ function showNotification(message, isGroup = false) {
     renotify: true,
     silent: false
   })
+
+  // 3 秒后自动关闭通知
+  setTimeout(() => notification.close(), 3000)
 
   notification.onclick = () => {
     window.focus()

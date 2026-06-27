@@ -243,6 +243,7 @@
   "chat.deleteFriend": "Delete Friend",
   "chat.friendId": "Account",
   "chat.email": "Email",
+  "chat.signature": "Signature",
   "chat.loading": "Loading…",
   "chat.deleteConfirm": "Delete this friend?",
   "chat.cancel": "Cancel",

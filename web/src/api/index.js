@@ -254,7 +254,11 @@ export async function addGroup(groupId) {
 }
 
 export async function getUserDetail(id) {
-  const { ok, body } = await safeFetch(`${API_BASE}/friend/get?id=${id}`, { method: 'POST' })
+  const { ok, body } = await safeFetch(`${API_BASE}/friend/info`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ friendId: id })
+  })
   if (!ok) return null
   return body
 }

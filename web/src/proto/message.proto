@@ -15,7 +15,9 @@ enum MessageType {
 
 // 登录消息
 message LoginMessage {
-    string token = 1;  // 登录凭证token，后端解析获取用户信息
+    string token = 1;           // 登录凭证token，后端解析获取用户信息
+    string device_type = 2;     // 设备类型：mobile / desktop / web / cli
+    string device_id = 3;       // 设备唯一标识
 }
 
 // 聊天消息

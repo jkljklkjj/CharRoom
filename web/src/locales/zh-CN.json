@@ -243,6 +243,7 @@
   "chat.deleteFriend": "删除好友",
   "chat.friendId": "账号",
   "chat.email": "邮箱",
+  "chat.signature": "个性签名",
   "chat.loading": "加载中…",
   "chat.deleteConfirm": "确定要删除这个好友吗？",
   "chat.cancel": "取消",

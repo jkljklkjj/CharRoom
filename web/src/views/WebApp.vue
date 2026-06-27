@@ -156,7 +156,7 @@ function handleIncomingMessage(msg) {
         time: normalizeTimestamp(msg.chat.timestamp),
         targetId: msg.chat.targetClientId
       })
-    } else if (msg.type === 'groupChat' && msg.groupChat) {
+    } else if (msg.type === 'group_chat' && msg.groupChat) {
       store.addGroupMessage({
         user: String(msg.groupChat.userId),
         text: msg.groupChat.content,
