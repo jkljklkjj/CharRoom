@@ -22,8 +22,23 @@ let currentUserId = null
 let loggedIn = false
 const MAX_QUEUE_SIZE = 1000
 const MAX_MESSAGE_CACHE = 1000
-const receivedMessageIds = new Set()
-const messageIdQueue = []
+// 消息去重：Map<messageId, timestamp>，带 TTL 自动过期
+const messageCache = new Map()
+const MESSAGE_TTL = 5 * 60 * 1000 // 5 分钟 TTL
+
+// 优先级队列：多个队列按优先级处理
+const PRIORITY_HIGH = 0   // ACK
+const PRIORITY_NORMAL = 1 // 聊天消息
+const PRIORITY_LOW = 2    // 心跳
+const priorityQueues = { [PRIORITY_HIGH]: [], [PRIORITY_NORMAL]: [], [PRIORITY_LOW]: [] }
+
+// 定期清理过期消息 ID
+setInterval(() => {
+  const now = Date.now()
+  for (const [id, ts] of messageCache) {
+    if (now - ts > MESSAGE_TTL) messageCache.delete(id)
+  }
+}, 60_000)
 
 // ── 公共 API ────────────────────────────────────
 
@@ -162,6 +177,19 @@ async function sendLogin(token) {
  * @param {Object} wrapperObj - 消息对象
  * @returns {Promise<boolean>}
  */
+/**
+ * 根据消息类型确定优先级。
+ */
+function getMessagePriority(wrapperObj) {
+  switch (wrapperObj.type) {
+    case 'ack': return PRIORITY_HIGH
+    case 'chat':
+    case 'groupChat': return PRIORITY_NORMAL
+    case 'heartbeat': return PRIORITY_LOW
+    default: return PRIORITY_NORMAL
+  }
+}
+
 export async function sendWrapper(wrapperObj) {
   try {
     const buffer = await encodeMessage(wrapperObj)
@@ -170,12 +198,27 @@ export async function sendWrapper(wrapperObj) {
       return transport.send(buffer)
     }
 
-    // 连接未建立，加入队列
-    if (pendingQueue.length < MAX_QUEUE_SIZE) {
-      pendingQueue.push(buffer)
-      console.log('消息加入队列，当前队列长度:', pendingQueue.length)
+    // 连接未建立，按优先级加入队列
+    const priority = getMessagePriority(wrapperObj)
+    const queue = priorityQueues[priority]
+    const totalQueued = Object.values(priorityQueues).reduce((sum, q) => sum + q.length, 0)
+    if (totalQueued < MAX_QUEUE_SIZE) {
+      queue.push(buffer)
+      console.log(`消息加入队列 (pri=${priority}), 总队列长度:`, totalQueued + 1)
     } else {
-      console.warn('消息队列已满，丢弃消息')
+      if (priority <= PRIORITY_NORMAL) {
+        // 高/中优先级踢掉最低优先级的消息
+        const lowQueue = priorityQueues[PRIORITY_LOW]
+        if (lowQueue.length > 0) {
+          lowQueue.shift()
+          queue.push(buffer)
+          console.log(`消息入队 (pri=${priority}), 踢掉一条低优先级消息`)
+        } else {
+          console.warn('消息队列已满，丢弃高优先级消息')
+        }
+      } else {
+        console.warn('消息队列已满，丢弃低优先级消息')
+      }
     }
     return false
   } catch (e) {
@@ -185,25 +228,29 @@ export async function sendWrapper(wrapperObj) {
 }
 
 /**
- * 刷新消息队列。
+ * 刷新消息队列（按优先级从高到低发送）。
  */
 function flushQueue() {
   if (!loggedIn) return
-  if (pendingQueue.length === 0) return
+  const total = Object.values(priorityQueues).reduce((sum, q) => sum + q.length, 0)
+  if (total === 0) return
 
-  console.log('发送队列中的消息，共', pendingQueue.length, '条')
-  const queue = [...pendingQueue]
-  pendingQueue = []
-
-  queue.forEach(buffer => {
-    if (transport && transport.isConnected()) {
-      transport.send(buffer)
-    } else {
-      if (pendingQueue.length < MAX_QUEUE_SIZE) {
-        pendingQueue.push(buffer)
+  console.log('发送队列中的消息，共', total, '条')
+  for (const priority of [PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW]) {
+    const queue = priorityQueues[priority]
+    while (queue.length > 0) {
+      const buffer = queue.shift()
+      if (transport && transport.isConnected()) {
+        transport.send(buffer)
+      } else {
+        // 发送失败时重新入队（但避免无限堆积）
+        if (priority <= PRIORITY_NORMAL) {
+          queue.unshift(buffer)
+        }
+        break
       }
     }
-  })
+  }
 }
 
 /**
@@ -236,8 +283,8 @@ export function close() {
   }
 
   pendingQueue = []
-  receivedMessageIds.clear()
-  messageIdQueue.length = 0
+  Object.values(priorityQueues).forEach(q => q.length = 0)
+  messageCache.clear()
   currentUserId = null
 }
 
@@ -391,15 +438,14 @@ async function handleMessage(rawData) {
     }
 
     if (messageId) {
-      if (receivedMessageIds.has(messageId)) {
+      if (messageCache.has(messageId)) {
         console.log('收到重复消息，忽略:', messageId)
         return
       }
-      receivedMessageIds.add(messageId)
-      messageIdQueue.push(messageId)
-      if (receivedMessageIds.size > MAX_MESSAGE_CACHE) {
-        const oldestId = messageIdQueue.shift()
-        receivedMessageIds.delete(oldestId)
+      messageCache.set(messageId, Date.now())
+      if (messageCache.size > MAX_MESSAGE_CACHE) {
+        const oldest = messageCache.entries().next().value
+        if (oldest) messageCache.delete(oldest[0])
       }
 
       if (isChatOrGroupMessage) {

@@ -10,67 +10,62 @@ import java.io.File
 
 /**
  * 本地数据源实现
- * 基于文件存储实现，后续可以替换为数据库实现
+ * 基于 AES-256/GCM 加密文件存储，防止本地数据泄露。
  */
 class LocalDataSourceImpl(
-    private val authFile: File = File(System.getProperty("user.home"), ".qingliao/auth.txt"),
-    private val credentialsFile: File = File("credentials.txt"),
-    private val friendsFile: File = File(System.getProperty("user.home"), ".qingliao/friends.json"),
-    private val groupsFile: File = File(System.getProperty("user.home"), ".qingliao/groups.json")
+    private val authFile: File = File(System.getProperty("user.home"), ".qingliao/auth.enc"),
+    private val friendsFile: File = File(System.getProperty("user.home"), ".qingliao/friends.enc"),
+    private val groupsFile: File = File(System.getProperty("user.home"), ".qingliao/groups.enc")
 ) : LocalDataSource {
+
+    // ── 写入辅助：加密后写入文件 ────────────────────
+
+    private fun writeEncrypted(file: File, text: String) {
+        file.parentFile?.mkdirs()
+        file.writeBytes(CryptoUtil.encrypt(text.encodeToByteArray()))
+    }
+
+    private fun readEncrypted(file: File): String? {
+        if (!file.exists()) return null
+        return String(CryptoUtil.decrypt(file.readBytes()))
+    }
+
+    // ── Auth 凭证（加密存储） ───────────────────────
 
     override suspend fun saveAuth(account: String, accessToken: String, refreshToken: String) {
         try {
-            authFile.parentFile?.mkdirs()
-            authFile.writeText("$account\n$accessToken\n$refreshToken")
+            writeEncrypted(authFile, "$account\n$accessToken\n$refreshToken")
         } catch (_: Exception) {
         }
     }
 
     override suspend fun getSavedAccount(): String? {
         return runCatching {
-            if (authFile.exists()) {
-                authFile.readLines().getOrNull(0)?.trim()
-            } else {
-                // 兼容旧的credentials文件
-                if (credentialsFile.exists()) {
-                    credentialsFile.readLines().getOrNull(0)?.trim()
-                } else {
-                    null
-                }
-            }
+            readEncrypted(authFile)?.lines()?.getOrNull(0)?.trim()
         }.getOrNull()
     }
 
     override suspend fun getSavedAccessToken(): String? {
         return runCatching {
-            if (authFile.exists()) {
-                authFile.readLines().getOrNull(1)?.trim()
-            } else {
-                null
-            }
+            readEncrypted(authFile)?.lines()?.getOrNull(1)?.trim()
         }.getOrNull()
     }
 
     override suspend fun getSavedRefreshToken(): String? {
         return runCatching {
-            if (authFile.exists()) {
-                authFile.readLines().getOrNull(2)?.trim()
-            } else {
-                null
-            }
+            readEncrypted(authFile)?.lines()?.getOrNull(2)?.trim()
         }.getOrNull()
     }
 
     override suspend fun clearAuth() {
         try {
             if (authFile.exists()) authFile.delete()
-            if (credentialsFile.exists()) credentialsFile.delete()
         } catch (_: Exception) {
         }
     }
 
-    // 以下方法暂未实现，后续可以逐步实现
+    // ── 用户、好友、群组数据（加密 JSON） ───────────
+
     override suspend fun saveUserProfile(user: User) {
         // TODO: 实现用户信息本地存储
     }
@@ -82,35 +77,27 @@ class LocalDataSourceImpl(
 
     override suspend fun saveFriends(friends: List<User>) {
         runCatching {
-            friendsFile.parentFile?.mkdirs()
-            friendsFile.writeText(json.encodeToString(friends))
+            writeEncrypted(friendsFile, json.encodeToString(friends))
         }
     }
 
     override suspend fun getFriends(): List<User> {
         return runCatching {
-            if (!friendsFile.exists()) {
-                emptyList()
-            } else {
-                json.decodeFromString<List<User>>(friendsFile.readText())
-            }
+            val text = readEncrypted(friendsFile) ?: return@runCatching emptyList<User>()
+            json.decodeFromString<List<User>>(text)
         }.getOrDefault(emptyList())
     }
 
     override suspend fun saveGroups(groups: List<User>) {
         runCatching {
-            groupsFile.parentFile?.mkdirs()
-            groupsFile.writeText(json.encodeToString(groups))
+            writeEncrypted(groupsFile, json.encodeToString(groups))
         }
     }
 
     override suspend fun getGroups(): List<User> {
         return runCatching {
-            if (!groupsFile.exists()) {
-                emptyList()
-            } else {
-                json.decodeFromString<List<User>>(groupsFile.readText())
-            }
+            val text = readEncrypted(groupsFile) ?: return@runCatching emptyList<User>()
+            json.decodeFromString<List<User>>(text)
         }.getOrDefault(emptyList())
     }
 

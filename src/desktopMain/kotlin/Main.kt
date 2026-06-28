@@ -26,8 +26,8 @@ import core.GlobalAppUpdateManager
 import core.ImageLoaderImpl
 import core.DesktopLocalChatHistoryStore
 import core.LocalChatHistoryStore
-import core.NettyWebSocketClient
 import core.Chat
+import core.di.desktopModule
 import component.DesktopAvatarCropDialog
 import component.dialog.AvatarCropDialogImpl
 import core.di.KoinInitializer
@@ -45,15 +45,15 @@ import component.settings.Platform as AppPlatform
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() = application {
-    // 初始化依赖注入
-    KoinInitializer.init()
+    // 初始化依赖注入（含桌面平台模块）并从 DI 获取 QUIC 传输层实例
+    val koin = KoinInitializer.init(platformModules = listOf(desktopModule)).koin
+    Chat = koin.get()
 
     // 初始化跨平台接口实现
     BackHandlerImpl = DesktopBackHandler
     FilePicker = DesktopFilePicker
     ImageLoaderImpl = DesktopImageLoader
     LocalChatHistoryStore = DesktopLocalChatHistoryStore
-    Chat = NettyWebSocketClient
     AvatarCropDialogImpl = DesktopAvatarCropDialog
 
     // 初始化平台信息

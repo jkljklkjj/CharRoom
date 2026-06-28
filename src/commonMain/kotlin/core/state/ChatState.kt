@@ -1,9 +1,5 @@
 package core.state
 
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -20,20 +16,31 @@ data class ConversationPreviewState(
  * 聊天状态
  * 管理用户列表、消息列表等聊天相关状态
  */
-class ChatState(
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate)
-) {
+class ChatState {
+    companion object {
+        /** 内存保留的最大私聊/群聊消息数，超出自动淘汰最旧消息 */
+        const val MAX_MESSAGES = 200
+    }
+
     // 用户列表（包含好友和群组）
     private val _users = MutableStateFlow<List<User>>(emptyList())
     val users: StateFlow<List<User>> = _users.asStateFlow()
 
-    // 私聊消息列表
-    private val _messages = MutableStateFlow<List<Message>>(emptyList())
-    val messages: StateFlow<List<Message>> = _messages.asStateFlow()
+    // 私聊消息列表（LRU 缓存自带 StateFlow，数据层直接驱动视图层）
+    private val _messageCache = MessageLruCache<Message>(
+        maxSize = MAX_MESSAGES,
+        id = { it.messageId },
+        timestamp = { it.timestamp }
+    )
+    val messages: StateFlow<List<Message>> = _messageCache.state
 
     // 群聊消息列表
-    private val _groupMessages = MutableStateFlow<List<GroupMessage>>(emptyList())
-    val groupMessages: StateFlow<List<GroupMessage>> = _groupMessages.asStateFlow()
+    private val _groupMessageCache = MessageLruCache<GroupMessage>(
+        maxSize = MAX_MESSAGES,
+        id = { it.messageId },
+        timestamp = { it.timestamp }
+    )
+    val groupMessages: StateFlow<List<GroupMessage>> = _groupMessageCache.state
 
     // 当前选中的聊天对象
     private val _selectedChatTarget = MutableStateFlow<User?>(null)
@@ -51,8 +58,14 @@ class ChatState(
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
-    // 状态修改互斥锁，保证线程安全
-    private val mutex = Mutex()
+    // 按领域拆分锁，减少互斥争用
+    private val usersMutex = Mutex()
+    private val messagesMutex = Mutex()
+    private val groupMessagesMutex = Mutex()
+    private val conversationStateMutex = Mutex()
+    private val seqIdMutex = Mutex()
+    private val loadingMutex = Mutex()
+    private val clearMutex = Mutex()
 
     private fun updateConversationStateLocked(
         conversationId: Int,
@@ -132,7 +145,7 @@ class ChatState(
     /**
      * 更新指定会话的 seqId，仅在新 seqId 大于旧 seqId 时更新。
      */
-    suspend fun updateConversationSeqId(conversationId: String, seqId: Long) = mutex.withLock {
+    suspend fun updateConversationSeqId(conversationId: String, seqId: Long) = seqIdMutex.withLock {
         val currentMap = _conversationSeqIds.value.toMutableMap()
         val oldSeqId = currentMap[conversationId]
         if (oldSeqId == null || seqId > oldSeqId) {
@@ -144,21 +157,21 @@ class ChatState(
     /**
      * 获取指定会话的当前 seqId，若不存在则返回 0。
      */
-    suspend fun getConversationSeqId(conversationId: String): Long = mutex.withLock {
+    suspend fun getConversationSeqId(conversationId: String): Long = seqIdMutex.withLock {
         _conversationSeqIds.value[conversationId] ?: 0L
     }
 
     /**
      * 清空所有会话的 seqId 跟踪。
      */
-    suspend fun clearConversationSeqIds() = mutex.withLock {
+    suspend fun clearConversationSeqIds() = seqIdMutex.withLock {
         _conversationSeqIds.value = emptyMap()
     }
 
     /**
      * 更新用户列表
      */
-    suspend fun updateUsers(newUsers: List<User>) = mutex.withLock {
+    suspend fun updateUsers(newUsers: List<User>) = usersMutex.withLock {
         if (_users.value == newUsers) return@withLock
         _users.value = newUsers
     }
@@ -167,7 +180,7 @@ class ChatState(
      * 全量替换联系人列表（保留顺序）。
      * 触发全量重组，仅用于初始加载。
      */
-    suspend fun replaceUsersPreservingOrder(newUsers: List<User>) = mutex.withLock {
+    suspend fun replaceUsersPreservingOrder(newUsers: List<User>) = usersMutex.withLock {
         val currentUsers = _users.value
         if (currentUsers == newUsers) return@withLock
 
@@ -193,7 +206,7 @@ class ChatState(
      * 只更新有变化的字段，不重建列表。
      * Compose LazyColumn + key 可保持 item 复用。
      */
-    suspend fun mergeUsers(incoming: List<User>) = mutex.withLock {
+    suspend fun mergeUsers(incoming: List<User>) = usersMutex.withLock {
         if (incoming.isEmpty()) return@withLock
         val current = _users.value.toMutableList()
         val existingMap = current.associateBy { it.id }.toMutableMap()
@@ -220,7 +233,7 @@ class ChatState(
     /**
      * 插入或更新单个联系人
      */
-    suspend fun upsertUser(user: User) = mutex.withLock {
+    suspend fun upsertUser(user: User) = usersMutex.withLock {
         val currentUsers = _users.value.toMutableList()
         val index = currentUsers.indexOfFirst { it.id == user.id }
         if (index == -1) {
@@ -234,7 +247,7 @@ class ChatState(
     /**
      * 批量插入或更新联系人
      */
-    suspend fun upsertUsers(users: List<User>) = mutex.withLock {
+    suspend fun upsertUsers(users: List<User>) = usersMutex.withLock {
         if (users.isEmpty()) return@withLock
         val currentUsers = _users.value.toMutableList()
         users.forEach { user ->
@@ -251,7 +264,7 @@ class ChatState(
     /**
      * 更新用户在线状态
      */
-    suspend fun updateUserOnlineStatus(userId: Int, online: Boolean) = mutex.withLock {
+    suspend fun updateUserOnlineStatus(userId: Int, online: Boolean) = usersMutex.withLock {
         _users.value = _users.value.map { user ->
             if (user.id == userId) user.copy(online = online) else user
         }
@@ -265,30 +278,21 @@ class ChatState(
     /**
      * 添加新的私聊消息（自动按时间戳排序插入）
      */
-    suspend fun addMessage(message: Message) = mutex.withLock {
+    suspend fun addMessage(message: Message) = messagesMutex.withLock {
         println("[ChatState] 添加私聊消息到状态: messageId=${message.messageId}, senderId=${message.senderId}, receiverId=${message.receiverId}, content=${message.message.take(50)}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
-        val currentMessages = _messages.value.toMutableList()
+        _messageCache.add(message)
 
-        // 查找插入位置：找到第一个时间戳比当前消息大的位置，插入到它前面
-        val insertIndex = currentMessages.indexOfFirst { it.timestamp > message.timestamp }
-        if (insertIndex == -1) {
-            // 所有消息都比当前早，追加到末尾
-            currentMessages.add(message)
-        } else {
-            // 插入到正确位置
-            currentMessages.add(insertIndex, message)
-        }
-
-        _messages.value = currentMessages
         val conversationId = privateConversationId(message)
         val shouldIncreaseUnread = !message.sender && _selectedChatTarget.value?.id != conversationId
-        updateConversationStateLocked(
-            conversationId = conversationId,
-            lastIncomingMessageTime = if (!message.sender) message.timestamp else null,
-            unreadDelta = if (shouldIncreaseUnread) 1 else 0
-        )
-        println("[ChatState] 插入位置: $insertIndex, 当前消息总数: ${currentMessages.size}")
+        conversationStateMutex.withLock {
+            updateConversationStateLocked(
+                conversationId = conversationId,
+                lastIncomingMessageTime = if (!message.sender) message.timestamp else null,
+                unreadDelta = if (shouldIncreaseUnread) 1 else 0
+            )
+        }
+        println("[ChatState] 添加完成, 当前消息总数: ${_messageCache.size}")
     }
 
     /**
@@ -297,92 +301,55 @@ class ChatState(
     suspend fun prependMessages(
         newMessages: List<Message>,
         markAsUnread: Boolean = false
-    ) = mutex.withLock {
-        if (newMessages.isEmpty()) return@withLock
-
-        val existingIds = _messages.value.map { it.messageId }.toSet()
-        val messagesToAdd = newMessages.filter { it.messageId !in existingIds }
-        if (messagesToAdd.isEmpty()) return@withLock
-
-        val currentMessages = _messages.value
-        if (currentMessages.isEmpty()) {
-            _messages.value = messagesToAdd
-            recordPrivateConversationHistoryLocked(messagesToAdd, markAsUnread)
-            println("[ChatState] 消息列表为空，直接添加 ${messagesToAdd.size} 条历史消息")
-            return@withLock
-        }
-
-        // 找到用户自己发的最早的消息位置（拉取离线期间用户发的消息）
-        val firstUserMessageIndex = currentMessages.indexOfFirst { it.senderId == GlobalAppState.currentUserId }
-
-        if (firstUserMessageIndex == -1) {
-            // 没有用户发的消息，直接插到最前面
-            _messages.value = messagesToAdd + currentMessages
-            recordPrivateConversationHistoryLocked(messagesToAdd, markAsUnread)
-            println("[ChatState] 无用户发送的消息，历史消息插入到最前面，总数: ${_messages.value.size}")
-        } else {
-            // 有用户发的消息，插到这些消息的前面，保证历史消息在旧消息和新消息之间
-            val firstPart = currentMessages.subList(0, firstUserMessageIndex)
-            val secondPart = currentMessages.subList(firstUserMessageIndex, currentMessages.size)
-            _messages.value = firstPart + messagesToAdd + secondPart
-            recordPrivateConversationHistoryLocked(messagesToAdd, markAsUnread)
-            println("[ChatState] 找到用户消息位置 $firstUserMessageIndex，历史消息插入到中间，总数: ${_messages.value.size}")
+    ) = messagesMutex.withLock {
+        _messageCache.prepend(newMessages)
+        conversationStateMutex.withLock {
+            recordPrivateConversationHistoryLocked(
+                newMessages.filter { _messageCache.snapshot.any { m -> m.messageId == it.messageId } },
+                markAsUnread
+            )
         }
     }
 
     /**
      * 更新消息发送状态
      */
-    suspend fun updateMessageSentStatus(messageId: String, isSent: Boolean) = mutex.withLock {
+    suspend fun updateMessageSentStatus(messageId: String, isSent: Boolean) = messagesMutex.withLock {
         println("[ChatState] 更新私聊消息发送状态: messageId=$messageId, isSent=$isSent")
-        _messages.value = _messages.value.map { message ->
-            if (message.messageId == messageId) {
-                message.copy(isSent = isSent)
-            } else {
-                message
-            }
+        val list = _messageCache.snapshot.toMutableList()
+        val idx = list.indexOfFirst { it.messageId == messageId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(isSent = isSent)
+            // 通过 add 重新入 cache（替换内容 + 提升 LRU）
+            _messageCache.add(list[idx])
         }
     }
 
     /**
      * 原位更新私聊消息（保持原有顺序，避免删除+新增导致的闪烁与排序抖动）
      */
-    suspend fun updateMessage(updatedMessage: Message) = mutex.withLock {
-        val currentMessages = _messages.value.toMutableList()
-        val index = currentMessages.indexOfFirst { it.messageId == updatedMessage.messageId }
-        if (index == -1) return@withLock
-
-        currentMessages[index] = updatedMessage
-        _messages.value = currentMessages
+    suspend fun updateMessage(updatedMessage: Message) = messagesMutex.withLock {
+        _messageCache.add(updatedMessage)
     }
 
     /**
      * 添加新的群聊消息（自动按时间戳排序插入）
      */
-    suspend fun addGroupMessage(message: GroupMessage) = mutex.withLock {
+    suspend fun addGroupMessage(message: GroupMessage) = groupMessagesMutex.withLock {
         println("[ChatState] 添加群聊消息到状态: messageId=${message.messageId}, groupId=${message.groupId}, senderId=${message.senderId}, senderName=${message.senderName}, content=${message.text.take(50)}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
-        val currentMessages = _groupMessages.value.toMutableList()
+        _groupMessageCache.add(message)
 
-        // 查找插入位置：找到第一个时间戳比当前消息大的位置，插入到它前面
-        val insertIndex = currentMessages.indexOfFirst { it.timestamp > message.timestamp }
-        if (insertIndex == -1) {
-            // 所有消息都比当前早，追加到末尾
-            currentMessages.add(message)
-        } else {
-            // 插入到正确位置
-            currentMessages.add(insertIndex, message)
-        }
-
-        _groupMessages.value = currentMessages
         val conversationId = groupConversationId(message)
         val shouldIncreaseUnread = message.senderId != GlobalAppState.currentUserId && _selectedChatTarget.value?.id != conversationId
-        updateConversationStateLocked(
-            conversationId = conversationId,
-            lastIncomingMessageTime = if (message.senderId != GlobalAppState.currentUserId) message.timestamp else null,
-            unreadDelta = if (shouldIncreaseUnread) 1 else 0
-        )
-        println("[ChatState] 插入位置: $insertIndex, 当前群消息总数: ${currentMessages.size}")
+        conversationStateMutex.withLock {
+            updateConversationStateLocked(
+                conversationId = conversationId,
+                lastIncomingMessageTime = if (message.senderId != GlobalAppState.currentUserId) message.timestamp else null,
+                unreadDelta = if (shouldIncreaseUnread) 1 else 0
+            )
+        }
+        println("[ChatState] 添加群聊消息完成, 当前群消息总数: ${_groupMessageCache.size}")
     }
 
     /**
@@ -391,57 +358,32 @@ class ChatState(
     suspend fun prependGroupMessages(
         newMessages: List<GroupMessage>,
         markAsUnread: Boolean = false
-    ) = mutex.withLock {
-        if (newMessages.isEmpty()) return@withLock
-
-        val existingIds = _groupMessages.value.map { it.messageId }.toSet()
-        val messagesToAdd = newMessages.filter { it.messageId !in existingIds }
-        if (messagesToAdd.isEmpty()) return@withLock
-
-        val currentMessages = _groupMessages.value
-        if (currentMessages.isEmpty()) {
-            _groupMessages.value = messagesToAdd
-            recordGroupConversationHistoryLocked(messagesToAdd, markAsUnread)
-            println("[ChatState] 群消息列表为空，直接添加 ${messagesToAdd.size} 条历史消息")
-            return@withLock
-        }
-
-        // 找到用户自己发的最早的消息位置（拉取离线期间用户发的消息）
-        val firstUserMessageIndex = currentMessages.indexOfFirst { it.senderId == GlobalAppState.currentUserId }
-
-        if (firstUserMessageIndex == -1) {
-            // 没有用户发的消息，直接插到最前面
-            _groupMessages.value = messagesToAdd + currentMessages
-            recordGroupConversationHistoryLocked(messagesToAdd, markAsUnread)
-            println("[ChatState] 无用户发送的群消息，历史消息插入到最前面，总数: ${_groupMessages.value.size}")
-        } else {
-            // 有用户发的消息，插到这些消息的前面，保证历史消息在旧消息和新消息之间
-            val firstPart = currentMessages.subList(0, firstUserMessageIndex)
-            val secondPart = currentMessages.subList(firstUserMessageIndex, currentMessages.size)
-            _groupMessages.value = firstPart + messagesToAdd + secondPart
-            recordGroupConversationHistoryLocked(messagesToAdd, markAsUnread)
-            println("[ChatState] 找到用户群消息位置 $firstUserMessageIndex，历史消息插入到中间，总数: ${_groupMessages.value.size}")
+    ) = groupMessagesMutex.withLock {
+        _groupMessageCache.prepend(newMessages)
+        conversationStateMutex.withLock {
+            recordGroupConversationHistoryLocked(
+                newMessages.filter { _groupMessageCache.snapshot.any { m -> m.messageId == it.messageId } },
+                markAsUnread
+            )
         }
     }
 
     /**
      * 更新群聊消息发送状态
      */
-    suspend fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) = mutex.withLock {
+    suspend fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) = groupMessagesMutex.withLock {
         println("[ChatState] 更新群聊消息发送状态: messageId=$messageId, isSent=$isSent")
-        _groupMessages.value = _groupMessages.value.map { message ->
-            if (message.messageId == messageId) {
-                message.copy(isSent = isSent)
-            } else {
-                message
-            }
+        val list = _groupMessageCache.snapshot.toMutableList()
+        val idx = list.indexOfFirst { it.messageId == messageId }
+        if (idx >= 0) {
+            _groupMessageCache.add(list[idx].copy(isSent = isSent))
         }
     }
 
     /**
      * 选择聊天对象
      */
-    suspend fun selectChatTarget(user: User?) = mutex.withLock {
+    suspend fun selectChatTarget(user: User?) = conversationStateMutex.withLock {
         _selectedChatTarget.value = user
         user?.let { targetUser ->
             val previousState = _conversationStates.value[targetUser.id]
@@ -452,33 +394,47 @@ class ChatState(
     }
 
     /**
+     * 标记私聊消息为最近访问（提升 LRU 位置，不改变时间排序）。
+     */
+    suspend fun touchMessage(messageId: String) = messagesMutex.withLock {
+        _messageCache.touch(messageId)
+    }
+
+    /**
+     * 标记群聊消息为最近访问。
+     */
+    suspend fun touchGroupMessage(messageId: String) = groupMessagesMutex.withLock {
+        _groupMessageCache.touch(messageId)
+    }
+
+    /**
      * 设置加载更多状态
      */
-    suspend fun setLoadingMore(loading: Boolean) = mutex.withLock {
+    suspend fun setLoadingMore(loading: Boolean) = loadingMutex.withLock {
         _isLoadingMore.value = loading
     }
 
     /**
      * 删除私聊消息
      */
-    suspend fun deleteMessage(messageId: String) = mutex.withLock {
-        _messages.value = _messages.value.filter { it.messageId != messageId }
+    suspend fun deleteMessage(messageId: String) = messagesMutex.withLock {
+        _messageCache.remove(messageId)
     }
 
     /**
      * 删除群聊消息
      */
-    suspend fun deleteGroupMessage(messageId: String) = mutex.withLock {
-        _groupMessages.value = _groupMessages.value.filter { it.messageId != messageId }
+    suspend fun deleteGroupMessage(messageId: String) = groupMessagesMutex.withLock {
+        _groupMessageCache.remove(messageId)
     }
 
     /**
      * 清空所有聊天数据（退出登录时调用）
      */
-    suspend fun clear() = mutex.withLock {
+    suspend fun clear() = clearMutex.withLock {
         _users.value = emptyList()
-        _messages.value = emptyList()
-        _groupMessages.value = emptyList()
+        _messageCache.clear()
+        _groupMessageCache.clear()
         _selectedChatTarget.value = null
         _isLoadingMore.value = false
         _conversationStates.value = emptyMap()

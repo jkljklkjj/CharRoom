@@ -1,9 +1,8 @@
 import core.ApiEndpoints
 import core.ServerConfig
 import core.agentChat
-import core.NettyWebSocketClient
 import core.QuicClientImpl
-import core.WebSocketClientProvider
+import core.ChatTransport
 import core.state.AuthState
 import core.state.GlobalAppState
 import data.datasource.local.LocalDataSourceImpl
@@ -22,8 +21,7 @@ class ChatLiteCli(private val args: Array<String>) {
     private var password = ""
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val localDataSource = LocalDataSourceImpl()
-    private var useQuic = true
-    private var transport: WebSocketClientProvider = NettyWebSocketClient
+    private var transport: ChatTransport = QuicClientImpl()
 
     suspend fun run() {
         parseArgs()
@@ -40,17 +38,11 @@ class ChatLiteCli(private val args: Array<String>) {
 
         println("登录成功，欢迎使用轻聊命令行客户端！输入 /help 查看所有命令")
 
-        // 传输层选择: QUIC (默认) 或 WebSocket
-        showWsStatus()
+        // QUIC 传输层初始化
+        showConnectionStatus()
         if (token.isNotBlank()) {
             ServerConfig.DEVICE_TYPE = "cli"
-            transport = if (useQuic) {
-                println("[QUIC] 使用 QUIC 协议")
-                QuicClientImpl()
-            } else {
-                println("[WS] 使用 WebSocket 协议")
-                NettyWebSocketClient
-            }
+            transport = QuicClientImpl()
             transport.addMessageReceiveListener(object : core.MessageReceiveListener {
                 override fun onPrivateMessageReceived(senderId: Int, msg: String, timestamp: Long) {
                     println("\n💬 [用户 $senderId]: $msg"); print("> ")
@@ -64,8 +56,8 @@ class ChatLiteCli(private val args: Array<String>) {
             }
             try {
                 transport.start()
-                println(if (useQuic) "[QUIC] 连接完成" else "[WS] 连接完成")
-            } catch (e: Exception) { println(if (useQuic) "[QUIC] $e" else "[WS] $e") }
+                println("[QUIC] 连接完成")
+            } catch (e: Exception) { println("[QUIC] $e") }
         }
 
         // 加载联系人
@@ -119,7 +111,7 @@ class ChatLiteCli(private val args: Array<String>) {
                 t.startsWith("/friend reject ") -> { val ok = GlobalChatRepository.rejectFriend(t.removePrefix("/friend reject ").trim()); println(if (ok) "OK" else "FAIL") }
                 t == "/group list" -> { val g = GlobalChatRepository.fetchGroups(); println("群组(${g.size}): ${g.joinToString { "${it.id}:${it.username}" }}") }
                 t.startsWith("/group join ") -> { val ok = GlobalChatRepository.addGroup(t.removePrefix("/group join ").trim()); println(if (ok) "OK" else "FAIL") }
-                t == "/status" -> showWsStatus()
+                t == "/status" -> showConnectionStatus()
                 t == "/help" -> printHelp()
                 t == "/exit" || t == "/quit" -> break
                 else -> handleAi(token, t)
@@ -132,9 +124,8 @@ class ChatLiteCli(private val args: Array<String>) {
         println(agentChat(token, content, stream = false))
     }
 
-    private fun showWsStatus() {
-        val proto = if (useQuic) "QUIC" else "WebSocket"
-        println("服务器: $serverUrl | $proto: ${if (transport.isConnected()) "🟢已连接" else "🔴未连接"} | 用户: ${GlobalAppState.currentAccount ?: "-"}")
+    private fun showConnectionStatus() {
+        println("服务器: $serverUrl | QUIC: ${if (transport.isConnected()) "🟢已连接" else "🔴未连接"} | 用户: ${GlobalAppState.currentAccount ?: "-"}")
     }
 
     private fun printHelp() {
@@ -159,18 +150,8 @@ class ChatLiteCli(private val args: Array<String>) {
                     core.ServerConfig.QUIC_PORT = args.getOrElse(i + 1) { "9443" }.toIntOrNull() ?: 9443
                     i++
                 }
-                "--quic-host" -> {
-                    val qhost = args.getOrElse(i + 1) { "" }
-                    if (qhost.isNotBlank()) {
-                        core.ServerConfig.SERVER_IP = qhost
-                        core.ServerConfig.QUIC_PORT = 9443
-                    }
-                    i++
-                }
                 "--username" -> { username = args.getOrElse(i + 1) { "" }; i++ }
                 "--password" -> { password = args.getOrElse(i + 1) { "" }; i++ }
-                "--quic" -> { useQuic = true }
-                "--no-quic" -> { useQuic = false }
             }
             i++
         }

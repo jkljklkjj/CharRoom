@@ -4,18 +4,21 @@ import model.GroupMessage
 import model.Message
 
 /**
- * WebSocket客户端接口
+ * 聊天传输层接口（QUIC 实现）。
+ *
+ * 管理连接生命周期、消息收发、监听器注册。
+ * 各平台通过 [Chat] 全局变量访问具体实现。
  */
-interface WebSocketClientProvider {
+interface ChatTransport {
     /**
-     * 启动WebSocket连接
+     * 建立连接并启动登录流程
      * @param host 服务器地址
      * @param port 服务器端口
      */
     fun start(host: String? = null, port: Int? = null)
 
     /**
-     * 停止WebSocket连接
+     * 停止连接
      */
     fun stop()
 
@@ -127,5 +130,5 @@ enum class MsgType(val wire: String) {
     RESPONSE("response"); // 通用响应消息
 }
 
-// 全局WebSocket客户端实现，由各平台初始化
-lateinit var Chat: WebSocketClientProvider
+// 全局传输层实现，由各平台入口初始化
+lateinit var Chat: ChatTransport

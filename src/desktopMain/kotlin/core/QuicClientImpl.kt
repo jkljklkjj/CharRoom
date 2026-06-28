@@ -8,14 +8,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * QUIC 协议客户端实现。
  *
- * 实现 [WebSocketClientProvider] 接口，通过 QUIC 自定义 Stream 协议通信。
+ * 实现 [ChatTransport] 接口，通过 QUIC 自定义 Stream 协议通信。
  * 内部委托给 [QuicNettyClient] 进行底层 QUIC 传输。
  *
  * 流分配策略：
  * - Stream 0: 控制流（登录/登出/心跳）
  * - Stream N (N>=1): 会话流（私聊/群聊/Agent），每个会话独立一条流
  */
-class QuicClientImpl : WebSocketClientProvider {
+class QuicClientImpl : ChatTransport {
 
     private val log = LoggerFactory.getLogger(QuicClientImpl::class.java)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())

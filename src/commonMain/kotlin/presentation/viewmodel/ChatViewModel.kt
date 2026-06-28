@@ -247,7 +247,7 @@ open class ChatViewModel(
     val groupRequests: StateFlow<List<User>> = _groupRequests.asStateFlow()
 
     /**
-     * 加载好友和群组列表
+     * 加载好友和群组列表 + 触发 SeqId 增量同步。
      */
     fun loadContacts() {
         coroutineScope.launch(Dispatchers.IO) {
@@ -259,6 +259,77 @@ open class ChatViewModel(
             val contacts = chatRepository.fetchAllContacts()
             if (contacts.isNotEmpty()) {
                 chatState.replaceUsersPreservingOrder(contacts)
+                // 联系人就绪后，触发 SeqId 增量同步
+                syncAllConversations(contacts)
+            }
+        }
+    }
+
+    /**
+     * SeqId 增量同步：为每个联系人会话拉取增量消息。
+     *
+     * 从服务端拉取自 [lastSeqId] 之后的新消息，合并到本地消息列表。
+     * 同步成功后更新本地 seqId 游标。
+     */
+    private suspend fun syncAllConversations(contacts: List<User>) {
+        val currentUserId = GlobalAppState.currentUserId ?: return
+        val token = GlobalAppState.currentToken ?: return
+
+        for (user in contacts) {
+            val conversationId: String
+            val isGroup: Boolean
+            if (user.id < 0) {
+                // 群组：ID 为负值，取绝对值
+                conversationId = "group:${-user.id}"
+                isGroup = true
+            } else {
+                // 私聊
+                val a = currentUserId.coerceAtMost(user.id)
+                val b = currentUserId.coerceAtLeast(user.id)
+                conversationId = "user:$a:$b"
+                isGroup = false
+            }
+
+            val lastSeqId = chatState.getConversationSeqId(conversationId)
+            if (lastSeqId <= 0L) continue // 从未同步过，跳过（首次由 fetchOfflineMessages 处理）
+
+            try {
+                val result = chatRepository.syncMessages(conversationId, lastSeqId, limit = 50)
+                if (result.messages.isEmpty() && result.serverSeqId <= 0L) continue
+
+                if (isGroup) {
+                    // 群聊消息：转为 GroupMessage 后 prepend
+                    val groupMessages = result.messages.map { msg ->
+                        GroupMessage(
+                            groupId = -user.id,
+                            senderName = msg.senderId.toString(),
+                            text = msg.message,
+                            senderId = msg.senderId,
+                            timestamp = msg.timestamp,
+                            isSent = true,
+                            messageId = msg.messageId,
+                            seqId = msg.seqId,
+                            conversationId = conversationId
+                        )
+                    }
+                    if (groupMessages.isNotEmpty()) {
+                        chatState.prependGroupMessages(groupMessages, markAsUnread = true)
+                    }
+                } else {
+                    // 私聊消息：直接 prepend
+                    if (result.messages.isNotEmpty()) {
+                        chatState.prependMessages(result.messages, markAsUnread = true)
+                    }
+                }
+
+                // 更新 seqId 游标
+                val newSeqId = maxOf(result.nextSeqId, result.serverSeqId)
+                if (newSeqId > 0L) {
+                    chatState.updateConversationSeqId(conversationId, newSeqId)
+                }
+                println("[ChatViewModel] SeqId 增量同步完成: conv=$conversationId, lastSeqId=$lastSeqId, newSeqId=$newSeqId, count=${result.messages.size}")
+            } catch (e: Exception) {
+                println("[ChatViewModel] SeqId 同步失败: conv=$conversationId, err=${e.message}")
             }
         }
     }
