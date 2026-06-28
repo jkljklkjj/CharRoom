@@ -197,13 +197,20 @@ export async function getOfflineMessages() {
  * 增量同步消息（基于 seqId 游标）。
  */
 export async function syncMessages(conversationId, lastSeqId, limit = 50) {
+  const deviceType = localStorage.getItem('charroom_deviceType') || 'web'
   const { ok, body } = await safeFetch(`${API_BASE}/sync/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversationId, lastSeqId, limit })
+    body: JSON.stringify({ conversationId, lastSeqId, limit, deviceType })
   })
   if (!ok || !body?.data) return { messages: [], nextSeqId: lastSeqId, hasMore: false }
   return body.data
+}
+
+export async function getMyGroups() {
+  const { ok, body } = await safeFetch(`${API_BASE}/group/get`, { method: 'GET' })
+  if (!ok) return []
+  return body?.data || body || []
 }
 
 export async function addFriend(account) {
@@ -379,6 +386,7 @@ export default {
   getFriends,
   getUserDetail,
   getGroupDetail,
+  getMyGroups,
   callAgentStream,
   sendVerifyCode,
   verifyRegister,

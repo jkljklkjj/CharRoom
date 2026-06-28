@@ -43,6 +43,10 @@ class ChatState(
     private val _conversationStates = MutableStateFlow<Map<Int, ConversationPreviewState>>(emptyMap())
     val conversationStates: StateFlow<Map<Int, ConversationPreviewState>> = _conversationStates.asStateFlow()
 
+    // 每个会话的 seqId 跟踪（用于消息去重和顺序保证）
+    private val _conversationSeqIds = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val conversationSeqIds: StateFlow<Map<String, Long>> = _conversationSeqIds.asStateFlow()
+
     // 加载更多历史消息状态
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
@@ -123,6 +127,32 @@ class ChatState(
                 updateConversationStateLocked(conversationId, unreadDelta = unreadCount)
             }
         }
+    }
+
+    /**
+     * 更新指定会话的 seqId，仅在新 seqId 大于旧 seqId 时更新。
+     */
+    suspend fun updateConversationSeqId(conversationId: String, seqId: Long) = mutex.withLock {
+        val currentMap = _conversationSeqIds.value.toMutableMap()
+        val oldSeqId = currentMap[conversationId]
+        if (oldSeqId == null || seqId > oldSeqId) {
+            currentMap[conversationId] = seqId
+            _conversationSeqIds.value = currentMap
+        }
+    }
+
+    /**
+     * 获取指定会话的当前 seqId，若不存在则返回 0。
+     */
+    suspend fun getConversationSeqId(conversationId: String): Long = mutex.withLock {
+        _conversationSeqIds.value[conversationId] ?: 0L
+    }
+
+    /**
+     * 清空所有会话的 seqId 跟踪。
+     */
+    suspend fun clearConversationSeqIds() = mutex.withLock {
+        _conversationSeqIds.value = emptyMap()
     }
 
     /**
@@ -452,6 +482,7 @@ class ChatState(
         _selectedChatTarget.value = null
         _isLoadingMore.value = false
         _conversationStates.value = emptyMap()
+        _conversationSeqIds.value = emptyMap()
     }
 }
 

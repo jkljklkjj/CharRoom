@@ -339,7 +339,97 @@ open class ChatViewModel(
     }
 
     /**
+     * 增量同步所有会话（基于 seqId 游标）。
+     * 对每个好友构建 conversationId，从服务器拉取增量消息，去重后加入消息列表。
+     */
+    open suspend fun syncAllConversations() {
+        println("[ChatViewModel] 开始增量同步所有会话")
+
+        val currentUserId = GlobalAppState.currentUserId ?: run {
+            println("[ChatViewModel] 当前用户ID为空，跳过同步")
+            return
+        }
+
+        // 1. 从本地存储恢复 seqId 游标
+        try {
+            val savedSeqIds = LocalChatHistoryStore.restoreConversationSeqIds()
+            if (savedSeqIds.isNotEmpty()) {
+                for ((convId, seqId) in savedSeqIds) {
+                    chatState.updateConversationSeqId(convId, seqId)
+                }
+                println("[ChatViewModel] 从本地恢复了 ${savedSeqIds.size} 个会话的 seqId 游标")
+            }
+        } catch (e: Exception) {
+            println("[ChatViewModel] 恢复 seqId 游标失败: ${e.message}")
+        }
+
+        // 2. 获取好友列表
+        val friends = try {
+            chatRepository.fetchFriends()
+        } catch (e: Exception) {
+            println("[ChatViewModel] 获取好友列表失败: ${e.message}")
+            return
+        }
+
+        println("[ChatViewModel] 开始同步 ${friends.size} 个好友的会话")
+
+        // 3. 对每个好友进行增量同步
+        for (friend in friends) {
+            val smallId = minOf(currentUserId, friend.id)
+            val bigId = maxOf(currentUserId, friend.id)
+            val conversationId = "user:$smallId:$bigId"
+
+            var lastSeqId = chatState.getConversationSeqId(conversationId)
+            var hasMore = true
+            var pageCount = 0
+
+            while (hasMore) {
+                try {
+                    val result = chatRepository.syncMessages(conversationId, lastSeqId, 50)
+                    if (result.messages.isEmpty()) break
+
+                    pageCount++
+                    // 去重：过滤掉已存在的消息
+                    val existingIds = chatState.messages.value.map { it.messageId }.toSet()
+                    val newMessages = result.messages.filter { it.messageId !in existingIds }
+
+                    println("[ChatViewModel] 会话 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条, lastSeqId=$lastSeqId, nextSeqId=${result.nextSeqId}, hasMore=${result.hasMore}")
+
+                    // 按时间戳顺序逐条插入
+                    for (msg in newMessages) {
+                        chatState.addMessage(msg)
+                    }
+
+                    // 更新该会话的 seqId 游标
+                    if (result.nextSeqId > lastSeqId) {
+                        chatState.updateConversationSeqId(conversationId, result.nextSeqId)
+                        lastSeqId = result.nextSeqId
+                    }
+
+                    hasMore = result.hasMore && result.messages.size >= 50
+                } catch (e: Exception) {
+                    println("[ChatViewModel] 同步会话 $conversationId 失败: ${e.message}")
+                    break
+                }
+            }
+        }
+
+        // 4. 持久化 seqId 游标
+        try {
+            LocalChatHistoryStore.saveConversationSeqIds(chatState.conversationSeqIds.value)
+            println("[ChatViewModel] seqId 游标已持久化到本地存储")
+        } catch (e: Exception) {
+            println("[ChatViewModel] 持久化 seqId 游标失败: ${e.message}")
+        }
+
+        // 5. 保存消息到本地存储
+        saveChatHistoryToLocal()
+        println("[ChatViewModel] 增量同步完成")
+    }
+
+    /**
      * 分页拉取离线消息（每次拉取50条，自动处理顺序问题）
+     * 保留作为降级回退方案
      */
     open suspend fun fetchOfflineMessages(page: Int = 0, pageSize: Int = 50): Boolean {
         if (isFetchingOfflineMessages) {

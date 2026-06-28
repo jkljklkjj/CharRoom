@@ -5,6 +5,7 @@ const STORAGE_PREFIX = 'charroom_chat_history_'
 
 const state = reactive({
   users: [],
+  groups: [],
   messages: [],
   groupMessages: [],
   conversationStates: {},
@@ -293,6 +294,10 @@ function setUsers(list) {
   rebuildConversationStates()
 }
 
+function setGroups(list) {
+  state.groups = list
+}
+
 /**
  * 增量合并用户列表。
  * 保留已有对象的引用，只更新变化的字段。
@@ -423,6 +428,13 @@ function addMessage(m) {
     })
   }
   savePrivateMessage(m)
+  // 如果消息带 seqId，更新会话的已同步游标
+  if (m.seqId != null) {
+    const partnerId = chatId
+    const ids = [Number(state.accountId), Number(partnerId)].sort((a, b) => a - b)
+    const convId = 'user:' + ids[0] + ':' + ids[1]
+    setConversationSeqId(convId, m.seqId)
+  }
 }
 function addGroupMessage(m) {
   const conversationId = `-${m.groupId}`
@@ -436,6 +448,11 @@ function addGroupMessage(m) {
     })
   }
   saveGroupMessage(m)
+  // 如果消息带 seqId，更新群聊会话的已同步游标
+  if (m.seqId != null) {
+    const convId = 'group:' + m.groupId
+    setConversationSeqId(convId, m.seqId)
+  }
 }
 function setSelectedChat(id) {
   loadConversation(id, Number(id) < 0)
@@ -480,6 +497,7 @@ function clearAll() {
     try { localStorage.removeItem(`charroom_seqids_${state.accountId}`) } catch (_) {}
   }
   state.users = []
+  state.groups = []
   state.messages = []
   state.groupMessages = []
   state.conversationStates = {}
@@ -496,6 +514,7 @@ export function useStore() {
     setRefreshToken,
     setAccountId,
     setUsers,
+    setGroups,
     addUser,
     removeUser,
     addMessage,

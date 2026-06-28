@@ -604,6 +604,7 @@ suspend fun getOfflineMessages(token: String): List<Message> {
 data class SyncMessagesResult(
     val messages: List<Message> = emptyList(),
     val nextSeqId: Long = 0L,
+    val serverSeqId: Long = 0L,
     val hasMore: Boolean = false
 )
 

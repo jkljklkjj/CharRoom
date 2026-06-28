@@ -92,6 +92,18 @@ interface LocalChatHistoryStoreProvider {
      * @return 是否清除成功
      */
     fun clearAll(): Boolean
+
+    /**
+     * 保存会话 seqId 游标（增量同步用）
+     * @param ids conversationId -> seqId 映射
+     */
+    fun saveConversationSeqIds(ids: Map<String, Long>)
+
+    /**
+     * 恢复会话 seqId 游标
+     * @return conversationId -> seqId 映射
+     */
+    fun restoreConversationSeqIds(): Map<String, Long>
 }
 
 /**

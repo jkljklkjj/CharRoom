@@ -208,6 +208,32 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(false)
     }
 
+    override fun saveConversationSeqIds(ids: Map<String, Long>) {
+        if (!this::context.isInitialized) return
+        runCatching {
+            val prefs = context.getSharedPreferences("conversation_seq_ids", Context.MODE_PRIVATE)
+            val json = JSONObject()
+            ids.forEach { (key, value) -> json.put(key, value) }
+            prefs.edit().putString("seq_ids", json.toString()).apply()
+        }.onFailure {
+            it.printStackTrace()
+        }
+    }
+
+    override fun restoreConversationSeqIds(): Map<String, Long> {
+        if (!this::context.isInitialized) return emptyMap()
+        return runCatching {
+            val prefs = context.getSharedPreferences("conversation_seq_ids", Context.MODE_PRIVATE)
+            val jsonStr = prefs.getString("seq_ids", null) ?: return@runCatching emptyMap()
+            val json = JSONObject(jsonStr)
+            val result = mutableMapOf<String, Long>()
+            json.keys().forEach { key ->
+                result[key] = json.optLong(key, 0L)
+            }
+            result
+        }.getOrDefault(emptyMap())
+    }
+
     // 内部方法
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {

@@ -173,14 +173,14 @@ function handleIncomingMessage(msg) {
   }
 }
 
-/** 建立 WebTransport 连接 */
 /** 登录后拉取所有会话的离线消息 */
 async function syncAllConversations() {
   const friends = store.state.users
   if (!friends || friends.length === 0) return
-  console.log("📡 拉取离线消息，共", friends.length, "个会话")
+  console.log("📡 拉取离线消息，共", friends.length, "个私聊会话")
   for (const friend of friends) {
-    const convId = store.state.accountId + ":" + friend.id
+    const ids = [Number(store.state.accountId), Number(friend.id)].sort((a, b) => a - b)
+    const convId = 'user:' + ids[0] + ':' + ids[1]
     const seqId = store.getConversationSeqId(convId) || 0
     try {
       const result = await api.syncMessages(convId, seqId, 100)
@@ -188,10 +188,11 @@ async function syncAllConversations() {
         console.log("📩 会话", convId, "拉取到", result.messages.length, "条新消息")
         for (const msg of result.messages) {
           store.addMessage({
-            user: String(msg.senderId),
+            user: String(msg.senderId === store.state.accountId ? 'you' : msg.senderId),
             text: msg.message,
             time: msg.timestamp,
-            targetId: String(msg.senderId === store.state.accountId ? msg.receiverId : msg.senderId)
+            targetId: String(msg.senderId === store.state.accountId ? msg.receiverId : msg.senderId),
+            seqId: msg.seqId
           })
         }
         store.setConversationSeqId(convId, result.nextSeqId)
@@ -200,6 +201,35 @@ async function syncAllConversations() {
       console.warn("⚠️ 拉取会话", convId, "失败:", e.message)
     }
   }
+
+  // 同步群聊消息
+  const groups = store.state.groups
+  if (groups && groups.length > 0) {
+    console.log("📡 拉取群聊消息，共", groups.length, "个群")
+    for (const group of groups) {
+      const convId = 'group:' + group.id
+      const seqId = store.getConversationSeqId(convId) || 0
+      try {
+        const result = await api.syncMessages(convId, seqId, 50)
+        if (result.messages && result.messages.length > 0) {
+          console.log("📩 群聊", convId, "拉取到", result.messages.length, "条新消息")
+          for (const msg of result.messages) {
+            store.addGroupMessage({
+              user: String(msg.senderId),
+              text: msg.message,
+              time: msg.timestamp,
+              groupId: String(group.id),
+              seqId: msg.seqId
+            })
+          }
+          store.setConversationSeqId(convId, result.nextSeqId)
+        }
+      } catch (e) {
+        console.warn("⚠️ 拉取群聊", convId, "失败:", e.message)
+      }
+    }
+  }
+
   console.log("✅ 离线消息拉取完成")
 }
 
@@ -266,6 +296,10 @@ async function initUserSession(accessToken, refreshToken) {
   const friends = await api.getFriends()
   store.mergeUsers(friends || [])   // 静默 merge，不重建 DOM
   store.cacheUsers(friends || [])   // 缓存到 localStorage
+
+  // 获取用户的群聊列表
+  const myGroups = await api.getMyGroups()
+  store.setGroups(myGroups || [])
 
   connectChat(accessToken, userRes.id)
   syncAllConversations()

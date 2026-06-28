@@ -145,9 +145,9 @@ fun ChatApp(
         // 加载本地聊天历史
         chatViewModel.loadLocalChatHistory()
 
-        // 拉取离线消息（后台异步执行）
+        // 增量同步所有会话（后台异步执行）
         scope.launch(Dispatchers.IO) {
-            chatViewModel.fetchOfflineMessages()
+            chatViewModel.syncAllConversations()
         }
 
         // 拉取好友和群聊请求

@@ -193,6 +193,32 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(false)
     }
 
+    override fun saveConversationSeqIds(ids: Map<String, Long>) {
+        runCatching {
+            val userHome = System.getProperty("user.home")
+            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            if (!folder.exists()) folder.mkdirs()
+            val file = java.io.File(folder, "seq_ids.json")
+            file.writeText(objectMapper.writeValueAsString(ids))
+        }.onFailure {
+            it.printStackTrace()
+        }
+    }
+
+    override fun restoreConversationSeqIds(): Map<String, Long> {
+        return runCatching {
+            val userHome = System.getProperty("user.home")
+            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            val file = java.io.File(folder, "seq_ids.json")
+            if (!file.exists()) return@runCatching emptyMap()
+            val text = file.readText()
+            if (text.isBlank()) return@runCatching emptyMap()
+            objectMapper.readValue(text, objectMapper.typeFactory.constructMapType(
+                Map::class.java, String::class.java, Long::class.javaObjectType
+            ))
+        }.getOrDefault(emptyMap())
+    }
+
     // 内部方法
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
