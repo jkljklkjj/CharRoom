@@ -414,7 +414,58 @@ open class ChatViewModel(
             }
         }
 
-        // 4. 持久化 seqId 游标
+        // 4. 增量同步群聊消息
+        try {
+            val groups = chatRepository.fetchGroups()
+            println("[ChatViewModel] 开始同步 ${groups.size} 个群聊")
+            for (group in groups) {
+                val conversationId = "group:${group.id}"
+                var lastSeqId = chatState.getConversationSeqId(conversationId)
+                var hasMore = true
+                var pageCount = 0
+
+                while (hasMore) {
+                    try {
+                        val result = chatRepository.syncMessages(conversationId, lastSeqId, 50)
+                        if (result.messages.isEmpty()) break
+
+                        pageCount++
+                        val existingIds = chatState.groupMessages.value.map { it.messageId }.toSet()
+                        val newMessages = result.messages.filter { it.messageId !in existingIds }
+
+                        println("[ChatViewModel] 群聊 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条")
+
+                        for (msg in newMessages) {
+                            val groupMsg = GroupMessage(
+                                groupId = group.id,
+                                senderName = "",
+                                text = msg.message,
+                                senderId = msg.senderId,
+                                timestamp = msg.timestamp,
+                                messageId = msg.messageId,
+                                seqId = msg.seqId,
+                                conversationId = conversationId
+                            )
+                            chatState.addGroupMessage(groupMsg)
+                        }
+
+                        if (result.nextSeqId > lastSeqId) {
+                            chatState.updateConversationSeqId(conversationId, result.nextSeqId)
+                            lastSeqId = result.nextSeqId
+                        }
+
+                        hasMore = result.hasMore && result.messages.size >= 50
+                    } catch (e: Exception) {
+                        println("[ChatViewModel] 同步群聊 $conversationId 失败: ${e.message}")
+                        break
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            println("[ChatViewModel] 获取群聊列表失败: ${e.message}")
+        }
+
+        // 6. 持久化 seqId 游标
         try {
             LocalChatHistoryStore.saveConversationSeqIds(chatState.conversationSeqIds.value)
             println("[ChatViewModel] seqId 游标已持久化到本地存储")
@@ -422,7 +473,7 @@ open class ChatViewModel(
             println("[ChatViewModel] 持久化 seqId 游标失败: ${e.message}")
         }
 
-        // 5. 保存消息到本地存储
+        // 7. 保存消息到本地存储
         saveChatHistoryToLocal()
         println("[ChatViewModel] 增量同步完成")
     }

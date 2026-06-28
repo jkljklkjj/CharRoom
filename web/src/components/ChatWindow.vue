@@ -80,7 +80,7 @@
 
     <!-- 未选中好友时的占位 -->
     <div class="empty-placeholder" v-if="currentChatId === null">
-      <div class="placeholder-text">{{ $t('chat.selectContactHint') }}</div>
+      <div class="placeholder-text"></div>
     </div>
 
     <!-- 输入框：只要选中会话就显示 -->
@@ -102,7 +102,7 @@
         <textarea
           v-model="text"
           ref="messageInput"
-          :placeholder="$t('chat.inputPlaceholder')"
+          placeholder=""
           rows="1"
           @keydown.enter.exact.prevent="send"
           @input="autoResize"
