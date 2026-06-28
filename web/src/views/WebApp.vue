@@ -255,12 +255,19 @@ function clearAuth() {
   store.setLoginValid(false)
 }
 
-function logout() {
+async function logout() {
+  try {
+    await chatSocket.sendWrapper({
+      type: 'logout',
+      logout: { userId: String(store.state.accountId) }
+    })
+  } catch (_) {}
   chatSocket.close()
   store.clearAll()
   clearAuth()
   store.setSelectedChat(null)
   showSettings.value = false
+  router.push('/')
 }
 
 /** 保存登录凭证到本地 */

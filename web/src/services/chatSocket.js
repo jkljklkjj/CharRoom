@@ -147,8 +147,8 @@ async function sendLogin(token) {
       type: 'login',
       login: {
         token: token,
-        device_type: getDeviceType(),
-        device_id: getDeviceId()
+        deviceType: getDeviceType(),
+        deviceId: getDeviceId()
       }
     })
     console.log('📤 登录消息已发送, 结果:', result)
