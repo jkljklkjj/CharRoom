@@ -45,7 +45,8 @@ fun MessageLongPressMenu(
     onCopy: () -> Unit,
     onDelete: () -> Unit,
     onForward: () -> Unit,
-    onReply: () -> Unit
+    onReply: () -> Unit,
+    onShare: (() -> Unit)? = null
 ) {
     if (!expanded) return
     val s = LocalStrings.current
@@ -87,6 +88,24 @@ fun MessageLongPressMenu(
                         Icon(Icons.Default.ContentCopy, contentDescription = s["message.copy"], modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(s["message.copy"], style = MaterialTheme.typography.body1)
+                    }
+
+                    // 分享消息（平台相关：桌面端用 java.awt.Desktop，Android 用 Intent）
+                    if (onShare != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onShare()
+                                    onDismiss()
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = s["message.share"], modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(s["message.share"], style = MaterialTheme.typography.body1)
+                        }
                     }
 
                     Row(

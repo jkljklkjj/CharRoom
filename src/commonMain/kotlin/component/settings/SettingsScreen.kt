@@ -25,13 +25,16 @@ import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.RadioButton
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Settings
@@ -50,9 +53,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import core.AppConfig
+import core.AppSettings
 import core.GlobalAppUpdateManager
-import core.UpdateState
 import core.LocalChatHistoryStore
+import core.ThemeMode
+import core.UpdateState
 import core.model.AppVersionInfo
 import core.state.GlobalAppState
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +94,8 @@ fun SettingsScreen(
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showUpdateProgressDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var latestVersionInfo: AppVersionInfo? by remember { mutableStateOf(null) }
     var updateError: String? by remember { mutableStateOf(null) }
 
@@ -165,6 +172,38 @@ fun SettingsScreen(
                 title = s["settings.token.quota"],
                 subtitle = s["settings.token.quota.subtitle"],
                 onClick = onQuotaClick
+            )
+
+            // Theme
+            val themeMode by AppSettings.themeMode.collectAsState()
+            SettingItem(
+                icon = Icons.Default.Palette,
+                title = s["settings.theme"],
+                subtitle = s["settings.theme.subtitle"].format(
+                    when (themeMode) {
+                        ThemeMode.SYSTEM -> s["settings.theme.follow.system"]
+                        ThemeMode.LIGHT -> s["settings.theme.light"]
+                        ThemeMode.DARK -> s["settings.theme.dark"]
+                    }
+                ),
+                onClick = { showThemeDialog = true }
+            )
+
+            // Language
+            val language by AppSettings.language.collectAsState()
+            val effectiveLanguage = AppSettings.getEffectiveLanguage()
+            SettingItem(
+                icon = Icons.Default.Language,
+                title = s["settings.language"],
+                subtitle = s["settings.language.subtitle"].format(
+                    when (effectiveLanguage) {
+                        "zh" -> s["settings.language.zh"]
+                        "en" -> s["settings.language.en"]
+                        "ja" -> s["settings.language.ja"]
+                        else -> s["settings.language.en"]
+                    }
+                ),
+                onClick = { showLanguageDialog = true }
             )
 
             // Check for updates
@@ -457,6 +496,102 @@ fun SettingsScreen(
                     }) {
                         Text(s["settings.cancel"])
                     }
+                }
+            }
+        )
+    }
+
+    // ── Theme selection dialog ──
+    if (showThemeDialog) {
+        val currentTheme by AppSettings.themeMode.collectAsState()
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            title = { Text(s["settings.theme"]) },
+            text = {
+                Column {
+                    ThemeMode.entries.forEach { mode ->
+                        val label = when (mode) {
+                            ThemeMode.SYSTEM -> s["settings.theme.follow.system"]
+                            ThemeMode.LIGHT -> s["settings.theme.light"]
+                            ThemeMode.DARK -> s["settings.theme.dark"]
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    AppSettings.setThemeMode(mode)
+                                    showThemeDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = currentTheme == mode,
+                                onClick = {
+                                    AppSettings.setThemeMode(mode)
+                                    showThemeDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.body1
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showThemeDialog = false }) {
+                    Text(s["settings.confirm"])
+                }
+            }
+        )
+    }
+
+    // ── Language selection dialog ──
+    if (showLanguageDialog) {
+        val currentLang by AppSettings.language.collectAsState()
+        val langOptions = listOf(
+            "zh" to s["settings.language.zh"],
+            "en" to s["settings.language.en"],
+            "ja" to s["settings.language.ja"]
+        )
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(s["settings.language"]) },
+            text = {
+                Column {
+                    langOptions.forEach { (code, displayName) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    AppSettings.setLanguage(code)
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = currentLang == code,
+                                onClick = {
+                                    AppSettings.setLanguage(code)
+                                    showLanguageDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = displayName,
+                                style = MaterialTheme.typography.body1
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(s["settings.confirm"])
                 }
             }
         )

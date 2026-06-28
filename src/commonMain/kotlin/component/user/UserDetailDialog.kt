@@ -149,6 +149,9 @@ fun UserDetailDialog(
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         DetailDialogRow(s["user.dialog.user.id"], user.id.toString())
+                        user.email?.takeIf { it.isNotBlank() }?.let { email ->
+                            DetailDialogRow(s["user.detail.email"], email)
+                        }
                     }
                 }
             }

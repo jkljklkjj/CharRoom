@@ -4,7 +4,7 @@
     <header class="chat-top" v-if="!isMobile && currentChatId !== null">
       <span class="chat-top-title">{{ currentChatTitle }}</span>
       <div class="chat-top-actions" v-if="!isGroupChat">
-        <button class="chat-top-btn" @click="toggleFriendMenu" title="好友操作">⋯</button>
+        <button class="chat-top-btn" @click.stop="toggleFriendMenu" title="好友操作">⋯</button>
         <div v-if="showFriendMenu" class="friend-dropdown" @click.stop>
           <div class="dropdown-item" @click="showFriendInfo">{{ $t('chat.info') }}</div>
           <div class="dropdown-item danger" @click="confirmDeleteFriend">{{ $t('chat.deleteFriend') }}</div>
@@ -228,10 +228,11 @@ function scrollToBottom(animate = false) {
   nextTick(() => {
     const el = msgList.value
     if (!el) return
+    const target = el.scrollHeight - el.clientHeight
     if (animate) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+      el.scrollTo({ top: target, behavior: 'smooth' })
     } else {
-      el.scrollTop = el.scrollHeight
+      el.scrollTop = target
     }
   })
 }

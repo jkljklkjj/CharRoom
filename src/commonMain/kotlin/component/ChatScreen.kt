@@ -947,7 +947,8 @@ private fun ChatScreenContent(
                                         onReply = {
                                             replyToMessage = message
                                             showLongPressMenu = false
-                                        }
+                                        },
+                                        onShare = { shareText(message.message) }
                                     )
                                 }
                             }

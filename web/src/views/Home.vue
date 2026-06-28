@@ -259,7 +259,7 @@ function handleDownload(url) {
 }
 
 onMounted(() => {
-  loadFriendRequests()
+  // 好友请求在点击按钮时按需加载，避免未登录时 401
 })
 </script>
 <style>

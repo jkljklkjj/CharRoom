@@ -1,66 +1,78 @@
 <template>
-  <div class="quota-overlay" @click.self="$emit('close')">
+  <div class="quota-overlay" @click.self="close">
     <div class="quota-dialog">
-      <div class="quota-header">
-        <h3>{{ $t('quota.title') }}</h3>
-        <button class="close-btn" @click="close">&times;</button>
-      </div>
+      <button class="close-btn" @click="close">✕</button>
 
       <div class="quota-body" v-if="!loading">
-        <!-- 余额 -->
-        <div class="balance-section">
+        <!-- 余额卡片 -->
+        <div class="balance-card">
+          <div class="balance-glow"></div>
           <div class="balance-label">{{ $t('quota.balance') }}</div>
-          <div class="balance-value">{{ quota?.balanceFen ? (quota.balanceFen / 100).toFixed(2) : '0.00' }}<span class="unit">元</span></div>
+          <div class="balance-value">
+            <span class="amount">{{ ((quota?.balanceFen || 0) / 100).toFixed(2) }}</span>
+            <span class="unit">元</span>
+          </div>
+          <div class="balance-sub">
+            免费剩余 {{ ((quota?.freeRemainingFen || 0) / 100).toFixed(2) }} 元
+          </div>
         </div>
 
-        <!-- 每周免费 -->
-        <div class="quota-section">
-          <h4>{{ $t('quota.weekly') }}</h4>
-          <div class="free-row">
-            <span class="free-label">{{ $t('quota.freeRemaining') }}</span>
-            <span class="free-value">{{ quota?.freeRemainingFen ? (quota.freeRemainingFen / 100).toFixed(2) : '0.00' }} 元</span>
+        <!-- 本周免费额度 -->
+        <div class="weekly-section">
+          <div class="section-header">
+            <span class="section-icon">🎁</span>
+            <span>{{ $t('quota.weekly') }}</span>
           </div>
           <div class="free-bar-wrap">
             <div class="free-bar" :style="{ width: freePct + '%' }"></div>
           </div>
-          <div class="used-row">
-            <span>{{ $t('quota.thisWeekUsed') }}: {{ quota?.weeklyCostFen ? (quota.weeklyCostFen / 100).toFixed(2) : '0.00' }} 元</span>
-            <span>{{ fmt(quota?.weeklyInputUsed) }} in / {{ fmt(quota?.weeklyOutputUsed) }} out</span>
+          <div class="free-stats">
+            <span class="stat">{{ $t('quota.freeRemaining') }} {{ ((quota?.freeRemainingFen || 0) / 100).toFixed(2) }} 元</span>
+            <span class="stat">本周已用 {{ ((quota?.weeklyCostFen || 0) / 100).toFixed(2) }} 元</span>
           </div>
         </div>
 
         <!-- 购买 -->
         <div class="purchase-section" v-if="!qrCodeUrl">
-          <h4>{{ $t('quota.purchaseTitle') }}</h4>
-          <div class="price-info">
-            <span>输入 1.2元/百万 &middot; 输出 2.5元/百万</span>
+          <div class="section-header">
+            <span class="section-icon">⚡</span>
+            <span>充值</span>
           </div>
-          <div class="amount-presets">
+          <div class="amount-grid">
             <button v-for="a in presets" :key="a" :class="{ active: purchaseAmount === a }"
-              @click="purchaseAmount = a">{{ a }}元</button>
+              @click="purchaseAmount = a">
+              <span class="amount-num">{{ a }}</span>
+              <span class="amount-unit">元</span>
+            </button>
           </div>
-          <div class="custom-amount">
+          <div class="custom-row">
+            <span class="custom-prefix">¥</span>
             <input v-model.number="purchaseAmount" type="number" min="1" placeholder="自定义金额" />
           </div>
-          <div class="purchase-hint" v-if="purchaseAmount > 0">
-            约可消耗 输入{{ (purchaseAmount / 1.2 * 100).toFixed(0) }}万 / 输出{{ (purchaseAmount / 2.5 * 100).toFixed(0) }}万
-          </div>
           <button class="buy-btn" @click="doPurchase" :disabled="purchasing || purchaseAmount <= 0">
-            {{ purchasing ? $t('quota.processing') : $t('quota.buy') }}
+            <span v-if="purchasing" class="btn-loading"></span>
+            <span v-else>立即充值</span>
           </button>
         </div>
 
         <!-- 支付二维码 -->
         <div class="qr-section" v-if="qrCodeUrl">
-          <h4>{{ $t('quota.scanPay') }}</h4>
-          <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrCodeUrl)" />
-          <p class="qr-hint">{{ $t('quota.scanHint') }}</p>
-          <button class="check-btn" @click="checkPayment">{{ $t('quota.checkPayment') }}</button>
+          <div class="qr-card">
+            <div class="qr-icon">📱</div>
+            <p class="qr-title">微信支付</p>
+            <div class="qr-img-wrap">
+              <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=' + encodeURIComponent(qrCodeUrl)" />
+            </div>
+            <p class="qr-hint">请使用微信扫描二维码支付</p>
+            <button class="check-btn" @click="checkPayment">已完成支付</button>
+          </div>
         </div>
 
         <div v-if="err" class="err-msg">{{ err }}</div>
       </div>
-      <div v-else class="quota-loading">{{ $t('quota.loading') }}</div>
+      <div v-else class="quota-loading">
+        <div class="loading-spinner"></div>
+      </div>
     </div>
   </div>
 </template>
@@ -92,13 +104,9 @@ onMounted(async () => {
 
 const freePct = computed(() => {
   if (!quota.value) return 0
-  return Math.min(quota.value.freeRemainingFen / 400 * 100, 100)
+  return Math.min((quota.value.freeRemainingFen || 0) / 400 * 100, 100)
 })
-function fmt(n) {
-  if (n == null) return '0'
-  if (n >= 10000) return (n / 10000).toFixed(1) + '万'
-  return String(n)
-}
+
 function close() {
   if (!purchasing.value) emit('close')
 }
@@ -114,7 +122,6 @@ async function doPurchase() {
       currentPurchaseId.value = result.purchaseId
       qrCodeUrl.value = result.codeUrl
     } else {
-      // mock / 直接完成
       await checkPayment()
     }
   } catch (e) {
@@ -143,65 +150,158 @@ async function checkPayment() {
 
 <style scoped>
 .quota-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000;
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .2s ease;
 }
 .quota-dialog {
-  background: var(--bg, #fff); border-radius: 14px; width: 420px; max-width: 90vw;
-  max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  background: #f8f9fc;
+  border-radius: 20px;
+  width: 380px; max-width: 88vw;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.18);
+  position: relative;
+  animation: slideUp .3s cubic-bezier(.16,1,.3,1);
 }
-.quota-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 18px 22px; border-bottom: 1px solid var(--border, #eee);
+.close-btn {
+  position: absolute; top: 14px; right: 14px; z-index: 2;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: rgba(0,0,0,0.06);
+  font-size: 15px; cursor: pointer; color: #666;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
 }
-.quota-header h3 { margin: 0; font-size: 16px; }
-.close-btn { background: none; border: 0; font-size: 24px; cursor: pointer; color: var(--muted, #999); }
-.quota-body { padding: 18px 22px; }
-.quota-loading { padding: 40px; text-align: center; color: var(--muted, #999); }
+.close-btn:hover { background: rgba(0,0,0,0.12); color: #222; }
+.quota-body { padding: 28px 24px 24px; }
+.quota-loading { padding: 60px; text-align: center; }
+.loading-spinner {
+  width: 30px; height: 30px; border: 3px solid #e8e8e8;
+  border-top-color: #ff7a33; border-radius: 50%;
+  animation: spin .6s linear infinite; margin: 0 auto;
+}
 
-.balance-section { text-align: center; padding: 16px 0; margin-bottom: 12px; }
-.balance-label { font-size: 13px; color: var(--muted, #999); margin-bottom: 4px; }
-.balance-value { font-size: 32px; font-weight: 700; color: var(--accent-1, #4f6ef7); }
-.balance-value .unit { font-size: 16px; font-weight: 400; color: var(--muted, #999); margin-left: 4px; }
-
-.quota-section { margin-bottom: 16px; }
-.quota-section h4 { margin: 0 0 10px; font-size: 14px; }
-.free-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
-.free-label { color: var(--muted, #999); }
-.free-value { font-weight: 600; color: var(--accent-1, #4f6ef7); }
-.free-bar-wrap { height: 10px; background: var(--border, #eee); border-radius: 5px; overflow: hidden; margin-bottom: 4px; }
-.free-bar { height: 100%; background: linear-gradient(90deg, var(--accent-1, #4f6ef7), #2ecc71); border-radius: 5px; transition: width .3s; }
-.used-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted, #999); }
-
-.purchase-section { border-top: 1px solid var(--border, #eee); padding-top: 16px; }
-.purchase-section h4 { margin: 0 0 6px; font-size: 14px; }
-.price-info { font-size: 12px; color: var(--muted, #999); margin-bottom: 12px; }
-.amount-presets { display: flex; gap: 8px; margin-bottom: 10px; }
-.amount-presets button {
-  flex: 1; padding: 8px 0; border-radius: 8px; border: 1px solid var(--border, #ddd);
-  background: transparent; cursor: pointer; font-size: 14px; color: var(--text, #333);
+/* 余额卡片 */
+.balance-card {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-radius: 16px; padding: 32px 24px 24px;
+  text-align: center; position: relative; overflow: hidden;
+  margin-bottom: 16px;
 }
-.amount-presets button.active { border-color: var(--accent-1, #4f6ef7); background: var(--accent-1, #4f6ef7); color: #fff; }
-.custom-amount input {
-  width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border, #ddd);
-  font-size: 14px; outline: none; box-sizing: border-box; margin-bottom: 8px;
+.balance-glow {
+  position: absolute; top: -60%; right: -30%;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(255,122,51,.2) 0%, transparent 70%);
+  pointer-events: none;
 }
-.custom-amount input:focus { border-color: var(--accent-1, #4f6ef7); }
-.purchase-hint { font-size: 11px; color: var(--muted, #999); margin-bottom: 12px; }
+.balance-label { font-size: 13px; color: rgba(255,255,255,.5); letter-spacing: .5px; margin-bottom: 6px; }
+.balance-value { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.balance-value .amount {
+  font-size: 44px; font-weight: 800; color: #fff;
+  letter-spacing: -2px; line-height: 1.1;
+}
+.balance-value .unit { font-size: 16px; color: rgba(255,255,255,.5); font-weight: 500; }
+.balance-sub { margin-top: 10px; font-size: 12px; color: rgba(255,255,255,.4); }
+
+/* 周免费 */
+.section-header {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: #222;
+  margin-bottom: 12px;
+}
+.section-icon { font-size: 16px; }
+.weekly-section {
+  background: #fff; border-radius: 14px; padding: 18px;
+  margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.free-bar-wrap {
+  height: 8px; background: #f0f0f2; border-radius: 4px;
+  overflow: hidden; margin-bottom: 10px;
+}
+.free-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff7a33, #ffb347);
+  border-radius: 4px; transition: width .4s ease;
+}
+.free-stats { display: flex; justify-content: space-between; font-size: 12px; color: #888; }
+
+/* 购买 */
+.purchase-section {
+  background: #fff; border-radius: 14px; padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.amount-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+  margin-bottom: 10px;
+}
+.amount-grid button {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 4px; border-radius: 10px;
+  border: 1.5px solid #eee; background: #fafafa;
+  cursor: pointer; transition: all .15s;
+}
+.amount-grid button:hover { border-color: #ffd5b3; background: #fff8f3; }
+.amount-grid button.active {
+  border-color: #ff7a33; background: #fff8f3;
+  box-shadow: 0 0 0 3px rgba(255,122,51,.12);
+}
+.amount-num { font-size: 16px; font-weight: 700; color: #222; }
+.amount-unit { font-size: 11px; color: #999; margin-top: 1px; }
+.amount-grid button.active .amount-num { color: #e05d1a; }
+
+.custom-row {
+  display: flex; align-items: center;
+  border: 1.5px solid #eee; border-radius: 10px; padding: 0 12px;
+  margin-bottom: 14px; transition: border-color .15s; background: #fafafa;
+}
+.custom-row:focus-within { border-color: #ff7a33; background: #fff; }
+.custom-prefix { font-size: 15px; font-weight: 600; color: #999; margin-right: 4px; }
+.custom-row input {
+  flex: 1; border: none; background: transparent;
+  padding: 9px 0; font-size: 14px; outline: none; color: #333;
+}
+.custom-row input::-webkit-inner-spin-button { display: none; }
+
 .buy-btn {
-  width: 100%; padding: 12px; border-radius: 8px; border: 0;
-  background: linear-gradient(135deg, var(--accent-1, #4f6ef7), var(--accent-2, #3b5de7));
+  width: 100%; padding: 13px; border-radius: 12px; border: none;
+  background: linear-gradient(135deg, #ff7a33, #e8601a);
   color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: all .15s;
 }
-.buy-btn:disabled { opacity: .5; cursor: not-allowed; }
+.buy-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(255,122,51,.3); }
+.buy-btn:active { transform: scale(.97); }
+.buy-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-loading {
+  display: inline-block; width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  border-radius: 50%; animation: spin .6s linear infinite;
+}
 
-.qr-section { text-align: center; padding: 16px 0; }
-.qr-section h4 { margin: 0 0 12px; }
-.qr-section img { width: 200px; height: 200px; border-radius: 8px; }
-.qr-hint { margin: 10px 0; font-size: 13px; color: var(--muted, #999); }
-.check-btn {
-  padding: 10px 24px; border-radius: 8px; border: 1px solid var(--border, #ddd);
-  background: transparent; cursor: pointer; font-size: 14px;
+/* 二维码 */
+.qr-section { margin-top: 4px; }
+.qr-card {
+  background: #fff; border-radius: 14px; padding: 24px;
+  text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
-.err-msg { color: #e74c3c; font-size: 13px; margin-top: 10px; text-align: center; }
+.qr-icon { font-size: 32px; margin-bottom: 8px; }
+.qr-title { font-size: 15px; font-weight: 600; color: #222; margin: 0 0 16px; }
+.qr-img-wrap {
+  display: inline-block; padding: 8px; background: #fff; border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08); margin-bottom: 12px;
+}
+.qr-img-wrap img { display: block; width: 200px; height: 200px; border-radius: 6px; }
+.qr-hint { font-size: 13px; color: #999; margin: 0 0 16px; }
+.check-btn {
+  padding: 10px 28px; border-radius: 10px; border: 1.5px solid #eee;
+  background: #fafafa; cursor: pointer; font-size: 14px;
+  font-weight: 500; color: #555; transition: all .15s;
+}
+.check-btn:hover { border-color: #ff7a33; color: #ff7a33; background: #fff8f3; }
+
+.err-msg { color: #e74c3c; font-size: 13px; margin-top: 12px; text-align: center; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

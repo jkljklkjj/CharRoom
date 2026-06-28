@@ -77,6 +77,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
@@ -102,6 +103,7 @@ function normalizeTimestamp(raw) {
 }
 
 const store = useStore()
+const router = useRouter()
 const { t, locale } = useI18n()
 
 // 移动端适配
@@ -345,6 +347,7 @@ onMounted(async () => {
     await initUserSession(activeToken, store.state.refreshToken)
   } else {
     clearAuth()
+    router.push('/')
   }
 
   loading.value = false
@@ -395,7 +398,7 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
-.app-wrap{height:100vh;display:flex;flex-direction:column}
+.app-wrap{height:100dvh;display:flex;flex-direction:column}
 .app-main{display:flex;flex:1;min-height:0}
 .sidebar{width:260px;border-right:1px solid rgba(0,0,0,0.04);background:var(--bg)}
 .chat{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -406,13 +409,13 @@ onUnmounted(() => {
     display: block;
     position: relative;
     width: 100%;
-    height: 100%;
+    height: 100dvh;
   }
 
   /* 移动端下的sidebar占满全屏 */
   .app-main.mobile-view .sidebar {
     width: 100%;
-    height: 100%;
+    height: 100dvh;
     border-right: none;
   }
 

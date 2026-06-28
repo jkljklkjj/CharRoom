@@ -1,7 +1,6 @@
 package component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +22,7 @@ import core.getTokenPrices
 import core.purchaseTokens
 import model.QuotaInfo
 import model.TokenPrices
+import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -214,24 +214,24 @@ fun TokenQuotaScreen(
                     shape = RoundedCornerShape(12.dp),
                     elevation = 2.dp
                 ) {
-                    Column(Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("请使用微信扫码支付", fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "扫码支付（QR Code URL）",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colors.primary,
-                            modifier = Modifier.clickable {
-                                // Desktop: open URL in browser
-                                // Android: call WeChat SDK
-                                openPaymentUrl(qrUrl)
-                            }
+                    Column(Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("请使用微信扫码支付", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        Spacer(Modifier.height(20.dp))
+                        // 二维码图片
+                        Image(
+                            painter = rememberQrCodePainter(qrUrl),
+                            contentDescription = "支付二维码",
+                            modifier = Modifier.size(200.dp)
                         )
-                        Spacer(Modifier.height(8.dp))
-                        Text("支付完成后请点击下方按钮", fontSize = 12.sp, color = Color.Gray)
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = { confirmPay(purchaseId, token, scope, onBack) }) {
-                            Text("我已支付完成")
+                        Spacer(Modifier.height(16.dp))
+                        Text("请使用微信扫描二维码支付", fontSize = 13.sp, color = Color.Gray)
+                        Spacer(Modifier.height(20.dp))
+                        Button(
+                            onClick = { confirmPay(purchaseId, token, scope, onBack) },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("已完成支付", fontSize = 15.sp)
                         }
                     }
                 }

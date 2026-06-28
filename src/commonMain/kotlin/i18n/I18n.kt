@@ -96,6 +96,7 @@ val zhStrings = Strings(
         "message.forward.select" to "选择转发对象",
         "message.forward.no.contacts" to "暂无联系人",
         "message.forward.selected" to "已选择",
+        "message.share" to "分享消息",
         "message.forward.confirm" to "确定",
 
         // ── User Avatar ──
@@ -139,6 +140,20 @@ val zhStrings = Strings(
         "settings.cancel" to "取消",
         "settings.confirm" to "确定",
         "settings.file.size.unknown" to "未知",
+
+        // ── Settings - Theme ──
+        "settings.theme" to "主题",
+        "settings.theme.subtitle" to "当前: %s",
+        "settings.theme.follow.system" to "跟随系统",
+        "settings.theme.light" to "浅色",
+        "settings.theme.dark" to "深色",
+
+        // ── Settings - Language ──
+        "settings.language" to "语言",
+        "settings.language.subtitle" to "当前: %s",
+        "settings.language.zh" to "中文",
+        "settings.language.en" to "English",
+        "settings.language.ja" to "日本語",
 
         // ── Contacts / User List ──
         "contact.list.title" to "聊天室",
@@ -423,6 +438,7 @@ val enStrings = Strings(
         "message.forward.select" to "Forward To",
         "message.forward.no.contacts" to "No contacts",
         "message.forward.selected" to "Selected",
+        "message.share" to "Share Message",
         "message.forward.confirm" to "OK",
 
         // ── User Avatar ──
@@ -466,6 +482,20 @@ val enStrings = Strings(
         "settings.cancel" to "Cancel",
         "settings.confirm" to "OK",
         "settings.file.size.unknown" to "Unknown",
+
+        // ── Settings - Theme ──
+        "settings.theme" to "Theme",
+        "settings.theme.subtitle" to "Current: %s",
+        "settings.theme.follow.system" to "Follow System",
+        "settings.theme.light" to "Light",
+        "settings.theme.dark" to "Dark",
+
+        // ── Settings - Language ──
+        "settings.language" to "Language",
+        "settings.language.subtitle" to "Current: %s",
+        "settings.language.zh" to "中文",
+        "settings.language.en" to "English",
+        "settings.language.ja" to "日本語",
 
         // ── Contacts / User List ──
         "contact.list.title" to "Chat Room",
@@ -742,6 +772,7 @@ val jaStrings = Strings(
         "message.forward.select" to "転送先を選択",
         "message.forward.no.contacts" to "連絡先がありません",
         "message.forward.selected" to "選択済み",
+        "message.share" to "共有",
         "message.forward.confirm" to "OK",
 
         // ── User Avatar ──
@@ -783,6 +814,20 @@ val jaStrings = Strings(
         "settings.cancel" to "キャンセル",
         "settings.confirm" to "OK",
         "settings.file.size.unknown" to "不明",
+
+        // ── Settings - Theme ──
+        "settings.theme" to "テーマ",
+        "settings.theme.subtitle" to "現在: %s",
+        "settings.theme.follow.system" to "システムに従う",
+        "settings.theme.light" to "ライト",
+        "settings.theme.dark" to "ダーク",
+
+        // ── Settings - Language ──
+        "settings.language" to "言語",
+        "settings.language.subtitle" to "現在: %s",
+        "settings.language.zh" to "中文",
+        "settings.language.en" to "English",
+        "settings.language.ja" to "日本語",
 
         // ── Contacts / User List ──
         "contact.list.title" to "チャットルーム",
@@ -985,6 +1030,25 @@ val jaStrings = Strings(
         "common.unknown.error" to "不明なエラー"
     )
 )
+
+/**
+ * Resolve a [Strings] instance for a given locale code.
+ */
+fun stringsForLocale(locale: String): Strings = when (locale) {
+    "zh" -> zhStrings
+    "en" -> enStrings
+    "ja" -> jaStrings
+    else -> enStrings
+}
+
+/**
+ * Update the global [currentStrings] singleton to reflect the selected locale.
+ * Call this whenever the user changes language so non-composable code picks it up.
+ */
+fun updateCurrentStrings(locale: String) {
+    val effective = if (locale == "follow") java.util.Locale.getDefault().language else locale
+    currentStrings = stringsForLocale(effective)
+}
 
 /** Global active strings singleton for use outside composable scope (ViewModels, repositories). */
 var currentStrings: Strings = run {
