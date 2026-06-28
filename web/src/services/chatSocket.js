@@ -190,28 +190,44 @@ function getMessagePriority(wrapperObj) {
   }
 }
 
+/**
+ * 根据消息类型获取流路由选项。
+ */
+function getStreamOptions(wrapperObj) {
+  const opts = { streamType: 'control' }
+  if (wrapperObj.type === 'chat' && wrapperObj.chat?.targetClientId) {
+    opts.streamType = 'chat'
+    opts.conversationId = wrapperObj.chat.targetClientId
+  } else if (wrapperObj.type === 'groupChat' && wrapperObj.groupChat?.targetClientId) {
+    opts.streamType = 'chat'
+    opts.conversationId = 'group:' + wrapperObj.groupChat.targetClientId
+  }
+  return opts
+}
+
 export async function sendWrapper(wrapperObj) {
   try {
     const buffer = await encodeMessage(wrapperObj)
+    const streamOptions = getStreamOptions(wrapperObj)
 
     if (transport && transport.isConnected()) {
-      return transport.send(buffer)
+      return transport.send(buffer, streamOptions)
     }
 
-    // 连接未建立，按优先级加入队列
+    // 连接未建立，按优先级加入队列（同时保存流路由信息）
     const priority = getMessagePriority(wrapperObj)
     const queue = priorityQueues[priority]
+    const entry = { buffer, streamOptions }
     const totalQueued = Object.values(priorityQueues).reduce((sum, q) => sum + q.length, 0)
     if (totalQueued < MAX_QUEUE_SIZE) {
-      queue.push(buffer)
+      queue.push(entry)
       console.log(`消息加入队列 (pri=${priority}), 总队列长度:`, totalQueued + 1)
     } else {
       if (priority <= PRIORITY_NORMAL) {
-        // 高/中优先级踢掉最低优先级的消息
         const lowQueue = priorityQueues[PRIORITY_LOW]
         if (lowQueue.length > 0) {
           lowQueue.shift()
-          queue.push(buffer)
+          queue.push(entry)
           console.log(`消息入队 (pri=${priority}), 踢掉一条低优先级消息`)
         } else {
           console.warn('消息队列已满，丢弃高优先级消息')
@@ -239,13 +255,12 @@ function flushQueue() {
   for (const priority of [PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW]) {
     const queue = priorityQueues[priority]
     while (queue.length > 0) {
-      const buffer = queue.shift()
+      const entry = queue.shift()
       if (transport && transport.isConnected()) {
-        transport.send(buffer)
+        transport.send(entry.buffer, entry.streamOptions)
       } else {
-        // 发送失败时重新入队（但避免无限堆积）
         if (priority <= PRIORITY_NORMAL) {
-          queue.unshift(buffer)
+          queue.unshift(entry)
         }
         break
       }
