@@ -82,7 +82,6 @@
   "app.settings.languageEn": "English",
   "app.settings.logout": "退出登录",
   "app.settings.tokenQuota": "Token 配额",
-
   "quota.title": "Token 配额",
   "quota.balance": "账户余额",
   "quota.weekly": "本周免费额度",
@@ -247,5 +246,6 @@
   "chat.loading": "加载中…",
   "chat.deleteConfirm": "确定要删除这个好友吗？",
   "chat.cancel": "取消",
-  "chat.confirmDelete": "确认删除"
+  "chat.confirmDelete": "确认删除",
+  "verify.submitting": "注册中..."
 }

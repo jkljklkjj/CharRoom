@@ -82,7 +82,6 @@
   "app.settings.languageEn": "English",
   "app.settings.logout": "Log Out",
   "app.settings.tokenQuota": "Token Quota",
-
   "quota.title": "Token Quota",
   "quota.balance": "Balance",
   "quota.weekly": "Weekly Free Quota",
@@ -247,5 +246,6 @@
   "chat.loading": "Loading…",
   "chat.deleteConfirm": "Delete this friend?",
   "chat.cancel": "Cancel",
-  "chat.confirmDelete": "Delete"
+  "chat.confirmDelete": "Delete",
+  "verify.submitting": "Registering..."
 }

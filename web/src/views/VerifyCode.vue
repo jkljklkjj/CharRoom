@@ -11,7 +11,9 @@
       <input v-model="code" :placeholder="$t('verify.placeholder')" />
 
       <div class="actions">
-        <button class="primary" @click="submit">{{ $t('verify.submit') }}</button>
+        <button class="primary" :disabled="submitting" @click="submit">
+          {{ submitting ? t('verify.submitting') : t('verify.submit') }}
+        </button>
         <button class="toggle-mode" :disabled="cooldown > 0" @click="resend">
           <span v-if="cooldown <= 0">{{ $t('verify.resend') }}</span>
           <span v-else>{{ $t('verify.resendCooldown', { seconds: cooldown }) }}</span>
@@ -34,6 +36,7 @@ const router = useRouter()
 const store = useStore()
 const email = ref('')
 let password = ''
+const submitting = ref(false)
 const cooldown = ref(0)
 let cooldownTimer = null
 
@@ -63,13 +66,19 @@ onBeforeUnmount(() => {
 
 async function submit() {
   if (!code.value) { window.$toast.warning(t('verify.inputCode')); return }
-  const id = await api.verifyRegister(email.value, code.value, password)
-  if (id && id !== -1) {
-    window.$toast.success(t('verify.success'))
-    store.clearPendingRegister()
-    router.push({ name: 'WebApp' })
-  } else {
-    window.$toast.error(t('verify.failed'))
+  if (submitting.value) return
+  submitting.value = true
+  try {
+    const id = await api.verifyRegister(email.value, code.value, password)
+    if (id && id !== -1) {
+      window.$toast.success(t('verify.success'))
+      store.clearPendingRegister()
+      router.push({ name: 'WebApp' })
+    } else {
+      window.$toast.error(t('verify.failed'))
+    }
+  } finally {
+    submitting.value = false
   }
 }
 
