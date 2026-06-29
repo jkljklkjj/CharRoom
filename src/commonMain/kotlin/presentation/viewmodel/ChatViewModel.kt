@@ -14,6 +14,7 @@ import data.repository.ChatRepository
 import data.repository.GlobalChatRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +39,7 @@ private const val AGENT_ASSISTANT_ID = 900000001
 open class ChatViewModel(
     protected val chatRepository: ChatRepository = GlobalChatRepository,
     protected val chatState: ChatState = GlobalChatState,
-    protected val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate)
+    protected var coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 ) {
     // 用户列表状态Flow
     val usersFlow: StateFlow<List<User>> = chatState.users
@@ -892,12 +893,14 @@ open class ChatViewModel(
     }
 
     /**
-     * 清空所有聊天数据
+     * 清空所有聊天数据（退出登录时调用）。
+     * 取消旧协程作用域，重建新作用域，避免内存泄漏与过期任务。
      */
     open fun clear() {
+        coroutineScope.cancel()
+        coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         coroutineScope.launch {
             chatState.clear()
-            // 清除本地存储
             launch(Dispatchers.IO) {
                 val userId = GlobalAppState.currentUserId ?: return@launch
                 val accountId = userId.toString()
