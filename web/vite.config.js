@@ -19,6 +19,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'inline',
       devOptions: {
         enabled: false // 开发环境不启用PWA
       },
