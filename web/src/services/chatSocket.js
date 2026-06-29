@@ -26,6 +26,28 @@ const MAX_MESSAGE_CACHE = 1000
 const messageCache = new Map()
 const MESSAGE_TTL = 5 * 60 * 1000 // 5 分钟 TTL
 
+// 乐观 UI：待确认消息跟踪 Map<messageId, { sendTime, warned, failed }>
+const pendingAcks = new Map()
+const ACK_CONFIRM_MS = 8000   // 0-8s: 已发送（乐观）
+const ACK_TIMEOUT_MS = 16000  // 8-16s: 发送中 → 16s+: 失败
+
+// 每秒检查待确认消息，更新状态
+setInterval(() => {
+  const now = Date.now()
+  const store = window.__chatStore
+  if (!store) return
+  for (const [msgId, info] of pendingAcks) {
+    const age = now - info.sendTime
+    if (age >= ACK_TIMEOUT_MS && !info.failed) {
+      info.failed = true
+      store.updateMessageStatus(msgId, 'failed')
+    } else if (age >= ACK_CONFIRM_MS && !info.warned) {
+      info.warned = true
+      store.updateMessageStatus(msgId, 'sending')
+    }
+  }
+}, 1000)
+
 // 优先级队列：多个队列按优先级处理
 const PRIORITY_HIGH = 0   // ACK
 const PRIORITY_NORMAL = 1 // 聊天消息
@@ -210,6 +232,12 @@ export async function sendWrapper(wrapperObj) {
     const buffer = await encodeMessage(wrapperObj)
     const streamOptions = getStreamOptions(wrapperObj)
 
+    // 注册待确认消息（chat/groupChat 类型的消息带 messageId）
+    const msgId = wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId || null
+    if (msgId) {
+      pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
+    }
+
     if (transport && transport.isConnected()) {
       return transport.send(buffer, streamOptions)
     }
@@ -300,6 +328,7 @@ export function close() {
   pendingQueue = []
   Object.values(priorityQueues).forEach(q => q.length = 0)
   messageCache.clear()
+  pendingAcks.clear()
   currentUserId = null
 }
 
@@ -416,10 +445,21 @@ async function handleMessage(rawData) {
       }
     }
 
-    // 心跳/ACK 响应 — 更新心跳时间，不发新心跳（避免循环）
-    if (processedData.type === 'heartbeat' || processedData.type === 'ack'
+    // 心跳/ACK 响应
+    if (processedData.type === 'heartbeat'
         || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
       lastHeartbeatResponseTime = Date.now()
+      return
+    }
+    // ACK 确认：匹配待确认消息，标记已发送
+    if (processedData.type === 'ack') {
+      lastHeartbeatResponseTime = Date.now()
+      const ackedMsgId = processedData.ack?.messageId || processedData.messageId
+      if (ackedMsgId && pendingAcks.has(ackedMsgId)) {
+        pendingAcks.delete(ackedMsgId)
+        const store = window.__chatStore
+        if (store) store.updateMessageStatus(ackedMsgId, 'sent')
+      }
       return
     }
 

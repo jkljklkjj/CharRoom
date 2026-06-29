@@ -50,6 +50,9 @@
             <div class="meta">
               <span class="sender">{{ m.user === 'you' ? $t('chat.myself') : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : $t('chat.groupChat')) }}</span>
               <span class="time">{{ formatRelativeTime(m.time) }}</span>
+              <span v-if="m.user === 'you' && m.isSent === 'sending'" class="status sending" title="发送中">⏳</span>
+              <span v-else-if="m.user === 'you' && m.isSent === 'failed'" class="status failed" title="发送失败">⚠</span>
+              <span v-else-if="m.user === 'you'" class="status sent" title="已发送">✓</span>
             </div>
             <!-- 图片消息 -->
             <div v-if="isImageMessage(m.text)" class="image-message">
@@ -120,6 +123,8 @@ import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
 
 const store = useStore()
+// 暴露 store 给 chatSocket 的 ACK 超时检查使用
+if (typeof window !== 'undefined') window.__chatStore = store
 const { t } = useI18n()
 const text = ref('')
 const msgList = ref(null)
@@ -384,15 +389,19 @@ function send(){
     targetId: currentChatId.value // 添加目标用户ID，用于区分会话
   }
 
+  const localMessageId = 'local_' + Date.now()
+  m.messageId = localMessageId
+  m.isSent = 'sent' // 乐观：0-8s 视为已发送
+
   const to = currentChatId.value
   const wrapper = isGroupChat.value
     ? {
         type: 'group_chat',
-        groupChat: { targetClientId: String(to), content: m.text, timestamp: m.time }
+        groupChat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: localMessageId }
       }
     : {
         type: 'chat',
-        chat: { targetClientId: String(to), content: m.text, timestamp: m.time }
+        chat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: localMessageId }
       }
 
   if (isGroupChat.value) {

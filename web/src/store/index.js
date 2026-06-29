@@ -487,6 +487,27 @@ function setCachedAvatar(url, dataUrl) {
   } catch (_) {}
 }
 
+/**
+ * 更新某条消息的发送状态（0-8s=已发送 / 8-16s=发送中 / 16s+=失败）。
+ * 支持私聊和群聊，按 messageId 匹配。
+ */
+function updateMessageStatus(messageId, status) {
+  // 私聊
+  for (let i = 0; i < state.messages.length; i++) {
+    if (state.messages[i].messageId === messageId) {
+      state.messages[i] = { ...state.messages[i], isSent: status }
+      return
+    }
+  }
+  // 群聊
+  for (let i = 0; i < state.groupMessages.length; i++) {
+    if (state.groupMessages[i].messageId === messageId) {
+      state.groupMessages[i] = { ...state.groupMessages[i], isSent: status }
+      return
+    }
+  }
+}
+
 function clearAll() {
   if (state.accountId) {
     const prefix = buildAccountPrefix(state.accountId)
@@ -519,6 +540,7 @@ export function useStore() {
     removeUser,
     addMessage,
     addGroupMessage,
+    updateMessageStatus,
     setSelectedChat,
     clearAll,
     setPendingRegister,
