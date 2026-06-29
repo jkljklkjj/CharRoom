@@ -512,7 +512,7 @@ onUnmounted(() => {
   /* 移动端聊天窗口占满剩余空间 */
   .app-main.mobile-view .chat {
     flex: 1;
-    height: calc(100% - 57px); /* 减去顶部栏高度 */
+    min-height: 0; /* 允许 flex 收缩 */
   }
 }
 
