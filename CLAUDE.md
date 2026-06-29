@@ -111,6 +111,13 @@ docker compose -f ../chat-room/docker/nginx/docker-compose.yml up -d --build ngi
 - **JSON** — kotlinx-serialization
 - **UI** — JetBrains Compose Multiplatform（Material Design）
 
+## 文档
+
+| 文档 | 路径 | 内容 |
+|------|------|------|
+| 架构规范 | `ARCHITECTURE.md` | 分层架构设计、依赖规则 |
+| 性能优化指南 | `docs/PERFORMANCE-OPTIMIZATION.md` | 传输层优化、协程模式、缓存策略、列表渲染等 |
+
 ## Proto 文件同步
 
 Compose Desktop 端从后端 `message.proto` 复制后编译：
