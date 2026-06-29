@@ -26,21 +26,23 @@ class ChatState {
     private val _users = MutableStateFlow<List<User>>(emptyList())
     val users: StateFlow<List<User>> = _users.asStateFlow()
 
-    // 私聊消息列表（LRU 缓存自带 StateFlow，数据层直接驱动视图层）
+    // 全量私聊消息（兼容 UserListScreen 等预览场景，限制总条数）
     private val _messageCache = MessageLruCache<Message>(
-        maxSize = MAX_MESSAGES,
-        id = { it.messageId },
-        timestamp = { it.timestamp }
+        MAX_MESSAGES, id = { it.messageId }, timestamp = { it.timestamp }
     )
     val messages: StateFlow<List<Message>> = _messageCache.state
 
-    // 群聊消息列表
+    // 全量群聊消息
     private val _groupMessageCache = MessageLruCache<GroupMessage>(
-        maxSize = MAX_MESSAGES,
-        id = { it.messageId },
-        timestamp = { it.timestamp }
+        MAX_MESSAGES, id = { it.messageId }, timestamp = { it.timestamp }
     )
     val groupMessages: StateFlow<List<GroupMessage>> = _groupMessageCache.state
+
+    // 按会话分桶的私聊消息（ChatScreen 按会话 O(1) 访问，不 filter 全量）
+    private val _privateMessageCaches = mutableMapOf<Int, MessageLruCache<Message>>()
+
+    // 按群组分桶的群聊消息
+    private val _groupMessageCaches = mutableMapOf<Int, MessageLruCache<GroupMessage>>()
 
     // 当前选中的聊天对象
     private val _selectedChatTarget = MutableStateFlow<User?>(null)
@@ -58,36 +60,28 @@ class ChatState {
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
-    // per-conversation 消息缓存：userId → 该会话的消息列表
-    // ChatScreen 直接订阅对应 flow，无需每次都过滤全量消息
-    private val _conversationMessageFlows = mutableMapOf<Int, MutableStateFlow<List<Message>>>()
-    private val _groupMessageFlows = mutableMapOf<Int, MutableStateFlow<List<GroupMessage>>>()
+    /** 获取或创建指定会话的私聊消息缓存桶。 */
+    private fun getOrCreatePrivateCache(userId: Int): MessageLruCache<Message> {
+        return _privateMessageCaches.getOrPut(userId) {
+            MessageLruCache(MAX_MESSAGES, id = { it.messageId }, timestamp = { it.timestamp })
+        }
+    }
+
+    private fun getOrCreateGroupCache(groupId: Int): MessageLruCache<GroupMessage> {
+        return _groupMessageCaches.getOrPut(groupId) {
+            MessageLruCache(MAX_MESSAGES, id = { it.messageId }, timestamp = { it.timestamp })
+        }
+    }
 
     /**
-     * 获取指定好友的私聊消息流。
-     * 消息到达时只更新对应会话的 flow，其他会话的订阅者不会触发重组。
+     * 获取指定好友的私聊消息流（O(1)，首次访问创建空桶）。
      */
     fun messagesFor(userId: Int): StateFlow<List<Message>> {
-        return _conversationMessageFlows.getOrPut(userId) {
-            MutableStateFlow(filterPrivateMessages(userId))
-        }
+        return getOrCreatePrivateCache(userId).state
     }
 
     fun groupMessagesFor(groupId: Int): StateFlow<List<GroupMessage>> {
-        return _groupMessageFlows.getOrPut(groupId) {
-            MutableStateFlow(filterGroupMessages(groupId))
-        }
-    }
-
-    private fun filterPrivateMessages(userId: Int): List<Message> {
-        return _messageCache.snapshot.filter { msg ->
-            (msg.receiverId == userId && msg.sender) ||
-            (msg.senderId == userId && !msg.sender)
-        }
-    }
-
-    private fun filterGroupMessages(groupId: Int): List<GroupMessage> {
-        return _groupMessageCache.snapshot.filter { it.groupId == groupId }
+        return getOrCreateGroupCache(groupId).state
     }
 
     // 按领域拆分锁，减少互斥争用
@@ -312,11 +306,9 @@ class ChatState {
     suspend fun addMessage(message: Message) = messagesMutex.withLock {
         println("[ChatState] 添加私聊消息到状态: messageId=${message.messageId}, senderId=${message.senderId}, receiverId=${message.receiverId}, content=${message.message.take(50)}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
-        _messageCache.add(message)
-
-        // 更新 per-conversation flow（只更新本会话订阅者，不触发其他会话重组）
+        _messageCache.add(message)                           // 全量镜像
         val convUserId = privateConversationId(message)
-        _conversationMessageFlows[convUserId]?.value = filterPrivateMessages(convUserId)
+        getOrCreatePrivateCache(convUserId).add(message)     // 分桶存储（O(1) 按会话访问）
 
         val shouldIncreaseUnread = !message.sender && _selectedChatTarget.value?.id != convUserId
         conversationStateMutex.withLock {
@@ -326,7 +318,7 @@ class ChatState {
                 unreadDelta = if (shouldIncreaseUnread) 1 else 0
             )
         }
-        println("[ChatState] 添加完成, 当前消息总数: ${_messageCache.size}")
+        println("[ChatState] 添加完成")
     }
 
     /**
@@ -338,10 +330,11 @@ class ChatState {
     ) = messagesMutex.withLock {
         val inserted = _messageCache.prepend(newMessages)
         if (inserted.isNotEmpty()) {
-            // 更新受影响的 per-conversation flow
             val affectedUsers = inserted.map { privateConversationId(it) }.distinct()
             affectedUsers.forEach { uid ->
-                _conversationMessageFlows[uid]?.value = filterPrivateMessages(uid)
+                getOrCreatePrivateCache(uid).prepend(
+                    inserted.filter { privateConversationId(it) == uid }
+                )
             }
             conversationStateMutex.withLock {
                 recordPrivateConversationHistoryLocked(inserted, markAsUnread)
@@ -354,20 +347,18 @@ class ChatState {
      */
     suspend fun updateMessageSentStatus(messageId: String, isSent: Boolean) = messagesMutex.withLock {
         println("[ChatState] 更新私聊消息发送状态: messageId=$messageId, isSent=$isSent")
-        val list = _messageCache.snapshot.toMutableList()
-        val idx = list.indexOfFirst { it.messageId == messageId }
-        if (idx >= 0) {
-            list[idx] = list[idx].copy(isSent = isSent)
-            // 通过 add 重新入 cache（替换内容 + 提升 LRU）
-            _messageCache.add(list[idx])
-        }
+        val msg = _messageCache.snapshot.find { it.messageId == messageId } ?: return
+        val updated = msg.copy(isSent = isSent)
+        _messageCache.add(updated)
+        getOrCreatePrivateCache(privateConversationId(updated)).add(updated)
     }
 
     /**
-     * 原位更新私聊消息（保持原有顺序，避免删除+新增导致的闪烁与排序抖动）
+     * 原位更新私聊消息。
      */
     suspend fun updateMessage(updatedMessage: Message) = messagesMutex.withLock {
         _messageCache.add(updatedMessage)
+        getOrCreatePrivateCache(privateConversationId(updatedMessage)).add(updatedMessage)
     }
 
     /**
@@ -376,11 +367,9 @@ class ChatState {
     suspend fun addGroupMessage(message: GroupMessage) = groupMessagesMutex.withLock {
         println("[ChatState] 添加群聊消息到状态: messageId=${message.messageId}, groupId=${message.groupId}, senderId=${message.senderId}, senderName=${message.senderName}, content=${message.text.take(50)}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
-        _groupMessageCache.add(message)
-
-        // 更新 per-conversation 群聊 flow
         val gid = groupConversationId(message)
-        _groupMessageFlows[gid]?.value = filterGroupMessages(gid)
+        _groupMessageCache.add(message)                       // 全量镜像
+        getOrCreateGroupCache(gid).add(message)                // 分桶
 
         val shouldIncreaseUnread = message.senderId != GlobalAppState.currentUserId && _selectedChatTarget.value?.id != gid
         conversationStateMutex.withLock {
@@ -404,7 +393,9 @@ class ChatState {
         if (inserted.isNotEmpty()) {
             val affectedGroups = inserted.map { groupConversationId(it) }.distinct()
             affectedGroups.forEach { gid ->
-                _groupMessageFlows[gid]?.value = filterGroupMessages(gid)
+                getOrCreateGroupCache(gid).prepend(
+                    inserted.filter { groupConversationId(it) == gid }
+                )
             }
             conversationStateMutex.withLock {
                 recordGroupConversationHistoryLocked(inserted, markAsUnread)
@@ -417,11 +408,10 @@ class ChatState {
      */
     suspend fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) = groupMessagesMutex.withLock {
         println("[ChatState] 更新群聊消息发送状态: messageId=$messageId, isSent=$isSent")
-        val list = _groupMessageCache.snapshot.toMutableList()
-        val idx = list.indexOfFirst { it.messageId == messageId }
-        if (idx >= 0) {
-            _groupMessageCache.add(list[idx].copy(isSent = isSent))
-        }
+        val msg = _groupMessageCache.snapshot.find { it.messageId == messageId } ?: return
+        val updated = msg.copy(isSent = isSent)
+        _groupMessageCache.add(updated)
+        getOrCreateGroupCache(updated.groupId).add(updated)
     }
 
     /**
@@ -462,14 +452,18 @@ class ChatState {
      * 删除私聊消息
      */
     suspend fun deleteMessage(messageId: String) = messagesMutex.withLock {
+        val msg = _messageCache.snapshot.find { it.messageId == messageId }
         _messageCache.remove(messageId)
+        if (msg != null) getOrCreatePrivateCache(privateConversationId(msg)).remove(messageId)
     }
 
     /**
      * 删除群聊消息
      */
     suspend fun deleteGroupMessage(messageId: String) = groupMessagesMutex.withLock {
+        val msg = _groupMessageCache.snapshot.find { it.messageId == messageId }
         _groupMessageCache.remove(messageId)
+        if (msg != null) getOrCreateGroupCache(msg.groupId).remove(messageId)
     }
 
     /**
@@ -479,8 +473,8 @@ class ChatState {
         _users.value = emptyList()
         _messageCache.clear()
         _groupMessageCache.clear()
-        _conversationMessageFlows.clear()
-        _groupMessageFlows.clear()
+        _privateMessageCaches.clear()
+        _groupMessageCaches.clear()
         _selectedChatTarget.value = null
         _isLoadingMore.value = false
         _conversationStates.value = emptyMap()
