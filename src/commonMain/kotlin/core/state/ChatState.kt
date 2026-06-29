@@ -58,6 +58,38 @@ class ChatState {
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
+    // per-conversation 消息缓存：userId → 该会话的消息列表
+    // ChatScreen 直接订阅对应 flow，无需每次都过滤全量消息
+    private val _conversationMessageFlows = mutableMapOf<Int, MutableStateFlow<List<Message>>>()
+    private val _groupMessageFlows = mutableMapOf<Int, MutableStateFlow<List<GroupMessage>>>()
+
+    /**
+     * 获取指定好友的私聊消息流。
+     * 消息到达时只更新对应会话的 flow，其他会话的订阅者不会触发重组。
+     */
+    fun messagesFor(userId: Int): StateFlow<List<Message>> {
+        return _conversationMessageFlows.getOrPut(userId) {
+            MutableStateFlow(filterPrivateMessages(userId))
+        }
+    }
+
+    fun groupMessagesFor(groupId: Int): StateFlow<List<GroupMessage>> {
+        return _groupMessageFlows.getOrPut(groupId) {
+            MutableStateFlow(filterGroupMessages(groupId))
+        }
+    }
+
+    private fun filterPrivateMessages(userId: Int): List<Message> {
+        return _messageCache.snapshot.filter { msg ->
+            (msg.receiverId == userId && msg.sender) ||
+            (msg.senderId == userId && !msg.sender)
+        }
+    }
+
+    private fun filterGroupMessages(groupId: Int): List<GroupMessage> {
+        return _groupMessageCache.snapshot.filter { it.groupId == groupId }
+    }
+
     // 按领域拆分锁，减少互斥争用
     private val usersMutex = Mutex()
     private val messagesMutex = Mutex()
@@ -282,11 +314,14 @@ class ChatState {
 
         _messageCache.add(message)
 
-        val conversationId = privateConversationId(message)
-        val shouldIncreaseUnread = !message.sender && _selectedChatTarget.value?.id != conversationId
+        // 更新 per-conversation flow（只更新本会话订阅者，不触发其他会话重组）
+        val convUserId = privateConversationId(message)
+        _conversationMessageFlows[convUserId]?.value = filterPrivateMessages(convUserId)
+
+        val shouldIncreaseUnread = !message.sender && _selectedChatTarget.value?.id != convUserId
         conversationStateMutex.withLock {
             updateConversationStateLocked(
-                conversationId = conversationId,
+                conversationId = convUserId,
                 lastIncomingMessageTime = if (!message.sender) message.timestamp else null,
                 unreadDelta = if (shouldIncreaseUnread) 1 else 0
             )
@@ -303,6 +338,11 @@ class ChatState {
     ) = messagesMutex.withLock {
         val inserted = _messageCache.prepend(newMessages)
         if (inserted.isNotEmpty()) {
+            // 更新受影响的 per-conversation flow
+            val affectedUsers = inserted.map { privateConversationId(it) }.distinct()
+            affectedUsers.forEach { uid ->
+                _conversationMessageFlows[uid]?.value = filterPrivateMessages(uid)
+            }
             conversationStateMutex.withLock {
                 recordPrivateConversationHistoryLocked(inserted, markAsUnread)
             }
@@ -338,11 +378,14 @@ class ChatState {
 
         _groupMessageCache.add(message)
 
-        val conversationId = groupConversationId(message)
-        val shouldIncreaseUnread = message.senderId != GlobalAppState.currentUserId && _selectedChatTarget.value?.id != conversationId
+        // 更新 per-conversation 群聊 flow
+        val gid = groupConversationId(message)
+        _groupMessageFlows[gid]?.value = filterGroupMessages(gid)
+
+        val shouldIncreaseUnread = message.senderId != GlobalAppState.currentUserId && _selectedChatTarget.value?.id != gid
         conversationStateMutex.withLock {
             updateConversationStateLocked(
-                conversationId = conversationId,
+                conversationId = gid,
                 lastIncomingMessageTime = if (message.senderId != GlobalAppState.currentUserId) message.timestamp else null,
                 unreadDelta = if (shouldIncreaseUnread) 1 else 0
             )
@@ -359,6 +402,10 @@ class ChatState {
     ) = groupMessagesMutex.withLock {
         val inserted = _groupMessageCache.prepend(newMessages)
         if (inserted.isNotEmpty()) {
+            val affectedGroups = inserted.map { groupConversationId(it) }.distinct()
+            affectedGroups.forEach { gid ->
+                _groupMessageFlows[gid]?.value = filterGroupMessages(gid)
+            }
             conversationStateMutex.withLock {
                 recordGroupConversationHistoryLocked(inserted, markAsUnread)
             }
@@ -432,6 +479,8 @@ class ChatState {
         _users.value = emptyList()
         _messageCache.clear()
         _groupMessageCache.clear()
+        _conversationMessageFlows.clear()
+        _groupMessageFlows.clear()
         _selectedChatTarget.value = null
         _isLoadingMore.value = false
         _conversationStates.value = emptyMap()

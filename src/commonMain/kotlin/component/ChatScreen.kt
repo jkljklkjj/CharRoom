@@ -105,6 +105,7 @@ import core.LocalChatHistoryStore
 import core.ServerConfig
 import core.loadImageBitmapWithCache
 import core.state.GlobalAppState
+import core.state.GlobalChatState
 import presentation.viewmodel.ChatViewModel
 import com.chatlite.i18n.LocalStrings
 import com.chatlite.i18n.Strings
@@ -236,18 +237,8 @@ private fun ChatScreenContent(
     // 既不会过窄也不会过长，不需要动态计算屏幕宽度，跨平台兼容性最好
     val maxBubbleWidth = 220.dp
 
-    // 使用derivedStateOf优化消息过滤，只有messages变化或user变化时才重新计算
-    val userMessages by remember(user.id, allMessages) {
-        derivedStateOf {
-            val filtered = allMessages.filter { message ->
-                // 显示和当前用户的所有对话：我发给对方的 + 对方发给我的
-                (message.receiverId == user.id && message.sender) || // 我发的消息
-                (message.senderId == user.id && !message.sender)   // 对方发的消息（包括AI）
-            }
-//            println("[ChatScreen] 用户 ${user.id} 的消息过滤结果：总数 ${allMessages.size} → 显示 ${filtered.size}")
-            filtered
-        }
-    }
+    // 使用 per-conversation StateFlow，消息到达时只更新本会话的订阅者
+    val userMessages by GlobalChatState.messagesFor(user.id).collectAsState()
     // 获取当前登录用户信息（自己）
     val currentUser: User? by remember(allUsers) {
         derivedStateOf {
