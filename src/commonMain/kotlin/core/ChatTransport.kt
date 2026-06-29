@@ -105,6 +105,14 @@ interface MessageReceiveListener {
      * 收到聊天助手流式输出（默认空实现，按需覆盖）
      */
     fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean) {}
+
+    /**
+     * 收到 ACK 确认（默认空实现，按需覆盖）
+     * @param messageId 被确认的消息 ID
+     * @param seqId 当前会话的 seqId（用于更新增量同步游标）
+     * @param conversationId 会话 ID
+     */
+    fun onAckReceived(messageId: String, seqId: Long, conversationId: String) {}
 }
 
 /**

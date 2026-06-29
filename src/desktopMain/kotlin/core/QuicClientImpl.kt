@@ -115,6 +115,18 @@ class QuicClientImpl : ChatTransport {
                     // 尝试解析为 protobuf MessageWrapper 并分发
                     val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
                     when (wrapper.type) {
+                        MsgType.ACK.wire -> {
+                            if (wrapper.hasAck()) {
+                                val ack = wrapper.ack
+                                val ackSeqId = ack.seqId
+                                val ackConvId = ack.conversationId
+                                // 更新会话 seqId 游标（增量同步用）
+                                if (ackConvId.isNotBlank() && ackSeqId > 0) {
+                                    GlobalChatState.updateConversationSeqId(ackConvId, ackSeqId)
+                                }
+                            }
+                            return@forEach
+                        }
                         MsgType.CHAT.wire -> {
                             if (wrapper.hasChat()) {
                                 val chat = wrapper.chat
