@@ -44,16 +44,10 @@ open class ChatViewModel(
     protected val chatRepository: ChatRepository = GlobalChatRepository,
     protected val chatState: ChatState = GlobalChatState
 ) {
-    // 顶层作用域：整个应用生命周期内存在，不清除
+    // 唯一的作用域嵌套：应用级（永不取消）→ 会话级（clear 时重建）
     private val appJob = SupervisorJob()
-    private val appScope = CoroutineScope(appJob + Dispatchers.Main)
-
-    // 会话作用域：登录期间存在，clear() 只取消这个子树，不影响 appJob
     private var sessionJob: Job = SupervisorJob(appJob)
-    protected var coroutineScope: CoroutineScope = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
-
-    // IO 子作用域：网络/数据库操作走 IO 线程池
-    private val ioScope = CoroutineScope(sessionJob + Dispatchers.IO)
+    private val sessionScope get() = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
     // 用户列表状态Flow
     val usersFlow: StateFlow<List<User>> = chatState.users
 
@@ -76,7 +70,7 @@ open class ChatViewModel(
         get() = chatState.selectedChatTarget.value
         set(value) {
             println("[ChatViewModel DEBUG] Setting selectedUser: ${value?.id} - ${value?.username}")
-            coroutineScope.launch {
+            sessionScope.launch {
                 chatState.selectChatTarget(value)
             }
         }
@@ -84,7 +78,7 @@ open class ChatViewModel(
     var isLoadingMore: Boolean
         get() = chatState.isLoadingMore.value
         set(value) {
-            coroutineScope.launch {
+            sessionScope.launch {
                 chatState.setLoadingMore(value)
             }
         }
@@ -99,7 +93,7 @@ open class ChatViewModel(
      * 更新用户在线状态
      */
     fun updateUserOnlineStatus(userId: Int, online: Boolean) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.updateUserOnlineStatus(userId, online)
         }
     }
@@ -108,7 +102,7 @@ open class ChatViewModel(
      * 前置添加私聊消息（用于加载历史消息）
      */
     fun prependMessages(newMessages: List<Message>) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.prependMessages(newMessages)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -121,7 +115,7 @@ open class ChatViewModel(
      * 前置添加群聊消息（用于加载历史消息）
      */
     fun prependGroupMessages(newMessages: List<GroupMessage>) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.prependGroupMessages(newMessages)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -134,7 +128,7 @@ open class ChatViewModel(
      * 添加新的私聊消息
      */
     fun addMessage(message: Message) {
-        coroutineScope.launch {
+        sessionScope.launch {
             // 离线消息拉取中，先缓存到临时队列，避免顺序混乱
             if (isFetchingOfflineMessages && !message.sender) {
                 pendingMessages.add(message)
@@ -169,7 +163,7 @@ open class ChatViewModel(
      * 添加新的群聊消息
      */
     fun addGroupMessage(message: GroupMessage) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.addGroupMessage(message)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -182,7 +176,7 @@ open class ChatViewModel(
      * 更新私聊消息发送状态
      */
     fun updateMessageSentStatus(messageId: String, isSent: Boolean) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.updateMessageSentStatus(messageId, isSent)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -195,7 +189,7 @@ open class ChatViewModel(
      * 原位更新私聊消息内容（用于流式输出）
      */
     fun updateMessage(updatedMessage: Message) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.updateMessage(updatedMessage)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -210,7 +204,7 @@ open class ChatViewModel(
      * 2) 后续块原位更新，不走删除+新增
      */
     fun upsertAgentStreamMessage(messageId: String, fullContent: String) {
-        coroutineScope.launch {
+        sessionScope.launch {
             val currentUserId = GlobalAppState.currentUserId ?: return@launch
             val existingMessage = chatState.messages.value.find {
                 it.messageId == messageId && it.senderId == AGENT_ASSISTANT_ID
@@ -244,7 +238,7 @@ open class ChatViewModel(
      * 更新群聊消息发送状态
      */
     fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.updateGroupMessageSentStatus(messageId, isSent)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -264,7 +258,7 @@ open class ChatViewModel(
      * 加载好友和群组列表 + 触发 SeqId 增量同步。
      */
     fun loadContacts() {
-        coroutineScope.launch(Dispatchers.IO) {
+        sessionScope.launch(Dispatchers.IO) {
             val cachedContacts = chatRepository.getCachedContacts()
             if (cachedContacts.isNotEmpty() && chatState.users.value.isEmpty()) {
                 chatState.updateUsers(cachedContacts)
@@ -273,11 +267,8 @@ open class ChatViewModel(
             val contacts = chatRepository.fetchAllContacts()
             if (contacts.isNotEmpty()) {
                 chatState.replaceUsersPreservingOrder(contacts)
-                // 恢复本地持久化的 seqId 游标
                 loadConversationSeqIds()
-                // 联系人就绪后，触发 SeqId 增量同步
                 syncAllConversations(contacts)
-                // 同步后保存更新后的游标
                 saveConversationSeqIds()
             }
         }
@@ -345,7 +336,7 @@ open class ChatViewModel(
      * 拉取好友和群聊请求
      */
     fun fetchRequests() {
-        coroutineScope.launch(Dispatchers.IO) {
+        sessionScope.launch(Dispatchers.IO) {
             try {
                 println("[ChatViewModel] 开始拉取好友和群聊请求")
                 val friendRequests = chatRepository.fetchFriendRequests()
@@ -366,7 +357,7 @@ open class ChatViewModel(
      * 获取当前用户信息
      */
     fun getCurrentUserProfile(onResult: (User?) -> Unit) {
-        coroutineScope.launch {
+        sessionScope.launch {
             val user = chatRepository.getCurrentUserProfile()
             onResult(user)
         }
@@ -376,7 +367,7 @@ open class ChatViewModel(
      * 添加好友
      */
     fun addFriend(account: String, onResult: (Boolean) -> Unit) {
-        coroutineScope.launch {
+        sessionScope.launch {
             val success = chatRepository.addFriend(account)
             if (success) {
                 loadContacts()
@@ -389,7 +380,7 @@ open class ChatViewModel(
      * 删除好友
      */
     fun deleteFriend(friendId: Int, onResult: (Boolean) -> Unit) {
-        coroutineScope.launch {
+        sessionScope.launch {
             val success = chatRepository.deleteFriend(friendId)
             if (success) {
                 loadContacts()
@@ -406,7 +397,7 @@ open class ChatViewModel(
      * 加入群组
      */
     fun addGroup(groupId: String, onResult: (Boolean) -> Unit) {
-        coroutineScope.launch {
+        sessionScope.launch {
             val success = chatRepository.addGroup(groupId)
             if (success) {
                 // 重新加载联系人列表
@@ -605,7 +596,7 @@ open class ChatViewModel(
             isFetchingOfflineMessages = false
             isLoadingMore = false
             // 保存到本地存储
-            coroutineScope.launch(Dispatchers.IO) {
+            sessionScope.launch(Dispatchers.IO) {
                 saveChatHistoryToLocal()
             }
         }
@@ -621,7 +612,7 @@ open class ChatViewModel(
         password: String? = null,
         onResult: (Boolean) -> Unit
     ) {
-        coroutineScope.launch {
+        sessionScope.launch {
             val success = chatRepository.updateUserProfile(username, phone, signature, password)
             onResult(success)
         }
@@ -631,7 +622,7 @@ open class ChatViewModel(
      * 更新用户列表
      */
     fun updateUsers(users: List<User>) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.updateUsers(users)
         }
     }
@@ -640,7 +631,7 @@ open class ChatViewModel(
      * 删除私聊消息
      */
     fun deleteMessage(messageId: String) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.deleteMessage(messageId)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -653,7 +644,7 @@ open class ChatViewModel(
      * 删除群聊消息
      */
     fun deleteGroupMessage(messageId: String) {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.deleteGroupMessage(messageId)
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
@@ -680,7 +671,7 @@ open class ChatViewModel(
         onDone: () -> Unit = {}
     ) {
         if (throttle.shouldThrottle(ThrottleOp.PRIVATE_SEND)) {
-            coroutineScope.launch { onDone() }
+            sessionScope.launch { onDone() }
             return
         }
         val currentUserId = GlobalAppState.currentUserId
@@ -688,7 +679,7 @@ open class ChatViewModel(
 
         if (currentUserId == null) {
             println("[ChatViewModel] 错误：发送消息失败，当前用户ID为空")
-            coroutineScope.launch {
+            sessionScope.launch {
                 onDone() // 必须调用onDone恢复UI状态
             }
             return
@@ -717,7 +708,7 @@ open class ChatViewModel(
             )
 
             // 发送前先把对方放入联系人列表，方便立即进入聊天并发送招呼消息
-            coroutineScope.launch {
+            sessionScope.launch {
                 chatState.upsertUser(user)
             }
 
@@ -748,7 +739,7 @@ open class ChatViewModel(
                 expectedResponses = 1
             ) { success, responses ->
                 println("[ChatViewModel] WebSocket消息发送结果: $success, messageId: $messageId")
-                coroutineScope.launch {
+                sessionScope.launch {
                     if (success) {
                         updateMessageSentStatus(messageId, true)
                         println("[ChatViewModel] 消息状态已更新，success: $success, messageId: $messageId")
@@ -762,7 +753,7 @@ open class ChatViewModel(
                             targetClientId = user.id.toString(),
                             expectedResponses = 1
                         ) { retrySuccess, _ ->
-                            coroutineScope.launch {
+                            sessionScope.launch {
                                 updateMessageSentStatus(messageId, retrySuccess)
                                 println("[ChatViewModel] 消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
                             }
@@ -773,7 +764,7 @@ open class ChatViewModel(
         } catch (e: Exception) {
             println("[ChatViewModel] 发送消息流程异常: ${e.message}")
             e.printStackTrace()
-            coroutineScope.launch {
+            sessionScope.launch {
                 onDone() // 发生任何异常都要恢复UI状态
             }
         }
@@ -795,7 +786,7 @@ open class ChatViewModel(
         onDone: () -> Unit = {}
     ) {
         if (throttle.shouldThrottle(ThrottleOp.GROUP_SEND)) {
-            coroutineScope.launch { onDone() }
+            sessionScope.launch { onDone() }
             return
         }
         // 获取当前用户信息
@@ -804,7 +795,7 @@ open class ChatViewModel(
 
         if (currentUserId == null) {
             println("[ChatViewModel] 错误：发送群消息失败，当前用户ID为空")
-            coroutineScope.launch {
+            sessionScope.launch {
                 onDone() // 必须调用onDone恢复UI状态
             }
             return
@@ -814,7 +805,7 @@ open class ChatViewModel(
             val currentUser = chatState.users.value.find { it.id == currentUserId }
             if (currentUser == null) {
                 println("[ChatViewModel] 错误：发送群消息失败，找不到当前用户信息")
-                coroutineScope.launch {
+                sessionScope.launch {
                     onDone()
                 }
                 return
@@ -867,7 +858,7 @@ open class ChatViewModel(
                 expectedResponses = 1
             ) { success, responses ->
                 println("[ChatViewModel] WebSocket群消息发送结果: $success, messageId: $messageId")
-                coroutineScope.launch {
+                sessionScope.launch {
                     if (success) {
                         updateGroupMessageSentStatus(messageId, true)
                         println("[ChatViewModel] 群消息状态已更新，success: $success, messageId: $messageId")
@@ -881,7 +872,7 @@ open class ChatViewModel(
                             targetClientId = group.id.toString(),
                             expectedResponses = 1
                         ) { retrySuccess, _ ->
-                            coroutineScope.launch {
+                            sessionScope.launch {
                                 updateGroupMessageSentStatus(messageId, retrySuccess)
                                 println("[ChatViewModel] 群消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
                             }
@@ -892,7 +883,7 @@ open class ChatViewModel(
         } catch (e: Exception) {
             println("[ChatViewModel] 发送群消息流程异常: ${e.message}")
             e.printStackTrace()
-            coroutineScope.launch {
+            sessionScope.launch {
                 onDone() // 发生任何异常都要恢复UI状态
             }
         }
@@ -903,19 +894,20 @@ open class ChatViewModel(
      * 取消旧协程作用域，重建新作用域，避免内存泄漏与过期任务。
      */
     open fun clear() {
-        saveConversationSeqIds() // 退出前持久化 seqId 游标
-        // 重置所有内部状态
+        saveConversationSeqIds()
+        // 重置内部状态
         isFetchingOfflineMessages = false
         pendingMessages.clear()
         pendingGroupMessages.clear()
         _friendRequests.value = emptyList()
         _groupRequests.value = emptyList()
-        // 取消会话作用域（保留 appJob 顶层不受影响）
+
+        // 重建会话作用域（取消旧会话 → 挂回 appJob）
         sessionJob.cancel()
         sessionJob = SupervisorJob(appJob)
-        coroutineScope = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
-        // 重建 IO 子作用域
-        ioScope.launch {
+
+        // 清除聊天数据
+        sessionScope.launch(Dispatchers.IO) {
             chatState.clear()
             val userId = GlobalAppState.currentUserId ?: return@launch
             val accountId = userId.toString()
@@ -927,7 +919,7 @@ open class ChatViewModel(
      * 仅清空内存中的消息，不删除本地存储（清空聊天记录时调用）
      */
     open fun clearMessages() {
-        coroutineScope.launch {
+        sessionScope.launch {
             chatState.clear()
         }
     }
@@ -960,7 +952,7 @@ open class ChatViewModel(
             if (!file.exists()) return
             val decrypted = data.datasource.local.CryptoUtil.decrypt(file.readBytes())
             val restored: Map<String, Long> = json.decodeFromString(String(decrypted))
-            coroutineScope.launch {
+            sessionScope.launch {
                 restored.forEach { (convId, seqId) ->
                     chatState.updateConversationSeqId(convId, seqId)
                 }
@@ -989,7 +981,7 @@ open class ChatViewModel(
      * 从本地加载聊天历史
      */
     open fun loadLocalChatHistory() {
-        coroutineScope.launch(Dispatchers.IO) {
+        sessionScope.launch(Dispatchers.IO) {
             val userId = GlobalAppState.currentUserId ?: return@launch
             val accountId = userId.toString()
             try {
