@@ -451,14 +451,19 @@ async function handleMessage(rawData) {
       lastHeartbeatResponseTime = Date.now()
       return
     }
-    // ACK 确认：匹配待确认消息，标记已发送
+    // ACK 确认：更新消息状态 + seqId 游标
     if (processedData.type === 'ack') {
       lastHeartbeatResponseTime = Date.now()
-      const ackedMsgId = processedData.ack?.messageId || processedData.messageId
+      const ack = processedData.ack || processedData
+      const ackedMsgId = ack.messageId
+      const store = window.__chatStore
       if (ackedMsgId && pendingAcks.has(ackedMsgId)) {
         pendingAcks.delete(ackedMsgId)
-        const store = window.__chatStore
         if (store) store.updateMessageStatus(ackedMsgId, 'sent')
+      }
+      // 更新 seqId 游标（用于增量同步断点续拉）
+      if (ack.seqId != null && ack.conversationId && store) {
+        store.setConversationSeqId(ack.conversationId, ack.seqId)
       }
       return
     }
