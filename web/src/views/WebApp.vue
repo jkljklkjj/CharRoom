@@ -470,7 +470,7 @@ onUnmounted(() => {
 
   /* 移动端聊天视图 */
   .app-main.mobile-view .chat-view {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;

@@ -108,6 +108,7 @@
           rows="1"
           @keydown.enter.exact.prevent="send"
           @input="autoResize"
+          @focus="onInputFocus"
         ></textarea>
         <button class="send" type="submit">{{ $t('chat.send') }}</button>
       </form>
@@ -373,6 +374,17 @@ function autoResize() {
   el.style.height = 'auto'
   const newHeight = Math.min(el.scrollHeight, 120) // 最大 5 行约 120px
   el.style.height = newHeight + 'px'
+}
+
+/** 移动端键盘弹出时，将输入区滚到可视范围 */
+function onInputFocus() {
+  // 仅移动端需要
+  if (window.innerWidth > 768) return
+  // 延迟执行等键盘完全弹出
+  setTimeout(() => {
+    const composer = document.querySelector('.composer')
+    composer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, 300)
 }
 
 let _sendLock = { private: false, group: false }
