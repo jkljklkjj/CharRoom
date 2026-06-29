@@ -7,6 +7,7 @@ import core.MsgType
 import core.ServerConfig.AGENT_ASSISTANT_ID
 import core.buildChatPayload
 import core.buildGroupChatPayload
+import core.json
 import core.state.ChatState
 import core.state.GlobalAppState
 import core.state.GlobalChatState
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import model.Group
 import model.GroupMessage
 import model.Message
@@ -260,8 +263,12 @@ open class ChatViewModel(
             val contacts = chatRepository.fetchAllContacts()
             if (contacts.isNotEmpty()) {
                 chatState.replaceUsersPreservingOrder(contacts)
+                // 恢复本地持久化的 seqId 游标
+                loadConversationSeqIds()
                 // 联系人就绪后，触发 SeqId 增量同步
                 syncAllConversations(contacts)
+                // 同步后保存更新后的游标
+                saveConversationSeqIds()
             }
         }
     }
@@ -897,6 +904,7 @@ open class ChatViewModel(
      * 取消旧协程作用域，重建新作用域，避免内存泄漏与过期任务。
      */
     open fun clear() {
+        saveConversationSeqIds() // 退出前持久化 seqId 游标
         coroutineScope.cancel()
         coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         coroutineScope.launch {
@@ -916,6 +924,42 @@ open class ChatViewModel(
         coroutineScope.launch {
             chatState.clear()
         }
+    }
+
+    /**
+     * 将 seqId 游标持久化到加密文件（重启后增量同步不中断）。
+     */
+    private fun saveConversationSeqIds() {
+        val userId = GlobalAppState.currentUserId ?: return
+        val accountId = userId.toString()
+        try {
+            val seqIds = chatState.conversationSeqIds.value
+            if (seqIds.isEmpty()) return
+            val file = java.io.File(System.getProperty("user.home"), ".qingliao/seqids.enc")
+            file.parentFile?.mkdirs()
+            file.writeBytes(data.datasource.local.CryptoUtil.encrypt(
+                json.encodeToString(seqIds).encodeToByteArray()
+            ))
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * 从加密文件恢复 seqId 游标。
+     */
+    private fun loadConversationSeqIds() {
+        val userId = GlobalAppState.currentUserId ?: return
+        val accountId = userId.toString()
+        try {
+            val file = java.io.File(System.getProperty("user.home"), ".qingliao/seqids.enc")
+            if (!file.exists()) return
+            val decrypted = data.datasource.local.CryptoUtil.decrypt(file.readBytes())
+            val restored: Map<String, Long> = json.decodeFromString(String(decrypted))
+            coroutineScope.launch {
+                restored.forEach { (convId, seqId) ->
+                    chatState.updateConversationSeqId(convId, seqId)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     /**

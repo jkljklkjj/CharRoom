@@ -148,13 +148,14 @@ class QuicClientImpl : ChatTransport {
                             }
                         }
                         MsgType.AGENT_CHAT_STREAM.wire -> {
-                            if (wrapper.hasChat()) {
-                                val chat = wrapper.chat
-                                val messageId = chat.messageId
-                                val fullContent = chat.content
-                                val done = false // 由服务端流结束标识决定
-                                val error = false
-                                listener.onAgentStreamChunk(messageId, fullContent, done, error)
+                            if (wrapper.hasAgentStream()) {
+                                val stream = wrapper.agentStream
+                                listener.onAgentStreamChunk(
+                                    messageId = stream.messageId,
+                                    fullContent = stream.chunk,
+                                    done = stream.done,
+                                    error = stream.error
+                                )
                             }
                         }
                     }
