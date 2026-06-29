@@ -7,6 +7,7 @@ import data.repository.AuthRepository
 import data.repository.GlobalAuthRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -17,7 +18,7 @@ import kotlinx.coroutines.launch
  */
 class AuthViewModel(
     private val authRepository: AuthRepository = GlobalAuthRepository,
-    private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 ) {
     private val throttle = Throttle()
 
@@ -80,6 +81,10 @@ class AuthViewModel(
      * 退出登录
      */
     fun logout() {
+        // 取消旧协程（清理登录过程中启动的定时器、网络请求等）
+        coroutineScope.coroutineContext[Job]?.cancel()
+        coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        // 执行登出逻辑
         coroutineScope.launch {
             authRepository.logout()
         }

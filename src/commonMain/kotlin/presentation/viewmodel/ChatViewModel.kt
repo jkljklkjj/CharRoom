@@ -895,6 +895,13 @@ open class ChatViewModel(
      */
     open fun clear() {
         saveConversationSeqIds() // 退出前持久化 seqId 游标
+        // 重置所有内部状态
+        isFetchingOfflineMessages = false
+        pendingMessages.clear()
+        pendingGroupMessages.clear()
+        _friendRequests.value = emptyList()
+        _groupRequests.value = emptyList()
+        // 取消旧协程作用域，重建新作用域
         coroutineScope.coroutineContext[Job]?.cancel()
         coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         coroutineScope.launch {
