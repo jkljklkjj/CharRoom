@@ -1,8 +1,9 @@
 import core.ApiEndpoints
 import core.ServerConfig
 import core.agentChat
-import core.QuicClientImpl
 import core.ChatTransport
+import core.di.KoinInitializer
+import core.di.desktopModule
 import core.state.AuthState
 import core.state.GlobalAppState
 import data.datasource.local.LocalDataSourceImpl
@@ -21,9 +22,13 @@ class ChatLiteCli(private val args: Array<String>) {
     private var password = ""
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val localDataSource = LocalDataSourceImpl()
-    private var transport: ChatTransport = QuicClientImpl()
+    private lateinit var transport: ChatTransport
 
     suspend fun run() {
+        // 初始化 DI
+        KoinInitializer.init(platformModules = listOf(desktopModule))
+        transport = org.koin.core.context.GlobalContext.get().get<ChatTransport>()
+
         parseArgs()
         printWelcome()
 

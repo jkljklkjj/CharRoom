@@ -52,7 +52,6 @@
               <span class="time">{{ formatRelativeTime(m.time) }}</span>
               <span v-if="m.user === 'you' && m.isSent === 'sending'" class="status sending" title="发送中">⏳</span>
               <span v-else-if="m.user === 'you' && m.isSent === 'failed'" class="status failed" title="发送失败">⚠</span>
-              <span v-else-if="m.user === 'you'" class="status sent" title="已发送">✓</span>
             </div>
             <!-- 图片消息 -->
             <div v-if="isImageMessage(m.text)" class="image-message">
@@ -391,7 +390,7 @@ function send(){
 
   const localMessageId = 'local_' + Date.now()
   m.messageId = localMessageId
-  m.isSent = 'sent' // 乐观：0-8s 视为已发送
+  // isSent 不设值 → 无图标（乐观：0-8s 安静展示，8-16s 才出⏳）
 
   const to = currentChatId.value
   const wrapper = isGroupChat.value
@@ -466,67 +465,95 @@ function handleDrop(e) {
 }
 
 // 处理文件上传
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_IMAGE_DIM = 1920 // 图片最长边
+
+/**
+ * 压缩图片到指定尺寸，输出 WebP base64。
+ */
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width > MAX_IMAGE_DIM || height > MAX_IMAGE_DIM) {
+        const ratio = Math.min(MAX_IMAGE_DIM / width, MAX_IMAGE_DIM / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('图片压缩失败')); return }
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.readAsDataURL(blob)
+      }, 'image/webp', 0.85)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')) }
+    img.src = url
+  })
+}
+
+/**
+ * 发送文件消息（图片压缩后 base64 / 非图片仅传文件名）。
+ */
 async function handleFileUpload(file) {
-  // 处理图片文件，转成base64发送
-  if (file.type.startsWith('image/')) {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const base64Data = e.target.result
-      const m = {
-        user: 'you',
-        text: `![${file.name}](${base64Data})`,
-        time: new Date().toISOString(),
-        targetId: currentChatId.value
-      }
-
-      const wrapper = isGroupChat.value
-        ? {
-            type: 'group_chat',
-            groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
-          }
-        : {
-            type: 'chat',
-            chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
-          }
-
-      if (isGroupChat.value) {
-        store.addGroupMessage({ ...m, groupId: currentChatId.value })
-      } else {
-        store.addMessage(m)
-      }
-
-      await chatSocket.sendWrapper(wrapper).catch(() => {})
-      scrollToBottom()
-    }
-    reader.readAsDataURL(file)
-  } else {
-    // 处理其他类型文件
-    const m = {
-      user: 'you',
-      text: `📎 ${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
-      time: new Date().toISOString(),
-      targetId: currentChatId.value
-    }
-
-    const wrapper = isGroupChat.value
-      ? {
-          type: 'group_chat',
-          groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
-        }
-      : {
-          type: 'chat',
-          chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
-        }
-
-    if (isGroupChat.value) {
-      store.addGroupMessage({ ...m, groupId: currentChatId.value })
-    } else {
-      store.addMessage(m)
-    }
-
-    await chatSocket.sendWrapper(wrapper).catch(() => {})
-    scrollToBottom()
+  // 文件大小校验
+  if (file.size > MAX_FILE_SIZE) {
+    alert(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），最大支持 10MB`)
+    return
   }
+
+  let content
+  if (file.type.startsWith('image/')) {
+    // 压缩图片
+    try {
+      content = await compressImage(file)
+    } catch (e) {
+      console.warn('图片压缩失败，使用原图:', e)
+      content = await new Promise((resolve, reject) => {
+        const r = new FileReader()
+        r.onload = () => resolve(r.result)
+        r.onerror = reject
+        r.readAsDataURL(file)
+      })
+    }
+  } else {
+    // 非图片文件：仅在消息中显示文件名
+    content = `📎 ${file.name} (${(file.size / 1024).toFixed(1)}KB)`
+  }
+
+  const m = {
+    user: 'you',
+    text: file.type.startsWith('image/') ? `![${file.name}](${content})` : content,
+    time: new Date().toISOString(),
+    targetId: currentChatId.value
+  }
+
+  const wrapper = isGroupChat.value
+    ? {
+        type: 'group_chat',
+        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
+      }
+    : {
+        type: 'chat',
+        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
+      }
+
+  if (isGroupChat.value) {
+    store.addGroupMessage({ ...m, groupId: currentChatId.value })
+  } else {
+    store.addMessage(m)
+  }
+
+  await chatSocket.sendWrapper(wrapper).catch(() => {})
+  scrollToBottom()
 }
 
 // 显示消息上下文菜单
