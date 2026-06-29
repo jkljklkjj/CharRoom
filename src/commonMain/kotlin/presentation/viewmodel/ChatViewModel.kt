@@ -42,9 +42,18 @@ private const val AGENT_ASSISTANT_ID = 900000001
  */
 open class ChatViewModel(
     protected val chatRepository: ChatRepository = GlobalChatRepository,
-    protected val chatState: ChatState = GlobalChatState,
-    protected var coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    protected val chatState: ChatState = GlobalChatState
 ) {
+    // 顶层作用域：整个应用生命周期内存在，不清除
+    private val appJob = SupervisorJob()
+    private val appScope = CoroutineScope(appJob + Dispatchers.Main)
+
+    // 会话作用域：登录期间存在，clear() 只取消这个子树，不影响 appJob
+    private var sessionJob: Job = SupervisorJob(appJob)
+    protected var coroutineScope: CoroutineScope = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
+
+    // IO 子作用域：网络/数据库操作走 IO 线程池
+    private val ioScope = CoroutineScope(sessionJob + Dispatchers.IO)
     // 用户列表状态Flow
     val usersFlow: StateFlow<List<User>> = chatState.users
 
@@ -901,16 +910,16 @@ open class ChatViewModel(
         pendingGroupMessages.clear()
         _friendRequests.value = emptyList()
         _groupRequests.value = emptyList()
-        // 取消旧协程作用域，重建新作用域
-        coroutineScope.coroutineContext[Job]?.cancel()
-        coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        coroutineScope.launch {
+        // 取消会话作用域（保留 appJob 顶层不受影响）
+        sessionJob.cancel()
+        sessionJob = SupervisorJob(appJob)
+        coroutineScope = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
+        // 重建 IO 子作用域
+        ioScope.launch {
             chatState.clear()
-            launch(Dispatchers.IO) {
-                val userId = GlobalAppState.currentUserId ?: return@launch
-                val accountId = userId.toString()
-                LocalChatHistoryStore.clear(accountId)
-            }
+            val userId = GlobalAppState.currentUserId ?: return@launch
+            val accountId = userId.toString()
+            LocalChatHistoryStore.clear(accountId)
         }
     }
 
