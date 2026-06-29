@@ -1,18 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import WebApp from '../views/WebApp.vue'
-import Verify from '../views/VerifyCode.vue'
-import FAQ from '../views/FAQ.vue'
-import Features from '../views/Features.vue'
-import Compare from '../views/Compare.vue'
 
 const routes = [
-  { path: '/', name: 'Home', component: Home },
-  { path: '/app', name: 'WebApp', component: WebApp }
-  ,{ path: '/verify', name: 'Verify', component: Verify }
-  ,{ path: '/faq', name: 'FAQ', component: FAQ }
-  ,{ path: '/features', name: 'Features', component: Features }
-  ,{ path: '/compare', name: 'Compare', component: Compare }
+  { path: '/', name: 'Home', component: () => import('../views/Home.vue') },
+  { path: '/app', name: 'WebApp', component: () => import('../views/WebApp.vue') }
+  ,{ path: '/verify', name: 'Verify', component: () => import('../views/VerifyCode.vue') }
+  ,{ path: '/faq', name: 'FAQ', component: () => import('../views/FAQ.vue') }
+  ,{ path: '/features', name: 'Features', component: () => import('../views/Features.vue') }
+  ,{ path: '/compare', name: 'Compare', component: () => import('../views/Compare.vue') }
 ]
 
 const router = createRouter({
