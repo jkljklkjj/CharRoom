@@ -103,10 +103,10 @@ img {
 }
 .container{max-width:1000px;margin:0 auto;padding:20px}
 
-/* 移动端取消容器内边距 */
+/* 移动端减小容器内边距 */
 @media (max-width: 768px) {
   .container {
-    padding: 0;
+    padding: 0 16px;
   }
 }
 .site-header{display:flex;justify-content:space-between;align-items:center;padding:12px 0}
