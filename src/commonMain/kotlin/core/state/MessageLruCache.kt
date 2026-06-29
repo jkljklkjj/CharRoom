@@ -62,12 +62,15 @@ class MessageLruCache<T : Any>(
 
     /**
      * 批量前置插入（历史消息）。去重后归并合并（O(n)），避免全量排序。
+     *
+     * @return 实际插入且未被 LRU 淘汰的消息（调用方可直接用此列表更新会话状态，
+     *         无需再通过 [snapshot] 回查哪些消息存活了）
      */
-    fun prepend(messages: List<T>) {
-        if (messages.isEmpty()) return
+    fun prepend(messages: List<T>): List<T> {
+        if (messages.isEmpty()) return emptyList()
         val existingIds = _items.map { id(it) }.toSet()
         val toAdd = messages.filter { id(it) !in existingIds }
-        if (toAdd.isEmpty()) return
+        if (toAdd.isEmpty()) return emptyList()
 
         // 两个列表都已按时间戳有序 → 归并合并 O(n+m)
         val merged = mutableListOf<T>()
@@ -85,6 +88,10 @@ class MessageLruCache<T : Any>(
         _items.clear(); _items.addAll(merged)
         toAdd.forEach { lru.remove(id(it)); lru.add(id(it)) }
         evictAndEmit()
+
+        // 返回去重后且未被淘汰的消息（调用方无需回查 snapshot）
+        val survivingIds = _items.map { id(it) }.toSet()
+        return toAdd.filter { id(it) in survivingIds }
     }
 
     /**

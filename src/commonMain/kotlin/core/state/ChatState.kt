@@ -94,6 +94,10 @@ class ChatState {
         return -message.groupId
     }
 
+    /**
+     * 统一记录消息到会话历史状态。
+     * 私聊和群聊共用一个逻辑，差异通过 lambda 参数化。
+     */
     private fun recordPrivateConversationHistoryLocked(messages: List<Message>, markAsUnread: Boolean) {
         val currentUserId = GlobalAppState.currentUserId
         val lastTimeByConversation = mutableMapOf<Int, Long>()
@@ -102,20 +106,11 @@ class ChatState {
         messages.forEach { message ->
             val conversationId = privateConversationId(message)
             lastTimeByConversation[conversationId] = maxOf(lastTimeByConversation[conversationId] ?: 0L, message.timestamp)
-
             if (markAsUnread && !message.sender && message.senderId != currentUserId) {
                 unreadByConversation[conversationId] = (unreadByConversation[conversationId] ?: 0) + 1
             }
         }
-
-        lastTimeByConversation.forEach { (conversationId, lastTime) ->
-            updateConversationStateLocked(conversationId, lastIncomingMessageTime = lastTime)
-        }
-        if (markAsUnread) {
-            unreadByConversation.forEach { (conversationId, unreadCount) ->
-                updateConversationStateLocked(conversationId, unreadDelta = unreadCount)
-            }
-        }
+        applyConversationUpdates(lastTimeByConversation, unreadByConversation)
     }
 
     private fun recordGroupConversationHistoryLocked(messages: List<GroupMessage>, markAsUnread: Boolean) {
@@ -126,19 +121,23 @@ class ChatState {
         messages.forEach { message ->
             val conversationId = groupConversationId(message)
             lastTimeByConversation[conversationId] = maxOf(lastTimeByConversation[conversationId] ?: 0L, message.timestamp)
-
             if (markAsUnread && message.senderId != currentUserId) {
                 unreadByConversation[conversationId] = (unreadByConversation[conversationId] ?: 0) + 1
             }
         }
+        applyConversationUpdates(lastTimeByConversation, unreadByConversation)
+    }
 
+    /** 两个 record* 方法的公共尾：将统计结果刷入 _conversationStates。 */
+    private fun applyConversationUpdates(
+        lastTimeByConversation: Map<Int, Long>,
+        unreadByConversation: Map<Int, Int>
+    ) {
         lastTimeByConversation.forEach { (conversationId, lastTime) ->
             updateConversationStateLocked(conversationId, lastIncomingMessageTime = lastTime)
         }
-        if (markAsUnread) {
-            unreadByConversation.forEach { (conversationId, unreadCount) ->
-                updateConversationStateLocked(conversationId, unreadDelta = unreadCount)
-            }
+        unreadByConversation.forEach { (conversationId, unreadCount) ->
+            updateConversationStateLocked(conversationId, unreadDelta = unreadCount)
         }
     }
 
@@ -302,12 +301,11 @@ class ChatState {
         newMessages: List<Message>,
         markAsUnread: Boolean = false
     ) = messagesMutex.withLock {
-        _messageCache.prepend(newMessages)
-        conversationStateMutex.withLock {
-            recordPrivateConversationHistoryLocked(
-                newMessages.filter { _messageCache.snapshot.any { m -> m.messageId == it.messageId } },
-                markAsUnread
-            )
+        val inserted = _messageCache.prepend(newMessages)
+        if (inserted.isNotEmpty()) {
+            conversationStateMutex.withLock {
+                recordPrivateConversationHistoryLocked(inserted, markAsUnread)
+            }
         }
     }
 
@@ -359,12 +357,11 @@ class ChatState {
         newMessages: List<GroupMessage>,
         markAsUnread: Boolean = false
     ) = groupMessagesMutex.withLock {
-        _groupMessageCache.prepend(newMessages)
-        conversationStateMutex.withLock {
-            recordGroupConversationHistoryLocked(
-                newMessages.filter { _groupMessageCache.snapshot.any { m -> m.messageId == it.messageId } },
-                markAsUnread
-            )
+        val inserted = _groupMessageCache.prepend(newMessages)
+        if (inserted.isNotEmpty()) {
+            conversationStateMutex.withLock {
+                recordGroupConversationHistoryLocked(inserted, markAsUnread)
+            }
         }
     }
 
