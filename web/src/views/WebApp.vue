@@ -175,62 +175,70 @@ function handleIncomingMessage(msg) {
 
 /** 登录后拉取所有会话的离线消息 */
 async function syncAllConversations() {
-  const friends = store.state.users
-  if (!friends || friends.length === 0) return
-  console.log("📡 拉取离线消息，共", friends.length, "个私聊会话")
-  for (const friend of friends) {
-    const ids = [Number(store.state.accountId), Number(friend.id)].sort((a, b) => a - b)
-    const convId = 'user:' + ids[0] + ':' + ids[1]
-    const seqId = store.getConversationSeqId(convId) || 0
-    try {
-      const result = await api.syncMessages(convId, seqId, 100)
-      if (result.messages && result.messages.length > 0) {
-        console.log("📩 会话", convId, "拉取到", result.messages.length, "条新消息")
-        for (const msg of result.messages) {
-          store.addMessage({
-            user: String(msg.senderId === store.state.accountId ? 'you' : msg.senderId),
-            text: msg.message,
-            time: msg.timestamp,
-            targetId: String(msg.senderId === store.state.accountId ? msg.receiverId : msg.senderId),
-            seqId: msg.seqId
-          })
-        }
-        store.setConversationSeqId(convId, result.nextSeqId)
-      }
-    } catch (e) {
-      console.warn("⚠️ 拉取会话", convId, "失败:", e.message)
-    }
-  }
+  const accountId = store.state.accountId
+  if (!accountId) return
+  console.log("📡 拉取离线消息...")
+  try {
+    const allMessages = await api.getOfflineMessages()
+    if (!allMessages || allMessages.length === 0) return
+    console.log("📩 拉取到", allMessages.length, "条离线消息")
 
-  // 同步群聊消息
-  const groups = store.state.groups
-  if (groups && groups.length > 0) {
-    console.log("📡 拉取群聊消息，共", groups.length, "个群")
-    for (const group of groups) {
-      const convId = 'group:' + group.id
-      const seqId = store.getConversationSeqId(convId) || 0
-      try {
-        const result = await api.syncMessages(convId, seqId, 50)
-        if (result.messages && result.messages.length > 0) {
-          console.log("📩 群聊", convId, "拉取到", result.messages.length, "条新消息")
-          for (const msg of result.messages) {
-            store.addGroupMessage({
-              user: String(msg.senderId),
-              text: msg.message,
-              time: msg.timestamp,
-              groupId: String(group.id),
-              seqId: msg.seqId
-            })
-          }
-          store.setConversationSeqId(convId, result.nextSeqId)
-        }
-      } catch (e) {
-        console.warn("⚠️ 拉取群聊", convId, "失败:", e.message)
+    // 按 conversationId 分组
+    const privateByConv = {}
+    const groupByConv = {}
+    for (const msg of allMessages) {
+      const convId = msg.conversationId || ''
+      if (convId.startsWith('group:')) {
+        if (!groupByConv[convId]) groupByConv[convId] = []
+        groupByConv[convId].push(msg)
+      } else {
+        const cid = convId || (() => {
+          const ids = [Number(accountId), Number(msg.senderId)].sort((a, b) => a - b)
+          return 'user:' + ids[0] + ':' + ids[1]
+        })()
+        if (!privateByConv[cid]) privateByConv[cid] = []
+        privateByConv[cid].push(msg)
       }
     }
-  }
 
-  console.log("✅ 离线消息拉取完成")
+    // 私聊
+    for (const [convId, msgs] of Object.entries(privateByConv)) {
+      msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+      for (const msg of msgs) {
+        const isMe = String(msg.senderId) === String(accountId)
+        store.addMessage({
+          user: isMe ? 'you' : String(msg.senderId),
+          text: msg.message,
+          time: msg.timestamp,
+          targetId: isMe ? String(msg.receiverId) : String(msg.senderId),
+          seqId: msg.seqId
+        })
+      }
+      const maxSeqId = Math.max(...msgs.map(m => m.seqId || 0))
+      if (maxSeqId > 0) store.setConversationSeqId(convId, maxSeqId)
+    }
+
+    // 群聊
+    for (const [convId, msgs] of Object.entries(groupByConv)) {
+      const gid = convId.replace('group:', '')
+      msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+      for (const msg of msgs) {
+        store.addGroupMessage({
+          user: String(msg.senderId),
+          text: msg.message,
+          time: msg.timestamp,
+          groupId: gid,
+          seqId: msg.seqId
+        })
+      }
+      const maxSeqId = Math.max(...msgs.map(m => m.seqId || 0))
+      if (maxSeqId > 0) store.setConversationSeqId(convId, maxSeqId)
+    }
+
+    console.log(`📡 增量同步完成: ${allMessages.length} 条, ${Object.keys(privateByConv).length} 个私聊会话, ${Object.keys(groupByConv).length} 个群聊`)
+  } catch (e) {
+    console.warn("⚠️ 拉取离线消息失败:", e.message)
+  }
 }
 
 /** 建立 WebTransport 连接 */
