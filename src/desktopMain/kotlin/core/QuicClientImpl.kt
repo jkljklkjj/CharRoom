@@ -58,6 +58,8 @@ class QuicClientImpl : ChatTransport {
                 scope.launch {
                     doLogin()
                     flushPendingMessages()
+                    // 启动心跳（服务端 idle timeout=30s，心跳间隔 20s）
+                    startHeartbeat()
                 }
             }
 
@@ -102,6 +104,24 @@ class QuicClientImpl : ChatTransport {
         val frame = QuicStreamProtocol.encodeFrame(loginPayload)
         transport.send(stream0Id, frame)
         log.info("QUIC 登录请求已发送 (streamId=$stream0Id)")
+    }
+
+    /**
+     * 心跳：每 20s 发送一次（服务端 idle timeout=30s）。
+     */
+    private suspend fun startHeartbeat() {
+        while (connected.get()) {
+            delay(20_000)
+            if (!connected.get()) break
+            val controlStreamId = sessions[CONTROL_SESSION_KEY]?.streamId ?: break
+            val hbPayload = buildHeartbeatPayload()
+            val frame = QuicStreamProtocol.encodeFrame(hbPayload)
+            try {
+                transport.send(controlStreamId, frame)
+            } catch (e: Exception) {
+                log.warn("心跳发送失败: ${e.message}")
+            }
+        }
     }
 
     /**
