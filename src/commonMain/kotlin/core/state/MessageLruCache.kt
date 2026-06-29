@@ -25,6 +25,8 @@ class MessageLruCache<T : Any>(
     private val _state = MutableStateFlow<List<T>>(emptyList())
     val state: StateFlow<List<T>> = _state.asStateFlow()
 
+    /** 当前列表快照（供 `ChatState.updateMessage*` 等只读场景使用，不触发 StateFlow 更新） */
+    val snapshot: List<T> get() = _items.toList()
     val size: Int get() = _items.size
 
     // LRU 访问顺序追踪器
@@ -139,7 +141,7 @@ class MessageLruCache<T : Any>(
      */
     private fun evictAndEmit() {
         if (_items.size <= maxSize) { emit(); return }
-        val keep = lru.takeLast(maxSize).toSet()
+        val keep = lru.toList().takeLast(maxSize).toSet()
         _items.removeAll { id(it) !in keep }
         lru.retainAll(keep)
         emit()

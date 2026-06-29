@@ -1,6 +1,7 @@
 package core
 
 import kotlinx.coroutines.*
+import core.state.GlobalChatState
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -142,7 +143,9 @@ class QuicClientImpl : ChatTransport {
                                 val ackConvId = ack.conversationId
                                 // 更新会话 seqId 游标（增量同步用）
                                 if (ackConvId.isNotBlank() && ackSeqId > 0) {
-                                    GlobalChatState.updateConversationSeqId(ackConvId, ackSeqId)
+                                    scope.launch {
+                                        GlobalChatState.updateConversationSeqId(ackConvId, ackSeqId)
+                                    }
                                 }
                             }
                             return@forEach

@@ -15,6 +15,7 @@ import data.repository.ChatRepository
 import data.repository.GlobalChatRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -292,7 +293,7 @@ open class ChatViewModel(
             val privateByConv = privateMsgIds.groupBy { msg ->
                 if (msg.conversationId.isNotBlank()) msg.conversationId
                 else {
-                    val ids = listOf(GlobalAppState.currentUserId?.toString(), msg.senderId.toString()).filter { it.toIntOrNull() != null }.sorted()
+                    val ids = listOf(GlobalAppState.currentUserId?.toString() ?: "0", msg.senderId.toString()).sorted()
                     "user:${ids[0]}:${ids[1]}"
                 }
             }
@@ -894,7 +895,7 @@ open class ChatViewModel(
      */
     open fun clear() {
         saveConversationSeqIds() // 退出前持久化 seqId 游标
-        coroutineScope.cancel()
+        coroutineScope.coroutineContext[Job]?.cancel()
         coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         coroutineScope.launch {
             chatState.clear()

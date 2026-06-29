@@ -47,7 +47,6 @@ class ChatLiteCli(private val args: Array<String>) {
         showConnectionStatus()
         if (token.isNotBlank()) {
             ServerConfig.DEVICE_TYPE = "cli"
-            transport = QuicClientImpl()
             transport.addMessageReceiveListener(object : core.MessageReceiveListener {
                 override fun onPrivateMessageReceived(senderId: Int, msg: String, timestamp: Long) {
                     println("\n💬 [用户 $senderId]: $msg"); print("> ")
