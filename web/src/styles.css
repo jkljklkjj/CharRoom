@@ -103,10 +103,14 @@ img {
 }
 .container{max-width:1000px;margin:0 auto;padding:20px}
 
-/* 移动端减小容器内边距 */
+/* 移动端容器内边距 */
 @media (max-width: 768px) {
   .container {
     padding: 0 16px;
+  }
+  /* hero 区自己有背景和内边距，容器无需额外 padding */
+  .hero-inner.container {
+    padding: 0;
   }
 }
 .site-header{display:flex;justify-content:space-between;align-items:center;padding:12px 0}
