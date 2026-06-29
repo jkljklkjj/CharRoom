@@ -369,6 +369,7 @@ function formatText(text) {
 
 // textarea 自动高度
 function autoResize() {
+  unlockSend() // 用户重新输入 → 解锁发送按钮
   const el = messageInput.value
   if (!el) return
   el.style.height = 'auto'
@@ -388,11 +389,15 @@ function onInputFocus() {
 }
 
 let _sendLock = { private: false, group: false }
+/** 用户重新输入时解锁发送按钮（代替 setTimeout，更自然） */
+function unlockSend() {
+  const key = isGroupChat.value ? 'group' : 'private'
+  _sendLock[key] = false
+}
 function send(){
   const key = isGroupChat.value ? 'group' : 'private'
   if(!text.value.trim() || currentChatId.value == null || _sendLock[key]) return
   _sendLock[key] = true
-  setTimeout(() => _sendLock[key] = false, 500)
   const m = {
     user: 'you',
     text: text.value,
