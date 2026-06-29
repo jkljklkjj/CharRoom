@@ -689,7 +689,7 @@ private fun ChatScreenContent(
 
                 itemsIndexed(
                     items = displayMessages,
-                    key = { index, message -> "${message.messageId}_$index" }
+                    key = { _, message -> message.messageId }
                 ) { index, message ->
                     // 显示日期分隔线
                     if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
