@@ -553,7 +553,6 @@ private fun ChatScreenContent(
                     ) {
                         Text(
                             text = "📹",
-                            contentDescription = s["call.video.btn"]
                         )
                     }
 
@@ -566,7 +565,6 @@ private fun ChatScreenContent(
                         ) {
                             Text(
                                 text = "⋯",
-                                contentDescription = s["friend.menu.info"]
                             )
                         }
                         DropdownMenu(

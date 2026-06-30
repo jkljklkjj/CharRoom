@@ -63,7 +63,6 @@ android {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
             java.exclude('**/Glassmorphism.kt')
-            java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }
