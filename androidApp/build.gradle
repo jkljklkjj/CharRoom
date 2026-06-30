@@ -61,20 +61,17 @@ android {
 
     sourceSets {
         main {
-            java.srcDirs += project.file('../src/commonMain/kotlin')
-            resources.srcDirs += project.file('../src/commonMain/resources')
-        }
-    }
-
-    // 编译前过滤掉 Desktop 专用文件
-    gradle.projectsEvaluated {
-        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { t ->
-            if (t.name.contains('Release') || t.name.contains('Debug')) {
-                t.exclude('**/Glassmorphism.kt')
-                t.exclude('**/ShareUtil.kt')
-                t.exclude('**/TokenQuotaScreen.kt')
-                t.exclude('**/call/**')
+            // Add all commonMain subdirectories, excluding desktop-only modules
+            def common = project.file('../src/commonMain/kotlin')
+            fileTree(common).visit { details ->
+                if (details.isDirectory()) {
+                    def path = details.relativePath.toString()
+                    if (!path.contains('call') && !path.contains('component/call')) {
+                        java.srcDirs += details.file
+                    }
+                }
             }
+            resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }
 
