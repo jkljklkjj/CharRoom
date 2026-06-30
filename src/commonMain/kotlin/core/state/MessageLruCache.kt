@@ -14,10 +14,18 @@ import kotlinx.coroutines.flow.asStateFlow
  * - 每次变更自动同步到 [state]，外部直接观察即可，无需手动赋值
  */
 class MessageLruCache<T : Any>(
-    val maxSize: Int,
+    maxSize: Int,
     private val id: (T) -> String,
     private val timestamp: (T) -> Long
 ) {
+    /** 当前缓存容量上限（可在前台/后台切换时动态调整，立即触发淘汰） */
+    var maxSize: Int = maxSize
+        set(value) {
+            if (value != field && value > 0) {
+                field = value
+                evictAndEmit()
+            }
+        }
     // 按时间戳排序的消息
     private val _items = mutableListOf<T>()
 

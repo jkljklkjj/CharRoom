@@ -108,18 +108,45 @@ class QuicClientImpl : ChatTransport {
         log.info("QUIC 登录请求已发送 (streamId=$stream0Id)")
     }
 
+    // 心跳自适应 RTT 跟踪
+    private val rttWindow = mutableListOf<Long>()
+    private var lastHeartbeatSend = 0L
+    private var hbSendInProgress = false
+
+    /** 自适应心跳间隔：基于 P90 RTT，范围 5-25s（服务端 idle timeout=30s）。 */
+    private fun adaptiveHbInterval(): Long {
+        if (rttWindow.size < 3) return 20_000L
+        val sorted = rttWindow.sorted()
+        val p90 = sorted[(sorted.size * 0.9).toInt().coerceAtMost(sorted.size - 1)]
+        return (p90 * 5).coerceIn(5_000, 25_000)
+    }
+
+    /** 收到服务端响应时记录 RTT。 */
+    private fun recordRtt() {
+        if (!hbSendInProgress) return
+        val rtt = System.currentTimeMillis() - lastHeartbeatSend
+        if (rtt < 0 || rtt > 60_000) return
+        rttWindow.add(rtt)
+        if (rttWindow.size > 10) rttWindow.removeFirst()
+        hbSendInProgress = false
+    }
+
     /**
-     * 心跳：每 20s 发送一次（服务端 idle timeout=30s）。
+     * 心跳：自适应间隔（基于 RTT 滑动窗口），服务端 idle timeout=30s。
      */
     private suspend fun startHeartbeat() {
         while (connected.get()) {
-            delay(20_000)
+            val interval = adaptiveHbInterval()
+            delay(interval)
             if (!connected.get()) break
             val controlStreamId = sessions[CONTROL_SESSION_KEY]?.streamId ?: break
             val hbPayload = buildHeartbeatPayload()
             val frame = QuicStreamProtocol.encodeFrame(hbPayload)
             try {
+                lastHeartbeatSend = System.currentTimeMillis()
+                hbSendInProgress = true
                 transport.send(controlStreamId, frame)
+                log.debug("心跳已发送 (interval={}ms)", interval)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 log.warn("心跳发送失败: ${e.message}")
@@ -131,6 +158,8 @@ class QuicClientImpl : ChatTransport {
      * 处理收到的 Stream 数据帧，向上层回调分发。
      */
     private fun handleStreamData(streamId: Long, data: ByteArray) {
+        // 任何服务端响应都可作为 RTT 样本（心跳确认 + 消息推送）
+        recordRtt()
         // 数据已由 QuicStreamInitializer 按帧边界返回，直接透传
         synchronized(messageListeners) {
             messageListeners.forEach { listener ->

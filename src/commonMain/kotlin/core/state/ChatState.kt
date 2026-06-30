@@ -428,6 +428,22 @@ class ChatState {
     }
 
     /**
+     * 自适应缓存容量：应用切前后台时调用，立即触发 LRU 淘汰。
+     * @param foreground true=保持最大容量(200)，false=缩减(50)释放内存
+     */
+    suspend fun setAdaptiveCache(foreground: Boolean) {
+        val target = if (foreground) MAX_MESSAGES else MAX_MESSAGES / 4
+        messagesMutex.withLock {
+            _messageCache.maxSize = target
+            _privateMessageCaches.values.forEach { it.maxSize = target }
+        }
+        groupMessagesMutex.withLock {
+            _groupMessageCache.maxSize = target
+            _groupMessageCaches.values.forEach { it.maxSize = target }
+        }
+    }
+
+    /**
      * 标记私聊消息为最近访问（提升 LRU 位置，不改变时间排序）。
      */
     suspend fun touchMessage(messageId: String) = messagesMutex.withLock {

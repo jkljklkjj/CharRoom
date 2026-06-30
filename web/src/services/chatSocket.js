@@ -340,22 +340,54 @@ export function isConnected() {
   return transport !== null && transport.isConnected()
 }
 
-// ── 心跳 ────────────────────────────────────────
+// ── 自适应心跳 ──────────────────────────────────
+
+// RTT 滑动窗口（用于自适应心跳间隔）
+const rttWindow = []
+let lastHbSendTime = 0
+
+/** 自适应心跳间隔：基于 P90 RTT，范围 8-27s */
+function adaptiveHbInterval() {
+  if (rttWindow.length < 3) return 30000
+  const sorted = [...rttWindow].sort((a, b) => a - b)
+  const p90 = sorted[Math.floor(sorted.length * 0.9)]
+  return Math.max(8000, Math.min(27000, p90 * 5))
+}
+
+/** 收到服务端响应时记录 RTT */
+function recordRtt() {
+  if (!lastHbSendTime) return
+  const rtt = Date.now() - lastHbSendTime
+  if (rtt < 0 || rtt > 60000) return
+  rttWindow.push(rtt)
+  if (rttWindow.length > 10) rttWindow.shift()
+  lastHbSendTime = 0
+
+  // 动态调整心跳间隔
+  const newInterval = adaptiveHbInterval()
+  if (Math.abs(newInterval - heartbeatInterval) > 3000) {
+    heartbeatInterval = newInterval
+    console.debug(`❤️ 心跳间隔自适应调整为 ${heartbeatInterval}ms (RTT=${rtt}ms)`)
+    stopHeartbeat()
+    startHeartbeat()
+  }
+}
 
 function startHeartbeat() {
   stopHeartbeat()
   lastHeartbeatResponseTime = Date.now()
 
-  heartbeatTimer = setInterval(() => {
+  const tick = () => {
     if (!transport || !transport.isConnected()) return
 
     const timeSinceLastResponse = Date.now() - lastHeartbeatResponseTime
-    if (timeSinceLastResponse > heartbeatInterval + heartbeatTimeout) {
+    if (timeSinceLastResponse > heartbeatInterval + 10000) {
       console.log(`❤️ 心跳超时 (${timeSinceLastResponse}ms)，关闭连接`)
       transport.close()
       return
     }
 
+    lastHbSendTime = Date.now()
     sendWrapper({
       type: 'heartbeat',
       heartbeat: { timestamp: Date.now() }
@@ -363,7 +395,9 @@ function startHeartbeat() {
       console.log('心跳发送失败，关闭连接')
       if (transport) transport.close()
     })
-  }, heartbeatInterval)
+  }
+
+  heartbeatTimer = setInterval(tick, heartbeatInterval)
 }
 
 function stopHeartbeat() {
@@ -423,8 +457,9 @@ async function handleMessage(rawData) {
 
   // 处理服务端响应
   if (processedData && typeof processedData === 'object') {
-    // 任何来自服务端的成功消息都视为心跳有效
+    // 任何来自服务端的成功消息都视为心跳有效，同时记录 RTT
     lastHeartbeatResponseTime = Date.now()
+    recordRtt()
 
     // 带 success 字段的响应（ResponseMessage / AckMessage）
     // protobuf 结构: { type, response: { success, message } }

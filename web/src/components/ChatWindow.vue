@@ -125,6 +125,24 @@ import chatSocket from '../services/chatSocket'
 const store = useStore()
 // 暴露 store 给 chatSocket 的 ACK 超时检查使用
 if (typeof window !== 'undefined') window.__chatStore = store
+
+// 前后台自适应：切后台时释放部分消息内存
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    const hidden = document.hidden
+    const MAX = 200
+    const MIN = 50
+    const target = hidden ? MIN : MAX
+    // 私聊消息截断
+    if (store.state.messages.length > target) {
+      store.state.messages.splice(0, store.state.messages.length - target)
+    }
+    // 群聊消息截断
+    if (store.state.groupMessages.length > target) {
+      store.state.groupMessages.splice(0, store.state.groupMessages.length - target)
+    }
+  })
+}
 const { t } = useI18n()
 const text = ref('')
 const msgList = ref(null)
