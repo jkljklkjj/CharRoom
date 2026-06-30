@@ -807,7 +807,7 @@ fun GroupChatScreen(
                                             replyToMessage = message
                                             showLongPressMenu = false
                                         },
-                                        onShare = { shareText(message.message) }
+                                        onShare = { shareText(it) }
                                     )
                                 }
                             }
