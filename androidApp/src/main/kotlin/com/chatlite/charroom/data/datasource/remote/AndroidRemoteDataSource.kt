@@ -128,6 +128,10 @@ class AndroidRemoteDataSource(
         return emptyList()
     }
 
+    override suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int): core.SyncMessagesResult {
+        return core.SyncMessagesResult()
+    }
+
     override suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
         return false

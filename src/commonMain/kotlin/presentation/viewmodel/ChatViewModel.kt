@@ -48,6 +48,8 @@ open class ChatViewModel(
     private val appJob = SupervisorJob()
     private var sessionJob: Job = SupervisorJob(appJob)
     private val sessionScope get() = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
+    /** Android 子类需要访问 coroutineScope */
+    protected val coroutineScope: CoroutineScope get() = sessionScope
     // 用户列表状态Flow
     val usersFlow: StateFlow<List<User>> = chatState.users
 

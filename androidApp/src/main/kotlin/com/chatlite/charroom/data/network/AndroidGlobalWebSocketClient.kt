@@ -5,7 +5,7 @@ import com.chatlite.proto.MessageProtos
 import core.AuthStateListener
 import core.MessageReceiveListener
 import core.MsgType
-import core.WebSocketClientProvider
+import core.ChatTransport
 import core.state.GlobalAppState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Android 平台的全局 WebSocket 适配器。
  * 适配 commonMain 的 Chat 接口到 Android 现有 NetworkRepository 实现。
  */
-object AndroidGlobalWebSocketClient : WebSocketClientProvider {
+object AndroidGlobalWebSocketClient : ChatTransport {
     private val repository by lazy { NetworkRepository.getInstance() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
