@@ -65,6 +65,8 @@ android {
             // Glassmorphism.kt uses expect declarations - not supported in non-KMP module.
             // Actual implementations are in androidMain/Glassmorphism.android.kt
             java.exclude('**/Glassmorphism.kt')
+            // 排除桌面端通话模块（使用 Desktop WebRTC，不兼容 Android）
+            java.exclude('**/component/call/**')
             java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
@@ -195,8 +197,8 @@ dependencies {
     implementation 'com.jakewharton.timber:timber:5.0.1' // Android日志库替代logback
     implementation 'com.arcao:slf4j-timber:3.1' // SLF4J到Timber的桥接，让AppLog也能通过Timber输出
 
-    // WebRTC 视频通话（Android 版 Google WebRTC 提供 org.webrtc.*）
-    implementation 'io.getstream:stream-webrtc-android:1.2.2'
+    // WebRTC 视频通话（当前 Desktop only）
+    // exclude component/call 目录，Android 不编译通话模块
     // Compose 图标扩展
     implementation "androidx.compose.material:material-icons-core:1.6.8"
     implementation "androidx.compose.material:material-icons-extended:1.6.8"
