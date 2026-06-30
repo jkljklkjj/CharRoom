@@ -417,7 +417,7 @@ suspend fun getTokenQuota(token: String): model.QuotaInfo? {
         path = ApiEndpoints.AGENT_QUOTA,
         token = token
     )
-    return if (response.isSuccess) response.body else null
+    return if (response.isSuccess) response.data else null
 }
 
 /**
@@ -428,7 +428,7 @@ suspend fun getTokenPrices(token: String): model.TokenPrices? {
         path = ApiEndpoints.AGENT_QUOTA_PRICES,
         token = token
     )
-    return if (response.isSuccess) response.body else null
+    return if (response.isSuccess) response.data else null
 }
 
 /**
@@ -444,7 +444,7 @@ suspend fun purchaseTokens(token: String, amountFen: Int): model.PayResult? {
         body = requestBody,
         token = token
     )
-    return if (response.isSuccess) response.body else null
+    return if (response.isSuccess) response.data else null
 }
 
 /**

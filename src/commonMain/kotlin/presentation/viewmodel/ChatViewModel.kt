@@ -247,6 +247,8 @@ open class ChatViewModel(
         }
     }
 
+    // 当前选中的用户（用于好友管理等）
+    private val _selectedUser = MutableStateFlow<User?>(null)
     // 好友/群请求状态Flow
     private val _friendRequests = MutableStateFlow<List<User>>(emptyList())
     val friendRequests: StateFlow<List<User>> = _friendRequests.asStateFlow()

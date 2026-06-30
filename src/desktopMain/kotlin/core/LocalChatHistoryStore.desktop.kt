@@ -206,13 +206,13 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun restoreConversationSeqIds(): Map<String, Long> {
-        return runCatching {
+        return runCatching<Map<String, Long>> {
             val userHome = System.getProperty("user.home")
             val folder = java.io.File(userHome, HISTORY_DIR_NAME)
             val file = java.io.File(folder, "seq_ids.json")
-            if (!file.exists()) return@runCatching emptyMap()
+            if (!file.exists()) return@runCatching emptyMap<String, Long>()
             val text = file.readText()
-            if (text.isBlank()) return@runCatching emptyMap()
+            if (text.isBlank()) return@runCatching emptyMap<String, Long>()
             objectMapper.readValue(text, objectMapper.typeFactory.constructMapType(
                 Map::class.java, String::class.java, Long::class.javaObjectType
             ))
