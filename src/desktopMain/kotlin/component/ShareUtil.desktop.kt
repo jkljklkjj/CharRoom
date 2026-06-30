@@ -7,7 +7,7 @@ import java.net.URLEncoder
 /**
  * Desktop: 用 java.awt.Desktop 打开默认邮件客户端，将消息内容填入邮件正文
  */
-actual fun shareText(text: String) {
+fun shareText(text: String) {
     try {
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.MAIL)) {
             val body = URLEncoder.encode(text, "UTF-8")

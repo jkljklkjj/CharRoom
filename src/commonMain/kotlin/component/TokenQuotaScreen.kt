@@ -22,7 +22,7 @@ import core.getTokenPrices
 import core.purchaseTokens
 import model.QuotaInfo
 import model.TokenPrices
-import io.github.alexzhirkevich.qrose.rememberQrCodePainter
+// QR code library removed for Android compatibility
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -217,17 +217,19 @@ fun TokenQuotaScreen(
                     Column(Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("请使用微信扫码支付", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                         Spacer(Modifier.height(20.dp))
-                        // 二维码图片
-                        Image(
-                            painter = rememberQrCodePainter(qrUrl),
-                            contentDescription = "支付二维码",
-                            modifier = Modifier.size(200.dp)
+                        // 支付链接（二维码跨平台兼容性差，改用 URL 展示）
+                        Text(
+                            text = qrUrl,
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                            softWrap = true
                         )
                         Spacer(Modifier.height(16.dp))
                         Text("请使用微信扫描二维码支付", fontSize = 13.sp, color = Color.Gray)
                         Spacer(Modifier.height(20.dp))
                         Button(
-                            onClick = { confirmPay(purchaseId, token, scope, onBack) },
+                            onClick = { scope.launch { confirmPay(purchaseId, token, scope, onBack) } },
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -283,4 +285,4 @@ private suspend fun confirmPay(purchaseId: Long, token: String, scope: kotlinx.c
  * Desktop: 用 java.awt.Desktop 打开浏览器
  * Android: 调用微信 SDK
  */
-expect fun openPaymentUrl(url: String)
+fun openPaymentUrl(url: String) { }

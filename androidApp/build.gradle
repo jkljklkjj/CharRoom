@@ -62,24 +62,12 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
+            java.srcDirs += project.file('../src/androidMain/kotlin')
+            // Exclude desktop-only files
+            java.exclude('**/Glassmorphism.kt')
+            java.exclude('**/ShareUtil*')
+            java.exclude('**/TokenQuota*')
             resources.srcDirs += project.file('../src/commonMain/resources')
-        }
-    }
-    // Exclude desktop-only files from Kotlin compilation
-    tasks.configureEach { task ->
-        if (task.name == 'compileReleaseKotlin' || task.name == 'compileDebugKotlin') {
-            task.doFirst {
-                def toRemove = []
-                task.source.each { f ->
-                    if (f.path.contains('component/call') ||
-                        f.name == 'Glassmorphism.kt' ||
-                        f.name == 'ShareUtil.kt' ||
-                        f.name == 'TokenQuotaScreen.kt') {
-                        toRemove.add(f)
-                    }
-                }
-                task.source -= toRemove as Set
-            }
         }
     }
 

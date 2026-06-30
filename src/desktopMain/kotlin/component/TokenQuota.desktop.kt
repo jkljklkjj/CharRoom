@@ -6,7 +6,7 @@ import java.net.URI
 /**
  * Desktop: 打开系统默认浏览器访问支付链接
  */
-actual fun openPaymentUrl(url: String) {
+fun openPaymentUrl(url: String) {
     try {
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
             Desktop.getDesktop().browse(URI(url))
