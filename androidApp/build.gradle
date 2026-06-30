@@ -61,14 +61,20 @@ android {
 
     sourceSets {
         main {
-            // Add common sources that are compatible with Android
             java.srcDirs += project.file('../src/commonMain/kotlin')
-            // Exclude desktop-only files
-            java.exclude('**/Glassmorphism.kt')
-            java.exclude('**/ShareUtil.kt')
-            java.exclude('**/TokenQuotaScreen.kt')
-            java.exclude('**/component/call/**')
             resources.srcDirs += project.file('../src/commonMain/resources')
+        }
+    }
+
+    // 编译前过滤掉 Desktop 专用文件
+    gradle.projectsEvaluated {
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { t ->
+            if (t.name.contains('Release') || t.name.contains('Debug')) {
+                t.exclude('**/Glassmorphism.kt')
+                t.exclude('**/ShareUtil.kt')
+                t.exclude('**/TokenQuotaScreen.kt')
+                t.exclude('**/call/**')
+            }
         }
     }
 
