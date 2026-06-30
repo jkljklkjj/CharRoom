@@ -62,7 +62,15 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
+            // Exclude desktop-specific files (WebRTC, expect/actual, etc.)
             java.exclude('**/Glassmorphism.kt')
+            java.exclude('**/ShareUtil.kt')
+            java.exclude('**/call/**')
+            java.exclude('**/TokenQuotaScreen.kt')
+            kotlin.exclude('**/Glassmorphism.kt')
+            kotlin.exclude('**/ShareUtil.kt')
+            kotlin.exclude('**/call/**')
+            kotlin.exclude('**/TokenQuotaScreen.kt')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }
@@ -192,8 +200,7 @@ dependencies {
     implementation 'com.jakewharton.timber:timber:5.0.1' // Android日志库替代logback
     implementation 'com.arcao:slf4j-timber:3.1' // SLF4J到Timber的桥接，让AppLog也能通过Timber输出
 
-    // WebRTC 视频通话
-    implementation 'io.getstream:stream-webrtc-android:1.2.2'
+    // WebRTC 视频通话（当前仅在 Desktop 编译）
     // Compose 图标扩展
     implementation "androidx.compose.material:material-icons-core:1.6.8"
     implementation "androidx.compose.material:material-icons-extended:1.6.8"
