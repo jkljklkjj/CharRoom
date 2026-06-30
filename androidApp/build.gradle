@@ -61,17 +61,25 @@ android {
 
     sourceSets {
         main {
-            // Add all commonMain subdirectories, excluding desktop-only modules
-            def common = project.file('../src/commonMain/kotlin')
-            fileTree(common).visit { details ->
-                if (details.isDirectory()) {
-                    def path = details.relativePath.toString()
-                    if (!path.contains('call') && !path.contains('component/call')) {
-                        java.srcDirs += details.file
+            java.srcDirs += project.file('../src/commonMain/kotlin')
+            resources.srcDirs += project.file('../src/commonMain/resources')
+        }
+    }
+    // Exclude desktop-only files from Kotlin compilation
+    tasks.configureEach { task ->
+        if (task.name == 'compileReleaseKotlin' || task.name == 'compileDebugKotlin') {
+            task.doFirst {
+                def toRemove = []
+                task.source.each { f ->
+                    if (f.path.contains('component/call') ||
+                        f.name == 'Glassmorphism.kt' ||
+                        f.name == 'ShareUtil.kt' ||
+                        f.name == 'TokenQuotaScreen.kt') {
+                        toRemove.add(f)
                     }
                 }
+                task.source -= toRemove as Set
             }
-            resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }
 
