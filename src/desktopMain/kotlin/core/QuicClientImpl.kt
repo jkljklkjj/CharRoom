@@ -84,6 +84,7 @@ class QuicClientImpl : ChatTransport {
             try {
                 transport.connect(this@QuicClientImpl.host, this@QuicClientImpl.port)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 log.error("QUIC 连接失败", e)
             }
         }
@@ -120,6 +121,7 @@ class QuicClientImpl : ChatTransport {
             try {
                 transport.send(controlStreamId, frame)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 log.warn("心跳发送失败: ${e.message}")
             }
         }
@@ -183,6 +185,7 @@ class QuicClientImpl : ChatTransport {
                         }
                     }
                 } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     log.debug("无法解析 Stream 数据为 MessageWrapper: ${e.message}")
                 }
             }

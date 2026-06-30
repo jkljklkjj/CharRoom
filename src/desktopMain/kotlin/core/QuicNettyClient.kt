@@ -53,6 +53,7 @@ class QuicNettyClient {
                 .trustManager(InsecureTrustManagerFactory.INSTANCE)
                 .build()
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             log.error("Failed to create QUIC SSL context", e)
             throw e
         }
@@ -66,8 +67,10 @@ class QuicNettyClient {
                 .sslContext(sslCtx)
                 .maxIdleTimeout(30000, TimeUnit.MILLISECONDS)
                 .initialCongestionWindowPackets(2)
+                .congestionControlAlgorithm(QuicCongestionControlAlgorithm.BBR)
                 .build()
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             log.error("Failed to create QUIC client codec", e)
             throw e
         }
@@ -88,6 +91,7 @@ class QuicNettyClient {
                 .sync()
                 .channel()
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             log.error("Failed to bind UDP channel", e)
             throw e
         }
@@ -158,6 +162,7 @@ class QuicNettyClient {
             datagramChannel?.close()?.awaitUninterruptibly()
             group?.shutdownGracefully()
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             log.warn("QUIC 关闭异常", e)
         }
     }

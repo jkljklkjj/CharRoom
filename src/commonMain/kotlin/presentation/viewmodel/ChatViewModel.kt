@@ -328,6 +328,7 @@ open class ChatViewModel(
 
             println("[ChatViewModel] 增量同步完成: ${allMessages.size} 条消息, ${privateByConv.size} 个私聊会话, ${groupByConv.size} 个群聊会话")
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 增量同步失败: ${e.message}")
         }
     }
@@ -347,6 +348,7 @@ open class ChatViewModel(
 
                 println("[ChatViewModel] 拉取请求完成: 好友请求 ${friendRequests.size} 条, 群聊请求 ${groupRequests.size} 条")
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 println("[ChatViewModel] 拉取请求失败: ${e.message}")
                 e.printStackTrace()
             }
@@ -429,6 +431,7 @@ open class ChatViewModel(
                 println("[ChatViewModel] 从本地恢复了 ${savedSeqIds.size} 个会话的 seqId 游标")
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 恢复 seqId 游标失败: ${e.message}")
         }
 
@@ -436,6 +439,7 @@ open class ChatViewModel(
         val friends = try {
             chatRepository.fetchFriends()
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 获取好友列表失败: ${e.message}")
             return
         }
@@ -477,6 +481,7 @@ open class ChatViewModel(
 
                     hasMore = result.hasMore && result.messages.size >= 50
                 } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     println("[ChatViewModel] 同步会话 $conversationId 失败: ${e.message}")
                     break
                 }
@@ -525,12 +530,14 @@ open class ChatViewModel(
 
                         hasMore = result.hasMore && result.messages.size >= 50
                     } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
                         println("[ChatViewModel] 同步群聊 $conversationId 失败: ${e.message}")
                         break
                     }
                 }
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 获取群聊列表失败: ${e.message}")
         }
 
@@ -539,6 +546,7 @@ open class ChatViewModel(
             LocalChatHistoryStore.saveConversationSeqIds(chatState.conversationSeqIds.value)
             println("[ChatViewModel] seqId 游标已持久化到本地存储")
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 持久化 seqId 游标失败: ${e.message}")
         }
 
@@ -589,6 +597,7 @@ open class ChatViewModel(
 
             hasMore
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 拉取离线消息失败: ${e.message}")
             e.printStackTrace()
             false
@@ -762,6 +771,7 @@ open class ChatViewModel(
                 }
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 发送消息流程异常: ${e.message}")
             e.printStackTrace()
             sessionScope.launch {
@@ -881,6 +891,7 @@ open class ChatViewModel(
                 }
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 发送群消息流程异常: ${e.message}")
             e.printStackTrace()
             sessionScope.launch {
@@ -972,6 +983,7 @@ open class ChatViewModel(
             LocalChatHistoryStore.save(accountId, privateMessages, groupMessages)
 //            println("[ChatViewModel] 聊天历史已保存到本地，私聊消息: ${privateMessages.size}条, 群聊消息: ${groupMessages.size}条")
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 保存聊天历史到本地失败: ${e.message}")
             e.printStackTrace()
         }
@@ -993,6 +1005,7 @@ open class ChatViewModel(
                     println("[ChatViewModel] 从本地加载聊天历史，私聊消息: ${history.privateMessages.size}条, 群聊消息: ${history.groupMessages.size}条")
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 println("[ChatViewModel] 从本地加载聊天历史失败: ${e.message}")
                 e.printStackTrace()
             }
