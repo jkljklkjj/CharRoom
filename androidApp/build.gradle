@@ -62,17 +62,16 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
-            // Exclude desktop-specific files (WebRTC, expect/actual, etc.)
-            java.exclude('**/Glassmorphism.kt')
-            java.exclude('**/ShareUtil.kt')
-            java.exclude('**/call/**')
-            java.exclude('**/TokenQuotaScreen.kt')
-            kotlin.exclude('**/Glassmorphism.kt')
-            kotlin.exclude('**/ShareUtil.kt')
-            kotlin.exclude('**/call/**')
-            kotlin.exclude('**/TokenQuotaScreen.kt')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
+    }
+
+    // Filter out desktop-specific files from Kotlin compilation
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { task ->
+        task.exclude('**/Glassmorphism.kt')
+        task.exclude('**/ShareUtil.kt')
+        task.exclude('**/TokenQuotaScreen.kt')
+        task.exclude('**/component/call/**')
     }
 
     def debugKeystoreFile = file("${rootProject.projectDir}/.android/debug.keystore")

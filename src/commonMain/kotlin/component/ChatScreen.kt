@@ -548,7 +548,7 @@ private fun ChatScreenContent(
 
                     // 视频通话按钮
                     IconButton(
-                        onClick = { onVideoCallClick?.invoke(user.id) },
+                        onClick = { onVideoCallClick?.invoke(user.id.toString()) },
                         modifier = Modifier.size(40.dp)
                     ) {
                         Text(
