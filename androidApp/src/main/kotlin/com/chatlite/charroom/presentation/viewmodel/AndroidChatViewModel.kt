@@ -27,9 +27,8 @@ import java.util.*
 class AndroidChatViewModel(
     private val remoteDataSource: AndroidRemoteDataSource,
     chatRepository: ChatRepository = GlobalChatRepository,
-    chatState: core.state.ChatState = core.state.GlobalChatState,
-    coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate)
-) : ChatViewModel(chatRepository, chatState, coroutineScope) {
+    chatState: core.state.ChatState = core.state.GlobalChatState
+) : ChatViewModel(chatRepository, chatState) {
 
     // WebSocket连接状态
     private val _wsConnected = MutableStateFlow(false)

@@ -183,6 +183,10 @@ class AndroidRemoteDataSource(
         return false
     }
 
+    override suspend fun deleteFriend(token: String, friendId: Int): Boolean {
+        return networkRepository.deleteFriend(friendId)
+    }
+
     /**
      * 上传头像 - Android特有方法
      */
