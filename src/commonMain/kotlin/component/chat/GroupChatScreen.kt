@@ -101,7 +101,6 @@ import component.chatHeaderBrush
 import component.messageBubbleBrush
 import component.rememberElasticScale
 import component.sidebarHeaderBrush
-import component.shareText
 import com.chatlite.i18n.LocalStrings
 import com.chatlite.i18n.currentStrings
 import core.GlobalApiService
@@ -807,7 +806,7 @@ fun GroupChatScreen(
                                             replyToMessage = message
                                             showLongPressMenu = false
                                         },
-                                        onShare = { shareText(it) }
+                                        onShare = { /* shareText unavailable on Android */ }
                                     )
                                 }
                             }

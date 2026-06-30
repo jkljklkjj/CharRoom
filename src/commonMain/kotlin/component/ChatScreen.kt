@@ -937,7 +937,7 @@ private fun ChatScreenContent(
                                             replyToMessage = message
                                             showLongPressMenu = false
                                         },
-                                        onShare = { shareText(message.message) }
+                                        onShare = { /* shareText unavailable on Android */ }
                                     )
                                 }
                             }

@@ -184,7 +184,8 @@ class AndroidRemoteDataSource(
     }
 
     override suspend fun deleteFriend(token: String, friendId: Int): Boolean {
-        return networkRepository.deleteFriend(friendId)
+        // Android 暂无删除好友的 API 实现
+        return false
     }
 
     /**
