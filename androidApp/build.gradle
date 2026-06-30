@@ -63,11 +63,13 @@ android {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
             java.exclude('**/Glassmorphism.kt')
-            // Explicitly exclude specific files that won't compile on Android
-            java.exclude('**/component/call/**')
             java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
+    }
+    // Force Kotlin compiler to skip component/call files
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        exclude('**/component/call/**')
     }
 
     def debugKeystoreFile = file("${rootProject.projectDir}/.android/debug.keystore")
