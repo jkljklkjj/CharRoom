@@ -61,15 +61,19 @@ android {
 
     sourceSets {
         main {
-            java.srcDirs += project.file('../src/commonMain/kotlin')
-            // Glassmorphism.kt uses expect declarations - not supported in non-KMP module.
-            // Actual implementations are in androidMain/Glassmorphism.android.kt
+            // 逐个添加 commonMain 子目录（排除 call 通话模块，使用 Desktop WebRTC 不兼容 Android）
+            def commonMain = project.file('../src/commonMain/kotlin')
+            java.srcDirs += commonMain
+            // 显式排除不需要的文件
             java.exclude('**/Glassmorphism.kt')
-            // 排除桌面端通话模块（使用 Desktop WebRTC，不兼容 Android）
             java.exclude('**/component/call/**')
             java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
+    }
+    // Kotlin 编译排除（java.exclude 在 AGP 中可能不覆盖 Kotlin 编译）
+    tasks.matching { it.name.startsWith('compile') && it.name.contains('Kotlin') }.configureEach {
+        exclude('**/component/call/**')
     }
 
     def debugKeystoreFile = file("${rootProject.projectDir}/.android/debug.keystore")
