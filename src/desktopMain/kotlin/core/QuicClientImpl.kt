@@ -258,7 +258,6 @@ class QuicClientImpl : ChatTransport {
                             MsgType.CHAT -> StreamSession.ConversationType.PRIVATE
                             MsgType.GROUP_CHAT -> StreamSession.ConversationType.GROUP
                             MsgType.AGENT_CHAT -> StreamSession.ConversationType.AGENT
-                            else -> StreamSession.ConversationType.PRIVATE
                         },
                         targetId = targetId
                     )
@@ -268,7 +267,6 @@ class QuicClientImpl : ChatTransport {
                             MsgType.CHAT -> "private"
                             MsgType.GROUP_CHAT -> "group"
                             MsgType.AGENT_CHAT -> "agent"
-                            else -> "private"
                         },
                         targetId = targetId
                     )

@@ -48,11 +48,11 @@ class ChatLiteCli(private val args: Array<String>) {
         if (token.isNotBlank()) {
             ServerConfig.DEVICE_TYPE = "cli"
             transport.addMessageReceiveListener(object : core.MessageReceiveListener {
-                override fun onPrivateMessageReceived(senderId: Int, msg: String, timestamp: Long) {
-                    println("\n💬 [用户 $senderId]: $msg"); print("> ")
+                override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long) {
+                    println("\n💬 [用户 $senderId]: $message"); print("> ")
                 }
-                override fun onGroupMessageReceived(gid: Int, sid: Int, name: String, msg: String, ts: Long) {
-                    println("\n👥 [群 $gid $name]: $msg"); print("> ")
+                override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long) {
+                    println("\n👥 [群 $groupId $senderName]: $message"); print("> ")
                 }
             })
             transport.addAuthStateListener { reason ->
