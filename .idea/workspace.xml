@@ -9,25 +9,27 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="实现手机版的头像裁剪功能">
+    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="优化包结构">
+      <change afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/component/Glassmorphism.android.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/AppUpdateManager.android.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/copilot-instructions.md" beforeDir="false" afterPath="$PROJECT_DIR$/.github/copilot-instructions.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/component/Glassmorphism.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/androidMain/kotlin/component/Glassmorphism.android.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TODO.md" beforeDir="false" afterPath="$PROJECT_DIR$/TODO.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/ChatApplication.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/NetworkChangeReceiver.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/NetworkChangeReceiver.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/datasource/local/AndroidLocalDataSourceImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/datasource/local/AndroidLocalDataSourceImpl.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/network/AndroidWebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/data/network/AndroidWebSocketClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/core/AppUpdateManager.android.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/component/Glassmorphism.android.kt" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/CommonComponents.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/CommonComponents.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ImmersiveUi.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ImmersiveUi.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/dialog/AddUserOrGroupDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/dialog/AddUserOrGroupDialog.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserListScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserListScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/state/AppState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/state/AppState.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSource.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSource.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSourceImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSourceImpl.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/repository/AuthRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/repository/AuthRepository.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicChannelInitializer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicChannelInitializer.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/settings/SettingsScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/settings/SettingsScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserProfileDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserProfileDialog.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicClientImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicClientImpl.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicNettyClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicNettyClient.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -828,6 +830,7 @@
       <workItem from="1782915951004" duration="1463000" />
       <workItem from="1782917440458" duration="3148000" />
       <workItem from="1782920712623" duration="2170000" />
+      <workItem from="1782923160432" duration="1599000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1165,7 +1168,15 @@
       <option name="project" value="LOCAL" />
       <updated>1778071145485</updated>
     </task>
-    <option name="localTasksCounter" value="43" />
+    <task id="LOCAL-00043" summary="优化UI">
+      <option name="closed" value="true" />
+      <created>1782923265809</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1782923265809</updated>
+    </task>
+    <option name="localTasksCounter" value="44" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1231,8 +1242,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="分多文件" />
-    <MESSAGE value="请求调用封装" />
     <MESSAGE value="请求调用封装&#10;进行分包整理" />
     <MESSAGE value="分包整理优化" />
     <MESSAGE value="新增拉取离线消息操作" />
@@ -1256,7 +1265,9 @@
     <MESSAGE value="全面可用版本" />
     <MESSAGE value="全面实现android和桌面端的互通逻辑，并且修改了聊天历史存储逻辑" />
     <MESSAGE value="实现手机版的头像裁剪功能" />
-    <option name="LAST_COMMIT_MESSAGE" value="实现手机版的头像裁剪功能" />
+    <MESSAGE value="优化UI" />
+    <MESSAGE value="优化包结构" />
+    <option name="LAST_COMMIT_MESSAGE" value="优化包结构" />
   </component>
   <component name="VgoProject">
     <integration-enabled>false</integration-enabled>

@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -84,8 +85,8 @@ fun MessageLongPressMenu(
         listOfNotNull(
             Triple(Icons.Default.ContentCopy, s["message.copy"], { onCopy(); onDismiss() }),
             if (onShare != null) Triple(Icons.Default.Share, s["message.share"], { onShare(); onDismiss() }) else null,
-            Triple(Icons.Default.Reply, s["message.reply"], { onReply(); onDismiss() }),
-            Triple(Icons.Default.Forward, s["message.forward"], { onForward(); onDismiss() }),
+            Triple(Icons.AutoMirrored.Filled.Reply, s["message.reply"], { onReply(); onDismiss() }),
+            Triple(Icons.AutoMirrored.Filled.Forward, s["message.forward"], { onForward(); onDismiss() }),
             if (isSelf) Triple(Icons.Default.Delete, s["message.delete"], { onDelete(); onDismiss() }) else null
         ).forEach { (icon, label, action) ->
             val itemInteraction = remember { MutableInteractionSource() }
@@ -385,7 +386,7 @@ fun UserAvatar(
     val avatarBitmapState = remember(user.id) {
         // 先从缓存同步读取
         val cached = if (!user.avatarUrl.isNullOrBlank()) {
-            getCachedImage(user.avatarUrl!!)
+            getCachedImage(user.avatarUrl)
         } else {
             null
         }
@@ -398,7 +399,7 @@ fun UserAvatar(
     LaunchedEffect(user.avatarUrl, user.avatarKey) {
         if (!isAvatarLoading && avatarBitmap == null && !user.avatarUrl.isNullOrBlank()) {
             isAvatarLoading = true
-            avatarBitmapState.value = loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
+            avatarBitmapState.value = loadImageBitmapWithCache(user.avatarUrl, user.avatarKey)
             isAvatarLoading = false
         }
     }

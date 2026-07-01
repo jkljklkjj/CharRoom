@@ -256,7 +256,7 @@ object AndroidAvatarCropDialog : AvatarCropDialogProvider {
                                         onCropComplete(outBytes, originalFileName)
                                         onDismiss()
                                     } catch (e: Exception) {
-                                        e.printStackTrace()
+                                        timber.log.Timber.e(e, "头像裁剪失败")
                                     }
                                 }
                             }) { Text("确认") }

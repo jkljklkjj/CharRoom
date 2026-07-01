@@ -171,6 +171,7 @@ fun GroupChatScreen(
     }
     val scope = rememberCoroutineScope()
     val isDarkMode = !MaterialTheme.colors.isLight
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
     // 消息动画控制：仅新消息第一次显示时才有动画，滚动历史消息无动画
     val animatedMessageIds = remember { mutableSetOf<String>() }
@@ -545,7 +546,7 @@ fun GroupChatScreen(
                                     var senderAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
                                         LaunchedEffect(senderUser?.avatarUrl, senderUser?.avatarKey, isViewportReady) {
                                             senderAvatar = if (isViewportReady && senderUser != null && !senderUser.avatarUrl.isNullOrBlank()) {
-                                            loadImageBitmapWithCache(senderUser.avatarUrl!!, senderUser.avatarKey)
+                                            loadImageBitmapWithCache(senderUser.avatarUrl, senderUser.avatarKey)
                                         } else {
                                             null
                                         }
@@ -732,7 +733,7 @@ fun GroupChatScreen(
                                     LaunchedEffect(currentUser?.avatarUrl, currentUser?.avatarKey, isViewportReady) {
                                         val user = currentUser
                                         myAvatar = if (isViewportReady && user != null && !user.avatarUrl.isNullOrBlank()) {
-                                            loadImageBitmapWithCache(user.avatarUrl!!, user.avatarKey)
+                                            loadImageBitmapWithCache(user.avatarUrl, user.avatarKey)
                                         } else {
                                             null
                                         }

@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.chatlite.charroom.data.network
 
 import model.Message as AppMessage
@@ -99,7 +100,8 @@ class AndroidWebSocketClient {
         awaitingLoginAck = false
         loginAckFuture = CompletableFuture()
 
-        group = NioEventLoopGroup()
+        @Suppress("DEPRECATION")
+        group = NioEventLoopGroup(0)
         connectFuture = CompletableFuture()
 
         val uri = URI(NetworkConstants.wsUrl())

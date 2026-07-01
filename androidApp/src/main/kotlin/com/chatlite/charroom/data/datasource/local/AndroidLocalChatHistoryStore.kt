@@ -216,7 +216,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             ids.forEach { (key, value) -> json.put(key, value) }
             prefs.edit().putString("seq_ids", json.toString()).apply()
         }.onFailure {
-            it.printStackTrace()
+            timber.log.Timber.w(it, "操作失败")
         }
     }
 
@@ -245,7 +245,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             }
             file.writeText(array.toString())
         }.onFailure {
-            it.printStackTrace()
+            timber.log.Timber.w(it, "操作失败")
         }
     }
 
@@ -263,7 +263,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             }
             records
         }.getOrElse {
-            it.printStackTrace()
+            timber.log.Timber.w(it, "操作失败")
             emptyList()
         }
     }
@@ -326,12 +326,12 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 timestamp = json.optLong("timestamp", System.currentTimeMillis()),
                 isSent = json.optBoolean("isSent", true),
                 messageId = json.optString("messageId", ""),
-                replyToMessageId = json.optString("replyToMessageId", null),
-                replyToContent = json.optString("replyToContent", null),
-                replyToSender = json.optString("replyToSender", null),
+                replyToMessageId = json.optString("replyToMessageId").takeIf { it.isNotEmpty() },
+                replyToContent = json.optString("replyToContent").takeIf { it.isNotEmpty() },
+                replyToSender = json.optString("replyToSender").takeIf { it.isNotEmpty() },
                 messageType = messageType,
-                fileUrl = json.optString("fileUrl", null),
-                fileName = json.optString("fileName", null),
+                fileUrl = json.optString("fileUrl").takeIf { it.isNotEmpty() },
+                fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
                 fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
             )
         } else {
@@ -343,12 +343,12 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 timestamp = json.optLong("timestamp", System.currentTimeMillis()),
                 isSent = json.optBoolean("isSent", true),
                 messageId = json.optString("messageId", ""),
-                replyToMessageId = json.optString("replyToMessageId", null),
-                replyToContent = json.optString("replyToContent", null),
-                replyToSender = json.optString("replyToSender", null),
+                replyToMessageId = json.optString("replyToMessageId").takeIf { it.isNotEmpty() },
+                replyToContent = json.optString("replyToContent").takeIf { it.isNotEmpty() },
+                replyToSender = json.optString("replyToSender").takeIf { it.isNotEmpty() },
                 messageType = messageType,
-                fileUrl = json.optString("fileUrl", null),
-                fileName = json.optString("fileName", null),
+                fileUrl = json.optString("fileUrl").takeIf { it.isNotEmpty() },
+                fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
                 fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
             )
         }

@@ -94,6 +94,7 @@ class NetworkChangeReceiver : BroadcastReceiver() {
         context ?: return
         intent ?: return
 
+        @Suppress("DEPRECATION")
         when (intent.action) {
             ConnectivityManager.CONNECTIVITY_ACTION,
             WifiManager.WIFI_STATE_CHANGED_ACTION -> {

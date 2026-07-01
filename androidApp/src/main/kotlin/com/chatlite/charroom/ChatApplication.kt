@@ -61,7 +61,7 @@ class ChatApplication : Application() {
             field.set(GlobalAuthRepository, androidLocalDataSource)
             println("[ChatApplication] 已替换为Android本地数据源实现")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.w(e, "替换Android本地数据源失败")
         }
         // 初始化图片加载器
         AndroidImageLoader.init(this)

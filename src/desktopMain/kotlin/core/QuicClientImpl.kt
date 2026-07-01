@@ -126,9 +126,9 @@ class QuicClientImpl : ChatTransport {
     private fun recordRtt() {
         if (!hbSendInProgress) return
         val rtt = System.currentTimeMillis() - lastHeartbeatSend
-        if (rtt < 0 || rtt > 60_000) return
+        if (rtt !in 0..60_000) return
         rttWindow.add(rtt)
-        if (rttWindow.size > 10) rttWindow.removeFirst()
+        if (rttWindow.size > 10) rttWindow.removeAt(0)
         hbSendInProgress = false
     }
 

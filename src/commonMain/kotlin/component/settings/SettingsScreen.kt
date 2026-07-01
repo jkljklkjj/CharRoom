@@ -31,6 +31,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Logout
@@ -250,7 +251,7 @@ fun SettingsScreen(
 
             // Logout
             SettingItem(
-                icon = Icons.Default.Logout,
+                icon = Icons.AutoMirrored.Filled.Logout,
                 title = s["settings.logout"],
                 subtitle = s["settings.logout.subtitle"],
                 onClick = {
@@ -469,7 +470,7 @@ fun SettingsScreen(
                 Column {
                     val progress = downloadState?.progress ?: 0
                     val total = downloadState?.total ?: 0
-                    Text(s["settings.update.downloaded"].format(progress.toInt(), formatFileSize(s, progress.toLong() * total / 100), formatFileSize(s, total)))
+                    Text(s["settings.update.downloaded"].format(progress, formatFileSize(s, progress.toLong() * total / 100), formatFileSize(s, total)))
                     Spacer(modifier = Modifier.height(8.dp))
                     // Simple progress bar
                     Box(

@@ -98,7 +98,7 @@ object AndroidImageLoader : ImageLoaderProvider {
 
             imageBitmap
         } catch (e: Exception) {
-            e.printStackTrace()
+            timber.log.Timber.e(e, "图片加载失败")
             null
         }
     }
@@ -137,7 +137,7 @@ object AndroidImageLoader : ImageLoaderProvider {
                 // 检查磁盘缓存大小，超过限制则清理旧文件
                 trimDiskCache()
             } catch (e: Exception) {
-                e.printStackTrace()
+                timber.log.Timber.e(e, "图片加载失败")
             }
         }
     }

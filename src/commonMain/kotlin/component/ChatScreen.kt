@@ -287,6 +287,7 @@ private fun ChatScreenContent(
     }
     val scope = rememberCoroutineScope()
     val isDarkMode = !MaterialTheme.colors.isLight
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
     // 消息动画控制：仅新消息第一次显示时才有动画，滚动历史消息无动画
     val animatedMessageIds = remember { mutableSetOf<String>() }

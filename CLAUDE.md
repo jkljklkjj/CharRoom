@@ -8,20 +8,18 @@ CharRoom — 跨平台即时通讯客户端（Kotlin Multiplatform + JetBrains C
 
 ```
 CharRoom/
-├── src/
-│   ├── commonMain/kotlin/        # 跨平台共享代码
-│   │   ├── App.kt                应用入口
-│   │   ├── Util.kt               通用工具
-│   │   ├── component/            UI 组件（ChatScreen, LoginRegister, dialog 等）
-│   │   ├── core/                 核心层（ApiClient, WebSocket, AppConfig 等）
-│   │   ├── data/                 数据层（datasource, repository）
-│   │   ├── model/                数据模型
-│   │   └── presentation/         ViewModel
-│   ├── desktopMain/kotlin/       # 桌面平台代码
-│   │   ├── Main.kt               JVM 入口
-│   │   ├── component/            平台相关 UI
-│   │   └── core/                 平台核心实现
-│   └── main/                     Android 资源
+├── commonMain/kotlin/           # 跨平台共享代码
+│   ├── App.kt                   应用入口
+│   ├── Util.kt                  通用工具
+│   ├── component/               UI 组件（ChatScreen, LoginRegister, dialog 等）
+│   ├── core/                    核心层（ApiClient, WebSocket, AppConfig 等）
+│   ├── data/                    数据层（datasource, repository）
+│   ├── model/                   数据模型
+│   └── presentation/            ViewModel
+├── desktopMain/kotlin/          # 桌面平台代码
+│   ├── Main.kt                  JVM 入口
+│   ├── component/               平台相关 UI
+│   └── core/                    平台核心实现
 ├── web/                          # Web 前端（Vue 3 + Vite + PWA）
 │   ├── src/                      
 │   ├── public/                   

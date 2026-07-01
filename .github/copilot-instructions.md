@@ -11,7 +11,7 @@
   - `model/`：用户、消息、群组模型
 - 平台实现层：
   - `src/desktopMain/kotlin/`：桌面 actual 实现（含 protobuf builder/response parser 的 actual）
-  - `src/androidMain/kotlin/`：Android actual 实现
+  - `androidApp/src/main/kotlin/`：Android actual 实现
 
 ## 通信与序列化约定
 - REST：HTTP + JSON（`ApiClient`）。

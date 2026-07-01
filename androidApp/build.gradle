@@ -62,11 +62,6 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
-            java.srcDirs += project.file('../src/androidMain/kotlin')
-            // Exclude desktop-only files
-            java.exclude('**/Glassmorphism.kt')
-            java.exclude('**/ShareUtil*')
-            java.exclude('**/TokenQuota*')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }

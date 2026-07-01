@@ -1,4 +1,4 @@
-package core
+package com.chatlite.charroom.core
 
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
@@ -9,19 +9,25 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import androidx.core.content.FileProvider
+import core.GlobalApiService
 import core.model.AppVersionInfo
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.utils.io.*
+import core.AppConfig
+import core.AppUpdateManager
+import core.GlobalAppUpdateManager
+import core.UpdateState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import java.io.File
-import java.io.FileOutputStream
 import java.security.MessageDigest
 
 /**
@@ -35,7 +41,7 @@ class AndroidAppUpdateManager(private val context: Context) : AppUpdateManager {
         followRedirects = true
     }
 
-    private var downloadJob: kotlinx.coroutines.Job? = null
+    private var downloadJob: Job? = null
     private var downloadId: Long = -1
 
     private val downloadReceiver = object : BroadcastReceiver() {
@@ -119,7 +125,6 @@ class AndroidAppUpdateManager(private val context: Context) : AppUpdateManager {
 
         latestVersionInfo = versionInfo
 
-        // 使用系统DownloadManager下载
         val request = DownloadManager.Request(Uri.parse(versionInfo.downloadUrl))
         request.setTitle("${AppConfig.APP_NAME}更新")
         request.setDescription("正在下载新版本 ${versionInfo.versionName}")
@@ -135,8 +140,8 @@ class AndroidAppUpdateManager(private val context: Context) : AppUpdateManager {
 
         _updateState.value = UpdateState.Downloading(0, versionInfo.fileSize)
 
-        // 启动协程监听下载进度
-        downloadJob = kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        @OptIn(DelicateCoroutinesApi::class)
+        downloadJob = GlobalScope.launch(Dispatchers.IO) {
             var finished = false
             while (!finished) {
                 val query = DownloadManager.Query().setFilterById(downloadId)
@@ -157,7 +162,7 @@ class AndroidAppUpdateManager(private val context: Context) : AppUpdateManager {
                     }
                 }
                 cursor.close()
-                kotlinx.coroutines.delay(1000)
+                delay(1000)
             }
         }
     }
@@ -209,9 +214,6 @@ class AndroidAppUpdateManager(private val context: Context) : AppUpdateManager {
         _updateState.value = UpdateState.Idle
     }
 
-    /**
-     * 从Uri获取真实文件路径
-     */
     private fun getRealPathFromUri(context: Context, uri: Uri): String? {
         if (uri.scheme == "content") {
             val cursor = context.contentResolver.query(uri, arrayOf(android.provider.MediaStore.MediaColumns.DATA), null, null, null)

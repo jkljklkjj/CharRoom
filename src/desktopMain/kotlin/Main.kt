@@ -32,6 +32,7 @@ import component.DesktopAvatarCropDialog
 import component.dialog.AvatarCropDialogImpl
 import core.di.KoinInitializer
 import core.initAppUpdateManager
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -63,6 +64,7 @@ fun main() = application {
     initAppUpdateManager()
 
     // 启动时自动检查更新
+    @OptIn(DelicateCoroutinesApi::class)
     kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
         try {
             GlobalAppUpdateManager.checkForUpdates(
@@ -101,9 +103,11 @@ fun main() = application {
     }
 
     // 系统托盘
+    @Suppress("DEPRECATION")
+    val trayIcon = painterResource("icons/ic_notification.svg")
     Tray(
         state = trayState,
-        icon = painterResource("icons/ic_notification.svg"),
+        icon = trayIcon,
         // AWT Tray Menu does not support keyboard shortcuts; omit `shortcut` here to avoid
         // UnsupportedOperationException on some JDKs/platforms.
         menu = {
@@ -127,6 +131,9 @@ fun main() = application {
         }
     )
 
+    @Suppress("DEPRECATION")
+    val appIcon = painterResource("icons/ic_launcher.svg")
+
     if (isWindowVisible) {
         Window(
             onCloseRequest = {
@@ -141,7 +148,7 @@ fun main() = application {
             },
             title = currentStrings["app.name"],
             state = windowState,
-            icon = painterResource("icons/ic_launcher.svg")
+            icon = appIcon
         ) {
             // 注册文件选择器
             FilePicker.Register()

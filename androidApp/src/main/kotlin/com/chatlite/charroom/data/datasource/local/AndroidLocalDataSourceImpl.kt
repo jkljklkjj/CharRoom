@@ -14,10 +14,8 @@ class AndroidLocalDataSourceImpl(
     private val context: Context
 ) : LocalDataSource {
 
-    override suspend fun saveAuth(account: String, accessToken: String, refreshToken: String) {
-        // 使用AndroidTokenStorage保存，和现有逻辑保持一致
-        // 注意：AndroidTokenStorage需要accountId是Int类型，这里假设account是数字字符串
-        val accountId = account.toIntOrNull() ?: 0
+    override suspend fun saveAuth(account: String, accessToken: String, refreshToken: String, userId: Int) {
+        val accountId = userId
         if (accountId > 0) {
             AndroidTokenStorage.save(context, accessToken, accountId, refreshToken)
         }
@@ -34,6 +32,10 @@ class AndroidLocalDataSourceImpl(
 
     override suspend fun getSavedRefreshToken(): String? {
         return AndroidTokenStorage.load(context)?.refreshToken
+    }
+
+    override suspend fun getSavedUserId(): Int {
+        return AndroidTokenStorage.load(context)?.accountId ?: 0
     }
 
     override suspend fun clearAuth() {

@@ -125,7 +125,7 @@ fun UserList(
             sortedUsers.filter { user ->
                 val displayName = buildDisplayName(user).lowercase()
                 val accountId = user.id.toString().lowercase()
-                val extra = (user.username ?: "") + " " + (user.email ?: "")
+                val extra = user.username + " " + user.email
                 extra.lowercase().contains(keyword) || displayName.contains(keyword) || accountId.contains(keyword)
             }
         }
