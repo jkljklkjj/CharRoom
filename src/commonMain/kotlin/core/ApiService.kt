@@ -304,7 +304,6 @@ class ApiService(private val authToken: String? = null) {
          * 获取好友列表（对 UI 友好）
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).fetchFriends()"))
         suspend fun fetchFriends(): List<User> {
             return GlobalAppState.currentToken?.let { ApiService(it).fetchFriends() } ?: emptyList()
         }
@@ -313,7 +312,6 @@ class ApiService(private val authToken: String? = null) {
          * 获取群组列表（对 UI 友好）
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).fetchGroups()"))
         suspend fun fetchGroups(): List<User> {
             return GlobalAppState.currentToken?.let { ApiService(it).fetchGroups() } ?: emptyList()
         }
@@ -322,7 +320,6 @@ class ApiService(private val authToken: String? = null) {
          * 获取好友列表
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).getFriendList()"))
         suspend fun getFriendList(token: String): List<User> {
             return ApiService(token).getFriendList()
         }
@@ -331,7 +328,6 @@ class ApiService(private val authToken: String? = null) {
          * 获取群组列表
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).getGroupList()"))
         suspend fun getGroupList(token: String): List<Group> {
             return ApiService(token).getGroupList()
         }
@@ -340,7 +336,6 @@ class ApiService(private val authToken: String? = null) {
          * 添加好友
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).addFriend(account)"))
         suspend fun addFriend(account: String): Boolean {
             return GlobalAppState.currentToken?.let { ApiService(it).addFriend(account) } ?: false
         }
@@ -349,7 +344,6 @@ class ApiService(private val authToken: String? = null) {
          * 加入群组
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).addGroup(groupId)"))
         suspend fun addGroup(groupId: String): Boolean {
             return GlobalAppState.currentToken?.let { ApiService(it).addGroup(groupId) } ?: false
         }
@@ -366,7 +360,6 @@ class ApiService(private val authToken: String? = null) {
          * 查询用户详情
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).getUserDetail(userId)"))
         suspend fun getUserDetail(userId: String): User? {
             return GlobalAppState.currentToken?.let { ApiService(it).getUserDetail(userId) }
         }
@@ -375,7 +368,6 @@ class ApiService(private val authToken: String? = null) {
          * 查询群组详情
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).getGroupDetail(groupId)"))
         suspend fun getGroupDetail(groupId: String): User? {
             return GlobalAppState.currentToken?.let { ApiService(it).getGroupDetail(groupId) }
         }
@@ -384,7 +376,6 @@ class ApiService(private val authToken: String? = null) {
          * 获取离线消息
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).getOfflineMessages()"))
         suspend fun getOfflineMessages(): List<Message> {
             return GlobalAppState.currentToken?.let { ApiService(it).getOfflineMessages() } ?: emptyList()
         }
@@ -393,7 +384,6 @@ class ApiService(private val authToken: String? = null) {
          * 发送邮箱更新验证码
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).sendEmailUpdateVerifyCode(email)"))
         suspend fun sendEmailUpdateVerifyCode(email: String): Boolean {
             return GlobalAppState.currentToken?.let { ApiService(it).sendEmailUpdateVerifyCode(email) } ?: false
         }
@@ -402,7 +392,6 @@ class ApiService(private val authToken: String? = null) {
          * 更新用户个人资料
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).updateUserProfile(username, phone, signature, password)"))
         suspend fun updateUserProfile(
             username: String,
             phone: String,
@@ -418,7 +407,6 @@ class ApiService(private val authToken: String? = null) {
          * 更新邮箱
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).updateEmail(newEmail, verifyCode)"))
         suspend fun updateEmail(newEmail: String, verifyCode: String): Boolean {
             return GlobalAppState.currentToken?.let { ApiService(it).updateEmail(newEmail, verifyCode) } ?: false
         }
@@ -427,7 +415,6 @@ class ApiService(private val authToken: String? = null) {
          * 获取好友申请列表（UI 用 User 类型）
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).fetchFriendRequests()"))
         suspend fun fetchFriendRequests(): List<User> {
             return GlobalAppState.currentToken?.let { ApiService(it).fetchFriendRequests() } ?: emptyList()
         }
@@ -436,7 +423,6 @@ class ApiService(private val authToken: String? = null) {
          * 获取群聊申请列表（UI 用 User 类型）
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).fetchGroupRequests()"))
         suspend fun fetchGroupRequests(): List<User> {
             return GlobalAppState.currentToken?.let { ApiService(it).fetchGroupRequests() } ?: emptyList()
         }
@@ -445,7 +431,6 @@ class ApiService(private val authToken: String? = null) {
          * 同意好友申请
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).acceptFriend(requestId)"))
         suspend fun acceptFriend(requestId: String): Boolean {
             return GlobalAppState.currentToken?.let { ApiService(it).acceptFriend(requestId) } ?: false
         }
@@ -454,7 +439,6 @@ class ApiService(private val authToken: String? = null) {
          * 拒绝好友申请
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).rejectFriend(requestId)"))
         suspend fun rejectFriend(requestId: String): Boolean {
             return GlobalAppState.currentToken?.let { ApiService(it).rejectFriend(requestId) } ?: false
         }
@@ -463,7 +447,6 @@ class ApiService(private val authToken: String? = null) {
          * 同意群聊申请
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).acceptGroupApplication(groupId, userId)"))
         suspend fun acceptGroupApplication(groupId: String, userId: String): Boolean {
             return GlobalAppState.currentToken?.let {
                 ApiService(it).acceptGroupApplication(groupId, userId)
@@ -474,7 +457,6 @@ class ApiService(private val authToken: String? = null) {
          * 拒绝群聊申请
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).rejectGroupApplication(groupId, userId)"))
         suspend fun rejectGroupApplication(groupId: String, userId: String): Boolean {
             return GlobalAppState.currentToken?.let {
                 ApiService(it).rejectGroupApplication(groupId, userId)
@@ -485,7 +467,6 @@ class ApiService(private val authToken: String? = null) {
          * 发送私聊消息
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).sendPrivateMessage(receiverId, content, messageType, fileUrl, fileName, fileSize, replyToMessageId)"))
         suspend fun sendPrivateMessage(
             receiverId: String,
             content: String,
@@ -512,7 +493,6 @@ class ApiService(private val authToken: String? = null) {
          * 发送群聊消息
          * @deprecated 请使用 ApiService 类实例方法
          */
-        @Deprecated("Use ApiService instance method instead", ReplaceWith("ApiService(token).sendGroupMessage(groupId, content, messageType, fileUrl, fileName, fileSize, replyToMessageId)"))
         suspend fun sendGroupMessage(
             groupId: String,
             content: String,
