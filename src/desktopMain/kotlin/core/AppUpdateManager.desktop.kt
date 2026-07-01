@@ -70,6 +70,7 @@ class AppUpdateManagerImpl : AppUpdateManager {
 
         _updateState.value = UpdateState.Downloading(0, versionInfo.fileSize)
 
+        @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
         downloadJob = GlobalScope.launch(Dispatchers.IO) {
             try {
                 val downloadDir = System.getProperty("java.io.tmpdir")

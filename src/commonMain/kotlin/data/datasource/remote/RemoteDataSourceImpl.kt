@@ -40,11 +40,11 @@ class RemoteDataSourceImpl : RemoteDataSource {
     }
 
     override suspend fun getFriendList(token: String): List<User> {
-        return core.ApiService.getFriendList(token)
+        return ApiService(token).getFriendList()
     }
 
     override suspend fun getGroupList(token: String): List<Group> {
-        return core.ApiService.getGroupList(token)
+        return ApiService(token).getGroupList()
     }
 
     override suspend fun addFriend(token: String, account: String): Boolean {

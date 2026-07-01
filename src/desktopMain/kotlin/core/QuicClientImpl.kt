@@ -1,6 +1,7 @@
 package core
 
 import kotlinx.coroutines.*
+import core.state.GlobalAppState
 import core.state.GlobalChatState
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -102,7 +103,7 @@ class QuicClientImpl : ChatTransport {
             targetId = ""
         )
 
-        val loginPayload = buildLoginPayload(ServerConfig.Token)
+        val loginPayload = buildLoginPayload(GlobalAppState.currentToken ?: "")
         val frame = QuicStreamProtocol.encodeFrame(loginPayload)
         transport.send(stream0Id, frame)
         log.info("QUIC 登录请求已发送 (streamId=$stream0Id)")
@@ -321,7 +322,7 @@ class QuicClientImpl : ChatTransport {
     override fun logoutAndDisconnect() {
         val controlStreamId = sessions[CONTROL_SESSION_KEY]?.streamId
         if (controlStreamId != null) {
-            val logoutPayload = buildLogoutPayload(ServerConfig.Token)
+            val logoutPayload = buildLogoutPayload(GlobalAppState.currentToken ?: "")
             val frame = QuicStreamProtocol.encodeFrame(logoutPayload)
             transport.send(controlStreamId, frame)
         }

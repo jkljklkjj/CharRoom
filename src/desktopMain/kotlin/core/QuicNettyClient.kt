@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package core
 
 import io.netty.bootstrap.Bootstrap

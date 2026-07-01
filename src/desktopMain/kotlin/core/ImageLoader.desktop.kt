@@ -7,8 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.io.File
+import core.state.GlobalAppState
 import java.net.URI
-import java.net.URL
 import javax.imageio.ImageIO
 
 /**
@@ -46,7 +46,7 @@ object DesktopImageLoader : ImageLoaderProvider {
         }
 
         // 下载图片
-        val conn = URL(url).openConnection() as java.net.HttpURLConnection
+        val conn = URI(url).toURL().openConnection() as java.net.HttpURLConnection
         conn.connectTimeout = 5000
         conn.readTimeout = 10000
         conn.requestMethod = "GET"
@@ -55,7 +55,7 @@ object DesktopImageLoader : ImageLoaderProvider {
 
         // 如果是本站资源，带上Authorization头
         if (url.contains(ServerConfig.SERVER_IP)) {
-            conn.setRequestProperty("Authorization", "Bearer ${ServerConfig.Token}")
+            conn.setRequestProperty("Authorization", "Bearer ${GlobalAppState.currentToken.orEmpty()}")
         }
 
         conn.inputStream.use { ins ->
