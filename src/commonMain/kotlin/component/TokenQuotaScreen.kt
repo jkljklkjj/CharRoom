@@ -280,9 +280,4 @@ private suspend fun confirmPay(purchaseId: Long, token: String, scope: kotlinx.c
     } catch (_: Exception) { }
 }
 
-/**
- * 打开支付链接 — 平台相关
- * Desktop: 用 java.awt.Desktop 打开浏览器
- * Android: 调用微信 SDK
- */
-fun openPaymentUrl(url: String) { }
+

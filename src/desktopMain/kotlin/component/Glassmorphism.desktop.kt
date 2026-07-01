@@ -17,13 +17,13 @@ import androidx.compose.ui.unit.dp
  * Desktop 平台的毛玻璃效果实现
  * 使用 Compose Multiplatform 的 graphicsLayer 模糊效果
  */
-actual fun Modifier.glassmorphism(
+fun Modifier.glassmorphism(
     blurRadius: Float,
     backgroundColor: Color
 ): Modifier = this
     .graphicsLayer {
         // 使用 Compose 的 BlurEffect（Compose 1.5+ 支持）
-        renderEffect = BlurEffect(blurRadius.toInt(), blurRadius.toInt())
+        renderEffect = BlurEffect(blurRadius, blurRadius)
         clip = true
     }
     .background(backgroundColor)
@@ -32,7 +32,7 @@ actual fun Modifier.glassmorphism(
  * Desktop 平台的柔和阴影效果实现
  * 使用 drawBehind 绘制多层阴影
  */
-actual fun Modifier.softShadow(
+fun Modifier.softShadow(
     elevation: Float,
     color: Color
 ): Modifier = this.drawBehind {
@@ -56,7 +56,7 @@ actual fun Modifier.softShadow(
  * Desktop 平台的动态模糊背景实现
  */
 @Composable
-actual fun DynamicBlurBackground(
+fun DynamicBlurBackground(
     content: @Composable () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {

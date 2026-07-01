@@ -94,7 +94,8 @@ sourceSets {
     main {
         kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin", "src/cliMain/kotlin")
         resources.srcDirs("src/commonMain/resources", "src/desktopMain/resources")
-        kotlin.exclude("**/component/**", "**/chat/**", "**/settings/**", "**/user/**", "**/Main.kt", "**/App.kt")
+        // 排除 Android 特定文件和 WebRTC call（包名不匹配）
+        kotlin.exclude("**/*.android.kt", "**/call/**")
     }
     test {
         kotlin.srcDirs("src/commonTest/kotlin", "src/desktopTest/kotlin", "src/androidUnitTest/kotlin")
