@@ -38,10 +38,13 @@ class AppState {
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     /**
-     * 更新认证状态
+     * 更新认证状态，同时同步 currentUserId。
      */
     fun updateAuthState(newState: AuthState) {
         _authState.value = newState
+        // 从 auth state 同步 currentUserId
+        currentUserId = (newState as? AuthState.Authenticated)?.userProfile?.id
+            ?: currentUserId // 如果 auth state 不含 userProfile，保留已有的值
     }
 
     /**
@@ -57,9 +60,21 @@ class AppState {
         get() = (_authState.value as? AuthState.Authenticated)?.account
 
     /**
-     * 获取当前用户ID，仅在已认证状态下有效
+     * 获取当前用户ID（优先从 auth state 的 userProfile 获取，
+     * 也可由 QUIC 登录响应直接设置，用于 auth state 尚未含 userProfile 的场景）。
      */
-    val currentUserId: Int?
+    var currentUserId: Int? = null
+        private set
+
+    /**
+     * 直接设置当前用户 ID（由 QUIC 登录响应调用）。
+     */
+    fun setCurrentUserId(id: Int) {
+        currentUserId = id
+    }
+
+    @Deprecated("Use currentUserId directly", ReplaceWith("currentUserId"))
+    val currentUserIdFromAuth: Int?
         get() = (_authState.value as? AuthState.Authenticated)?.userProfile?.id
 
     /**

@@ -121,6 +121,8 @@ compose.desktop {
         jvmArgs += listOf(
             "-Dfile.encoding=UTF-8",
             "-Dsun.jnu.encoding=UTF-8",
+            "-Dstdout.encoding=UTF-8",
+            "-Dstderr.encoding=UTF-8",
             "-Duser.language=zh",
             "-Duser.country=CN",
             "-Dconsole.encoding=UTF-8"

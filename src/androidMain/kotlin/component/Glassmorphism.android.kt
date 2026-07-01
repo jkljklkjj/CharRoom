@@ -2,6 +2,7 @@ package component
 
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,9 +26,11 @@ fun Modifier.glassmorphism(
 ): Modifier = this
     .graphicsLayer {
         // 使用 Android 的 RenderEffect 实现模糊
-        renderEffect = RenderEffect
-            .createBlurEffect(blurRadius, blurRadius, Shader.TileMode.CLAMP)
-            .asComposeRenderEffect()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            renderEffect = RenderEffect
+                .createBlurEffect(blurRadius, blurRadius, Shader.TileMode.CLAMP)
+                .asComposeRenderEffect()
+        }
         // 确保模糊效果在硬件加速下工作
         clip = true
     }

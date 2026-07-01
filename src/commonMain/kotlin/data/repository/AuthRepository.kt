@@ -43,8 +43,17 @@ class AuthRepository(
             if (validated != null && validated.accessToken.isNotBlank()) {
                 // Token is valid, update local storage
                 localDataSource.saveAuth(savedAccount, validated.accessToken, validated.refreshToken)
-                // Get user profile
-                val userProfile = remoteDataSource.getUserInfo(validated.accessToken)
+                // Get user profile (失败时兜底用本地缓存的 userId)
+                val userProfile = runCatching {
+                    remoteDataSource.getUserInfo(validated.accessToken)
+                }.getOrNull()
+                if (userProfile == null) {
+                    // getUserInfo 失败时从本地存储恢复 userId
+                    val savedUserId = localDataSource.getSavedUserId()
+                    if (savedUserId > 0) {
+                        GlobalAppState.setCurrentUserId(savedUserId)
+                    }
+                }
                 val authState = AuthState.Authenticated(
                     account = savedAccount,
                     accessToken = validated.accessToken,
@@ -52,7 +61,6 @@ class AuthRepository(
                     userProfile = userProfile
                 )
                 _authState.value = authState
-                // Sync to GlobalAppState
                 GlobalAppState.updateAuthState(authState)
                 return
             }
@@ -62,8 +70,15 @@ class AuthRepository(
                 val refreshed = remoteDataSource.refreshToken(savedRefreshToken)
                 if (refreshed != null && refreshed.accessToken.isNotBlank()) {
                     localDataSource.saveAuth(savedAccount, refreshed.accessToken, refreshed.refreshToken)
-                    // Get user profile
-                    val userProfile = remoteDataSource.getUserInfo(refreshed.accessToken)
+                    val userProfile = runCatching {
+                        remoteDataSource.getUserInfo(refreshed.accessToken)
+                    }.getOrNull()
+                    if (userProfile == null) {
+                        val savedUserId = localDataSource.getSavedUserId()
+                        if (savedUserId > 0) {
+                            GlobalAppState.setCurrentUserId(savedUserId)
+                        }
+                    }
                     val authState = AuthState.Authenticated(
                         account = savedAccount,
                         accessToken = refreshed.accessToken,
@@ -71,7 +86,6 @@ class AuthRepository(
                         userProfile = userProfile
                     )
                     _authState.value = authState
-                    // Sync to GlobalAppState
                     GlobalAppState.updateAuthState(authState)
                     return
                 }
@@ -98,9 +112,11 @@ class AuthRepository(
             val result = remoteDataSource.login(account, password)
             if (result != null && result.accessToken.isNotBlank()) {
                 // Login successful, save locally
-                localDataSource.saveAuth(account, result.accessToken, result.refreshToken)
-                // Get user profile
-                val userProfile = remoteDataSource.getUserInfo(result.accessToken)
+                val userProfile = runCatching {
+                    remoteDataSource.getUserInfo(result.accessToken)
+                }.getOrNull()
+                val userId = userProfile?.id ?: 0
+                localDataSource.saveAuth(account, result.accessToken, result.refreshToken, userId)
                 val authState = AuthState.Authenticated(
                     account = account,
                     accessToken = result.accessToken,

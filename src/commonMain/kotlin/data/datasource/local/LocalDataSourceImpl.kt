@@ -31,10 +31,11 @@ class LocalDataSourceImpl(
     }
 
     // ── Auth 凭证（加密存储） ───────────────────────
+    // 格式: account \n accessToken \n refreshToken \n userId
 
-    override suspend fun saveAuth(account: String, accessToken: String, refreshToken: String) {
+    override suspend fun saveAuth(account: String, accessToken: String, refreshToken: String, userId: Int) {
         try {
-            writeEncrypted(authFile, "$account\n$accessToken\n$refreshToken")
+            writeEncrypted(authFile, "$account\n$accessToken\n$refreshToken\n$userId")
         } catch (_: Exception) {
         }
     }
@@ -55,6 +56,12 @@ class LocalDataSourceImpl(
         return runCatching {
             readEncrypted(authFile)?.lines()?.getOrNull(2)?.trim()
         }.getOrNull()
+    }
+
+    override suspend fun getSavedUserId(): Int {
+        return runCatching {
+            readEncrypted(authFile)?.lines()?.getOrNull(3)?.trim()?.toIntOrNull() ?: 0
+        }.getOrDefault(0)
     }
 
     override suspend fun clearAuth() {

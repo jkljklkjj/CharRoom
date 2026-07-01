@@ -4,12 +4,22 @@ import component.chat.ChatApp
 import presentation.viewmodel.AuthViewModel
 import presentation.viewmodel.GlobalAuthViewModel
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.DpSize
@@ -113,181 +123,363 @@ fun LoginRegisterApp(
 
             val isSubmitting = authState is core.state.AuthState.Loading
 
-            Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            Box(
+                modifier = Modifier.fillMaxSize().background(immersiveBackgroundBrush(isDarkMode)),
+                contentAlignment = Alignment.Center
             ) {
-                Text(text = if (isLogin) s["login.title"] else s["register.title"], style = MaterialTheme.typography.h4)
-                Spacer(modifier = Modifier.height(16.dp))
-                TextField(
-                    value = if (isLogin) account else username,
-                    onValueChange = {
-                        if (isLogin) account = it else username = it
-                    },
-                    label = { Text(if (isLogin) s["login.account"] else s["login.username"]) },
-                    enabled = !isSubmitting
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                TextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text(s["login.password"]) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    enabled = !isSubmitting
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 注册模式下显示邮箱和验证码输入框
-                if (!isLogin) {
-                    TextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text(s["login.email"]) },
-                        enabled = !isSubmitting
+                Column(
+                    modifier = Modifier.widthIn(max = 380.dp).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Brand header - just title
+                    Text(
+                        text = "ChatLite",
+                        style = MaterialTheme.typography.h4,
+                        color = MaterialTheme.colors.primary,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (isLogin) s["login.title"] else s["register.title"],
+                        style = MaterialTheme.typography.subtitle1,
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    Row(
+                    // Form card
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        color = MaterialTheme.colors.surface.copy(alpha = 0.85f),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = 0.dp
                     ) {
-                        TextField(
-                            value = verifyCode,
-                            onValueChange = { verifyCode = it },
-                            label = { Text(s["login.verify.code"]) },
-                            enabled = !isSubmitting,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (email.isBlank()) {
-                                    message = s["login.please.enter.email"]
-                                    return@Button
-                                }
-                                // 发送验证码
-                                isSendingCode = true
-                                authViewModel.sendRegisterVerifyCode(email) { result ->
-                                    result.onSuccess {
-                                        message = s["login.code.sent"]
-                                        // 开始60秒倒计时
-                                        countdownTime = 60
-                                        scope.launch {
-                                            while (countdownTime > 0) {
-                                                delay(1000)
-                                                countdownTime--
-                                            }
-                                            isSendingCode = false
+                        Column(
+                            modifier = Modifier.padding(20.dp)
+                        ) {
+                            // 账号/用户名
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
+                                shape = RoundedCornerShape(10.dp),
+                                elevation = 0.dp
+                            ) {
+                                TextField(
+                                    value = if (isLogin) account else username,
+                                    onValueChange = {
+                                        if (isLogin) account = it else username = it
+                                    },
+                                    placeholder = { Text(
+                                        if (isLogin) s["login.account"] else s["login.username"],
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)
+                                    ) },
+                                    enabled = !isSubmitting,
+                                    colors = TextFieldDefaults.textFieldColors(
+                                        backgroundColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        cursorColor = MaterialTheme.colors.primary
+                                    ),
+                                    singleLine = true,
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 密码
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
+                                shape = RoundedCornerShape(10.dp),
+                                elevation = 0.dp
+                            ) {
+                                TextField(
+                                    value = password,
+                                    onValueChange = { password = it },
+                                    placeholder = { Text(s["login.password"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    enabled = !isSubmitting,
+                                    colors = TextFieldDefaults.textFieldColors(
+                                        backgroundColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        cursorColor = MaterialTheme.colors.primary
+                                    ),
+                                    singleLine = true,
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Lock,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                )
+                            }
+
+                            // 注册模式下显示邮箱和验证码
+                            if (!isLogin) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    elevation = 0.dp
+                                ) {
+                                    TextField(
+                                        value = email,
+                                        onValueChange = { email = it },
+                                        placeholder = { Text(s["login.email"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                                        enabled = !isSubmitting,
+                                        colors = TextFieldDefaults.textFieldColors(
+                                            backgroundColor = Color.Transparent,
+                                            focusedIndicatorColor = Color.Transparent,
+                                            unfocusedIndicatorColor = Color.Transparent,
+                                            cursorColor = MaterialTheme.colors.primary
+                                        ),
+                                        singleLine = true,
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Email,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(20.dp)
+                                            )
                                         }
-                                    }.onFailure {
-                                        message = s["login.code.send.failed"].format(it.message)
-                                        isSendingCode = false
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // 验证码 + 发送按钮
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        modifier = Modifier.weight(1f),
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        elevation = 0.dp
+                                    ) {
+                                        TextField(
+                                            value = verifyCode,
+                                            onValueChange = { verifyCode = it },
+                                            placeholder = { Text(s["login.verify.code"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                                            enabled = !isSubmitting,
+                                            colors = TextFieldDefaults.textFieldColors(
+                                                backgroundColor = Color.Transparent,
+                                                focusedIndicatorColor = Color.Transparent,
+                                                unfocusedIndicatorColor = Color.Transparent,
+                                                cursorColor = MaterialTheme.colors.primary
+                                            ),
+                                            singleLine = true,
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.VerifiedUser,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    val codeInteraction = remember { MutableInteractionSource() }
+                                    val codeScale = rememberElasticScale(codeInteraction)
+                                    Button(
+                                        onClick = {
+                                            if (email.isBlank()) {
+                                                message = s["login.please.enter.email"]
+                                                return@Button
+                                            }
+                                            isSendingCode = true
+                                            authViewModel.sendRegisterVerifyCode(email) { result ->
+                                                result.onSuccess {
+                                                    message = s["login.code.sent"]
+                                                    countdownTime = 60
+                                                    scope.launch {
+                                                        while (countdownTime > 0) {
+                                                            delay(1000)
+                                                            countdownTime--
+                                                        }
+                                                        isSendingCode = false
+                                                    }
+                                                }.onFailure {
+                                                    message = s["login.code.send.failed"].format(it.message)
+                                                    isSendingCode = false
+                                                }
+                                            }
+                                        },
+                                        enabled = !isSubmitting && !isSendingCode && countdownTime == 0,
+                                        interactionSource = codeInteraction,
+                                        modifier = Modifier
+                                            .height(48.dp)
+                                            .graphicsLayer { scaleX = codeScale; scaleY = codeScale },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            backgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.9f),
+                                            contentColor = MaterialTheme.colors.onPrimary
+                                        )
+                                    ) {
+                                        Text(
+                                            if (countdownTime > 0) s["login.send.code.resend"].format(countdownTime)
+                                            else if (isSendingCode) s["login.send.code.sending"]
+                                            else s["login.send.code"],
+                                            maxLines = 1
+                                        )
                                     }
                                 }
-                            },
-                            enabled = !isSubmitting && !isSendingCode && countdownTime == 0,
-                            modifier = Modifier.height(56.dp)
+                            }
+
+                            // 记住我
+                            if (isLogin) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = rememberMe,
+                                        onCheckedChange = { rememberMe = it },
+                                        enabled = !isSubmitting,
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = MaterialTheme.colors.primary
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = s["login.remember.me"],
+                                        style = MaterialTheme.typography.body2,
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            // 提交按钮
+                            val submitInteraction = remember { MutableInteractionSource() }
+                            val submitScale = rememberElasticScale(submitInteraction, pressedScale = 0.96f)
+                            Button(
+                                onClick = {
+                                    if (isSubmitting) return@Button
+                                    if (isLogin) {
+                                        val acc = account.trim()
+                                        val pwd = password.trim()
+                                        if (acc.isEmpty() || pwd.isEmpty()) {
+                                            message = s["login.account.password.empty"]
+                                            return@Button
+                                        }
+                                        authViewModel.login(acc, pwd, rememberMe)
+                                    } else {
+                                        val name = username.trim()
+                                        val pwd = password.trim()
+                                        val emailText = email.trim()
+                                        val code = verifyCode.trim()
+                                        if (name.isEmpty() || pwd.isEmpty()) {
+                                            message = s["login.username.password.empty"]
+                                            return@Button
+                                        }
+                                        if (emailText.isEmpty()) {
+                                            message = s["login.email.empty"]
+                                            return@Button
+                                        }
+                                        if (code.isEmpty()) {
+                                            message = s["login.code.empty"]
+                                            return@Button
+                                        }
+                                        authViewModel.verifyRegister(name, pwd, emailText, code) { result ->
+                                            result.onSuccess { accountId ->
+                                                account = accountId.toString()
+                                                message = s["login.register.success"].format(accountId)
+                                                isSuccessMessage = true
+                                                isLogin = true
+                                                password = ""
+                                                email = ""
+                                                verifyCode = ""
+                                            }.onFailure {
+                                                message = s["login.register.failed"].format(it.message ?: s["login.retry.later"])
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = !isSubmitting,
+                                interactionSource = submitInteraction,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                                    .graphicsLayer { scaleX = submitScale; scaleY = submitScale },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    backgroundColor = MaterialTheme.colors.primary,
+                                    contentColor = MaterialTheme.colors.onPrimary,
+                                    disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
+                                )
+                            ) {
+                                if (isSubmitting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colors.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    if (isSubmitting) s["login.processing"]
+                                    else if (isLogin) s["login.title"]
+                                    else s["register.title"]
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 切换登录/注册
+                    val toggleInteraction = remember { MutableInteractionSource() }
+                    val toggleScale = rememberElasticScale(toggleInteraction)
+                    TextButton(
+                        onClick = {
+                            if (!isSubmitting) {
+                                isLogin = !isLogin
+                                if (isLogin) {
+                                    email = ""
+                                    verifyCode = ""
+                                    countdownTime = 0
+                                    isSendingCode = false
+                                } else {
+                                    account = ""
+                                }
+                                message = ""
+                            }
+                        },
+                        enabled = !isSubmitting,
+                        interactionSource = toggleInteraction,
+                        modifier = Modifier.graphicsLayer { scaleX = toggleScale; scaleY = toggleScale }
+                    ) {
+                        Text(
+                            text = if (isLogin) s["login.switch.to.register"] else s["register.switch.to.login"],
+                            color = MaterialTheme.colors.primary.copy(alpha = 0.8f)
+                        )
+                    }
+
+                    // 提示消息
+                    if (message.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            color = if (isSuccessMessage) Color(0xFF4CAF50).copy(alpha = 0.1f)
+                                    else MaterialTheme.colors.error.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = 0.dp
                         ) {
                             Text(
-                                if (countdownTime > 0) s["login.send.code.resend"].format(countdownTime)
-                                else if (isSendingCode) s["login.send.code.sending"]
-                                else s["login.send.code"]
+                                text = message,
+                                color = if (isSuccessMessage) Color(0xFF2E7D32) else MaterialTheme.colors.error,
+                                style = MaterialTheme.typography.body2,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
-
-                if (isLogin) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it }, enabled = !isSubmitting)
-                        Text(text = s["login.remember.me"])
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    enabled = !isSubmitting,
-                    onClick = {
-                        if (isSubmitting) return@Button
-
-                        if (isLogin) {
-                            val acc = account.trim()
-                            val pwd = password.trim()
-                            if (acc.isEmpty() || pwd.isEmpty()) {
-                                message = s["login.account.password.empty"]
-                                return@Button
-                            }
-
-                            // 转发登录事件到ViewModel
-                            authViewModel.login(acc, pwd, rememberMe)
-                        } else {
-                            val name = username.trim()
-                            val pwd = password.trim()
-                            val emailText = email.trim()
-                            val code = verifyCode.trim()
-
-                            if (name.isEmpty() || pwd.isEmpty()) {
-                                message = s["login.username.password.empty"]
-                                return@Button
-                            }
-                            if (emailText.isEmpty()) {
-                                message = s["login.email.empty"]
-                                return@Button
-                            }
-                            if (code.isEmpty()) {
-                                message = s["login.code.empty"]
-                                return@Button
-                            }
-
-                            // 转发注册事件到ViewModel，使用verifyRegister接口与网页端逻辑一致
-                            authViewModel.verifyRegister(name, pwd, emailText, code) { result ->
-                                result.onSuccess { accountId ->
-                                    account = accountId.toString()
-                                    message = s["login.register.success"].format(accountId)
-                                    isSuccessMessage = true
-                                    isLogin = true
-                                    password = ""
-                                    email = ""
-                                    verifyCode = ""
-                                }.onFailure {
-                                    message = s["login.register.failed"].format(it.message ?: s["login.retry.later"])
-                                }
-                            }
-                        }
-                    }
-                ) {
-                    Text(text = if (isSubmitting) s["login.processing"] else if (isLogin) s["login.title"] else s["register.title"])
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(
-                    onClick = {
-                        if (!isSubmitting) {
-                            isLogin = !isLogin
-                            // 切换模式时清空相关字段
-                            if (isLogin) {
-                                // 切换到登录模式，清空注册相关字段
-                                email = ""
-                                verifyCode = ""
-                                countdownTime = 0
-                                isSendingCode = false
-                            } else {
-                                // 切换到注册模式，清空账号字段（注册用username）
-                                account = ""
-                            }
-                            message = ""
-                        }
-                    },
-                    enabled = !isSubmitting
-                ) {
-                    Text(text = if (isLogin) s["login.switch.to.register"] else s["register.switch.to.login"])
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = message,
-                    color = if (isSuccessMessage) Color(0xFF2E7D32) else MaterialTheme.colors.error
-                )
             }
         }
     }

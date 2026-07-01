@@ -65,7 +65,7 @@ fun buildLogoutPayload(userId: String): ByteArray {
 fun buildChatPayload(
     targetClientId: String,
     content: String,
-    userId: Int,
+    userId: Int = 0,
     timestamp: Long,
     replyToMessageId: String? = null,
     replyToContent: String? = null,
@@ -158,7 +158,7 @@ fun buildAgentChatPayload(
 fun buildGroupChatPayload(
     targetClientId: String,
     content: String,
-    userId: Int,
+    userId: Int = 0,
     replyToMessageId: String? = null,
     replyToContent: String? = null,
     replyToSender: String? = null,

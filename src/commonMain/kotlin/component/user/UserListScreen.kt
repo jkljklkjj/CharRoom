@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -175,24 +176,25 @@ fun UserList(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(8.dp).statusBarsPadding()) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = 8.dp, start = 8.dp, end = 8.dp).statusBarsPadding()) {
+        // Sidebar header
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colors.surface.copy(alpha = 0.18f),
-            shape = MaterialTheme.shapes.large,
+            color = Color.Transparent,
+            shape = RoundedCornerShape(14.dp),
             elevation = 0.dp
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(sidebarHeaderBrush(!MaterialTheme.colors.isLight))
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Current user avatar, click to open profile
+                    // Current user avatar
                     Surface(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
                             .clickable(onClick = onOpenProfile),
                         color = Color.White.copy(alpha = 0.2f)
@@ -214,28 +216,26 @@ fun UserList(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = s["contact.list.title"],
-                            style = MaterialTheme.typography.h6,
+                            style = MaterialTheme.typography.subtitle1,
                             color = Color.White
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = s["contact.list.online.count"].format(onlineCount, userListState.size),
                             style = MaterialTheme.typography.caption,
-                            color = Color.White.copy(alpha = 0.86f)
+                            color = Color.White.copy(alpha = 0.8f)
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         ElasticHeaderAction(
                             icon = Icons.Default.Search,
                             contentDescription = s["contact.search.add"],
                             onClick = onOpenSearch
                         )
-                        // Unified application management entry, shows red dot when pending
                         Box {
                             ElasticHeaderAction(
                                 icon = Icons.Default.Notifications,
@@ -245,9 +245,9 @@ fun UserList(
                             if (hasPendingApplications) {
                                 Box(
                                     modifier = Modifier
-                                        .size(8.dp)
+                                        .size(7.dp)
                                         .align(Alignment.TopEnd)
-                                        .background(MaterialTheme.colors.error, CircleShape)
+                                        .background(Color(0xFFFF4757), CircleShape)
                                 )
                             }
                         }
@@ -261,24 +261,39 @@ fun UserList(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        TextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text(text = s["contact.search"]) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            colors = TextFieldDefaults.textFieldColors(
-                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.15f),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = MaterialTheme.colors.primary
+        // Search field
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colors.surface.copy(alpha = if (MaterialTheme.colors.isLight) 0.6f else 0.15f),
+            shape = RoundedCornerShape(12.dp),
+            elevation = 0.dp
+        ) {
+            TextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text(text = s["contact.search"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.textFieldColors(
+                    backgroundColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colors.primary
+                ),
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                singleLine = true
             )
-        )
+        }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(
@@ -312,21 +327,15 @@ fun UserList(
                 val selected = selectedUserId == user.id
                 val cardColor by animateColorAsState(
                     targetValue = if (selected) {
-                        MaterialTheme.colors.primary.copy(alpha = if (MaterialTheme.colors.isLight) 0.16f else 0.34f)
+                        MaterialTheme.colors.primary.copy(alpha = if (MaterialTheme.colors.isLight) 0.12f else 0.28f)
                     } else {
-                        MaterialTheme.colors.surface.copy(alpha = if (MaterialTheme.colors.isLight) 0.78f else 0.6f)
+                        Color.Transparent
                     }
                 )
-                val borderColor = if (selected) {
-                    MaterialTheme.colors.secondary.copy(alpha = 0.45f)
-                } else {
-                    MaterialTheme.colors.onSurface.copy(alpha = 0.08f)
-                }
 
-                Surface(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 2.dp, vertical = 4.dp)
                         .clickable {
                             println("[UserList DEBUG] Clicked user: ${user.id} - ${user.username}")
                             try {
@@ -337,51 +346,40 @@ fun UserList(
                                         metadata = mapOf("username" to user.username)
                                     )
                                 )
-                            } catch (_: Exception) {
-                            }
-                            // When clicking a user, proactively query online status
+                            } catch (_: Exception) {}
                             if (Chat.isServerConnected && user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
-                                // Build CHECK message to query user online status
                                 val checkPayload = buildCheckPayload(user.id.toString())
                                 Chat.send(checkPayload, MsgType.CHECK, user.id.toString(), 1) { success, _ ->
-                                    if (success) {
-                                        println("[UserList] Online status check sent: user=${user.id}")
-                                    }
+                                    if (success) println("[UserList] Online status check sent: user=${user.id}")
                                 }
                             }
                             onUserClick(user)
-                        },
-                    color = cardColor,
-                    shape = MaterialTheme.shapes.medium,
-                    border = BorderStroke(1.dp, borderColor),
-                    elevation = if (selected) 4.dp else 0.dp
+                        }
+                        .background(cardColor, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Online dot
                         if (showOnlineDot(user)) {
                             val pulseScale = if (user.online == true) {
                                 rememberPulseAnimation()
-                            } else {
-                                1f
-                            }
+                            } else 1f
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
-                                    .graphicsLayer {
-                                        scaleX = pulseScale
-                                        scaleY = pulseScale
-                                    }
+                                    .size(7.dp)
+                                    .graphicsLayer { scaleX = pulseScale; scaleY = pulseScale }
                                     .background(
                                         color = if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1),
                                         shape = CircleShape
                                     )
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                         }
 
-                        // Avatar image (lazy load)
+                        // Avatar
                         val avatarUrl = user.avatarUrl
                         var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                         LaunchedEffect(avatarUrl, user.avatarKey) {
@@ -392,32 +390,21 @@ fun UserList(
                             }
                         }
 
-                        // Avatar click/long-press handling
                         val avatarModifier = Modifier
                             .size(40.dp)
-                            .clip(CircleShape)
+                            .clip(RoundedCornerShape(10.dp))
                             .combinedClickable(
-                                onClick = {
-                                    // Click avatar to view details
-                                    onUserLongClick?.invoke(user)
-                                },
-                                onLongClick = {
-                                    // Long-press avatar to view details
-                                    onUserLongClick?.invoke(user)
-                                }
+                                onClick = { onUserLongClick?.invoke(user) },
+                                onLongClick = { onUserLongClick?.invoke(user) }
                             )
 
                         if (avatarBitmap != null) {
-                            Image(
-                                bitmap = avatarBitmap!!,
-                                contentDescription = "avatar",
-                                modifier = avatarModifier
-                            )
+                            Image(bitmap = avatarBitmap!!, contentDescription = "avatar", modifier = avatarModifier)
                         } else {
                             Box(
                                 modifier = avatarModifier.background(
                                     brush = sidebarHeaderBrush(!MaterialTheme.colors.isLight),
-                                    shape = CircleShape
+                                    shape = RoundedCornerShape(10.dp)
                                 ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -430,7 +417,7 @@ fun UserList(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = displayName,
-                                style = MaterialTheme.typography.subtitle1,
+                                style = MaterialTheme.typography.subtitle2,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -438,7 +425,7 @@ fun UserList(
                             Text(
                                 text = subtitle,
                                 style = MaterialTheme.typography.body2,
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.65f),
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -446,27 +433,25 @@ fun UserList(
 
                         val timeText = buildLastMessageTime(user, allMessages, allGroupMessages)
                         if (timeText.isNotBlank() || unreadCount > 0) {
-                            Spacer(modifier = Modifier.width(8.dp))
                             Column(horizontalAlignment = Alignment.End) {
                                 if (timeText.isNotBlank()) {
                                     Text(
                                         text = timeText,
                                         style = MaterialTheme.typography.caption,
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f)
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.45f)
                                     )
                                 }
                                 if (unreadCount > 0) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Surface(
-                                        color = MaterialTheme.colors.error,
-                                        shape = CircleShape,
-                                        elevation = 0.dp
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color(0xFFFF4757), shape = RoundedCornerShape(999.dp))
+                                            .padding(horizontal = 6.dp, vertical = 1.dp)
                                     ) {
                                         Text(
                                             text = if (unreadCount > 99) "99+" else unreadCount.toString(),
                                             color = Color.White,
                                             style = MaterialTheme.typography.overline,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
                                 }

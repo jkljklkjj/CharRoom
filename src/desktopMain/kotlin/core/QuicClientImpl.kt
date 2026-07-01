@@ -134,16 +134,17 @@ class QuicClientImpl : ChatTransport {
 
     /**
      * 心跳：自适应间隔（基于 RTT 滑动窗口），服务端 idle timeout=30s。
+     * 每次发送前通过 [getOrCreateControlStream] 确保控制流活跃。
      */
     private suspend fun startHeartbeat() {
         while (connected.get()) {
             val interval = adaptiveHbInterval()
             delay(interval)
             if (!connected.get()) break
-            val controlStreamId = sessions[CONTROL_SESSION_KEY]?.streamId ?: break
-            val hbPayload = buildHeartbeatPayload()
-            val frame = QuicStreamProtocol.encodeFrame(hbPayload)
             try {
+                val controlStreamId = getOrCreateControlStream()
+                val hbPayload = buildHeartbeatPayload()
+                val frame = QuicStreamProtocol.encodeFrame(hbPayload)
                 lastHeartbeatSend = System.currentTimeMillis()
                 hbSendInProgress = true
                 transport.send(controlStreamId, frame)
@@ -177,6 +178,21 @@ class QuicClientImpl : ChatTransport {
                                 if (ackConvId.isNotBlank() && ackSeqId > 0) {
                                     scope.launch {
                                         GlobalChatState.updateConversationSeqId(ackConvId, ackSeqId)
+                                    }
+                                }
+                            }
+                            return@forEach
+                        }
+                        MsgType.RESPONSE.wire -> {
+                            // 登录响应：提取 clientId 作为当前用户 ID
+                            if (wrapper.hasResponse()) {
+                                val resp = wrapper.response
+                                val clientId = resp.clientId
+                                if (resp.success && clientId.isNotBlank()) {
+                                    val userId = clientId.toIntOrNull()
+                                    if (userId != null && userId > 0) {
+                                        GlobalAppState.setCurrentUserId(userId)
+                                        log.info("QUIC 登录成功: userId={}", userId)
                                     }
                                 }
                             }
@@ -233,22 +249,43 @@ class QuicClientImpl : ChatTransport {
     }
 
     /**
+     * 获取或重建控制流。
+     * QUIC stream 在服务端回复后可能被关闭，需要检查实际活跃状态。
+     */
+    private fun getOrCreateControlStream(): Long {
+        val existing = sessions[CONTROL_SESSION_KEY]
+        if (existing != null && transport.isStreamActive(existing.streamId)) {
+            return existing.streamId
+        }
+        // 控制流已失效，重建
+        log.warn("控制流 {} 已失效，重建中", existing?.streamId)
+        val newStreamId = transport.openStream()
+        sessions[CONTROL_SESSION_KEY] = StreamSession(
+            streamId = newStreamId,
+            conversationId = CONTROL_SESSION_KEY,
+            conversationType = StreamSession.ConversationType.CONTROL,
+            targetId = ""
+        )
+        return newStreamId
+    }
+
+    /**
      * 根据消息类型和目标选择或创建会话流。
      *
      * 流分配规则：
-     * - 控制类消息（LOGIN/LOGOUT/HEARTBEAT）-> Stream 0
+     * - 控制类消息（LOGIN/LOGOUT/HEARTBEAT/CHECK/ACK/RESPONSE）-> 控制流，自动重建
      * - 会话类消息（CHAT/GROUP_CHAT/AGENT_CHAT）-> 按 conversationId 复用或新建流
      */
     private fun getOrCreateStream(type: MsgType, targetId: String): Long {
         return when (type) {
-            MsgType.LOGIN, MsgType.LOGOUT, MsgType.HEARTBEAT -> {
-                sessions[CONTROL_SESSION_KEY]?.streamId
-                    ?: throw IllegalStateException("控制流未就绪")
+            MsgType.LOGIN, MsgType.LOGOUT, MsgType.HEARTBEAT,
+            MsgType.CHECK, MsgType.ACK, MsgType.RESPONSE, MsgType.AGENT_CHAT_STREAM -> {
+                getOrCreateControlStream()
             }
             MsgType.CHAT, MsgType.GROUP_CHAT, MsgType.AGENT_CHAT -> {
                 val convId = targetId
                 val existing = sessions[convId]
-                if (existing != null && existing.isActive) {
+                if (existing != null && transport.isStreamActive(existing.streamId)) {
                     existing.streamId
                 } else {
                     val newStreamId = transport.openStream()
@@ -274,10 +311,6 @@ class QuicClientImpl : ChatTransport {
                     transport.send(newStreamId, initFrame)
                     newStreamId
                 }
-            }
-            MsgType.CHECK, MsgType.ACK, MsgType.RESPONSE, MsgType.AGENT_CHAT_STREAM -> {
-                sessions[CONTROL_SESSION_KEY]?.streamId
-                    ?: throw IllegalStateException("控制流未就绪")
             }
         }
     }

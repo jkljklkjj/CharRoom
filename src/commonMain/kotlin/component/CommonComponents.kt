@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,127 +53,84 @@ fun MessageLongPressMenu(
     if (!expanded) return
     val s = LocalStrings.current
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(s["message.actions"]) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // 消息预览
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.5f)
-                ) {
-                    Text(
-                        text = message.message.take(50) + if (message.message.length > 50) "..." else "",
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.body2,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+    ModernDialog(onDismissRequest = onDismiss) {
+        Text(
+            text = s["message.actions"],
+            style = MaterialTheme.typography.h6,
+            color = MaterialTheme.colors.onSurface
+        )
+        Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
+        // 消息预览
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.05f),
+            shape = RoundedCornerShape(8.dp),
+            elevation = 0.dp
+        ) {
+            Text(
+                text = message.message.take(50) + if (message.message.length > 50) "..." else "",
+                modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.body2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+            )
+        }
 
-                // 操作项
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onCopy()
-                                onDismiss()
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = s["message.copy"], modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(s["message.copy"], style = MaterialTheme.typography.body1)
-                    }
+        Spacer(modifier = Modifier.height(16.dp))
 
-                    // 分享消息（平台相关：桌面端用 java.awt.Desktop，Android 用 Intent）
-                    if (onShare != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onShare()
-                                    onDismiss()
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = s["message.share"], modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(s["message.share"], style = MaterialTheme.typography.body1)
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onReply()
-                                onDismiss()
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Reply, contentDescription = s["message.reply"], modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(s["message.reply"], style = MaterialTheme.typography.body1)
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onForward()
-                                onDismiss()
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Forward, contentDescription = s["message.forward"], modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(s["message.forward"], style = MaterialTheme.typography.body1)
-                    }
-
-                    if (isSelf) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onDelete()
-                                    onDismiss()
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = s["message.delete"],
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colors.error
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                s["message.delete"],
-                                style = MaterialTheme.typography.body1,
-                                color = MaterialTheme.colors.error
-                            )
-                        }
-                    }
-                }
+        // 操作项
+        listOfNotNull(
+            Triple(Icons.Default.ContentCopy, s["message.copy"], { onCopy(); onDismiss() }),
+            if (onShare != null) Triple(Icons.Default.Share, s["message.share"], { onShare(); onDismiss() }) else null,
+            Triple(Icons.Default.Reply, s["message.reply"], { onReply(); onDismiss() }),
+            Triple(Icons.Default.Forward, s["message.forward"], { onForward(); onDismiss() }),
+            if (isSelf) Triple(Icons.Default.Delete, s["message.delete"], { onDelete(); onDismiss() }) else null
+        ).forEach { (icon, label, action) ->
+            val itemInteraction = remember { MutableInteractionSource() }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = itemInteraction,
+                        indication = null
+                    ) { action() }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (label == s["message.delete"]) MaterialTheme.colors.error
+                           else MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.body1,
+                    color = if (label == s["message.delete"]) MaterialTheme.colors.error
+                            else MaterialTheme.colors.onSurface
+                )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(s["message.cancel"])
+            if (label != s["message.delete"]) {
+                Divider(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.06f)
+                )
             }
         }
-    )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(
+            onClick = onDismiss,
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text(s["message.cancel"])
+        }
+    }
 }
 
 /**
@@ -189,7 +148,7 @@ fun ReplyPreviewBar(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colors.surface.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+        shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
     ) {
         Row(
             modifier = Modifier
@@ -197,6 +156,13 @@ fun ReplyPreviewBar(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(32.dp)
+                    .background(MaterialTheme.colors.primary, RoundedCornerShape(2.dp))
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = s["chat.reply.to"].format(senderName),
@@ -208,12 +174,17 @@ fun ReplyPreviewBar(
                     style = MaterialTheme.typography.body2,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.8f)
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                 )
             }
+            val closeInteraction = remember { MutableInteractionSource() }
+            val closeScale = rememberElasticScale(closeInteraction, pressedScale = 0.86f)
             IconButton(
                 onClick = onCancel,
-                modifier = Modifier.size(24.dp)
+                interactionSource = closeInteraction,
+                modifier = Modifier
+                    .size(28.dp)
+                    .graphicsLayer { scaleX = closeScale; scaleY = closeScale }
             ) {
                 Icon(Icons.Default.Close, contentDescription = s["message.cancel.reply"], modifier = Modifier.size(18.dp))
             }
@@ -285,119 +256,119 @@ fun ForwardSelectDialog(
     val userList by remember(users) { mutableStateOf(users.filter { it.id > 0 }) }
     var selectedUser by remember { mutableStateOf<User?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(s["message.forward.select"]) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-                if (userList.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(s["message.forward.no.contacts"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f))
-                    }
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(userList) { user ->
-                            val isSelected = selectedUser?.id == user.id
-                            var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    ModernDialog(onDismissRequest = onDismiss) {
+        Text(
+            text = s["message.forward.select"],
+            style = MaterialTheme.typography.h6,
+            color = MaterialTheme.colors.onSurface
+        )
+        Spacer(modifier = Modifier.height(12.dp))
 
-                            androidx.compose.runtime.LaunchedEffect(user.avatarUrl, user.avatarKey) {
-                                user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                                    avatarBitmap = loadImageBitmapWithCache(url, user.avatarKey)
-                                }
-                            }
+        if (userList.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(s["message.forward.no.contacts"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
+            }
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+                items(userList, key = { it.id }) { user ->
+                    val isSelected = selectedUser?.id == user.id
+                    var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedUser = user }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp)
-                                    .background(
-                                        color = if (isSelected) {
-                                            MaterialTheme.colors.primary.copy(alpha = 0.1f)
-                                        } else {
-                                            Color.Transparent
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
-                                    ),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // 头像
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colors.primary.copy(alpha = 0.1f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (avatarBitmap != null) {
-                                        Image(
-                                            bitmap = avatarBitmap!!,
-                                            contentDescription = "avatar",
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    } else {
-                                        Text(
-                                            text = user.username.firstOrNull()?.toString() ?: "U",
-                                            color = MaterialTheme.colors.primary
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = user.username,
-                                        style = MaterialTheme.typography.body1
-                                    )
-                                    Text(
-                                        text = if (user.online == true) s["user.detail.online"] else s["user.detail.offline"],
-                                        style = MaterialTheme.typography.caption,
-                                        color = if (user.online == true) {
-                                            MaterialTheme.colors.secondary
-                                        } else {
-                                            MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                                        }
-                                    )
-                                }
-
-                                if (isSelected) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = s["message.forward.selected"],
-                                        tint = MaterialTheme.colors.primary
-                                    )
-                                }
-                            }
-
-                            Divider(modifier = Modifier.fillMaxWidth())
+                    LaunchedEffect(user.avatarUrl, user.avatarKey) {
+                        user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                            avatarBitmap = loadImageBitmapWithCache(url, user.avatarKey)
                         }
                     }
+
+                    val itemInteraction = remember { MutableInteractionSource() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(interactionSource = itemInteraction, indication = null) { selectedUser = user }
+                            .background(
+                                color = if (isSelected) MaterialTheme.colors.primary.copy(alpha = 0.08f)
+                                        else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(vertical = 10.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colors.primary.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (avatarBitmap != null) {
+                                Image(bitmap = avatarBitmap!!, contentDescription = "avatar", modifier = Modifier.fillMaxSize())
+                            } else {
+                                Text(user.username.firstOrNull()?.toString() ?: "U", color = MaterialTheme.colors.primary)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = user.username,
+                                style = MaterialTheme.typography.body1,
+                                color = MaterialTheme.colors.onSurface
+                            )
+                            Text(
+                                text = if (user.online == true) s["user.detail.online"] else s["user.detail.offline"],
+                                style = MaterialTheme.typography.caption,
+                                color = if (user.online == true) MaterialTheme.colors.secondary
+                                        else MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+
+                        if (isSelected) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = s["message.forward.selected"],
+                                tint = MaterialTheme.colors.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    Divider(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f))
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onDismiss) {
+                Text(s["message.cancel"])
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
                 onClick = {
                     selectedUser?.let { user ->
                         onForward(user)
                         onDismiss()
                     }
                 },
-                enabled = selectedUser != null
+                enabled = selectedUser != null,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = MaterialTheme.colors.primary,
+                    contentColor = MaterialTheme.colors.onPrimary
+                )
             ) {
                 Text(s["message.forward.confirm"])
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(s["message.cancel"])
-            }
         }
-    )
+    }
 }
 
 /**

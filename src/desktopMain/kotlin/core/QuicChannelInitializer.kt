@@ -18,6 +18,8 @@ class QuicStreamInitializer(
     private val log = LoggerFactory.getLogger(QuicStreamInitializer::class.java)
 
     override fun initChannel(ch: QuicStreamChannel) {
+        // 启用半开状态：服务端发 FIN 后写端仍可用（类似 WebTransport writable）
+        ch.config().isAllowHalfClosure = true
         ch.pipeline().addLast(object : SimpleChannelInboundHandler<ByteBuf>() {
             override fun channelRead0(ctx: ChannelHandlerContext, msg: ByteBuf) {
                 val readable = msg.readableBytes()

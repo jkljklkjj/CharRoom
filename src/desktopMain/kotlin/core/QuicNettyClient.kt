@@ -69,6 +69,10 @@ class QuicNettyClient {
                 .maxIdleTimeout(30000, TimeUnit.MILLISECONDS)
                 .initialCongestionWindowPackets(2)
                 .congestionControlAlgorithm(QuicCongestionControlAlgorithm.BBR)
+                // 服务端使用 Http3.newQuicServerCodecBuilder，需要创建 HTTP/3 控制流（unidirectional）
+                .initialMaxStreamsUnidirectional(100)
+                // 同时允许足够多的双向流（会话流复用）
+                .initialMaxStreamsBidirectional(100)
                 .build()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -140,6 +144,14 @@ class QuicNettyClient {
         streams[stream.streamId()] = stream
         log.debug("QUIC 新流打开: streamId={}", stream.streamId())
         return stream.streamId()
+    }
+
+    /**
+     * 检查指定 Stream 是否仍活跃。
+     */
+    fun isStreamActive(streamId: Long): Boolean {
+        val stream = streams[streamId]
+        return stream != null && stream.isActive
     }
 
     /**

@@ -233,9 +233,8 @@ private fun ChatScreenContent(
     val allUsers by chatViewModel.usersFlow.collectAsState()
 
     // 消息气泡宽度适配所有设备
-    // 固定最大宽度220dp（约11个汉字），在手机和平板上都有良好的显示效果
-    // 既不会过窄也不会过长，不需要动态计算屏幕宽度，跨平台兼容性最好
-    val maxBubbleWidth = 220.dp
+    // 使用容器宽度的 70% 为参考，桌面端上限 400dp 保证可读性
+    val maxBubbleWidth = 400.dp
 
     // 使用 per-conversation StateFlow，消息到达时只更新本会话的订阅者
     val userMessages by GlobalChatState.messagesFor(user.id).collectAsState()
@@ -486,25 +485,31 @@ private fun ChatScreenContent(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(14.dp).statusBarsPadding().imePadding()) {
+    Column(modifier = Modifier.fillMaxSize().padding(12.dp).statusBarsPadding().imePadding()) {
+        // Chat header
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
-            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.18f else 0.6f),
+            shape = RoundedCornerShape(16.dp),
             elevation = 0.dp
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(chatHeaderBrush(isDarkMode))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // 返回按钮（仅在onBackClick存在时显示）
                     onBackClick?.let { onBack ->
+                        val backInteraction = remember { MutableInteractionSource() }
+                        val backScale = rememberElasticScale(backInteraction, pressedScale = 0.86f)
                         IconButton(
                             onClick = onBack,
-                            modifier = Modifier.size(40.dp)
+                            interactionSource = backInteraction,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .graphicsLayer { scaleX = backScale; scaleY = backScale }
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -512,29 +517,31 @@ private fun ChatScreenContent(
                                 tint = MaterialTheme.colors.onBackground
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                     }
 
-                    // 用户头像：使用统一的头像组件
+                    // 用户头像
                     UserAvatar(
                         user = user,
-                        size = 40.dp,
+                        size = 36.dp,
                         onClick = { onAvatarClick?.invoke(user) }
                     )
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
+                    // 在线状态指示器
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(8.dp)
                             .clip(CircleShape)
                             .background(if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1))
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = user.username,
-                            style = MaterialTheme.typography.h6,
+                            style = MaterialTheme.typography.subtitle1,
                             color = MaterialTheme.colors.onBackground,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -542,53 +549,46 @@ private fun ChatScreenContent(
                         Text(
                             text = if (user.online == true) s["chat.status.online"] else if (user.online == false) s["chat.status.offline"] else s["chat.status.syncing"],
                             style = MaterialTheme.typography.caption,
-                            color = MaterialTheme.colors.onBackground.copy(alpha = 0.72f)
+                            color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f)
                         )
                     }
 
                     // 视频通话按钮
+                    val callInteraction = remember { MutableInteractionSource() }
+                    val callScale = rememberElasticScale(callInteraction, pressedScale = 0.86f)
                     IconButton(
                         onClick = { onVideoCallClick?.invoke(user.id.toString()) },
-                        modifier = Modifier.size(40.dp)
+                        interactionSource = callInteraction,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .graphicsLayer { scaleX = callScale; scaleY = callScale }
                     ) {
-                        Text(
-                            text = "📹",
-                        )
+                        Text(text = "📹")
                     }
 
-                    // 好友菜单按钮（查看资料、删除好友）
+                    // 好友菜单按钮
                     Box {
                         var showMenu by remember { mutableStateOf(false) }
+                        val menuInteraction = remember { MutableInteractionSource() }
+                        val menuScale = rememberElasticScale(menuInteraction, pressedScale = 0.86f)
                         IconButton(
                             onClick = { showMenu = true },
-                            modifier = Modifier.size(40.dp)
+                            interactionSource = menuInteraction,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .graphicsLayer { scaleX = menuScale; scaleY = menuScale }
                         ) {
-                            Text(
-                                text = "⋯",
-                            )
+                            Text(text = "⋯")
                         }
                         DropdownMenu(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false }
                         ) {
-                            DropdownMenuItem(
-                                onClick = {
-                                    showMenu = false
-                                    onUserMenuClick?.invoke(user)
-                                }
-                            ) {
+                            DropdownMenuItem(onClick = { showMenu = false; onUserMenuClick?.invoke(user) }) {
                                 Text(s["friend.menu.info"])
                             }
-                            DropdownMenuItem(
-                                onClick = {
-                                    showMenu = false
-                                    showDeleteConfirm = true
-                                }
-                            ) {
-                                Text(
-                                    s["friend.menu.delete"],
-                                    color = MaterialTheme.colors.error
-                                )
+                            DropdownMenuItem(onClick = { showMenu = false; showDeleteConfirm = true }) {
+                                Text(s["friend.menu.delete"], color = MaterialTheme.colors.error)
                             }
                         }
                     }
@@ -596,30 +596,17 @@ private fun ChatScreenContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-//        TextField(
-//            value = historyQuery,
-//            onValueChange = { historyQuery = it },
-//            placeholder = { Text(text = "搜索本地聊天历史，支持消息内容和发送者") },
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(horizontal = 4.dp),
-//            colors = TextFieldDefaults.textFieldColors(
-//                backgroundColor = MaterialTheme.colors.surface.copy(alpha = 0.14f),
-//                focusedIndicatorColor = Color.Transparent,
-//                unfocusedIndicatorColor = Color.Transparent,
-//                cursorColor = MaterialTheme.colors.primary
-//            )
-//        )
+        // Message list header END - removed commented out search field
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Surface(
             modifier = Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
-            color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.3f else 0.6f),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
+            color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.2f else 0.5f),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.05f)),
             elevation = 0.dp
         ) {
             // 监听滚动位置，滚动到顶部时加载更多历史
@@ -747,6 +734,7 @@ private fun ChatScreenContent(
                         } else {
                             MaterialTheme.colors.onSurface
                         }
+                        val bubbleShape = bubbleShape(message.sender)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -778,16 +766,16 @@ private fun ChatScreenContent(
 
                                 Box(
                                     modifier = Modifier
-                                        .widthIn(max = maxBubbleWidth) // 最大宽度为屏幕的40%，内容短自动适配
+                                        .widthIn(max = maxBubbleWidth)
                                         .shadow(
                                             elevation = if (message.sender) 6.dp else 3.dp,
                                             shape = RoundedCornerShape(18.dp),
                                             ambientColor = Color.Black.copy(alpha = 0.1f),
                                             spotColor = Color.Black.copy(alpha = 0.08f)
                                         )
-                                        .clip(RoundedCornerShape(18.dp))
+                                        .clip(bubbleShape)
                                         .background(refinedMessageBubbleBrush(message.sender, isDarkMode))
-                                        .border(1.dp, bubbleBorderColor, RoundedCornerShape(18.dp))
+                                        .border(1.dp, bubbleBorderColor, bubbleShape)
                                         .combinedClickable(
                                             onClick = {},
                                             onLongClick = {
@@ -902,7 +890,16 @@ private fun ChatScreenContent(
                                             }
                                         }
 
-                                        // 已移除聊天气泡内的时间戳显示
+                                        // 气泡内时间戳
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = formatTime(message.timestamp),
+                                            style = MaterialTheme.typography.caption,
+                                            color = bubbleTextColor.copy(alpha = 0.6f),
+                                            modifier = Modifier.align(
+                                                if (message.sender) Alignment.End else Alignment.Start
+                                            )
+                                        )
                                     }
                                 }
 
@@ -972,7 +969,7 @@ private fun ChatScreenContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Column {
             // 引用回复预览栏
@@ -985,40 +982,46 @@ private fun ChatScreenContent(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.36f else 0.8f),
-                shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.06f)),
                 elevation = 0.dp
             ) {
                 Column {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // 表情按钮
+                        val emojiInteraction = remember { MutableInteractionSource() }
+                        val emojiScale = rememberElasticScale(emojiInteraction, pressedScale = 0.86f)
                         IconButton(
                             onClick = { showEmojiPanel = !showEmojiPanel },
-                            modifier = Modifier.size(40.dp)
+                            interactionSource = emojiInteraction,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .graphicsLayer { scaleX = emojiScale; scaleY = emojiScale }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.EmojiEmotions,
                                 contentDescription = s["chat.emoji"],
-                                tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                                tint = MaterialTheme.colors.primary.copy(alpha = 0.7f)
                             )
                         }
 
                         // 附件按钮
+                        val attachInteraction = remember { MutableInteractionSource() }
+                        val attachScale = rememberElasticScale(attachInteraction, pressedScale = 0.86f)
                         IconButton(
-                            onClick = {
-                                // 弹出选择菜单：图片/文件
-                                // 这里简化处理，先选择图片，后续可以扩展
-                                pickImage()
-                            },
-                            modifier = Modifier.size(40.dp),
+                            onClick = { pickImage() },
+                            interactionSource = attachInteraction,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .graphicsLayer { scaleX = attachScale; scaleY = attachScale },
                             enabled = !isUploading && !isSending
                         ) {
                             if (isUploading) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp,
                                     color = MaterialTheme.colors.primary
                                 )
@@ -1026,71 +1029,94 @@ private fun ChatScreenContent(
                                 Icon(
                                     imageVector = Icons.Default.AttachFile,
                                     contentDescription = s["chat.attachment"],
-                                    tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                                    tint = MaterialTheme.colors.primary.copy(alpha = 0.7f)
                                 )
                             }
                         }
 
-                        TextField(
-                            value = messageText,
-                            onValueChange = { messageText = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(inputFocusRequester)
-                                .onFocusChanged { state ->
-                                    val focused = state.isFocused
-                                    if (focused && !isInputFocused) {
-                                        isInputFocused = true
-                                        // 输入框获焦时滚动到底部，覆盖因键盘弹起导致消息被遮挡的问题
-                                        scope.launch {
-                                            if (filteredMessages.isNotEmpty()) {
-                                                listState.animateScrollToItem(filteredMessages.lastIndex)
+                        // 输入框背景容器
+                        Surface(
+                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
+                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = 0.dp
+                        ) {
+                            TextField(
+                                value = messageText,
+                                onValueChange = { messageText = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(inputFocusRequester)
+                                    .onFocusChanged { state ->
+                                        val focused = state.isFocused
+                                        if (focused && !isInputFocused) {
+                                            isInputFocused = true
+                                            scope.launch {
+                                                if (filteredMessages.isNotEmpty()) {
+                                                    listState.animateScrollToItem(filteredMessages.lastIndex)
+                                                }
                                             }
+                                        } else if (!focused) {
+                                            isInputFocused = false
                                         }
-                                    } else if (!focused) {
-                                        isInputFocused = false
                                     }
-                                }
-                                .onKeyEvent { event ->
-                                    if (event.type == KeyEventType.KeyUp && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
-                                        submitMessage()
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                },
-                            placeholder = { Text(s["chat.placeholder"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
-                            colors = TextFieldDefaults.textFieldColors(
-                                backgroundColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            maxLines = 5, // 最多显示5行，超过后滚动
-                            textStyle = MaterialTheme.typography.body1
-                        )
+                                    .onKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyUp && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
+                                            submitMessage()
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    },
+                                placeholder = { Text(s["chat.placeholder"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                                colors = TextFieldDefaults.textFieldColors(
+                                    backgroundColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    cursorColor = MaterialTheme.colors.primary
+                                ),
+                                maxLines = 5,
+                                textStyle = MaterialTheme.typography.body1
+                            )
+                        }
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
 
+                        // 发送按钮 - 带渐变和阴影
                         val sendInteraction = remember { MutableInteractionSource() }
                         val sendScale = rememberElasticScale(sendInteraction, pressedScale = 0.9f)
+                        val isSendEnabled = !isSending && (messageText.isNotBlank() || replyToMessage != null)
                         Button(
                             onClick = { submitMessage() },
-                            enabled = !isSending && (messageText.isNotBlank() || replyToMessage != null),
+                            enabled = isSendEnabled,
                             interactionSource = sendInteraction,
                             modifier = Modifier
-                                .height(42.dp)
+                                .height(36.dp)
                                 .graphicsLayer {
                                     scaleX = sendScale
                                     scaleY = sendScale
+                                    shadowElevation = if (isSendEnabled) 4f else 0f
                                 },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 backgroundColor = MaterialTheme.colors.primary,
                                 contentColor = MaterialTheme.colors.onPrimary,
-                                disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
+                                disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.35f)
                             )
                         ) {
-                            Text(if (isSending) s["chat.sending"] else s["chat.send"])
+                            if (isSending) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colors.onPrimary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = s["chat.send"],
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
 

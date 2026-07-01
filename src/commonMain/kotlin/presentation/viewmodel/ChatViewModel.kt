@@ -690,21 +690,15 @@ open class ChatViewModel(
         val currentUserId = GlobalAppState.currentUserId
         println("[ChatViewModel] 准备发送私聊消息，currentUserId: $currentUserId, 接收者: ${user.id}")
 
-        if (currentUserId == null) {
-            println("[ChatViewModel] 错误：发送消息失败，当前用户ID为空")
-            sessionScope.launch {
-                onDone() // 必须调用onDone恢复UI状态
-            }
-            return
-        }
+        val senderId = currentUserId ?: 0 // 0=未知，服务端从连接推导
 
         try {
             val timestamp = System.currentTimeMillis()
-            val messageId = MessageIdGenerator.generateMessageId(currentUserId, messageText + fileUrl.orEmpty(), timestamp)
+            val messageId = MessageIdGenerator.generateMessageId(senderId, messageText + fileUrl.orEmpty(), timestamp)
 
             // 创建消息对象
             val message = Message(
-                senderId = currentUserId,
+                senderId = senderId,
                 message = messageText,
                 sender = true,
                 receiverId = user.id,
@@ -729,11 +723,10 @@ open class ChatViewModel(
             addMessage(message)
             println("[ChatViewModel] 本地消息已添加，messageId: $messageId")
 
-            // 构建WebSocket消息
+            // 构建 protobuf 消息（userId 服务端会从 QUIC 连接推导，传 0 即可）
             val payload = buildChatPayload(
                 targetClientId = user.id.toString(),
                 content = messageText,
-                userId = currentUserId,
                 timestamp = timestamp,
                 replyToMessageId = replyToMessageId,
                 replyToContent = replyToContent,
@@ -807,33 +800,23 @@ open class ChatViewModel(
         val currentUserId = GlobalAppState.currentUserId
         println("[ChatViewModel] 准备发送群聊消息，currentUserId: $currentUserId, 群组: ${group.id}")
 
-        if (currentUserId == null) {
-            println("[ChatViewModel] 错误：发送群消息失败，当前用户ID为空")
-            sessionScope.launch {
-                onDone() // 必须调用onDone恢复UI状态
-            }
-            return
+        val senderId = currentUserId ?: 0
+        val senderName = if (currentUserId != null) {
+            chatState.users.value.find { it.id == currentUserId }?.username ?: "我"
+        } else {
+            "我"
         }
 
         try {
-            val currentUser = chatState.users.value.find { it.id == currentUserId }
-            if (currentUser == null) {
-                println("[ChatViewModel] 错误：发送群消息失败，找不到当前用户信息")
-                sessionScope.launch {
-                    onDone()
-                }
-                return
-            }
-
             val timestamp = System.currentTimeMillis()
-            val messageId = MessageIdGenerator.generateGroupMessageId(group.id, currentUserId, messageText + fileUrl.orEmpty(), timestamp)
+            val messageId = MessageIdGenerator.generateGroupMessageId(group.id, senderId, messageText + fileUrl.orEmpty(), timestamp)
 
             // 创建群聊消息对象
             val groupMessage = GroupMessage(
                 groupId = group.id,
-                senderName = currentUser.username,
+                senderName = senderName,
                 text = messageText,
-                senderId = currentUserId,
+                senderId = senderId,
                 timestamp = timestamp,
                 isSent = true, // 先乐观显示为已发送，失败时再回退
                 messageId = messageId,
@@ -850,11 +833,10 @@ open class ChatViewModel(
             addGroupMessage(groupMessage)
             println("[ChatViewModel] 本地群消息已添加，messageId: $messageId")
 
-            // 构建WebSocket群聊消息
+            // 构建 protobuf 消息（userId 服务端会从 QUIC 连接推导）
             val payload = buildGroupChatPayload(
                 targetClientId = group.id.toString(),
                 content = messageText,
-                userId = currentUserId,
                 replyToMessageId = replyToMessageId,
                 replyToContent = replyToContent,
                 replyToSender = replyToSender,

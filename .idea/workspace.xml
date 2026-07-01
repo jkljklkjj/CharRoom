@@ -11,7 +11,23 @@
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="实现手机版的头像裁剪功能">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/AppLifecycleObserver.kt" beforeDir="false" afterPath="$PROJECT_DIR$/androidApp/src/main/kotlin/com/chatlite/charroom/core/AppLifecycleObserver.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/component/Glassmorphism.android.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/androidMain/kotlin/component/Glassmorphism.android.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/CommonComponents.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/CommonComponents.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ImmersiveUi.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ImmersiveUi.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/LoginRegisterApp.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/dialog/AddUserOrGroupDialog.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/dialog/AddUserOrGroupDialog.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserListScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/user/UserListScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/state/AppState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/state/AppState.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSource.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSource.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSourceImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/datasource/local/LocalDataSourceImpl.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/data/repository/AuthRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/data/repository/AuthRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicChannelInitializer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicChannelInitializer.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicClientImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicClientImpl.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicNettyClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicNettyClient.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,7 +66,7 @@
       <entry key="chat-panel" value="GPT-5 mini" />
     </selectedModels>
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=10AD5U25FA000YT)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -210,7 +226,7 @@
     &quot;project.structure.last.edited&quot;: &quot;模块&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;File.Encoding&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
     &quot;ts.external.directory.path&quot;: &quot;D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
@@ -232,7 +248,7 @@
       <recent name="component" />
     </key>
   </component>
-  <component name="RunManager" selected="Android App.CharRoom">
+  <component name="RunManager" selected="Gradle.desktop">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="CharRoom" />
       <working_directory value="$PROJECT_DIR$" />
@@ -807,6 +823,11 @@
       <workItem from="1779285524347" duration="672000" />
       <workItem from="1779292323590" duration="2673000" />
       <workItem from="1779323961208" duration="116000" />
+      <workItem from="1782892442479" duration="6079000" />
+      <workItem from="1782913699498" duration="1782000" />
+      <workItem from="1782915951004" duration="1463000" />
+      <workItem from="1782917440458" duration="3148000" />
+      <workItem from="1782920712623" duration="2170000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1174,6 +1195,17 @@
             </list>
           </value>
         </entry>
+        <entry key="User">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="*" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
       </map>
     </option>
     <option name="TAB_STATES">
@@ -1235,7 +1267,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/build.gradle.kts</url>
-          <line>163</line>
+          <line>167</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>

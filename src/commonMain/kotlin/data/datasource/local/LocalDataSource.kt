@@ -10,9 +10,9 @@ import model.User
  */
 interface LocalDataSource {
     /**
-     * Save auth credentials
+     * Save auth credentials (with user ID)
      */
-    suspend fun saveAuth(account: String, accessToken: String, refreshToken: String)
+    suspend fun saveAuth(account: String, accessToken: String, refreshToken: String, userId: Int = 0)
 
     /**
      * Get saved account
@@ -28,6 +28,11 @@ interface LocalDataSource {
      * Get saved refresh token
      */
     suspend fun getSavedRefreshToken(): String?
+
+    /**
+     * Get saved user ID (0 if not persisted)
+     */
+    suspend fun getSavedUserId(): Int
 
     /**
      * Clear auth credentials
