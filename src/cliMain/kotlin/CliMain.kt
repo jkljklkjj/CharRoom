@@ -1,6 +1,7 @@
 import core.ApiEndpoints
 import core.ServerConfig
 import core.agentChat
+import core.ApiService
 import core.ChatTransport
 import core.di.KoinInitializer
 import core.di.desktopModule
@@ -10,6 +11,7 @@ import data.datasource.local.LocalDataSourceImpl
 import data.repository.GlobalAuthRepository
 import data.repository.GlobalChatRepository
 import kotlinx.coroutines.*
+import model.Message
 
 fun main(args: Array<String>) = runBlocking {
     ChatLiteCli(args).run()
@@ -67,6 +69,9 @@ class ChatLiteCli(private val args: Array<String>) {
         // 加载联系人
         try { println("已加载 ${GlobalChatRepository.fetchFriends().size} 个联系人") } catch (_: Exception) {}
 
+        // 登录后拉取离线消息
+        fetchOfflineMessages(token)
+
         // 命令循环
         enterReplLoop(token)
         transport.logoutAndDisconnect()
@@ -100,6 +105,35 @@ class ChatLiteCli(private val args: Array<String>) {
         return loginWithArgs()
     }
 
+    // ── 离线消息 ──
+
+    private suspend fun fetchOfflineMessages(token: String) {
+        try {
+            val msgs = ApiService(token).getOfflineMessages()
+            if (msgs.isEmpty()) return
+            println("\n📩 ${msgs.size} 条离线消息:")
+            msgs.forEach { msg: Message ->
+                println("  💬 [${msg.senderId}]: ${msg.message.take(80)}")
+            }
+        } catch (_: Exception) { /* 拉取离线消息失败，不影响主流程 */ }
+    }
+
+    // ── 发送私聊消息 ──
+
+    private suspend fun sendPrivateMessage(token: String, receiverId: String, content: String) {
+        val api = ApiService(token)
+        val ok = api.sendPrivateMessage(receiverId = receiverId, content = content, messageType = "text")
+        println(if (ok) "✅ 已发送" else "❌ 发送失败")
+    }
+
+    // ── 发送群聊消息 ──
+
+    private suspend fun sendGroupMessage(token: String, groupId: String, content: String) {
+        val api = ApiService(token)
+        val ok = api.sendGroupMessage(groupId = groupId, content = content, messageType = "text")
+        println(if (ok) "✅ 已发送" else "❌ 发送失败")
+    }
+
     // ---- 以下为 CLI 特有的命令处理 ----
 
     private fun enterReplLoop(token: String) = runBlocking {
@@ -115,6 +149,26 @@ class ChatLiteCli(private val args: Array<String>) {
                 t.startsWith("/friend reject ") -> { val ok = GlobalChatRepository.rejectFriend(t.removePrefix("/friend reject ").trim()); println(if (ok) "OK" else "FAIL") }
                 t == "/group list" -> { val g = GlobalChatRepository.fetchGroups(); println("群组(${g.size}): ${g.joinToString { "${it.id}:${it.username}" }}") }
                 t.startsWith("/group join ") -> { val ok = GlobalChatRepository.addGroup(t.removePrefix("/group join ").trim()); println(if (ok) "OK" else "FAIL") }
+                t.startsWith("/msg ") -> {
+                    // /msg <userId> <text>
+                    val rest = t.removePrefix("/msg ").trim()
+                    val spaceIdx = rest.indexOf(' ')
+                    if (spaceIdx > 0) {
+                        val targetId = rest.substring(0, spaceIdx)
+                        val text = rest.substring(spaceIdx + 1).trim()
+                        sendPrivateMessage(token, targetId, text)
+                    } else println("用法: /msg <用户ID> <消息内容>")
+                }
+                t.startsWith("/group send ") -> {
+                    // /group send <groupId> <text>
+                    val rest = t.removePrefix("/group send ").trim()
+                    val spaceIdx = rest.indexOf(' ')
+                    if (spaceIdx > 0) {
+                        val groupId = rest.substring(0, spaceIdx)
+                        val text = rest.substring(spaceIdx + 1).trim()
+                        sendGroupMessage(token, groupId, text)
+                    } else println("用法: /group send <群组ID> <消息内容>")
+                }
                 t == "/status" -> showConnectionStatus()
                 t == "/help" -> printHelp()
                 t == "/exit" || t == "/quit" -> break
@@ -133,7 +187,19 @@ class ChatLiteCli(private val args: Array<String>) {
     }
 
     private fun printHelp() {
-        println("""命令: /ai <text> | /friend list|add|accept|reject | /group list|join | /status | /help | /exit""".trimIndent())
+        println("""命令:
+  /ai <text>               — AI 对话
+  /msg <userId> <text>     — 发送私聊消息
+  /friend list             — 好友列表
+  /friend add <account>    — 添加好友
+  /friend accept <id>      — 接受好友请求
+  /friend reject <id>      — 拒绝好友请求
+  /group list              — 群组列表
+  /group join <id>         — 加入群组
+  /group send <id> <text>  — 发送群聊消息
+  /status                  — 连接状态
+  /help                    — 此帮助
+  /exit                    — 退出""".trimIndent())
     }
 
     private fun parseArgs() {
@@ -151,7 +217,7 @@ class ChatLiteCli(private val args: Array<String>) {
                     i++
                 }
                 "--quic-port" -> {
-                    core.ServerConfig.QUIC_PORT = args.getOrElse(i + 1) { "9443" }.toIntOrNull() ?: 9443
+                    core.ServerConfig.QUIC_PORT = args.getOrElse(i + 1) { "443" }.toIntOrNull() ?: 443
                     i++
                 }
                 "--username" -> { username = args.getOrElse(i + 1) { "" }; i++ }
