@@ -340,7 +340,7 @@ suspend fun getUserInfo(token: String): User? {
 suspend fun getFriendList(token: String): List<User> {
     val response = sendRequest<List<User>>(
         path = ApiEndpoints.FRIEND_GET,
-        method = "POST",
+        method = "GET",
         token = token
     )
 
@@ -460,16 +460,12 @@ suspend fun confirmPurchase(token: String, purchaseId: Long): Boolean {
 }
 
 /**
- * 删除好友 — POST /friend/del { friendId }
+ * 删除好友 — DELETE /friends/{friendId}
  */
 suspend fun deleteFriend(token: String, friendId: Int): Boolean {
-    val requestBody = buildJsonObject {
-        put("friendId", friendId)
-    }
     val response = sendRequest<Unit>(
-        path = ApiEndpoints.FRIEND_DEL,
-        method = "POST",
-        body = requestBody,
+        path = "${ApiEndpoints.FRIEND_DEL}/$friendId",
+        method = "DELETE",
         token = token
     )
     return response.isSuccess
@@ -543,14 +539,9 @@ suspend fun addFriend(token: String, account: String): Boolean {
  * @return 完整响应，包含 code/message/data。code=1005 表示需要审核（群组需管理员批准）
  */
 suspend fun addGroup(token: String, groupId: String): ApiResponse<Unit> {
-    val requestBody = buildJsonObject {
-        put("groupId", groupId)
-    }
-
     return sendRequest<Unit>(
-        path = ApiEndpoints.GROUP_ADD,
+        path = "${ApiEndpoints.GROUP_ADD}/${groupId}/join",
         method = "POST",
-        body = requestBody,
         token = token
     )
 }
@@ -559,9 +550,8 @@ suspend fun addGroup(token: String, groupId: String): ApiResponse<Unit> {
  * 查询用户详情
  */
 suspend fun getUserDetail(token: String, userId: String): User? {
-    val path = "${ApiEndpoints.USER_DETAIL}?account=$userId"
     val response = sendRequest<User>(
-        path = path,
+        path = "${ApiEndpoints.USER_DETAIL}?userId=$userId",
         method = "GET",
         token = token
     )
@@ -573,7 +563,7 @@ suspend fun getUserDetail(token: String, userId: String): User? {
  * 查询群组详情
  */
 suspend fun getGroupDetail(token: String, groupId: String): Group? {
-    val path = "${ApiEndpoints.GROUP_DETAIL}?id=$groupId"
+    val path = "${ApiEndpoints.GROUP_DETAIL}/$groupId"
     val response = sendRequest<Group>(
         path = path,
         method = "GET",
@@ -654,7 +644,7 @@ suspend fun updateUserProfile(token: String, username: String, phone: String, si
 
     val response = sendRequest<Unit>(
         path = ApiEndpoints.USER_PROFILE_UPDATE,
-        method = "POST",
+        method = "PUT",
         body = requestBody,
         token = token
     )
@@ -673,7 +663,7 @@ suspend fun updateEmail(token: String, newEmail: String, verifyCode: String): Bo
 
     val response = sendRequest<Unit>(
         path = ApiEndpoints.USER_PROFILE_UPDATE_EMAIL,
-        method = "POST",
+        method = "PUT",
         body = requestBody,
         token = token
     )
@@ -781,13 +771,11 @@ suspend fun createGroup(token: String, name: String, memberIds: List<Int>): Grou
  */
 suspend fun inviteToGroup(token: String, groupId: Int, userId: Int): Boolean {
     val requestBody = buildJsonObject {
-        put("groupId", groupId)
         put("userId", userId)
     }
 
-    // 暂用现有接口
     val response = sendRequest<Unit>(
-        path = ApiEndpoints.GROUP_ADD,
+        path = "${ApiEndpoints.GROUP_ADD}/$groupId/members",
         method = "POST",
         body = requestBody,
         token = token
@@ -800,15 +788,9 @@ suspend fun inviteToGroup(token: String, groupId: Int, userId: Int): Boolean {
  * 退出群组
  */
 suspend fun leaveGroup(token: String, groupId: Int): Boolean {
-    val requestBody = buildJsonObject {
-        put("groupId", groupId)
-    }
-
-    // 暂用现有接口
     val response = sendRequest<Unit>(
-        path = ApiEndpoints.GROUP_GET,
+        path = "${ApiEndpoints.GROUP_GET}/$groupId/leave",
         method = "POST",
-        body = requestBody,
         token = token
     )
 
@@ -831,7 +813,7 @@ suspend fun updateUserInfo(
 
     val response = sendRequest<Unit>(
         path = ApiEndpoints.USER_PROFILE_UPDATE,
-        method = "POST",
+        method = "PUT",
         body = requestBody,
         token = token
     )
@@ -849,7 +831,7 @@ suspend fun changePassword(token: String, oldPassword: String, newPassword: Stri
 
     val response = sendRequest<Unit>(
         path = ApiEndpoints.USER_PROFILE_UPDATE,
-        method = "POST",
+        method = "PUT",
         body = requestBody,
         token = token
     )

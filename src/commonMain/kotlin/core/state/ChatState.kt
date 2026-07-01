@@ -345,12 +345,14 @@ class ChatState {
     /**
      * 更新消息发送状态
      */
-    suspend fun updateMessageSentStatus(messageId: String, isSent: Boolean) = messagesMutex.withLock {
-        println("[ChatState] 更新私聊消息发送状态: messageId=$messageId, isSent=$isSent")
-        val msg = _messageCache.snapshot.find { it.messageId == messageId } ?: return
-        val updated = msg.copy(isSent = isSent)
-        _messageCache.add(updated)
-        getOrCreatePrivateCache(privateConversationId(updated)).add(updated)
+    suspend fun updateMessageSentStatus(messageId: String, isSent: Boolean) {
+        messagesMutex.withLock {
+            println("[ChatState] 更新私聊消息发送状态: messageId=$messageId, isSent=$isSent")
+            val msg = _messageCache.snapshot.find { it.messageId == messageId } ?: return@withLock
+            val updated = msg.copy(isSent = isSent)
+            _messageCache.add(updated)
+            getOrCreatePrivateCache(privateConversationId(updated)).add(updated)
+        }
     }
 
     /**
@@ -406,12 +408,14 @@ class ChatState {
     /**
      * 更新群聊消息发送状态
      */
-    suspend fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) = groupMessagesMutex.withLock {
-        println("[ChatState] 更新群聊消息发送状态: messageId=$messageId, isSent=$isSent")
-        val msg = _groupMessageCache.snapshot.find { it.messageId == messageId } ?: return
-        val updated = msg.copy(isSent = isSent)
-        _groupMessageCache.add(updated)
-        getOrCreateGroupCache(updated.groupId).add(updated)
+    suspend fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) {
+        groupMessagesMutex.withLock {
+            println("[ChatState] 更新群聊消息发送状态: messageId=$messageId, isSent=$isSent")
+            val msg = _groupMessageCache.snapshot.find { it.messageId == messageId } ?: return@withLock
+            val updated = msg.copy(isSent = isSent)
+            _groupMessageCache.add(updated)
+            getOrCreateGroupCache(updated.groupId).add(updated)
+        }
     }
 
     /**

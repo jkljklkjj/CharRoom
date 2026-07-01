@@ -120,7 +120,7 @@ function getDeviceType() { return 'web' }
 
 export async function login(account, password) {
   if (!account || !password) return null
-  const { ok, body } = await safeFetch(`${API_BASE}/user/login`, {
+  const { ok, body } = await safeFetch(`${API_BASE}/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ account, password, deviceType: getDeviceType(), deviceId: getDeviceId() })
   })
@@ -144,7 +144,7 @@ export async function login(account, password) {
 
 export async function refreshToken(refreshToken) {
   if (!refreshToken) return null
-  const { ok, body } = await safeFetch(`${API_BASE}/user/refreshToken`, {
+  const { ok, body } = await safeFetch(`${API_BASE}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken })
@@ -162,7 +162,7 @@ export async function register(username, password) {
   if (!username || !password) return -1
   // 注册使用后端的 /user/register，传入 User 对象。只提供 username 和 password，email/phone 可留空。
   const userObj = { username, password, email: '', phone: '' }
-  const { ok, body } = await safeFetch(`${API_BASE}/user/register`, {
+  const { ok, body } = await safeFetch(`${API_BASE}/auth/register/verify`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userObj)
   })
   if (!ok) return -1
@@ -171,7 +171,7 @@ export async function register(username, password) {
 
 export async function sendVerifyCode(email) {
   if (!email) return false
-  const { ok, body } = await safeFetch(`${API_BASE}/user/sendVerifyCode`, {
+  const { ok, body } = await safeFetch(`${API_BASE}/auth/verify-code`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
   })
   if (!ok) return false
@@ -180,17 +180,18 @@ export async function sendVerifyCode(email) {
 
 export async function verifyRegister(email, code, password) {
   if (!email || !code || !password) return -1
-  const { ok, body } = await safeFetch(`${API_BASE}/user/verifyRegister`, {
+  const { ok, body } = await safeFetch(`${API_BASE}/auth/register/verify`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code, password })
   })
   if (!ok) return -1
   return body?.data ?? -1
 }
 
-export async function getOfflineMessages() {
-  const { ok, body } = await safeFetch(`${API_BASE}/messages/offline`, { method: 'GET' })
+export async function getOfflineMessages(pageSize) {
+  const params = pageSize ? `?pageSize=${pageSize}` : ''
+  const { ok, body } = await safeFetch(`${API_BASE}/messages/offline${params}`, { method: 'GET' })
   if (!ok) return []
-  return body || []
+  return body?.data || []
 }
 
 /**
@@ -208,20 +209,20 @@ export async function syncMessages(conversationId, lastSeqId, limit = 50) {
 }
 
 export async function getMyGroups() {
-  const { ok, body } = await safeFetch(`${API_BASE}/group/get`, { method: 'GET' })
+  const { ok, body } = await safeFetch(`${API_BASE}/groups`, { method: 'GET' })
   if (!ok) return []
   return body?.data || body || []
 }
 
 export async function addFriend(account) {
-  const { ok } = await safeFetch(`${API_BASE}/friend/add`, {
+  const { ok } = await safeFetch(`${API_BASE}/friends`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account })
   })
   return ok
 }
 
 export async function getFriendRequests() {
-  const { ok, body } = await safeFetch(`${API_BASE}/friend/requests`, { method: 'GET' })
+  const { ok, body } = await safeFetch(`${API_BASE}/friends/requests`, { method: 'GET' })
   if (!ok) return []
   // 支持 ApiResponse 包装或直接返回数组
   return body?.data || body || []
@@ -233,7 +234,7 @@ export async function acceptFriend(requesterId) {
   console.log('acceptFriend 转换后参数:', friendId, '类型:', typeof friendId)
   const body = JSON.stringify({ friendId })
   console.log('acceptFriend 请求体:', body)
-  const { ok } = await safeFetch(`${API_BASE}/friend/accept`, {
+  const { ok } = await safeFetch(`${API_BASE}/friends/accept`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body
   })
   console.log('acceptFriend 返回结果:', ok)
@@ -246,7 +247,7 @@ export async function rejectFriend(requesterId) {
   console.log('rejectFriend 转换后参数:', friendId, '类型:', typeof friendId)
   const body = JSON.stringify({ friendId })
   console.log('rejectFriend 请求体:', body)
-  const { ok } = await safeFetch(`${API_BASE}/friend/reject`, {
+  const { ok } = await safeFetch(`${API_BASE}/friends/reject`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body
   })
   console.log('rejectFriend 返回结果:', ok)
@@ -254,38 +255,30 @@ export async function rejectFriend(requesterId) {
 }
 
 export async function addGroup(groupId) {
-  const { ok } = await safeFetch(`${API_BASE}/group/add`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groupId })
-  })
+  const { ok } = await safeFetch(`${API_BASE}/groups/${groupId}/join`, { method: 'POST' })
   return ok
 }
 
 export async function getUserDetail(id) {
-  const { ok, body } = await safeFetch(`${API_BASE}/friend/info`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ friendId: id })
-  })
+  const { ok, body } = await safeFetch(`${API_BASE}/friends/${id}`, { method: 'GET' })
   if (!ok) return null
-  return body
+  return body?.data || body || null
 }
 
 export async function delFriend(friendId) {
-  const { ok } = await safeFetch(`${API_BASE}/friend/del`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendId })
-  })
+  const { ok } = await safeFetch(`${API_BASE}/friends/${friendId}`, { method: 'DELETE' })
   return ok
 }
 
 export async function getCurrentUser() {
-  const { ok, body } = await safeFetch(`${API_BASE}/user/get`, { method: 'GET' })
+  const { ok, body } = await safeFetch(`${API_BASE}/users/me`, { method: 'GET' })
   if (!ok) return null
   return body?.data || body || null
 }
 
 export async function validateToken() {
   try {
-    const { ok, body } = await safeFetch(`${API_BASE}/user/validateToken`, { method: 'GET' })
+    const { ok, body } = await safeFetch(`${API_BASE}/auth/validate`, { method: 'GET' })
     if (!ok) return null
     if (body?.code === 0) {
       // 验证成功
@@ -313,18 +306,13 @@ export async function validateToken() {
 }
 
 export async function getFriends() {
-  const { ok, body } = await safeFetch(`${API_BASE}/friend/get`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({})
-  })
+  const { ok, body } = await safeFetch(`${API_BASE}/friends`, { method: 'GET' })
   if (!ok) return []
-  // 支持 ApiResponse 包装或直接返回数组
   return body?.data || body || []
 }
 
 export async function getGroupDetail(id) {
-  const { ok, body } = await safeFetch(`${API_BASE}/group/get/detail?id=${id}`, { method: 'GET' })
+  const { ok, body } = await safeFetch(`${API_BASE}/groups/${id}`, { method: 'GET' })
   if (!ok) return null
   return body
 }
