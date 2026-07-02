@@ -15,7 +15,10 @@ import java.io.File
 class LocalDataSourceImpl(
     private val authFile: File = File(System.getProperty("user.home"), ".qingliao/auth.enc"),
     private val friendsFile: File = File(System.getProperty("user.home"), ".qingliao/friends.enc"),
-    private val groupsFile: File = File(System.getProperty("user.home"), ".qingliao/groups.enc")
+    private val groupsFile: File = File(System.getProperty("user.home"), ".qingliao/groups.enc"),
+    private val profileFile: File = File(System.getProperty("user.home"), ".qingliao/profile.enc"),
+    private val messagesFile: File = File(System.getProperty("user.home"), ".qingliao/messages.enc"),
+    private val groupMessagesFile: File = File(System.getProperty("user.home"), ".qingliao/group_messages.enc")
 ) : LocalDataSource {
 
     // ── 写入辅助：加密后写入文件 ────────────────────
@@ -74,12 +77,14 @@ class LocalDataSourceImpl(
     // ── 用户、好友、群组数据（加密 JSON） ───────────
 
     override suspend fun saveUserProfile(user: User) {
-        // TODO: 实现用户信息本地存储
+        runCatching { writeEncrypted(profileFile, json.encodeToString(user)) }
     }
 
     override suspend fun getUserProfile(): User? {
-        // TODO: 实现用户信息本地读取
-        return null
+        return runCatching {
+            val text = readEncrypted(profileFile) ?: return@runCatching null
+            json.decodeFromString<User>(text)
+        }.getOrNull()
     }
 
     override suspend fun saveFriends(friends: List<User>) {
@@ -109,25 +114,31 @@ class LocalDataSourceImpl(
     }
 
     override suspend fun saveMessages(messages: List<Message>) {
-        // TODO: 实现私聊消息本地存储
+        runCatching { writeEncrypted(messagesFile, json.encodeToString(messages)) }
     }
 
     override suspend fun getMessages(userId: Int): List<Message> {
-        // TODO: 实现私聊消息本地读取
-        return emptyList()
+        return runCatching {
+            val text = readEncrypted(messagesFile) ?: return@runCatching emptyList()
+            json.decodeFromString<List<Message>>(text).filter { it.senderId == userId || it.receiverId == userId }
+        }.getOrDefault(emptyList())
     }
 
     override suspend fun saveGroupMessages(messages: List<GroupMessage>) {
-        // TODO: 实现群聊消息本地存储
+        runCatching { writeEncrypted(groupMessagesFile, json.encodeToString(messages)) }
     }
 
     override suspend fun getGroupMessages(groupId: Int): List<GroupMessage> {
-        // TODO: 实现群聊消息本地读取
-        return emptyList()
+        return runCatching {
+            val text = readEncrypted(groupMessagesFile) ?: return@runCatching emptyList()
+            json.decodeFromString<List<GroupMessage>>(text).filter { it.groupId == groupId }
+        }.getOrDefault(emptyList())
     }
 
     override suspend fun clearAll() {
         clearAuth()
-        // TODO: 清除其他本地数据
+        listOf(profileFile, friendsFile, groupsFile, messagesFile, groupMessagesFile).forEach {
+            runCatching { if (it.exists()) it.delete() }
+        }
     }
 }
