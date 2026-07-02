@@ -1,7 +1,6 @@
 package component
 
 import component.dialog.AvatarCropDialogProvider
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,6 +51,8 @@ import java.awt.Window
 import java.awt.event.MouseWheelEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseWheelListener
+import io.github.oshai.kotlinlogging.KotlinLogging
+private val logger = KotlinLogging.logger {}
 
 /**
  * 桌面端头像裁剪对话框实现

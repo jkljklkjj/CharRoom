@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
  * 桌面端本地聊天历史存储实现
  */
 object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
+    private val logger = io.github.oshai.kotlinlogging.KotlinLogging.logger {}
     private const val HISTORY_DIR_NAME = ".qingliao/history"
     private val objectMapper = jacksonObjectMapper()
 
@@ -201,7 +202,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             val file = java.io.File(folder, "seq_ids.json")
             file.writeText(objectMapper.writeValueAsString(ids))
         }.onFailure {
-            it.printStackTrace()
+            logger.warn(it) { "LocalChatHistoryStore operation failed" }
         }
     }
 
@@ -230,7 +231,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             }
             file.writeText(objectMapper.writeValueAsString(array))
         }.onFailure {
-            it.printStackTrace()
+            logger.warn(it) { "LocalChatHistoryStore operation failed" }
         }
     }
 
@@ -248,7 +249,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             }
             records
         }.getOrElse {
-            it.printStackTrace()
+            logger.warn(it) { "LocalChatHistoryStore operation failed" }
             emptyList()
         }
     }

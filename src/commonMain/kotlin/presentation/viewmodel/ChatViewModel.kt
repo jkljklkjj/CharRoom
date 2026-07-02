@@ -3,6 +3,7 @@ package presentation.viewmodel
 import core.Chat
 import core.GlobalApiService
 import core.LocalChatHistoryStore
+import io.github.oshai.kotlinlogging.KotlinLogging
 import core.MsgType
 import core.ServerConfig.AGENT_ASSISTANT_ID
 import core.buildChatPayload
@@ -40,6 +41,8 @@ private const val AGENT_ASSISTANT_ID = 900000001
  * 聊天ViewModel
  * 处理聊天相关的UI逻辑和状态
  */
+private val logger = KotlinLogging.logger {}
+
 open class ChatViewModel(
     protected val chatRepository: ChatRepository = GlobalChatRepository,
     protected val chatState: ChatState = GlobalChatState
@@ -354,7 +357,7 @@ open class ChatViewModel(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 println("[ChatViewModel] 拉取请求失败: ${e.message}")
-                e.printStackTrace()
+                logger.error(e) { "ChatViewModel error" }
             }
         }
     }
@@ -603,7 +606,7 @@ open class ChatViewModel(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 拉取离线消息失败: ${e.message}")
-            e.printStackTrace()
+            logger.error(e) { "ChatViewModel error" }
             false
         } finally {
             isFetchingOfflineMessages = false
@@ -770,7 +773,7 @@ open class ChatViewModel(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 发送消息流程异常: ${e.message}")
-            e.printStackTrace()
+            logger.error(e) { "ChatViewModel error" }
             sessionScope.launch {
                 onDone() // 发生任何异常都要恢复UI状态
             }
@@ -879,7 +882,7 @@ open class ChatViewModel(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 发送群消息流程异常: ${e.message}")
-            e.printStackTrace()
+            logger.error(e) { "ChatViewModel error" }
             sessionScope.launch {
                 onDone() // 发生任何异常都要恢复UI状态
             }
@@ -971,7 +974,7 @@ open class ChatViewModel(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             println("[ChatViewModel] 保存聊天历史到本地失败: ${e.message}")
-            e.printStackTrace()
+            logger.error(e) { "ChatViewModel error" }
         }
     }
 
@@ -993,7 +996,7 @@ open class ChatViewModel(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 println("[ChatViewModel] 从本地加载聊天历史失败: ${e.message}")
-                e.printStackTrace()
+                logger.error(e) { "ChatViewModel error" }
             }
         }
     }
