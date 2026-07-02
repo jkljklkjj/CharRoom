@@ -10,8 +10,11 @@ import core.state.GlobalAppState
 import data.datasource.local.LocalDataSourceImpl
 import data.repository.GlobalAuthRepository
 import data.repository.GlobalChatRepository
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.*
 import model.Message
+
+private val log = KotlinLogging.logger {}
 
 fun main(args: Array<String>) = runBlocking {
     ChatLiteCli(args).run()
@@ -62,8 +65,11 @@ class ChatLiteCli(private val args: Array<String>) {
             }
             try {
                 transport.start()
-                println("[QUIC] 连接完成")
-            } catch (e: Exception) { println("[QUIC] $e") }
+                log.info { "QUIC 连接完成" }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                log.error(e) { "QUIC 连接失败" }
+            }
         }
 
         // 加载联系人
