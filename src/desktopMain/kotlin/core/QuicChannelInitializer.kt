@@ -22,10 +22,7 @@ class QuicStreamInitializer(
         ch.config().isAllowHalfClosure = true
         ch.pipeline().addLast(object : SimpleChannelInboundHandler<ByteBuf>() {
             override fun channelRead0(ctx: ChannelHandlerContext, msg: ByteBuf) {
-                val readable = msg.readableBytes()
-                if (readable < 4) return
-                val payload = ByteArray(readable)
-                msg.readBytes(payload)
+                val payload = QuicStreamProtocol.decodeFrame(msg) ?: return
                 onStreamFrame(ch.streamId(), payload)
             }
 

@@ -331,6 +331,15 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 }
                             }
                         }
+                        MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
+                            val stream = wrapper.agentStream
+                            listener.onAgentStreamChunk(
+                                messageId = stream.messageId,
+                                fullContent = stream.chunk,
+                                done = stream.done,
+                                error = stream.error
+                            )
+                        }
                     }
                 }
             }
