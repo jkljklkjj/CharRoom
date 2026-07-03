@@ -312,6 +312,17 @@ async function initUserSession(accessToken, refreshToken) {
   store.mergeUsers(friends || [])   // 静默 merge，不重建 DOM
   store.cacheUsers(friends || [])   // 缓存到 localStorage
 
+  // 批量拉取好友在线状态
+  if (friends && friends.length > 0) {
+    const friendIds = friends.map(f => f.id).filter(id => id && id !== 900000001)
+    if (friendIds.length > 0) {
+      const statusMap = await api.getOnlineStatus(friendIds)
+      for (const [userId, online] of Object.entries(statusMap)) {
+        store.updateUserOnlineStatus(parseInt(userId), online)
+      }
+    }
+  }
+
   // 获取用户的群聊列表
   const myGroups = await api.getMyGroups()
   store.setGroups(myGroups || [])
