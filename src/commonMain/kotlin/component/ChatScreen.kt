@@ -268,8 +268,12 @@ private fun ChatScreenContent(
         }
     }
     var isSending by remember { mutableStateOf(false) }
-    val listState = remember(user.id) {
-        LazyListState(displayMessages.lastIndex.coerceAtLeast(0), 0)
+    val listState = remember { LazyListState() }
+    // 切换用户时直接滚到底部，无动画（QQ/微信风格：瞬间切换，不闪烁）
+    LaunchedEffect(user.id) {
+        if (displayMessages.isNotEmpty()) {
+            listState.scrollToItem(displayMessages.lastIndex)
+        }
     }
     val inputFocusRequester = remember { FocusRequester() }
     var isInputFocused by remember { mutableStateOf(false) }
@@ -666,7 +670,7 @@ private fun ChatScreenContent(
 
                 itemsIndexed(
                     items = displayMessages,
-                    key = { index, message -> "${message.messageId}_$index" }
+                    key = { index, message -> "${user.id}_${message.messageId}_${message.timestamp}" }
                 ) { index, message ->
                     // 显示日期分隔线
                     if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
