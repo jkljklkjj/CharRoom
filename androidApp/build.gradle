@@ -161,9 +161,11 @@ dependencies {
     implementation 'com.google.android.material:material:1.13.0'
     // Reuse protobuf-generated classes from the root :proto module
     implementation project(':proto')
-    implementation('io.netty:netty-all:4.2.5.Final') {
-        exclude group: 'io.netty', module: 'netty-codec-native-quic'
-    }
+    implementation('io.netty:netty-all:4.2.5.Final')
+    // Netty QUIC 自定义协议（classes + native）
+    implementation 'io.netty.incubator:netty-incubator-codec-classes-quic:0.0.75.Final'
+    // 原生库 — Android ARM64 需自行编译
+    // 参考 docs/ANDROID-QUIC-PLAN.md
     implementation 'com.google.protobuf:protobuf-java:4.34.1'
     implementation 'com.google.protobuf:protobuf-kotlin:4.34.1'
 

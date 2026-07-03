@@ -6,6 +6,7 @@ import core.LocalChatHistoryStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import core.MsgType
 import core.ServerConfig.AGENT_ASSISTANT_ID
+import core.batchOnlineStatus
 import core.buildChatPayload
 import core.buildGroupChatPayload
 import core.json
@@ -450,6 +451,20 @@ open class ChatViewModel(
             println("[ChatViewModel] 获取好友列表失败: ${e.message}")
             return
         }
+
+        // 批量拉取在线状态
+        try {
+            val token = GlobalAppState.currentToken
+            if (token != null && friends.isNotEmpty()) {
+                val friendIds = friends.map { it.id }.filter { it > 0 && it != 900000001 }
+                val statusMap = batchOnlineStatus(token, friendIds)
+                for ((userIdStr, online) in statusMap) {
+                    val userId = userIdStr.toIntOrNull() ?: continue
+                    chatState.updateUserOnlineStatus(userId, online)
+                }
+                println("[ChatViewModel] 批量在线状态已更新: ${statusMap.size} 人")
+            }
+        } catch (_: Exception) { }
 
         println("[ChatViewModel] 开始同步 ${friends.size} 个好友的会话")
 

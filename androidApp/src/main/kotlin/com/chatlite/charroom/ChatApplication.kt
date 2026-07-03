@@ -67,8 +67,8 @@ class ChatApplication : Application() {
         AndroidImageLoader.init(this)
         // 初始化头像裁剪对话框
         AvatarCropDialogImpl = AndroidAvatarCropDialog
-        // 初始化 commonMain 全局 WebSocket 客户端实现
-        Chat = AndroidGlobalWebSocketClient
+        // 初始化 commonMain 全局 QUIC 客户端实现
+        Chat = AndroidQuicClient()
         // 初始化日志
         if (BuildConfig.DEBUG) {
             Timber.plant(object : Timber.DebugTree() {

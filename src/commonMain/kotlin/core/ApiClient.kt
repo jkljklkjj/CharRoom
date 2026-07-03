@@ -1121,3 +1121,25 @@ suspend fun sendGroupMessage(
         false
     }
 }
+
+/**
+ * 批量查询用户在线状态。
+ * @return userId → online 映射
+ */
+suspend fun batchOnlineStatus(token: String, userIds: List<Int>): Map<String, Boolean> {
+    if (userIds.isEmpty()) return emptyMap()
+    return try {
+        val response = httpClient.post(ApiEndpoints.url("/users/online-status")) {
+            header("Authorization", "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject {
+                put("userIds", userIds.joinToString(","))
+            })
+        }
+        val apiResponse = response.body<ApiResponse<Map<String, Boolean>>>()
+        apiResponse.data ?: emptyMap()
+    } catch (e: Exception) {
+        println("[ApiClient] 批量在线状态查询失败: ${e.message}")
+        emptyMap()
+    }
+}
