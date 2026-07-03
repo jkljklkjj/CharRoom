@@ -4,7 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.chatlite.charroom.core.AppLifecycleObserver
 import com.chatlite.charroom.core.ChatNotificationManager
-import com.chatlite.charroom.data.network.AndroidGlobalWebSocketClient
+import com.chatlite.charroom.core.CronetQuicClient
 import com.chatlite.charroom.data.datasource.local.AndroidLocalChatHistoryStore
 import com.chatlite.charroom.data.datasource.local.AndroidLocalDataSourceImpl
 import core.LocalChatHistoryStore
@@ -31,11 +31,6 @@ class ChatApplication : Application() {
     }
 
     override fun onCreate() {
-        // 配置Netty系统属性，禁用资源泄漏检测，避免Android混淆导致的类找不到问题
-        System.setProperty("io.netty.leakDetection.level", "DISABLED")
-        System.setProperty("io.netty.tryReflectionSetAccessible", "true")
-        System.setProperty("io.netty.noResourceLeakDetector", "true")
-
         super.onCreate()
 
         // 初始化依赖注入
@@ -46,7 +41,7 @@ class ChatApplication : Application() {
 
         // 提前初始化通知管理器，确保在需要时已经可用
         chatNotificationManager
-        // 注册应用生命周期观察者，仅在完全关闭程序时断开WebSocket连接
+        // 注册应用生命周期观察者
         AppLifecycleObserver.register(this)
         // 初始化本地存储
         AndroidLocalChatHistoryStore.init(this)

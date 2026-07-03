@@ -8,8 +8,9 @@ import kotlinx.coroutines.*
 import com.google.android.gms.net.CronetProviderInstaller
 import org.chromium.net.CronetEngine
 import org.chromium.net.BidirectionalStream
+import org.chromium.net.CronetException
+import org.chromium.net.UrlResponseInfo
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
@@ -67,7 +68,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
         controlStream?.cancel()
         sessionStreams.values.forEach { it.cancel() }
         sessionStreams.clear()
-        cronetEngine?.shutdownExecutorService()
+        cronetEngine?.shutdown()
         cronetEngine = null
     }
 
@@ -93,7 +94,11 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
             try {
                 val stream = getOrCreateStream(type, targetClientId)
                 val framed = QuicStreamProtocol.encodeFrame(payload)
-                stream.write(framed)
+                val buf = ByteBuffer.allocateDirect(framed.size)
+                buf.put(framed)
+                buf.flip()
+                stream.write(buf, false)
+                stream.flush()
                 callback(true, emptyList())
             } catch (e: Exception) {
                 log.error("发送失败 type={}", type, e)
@@ -130,47 +135,52 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
         val url = "https://$host:$port/.well-known/webtransport"
 
-        val streamBuilder = cronetEngine!!.newBidirectionalStreamBuilder()
-            .setHttpMethod("POST")
-            .setUrl(url)
-            .setExecutor(executor)
-            .setBidirectionalStreamCallback(createControlStreamCallback())
+        controlStream = cronetEngine!!.newBidirectionalStreamBuilder(url, createControlStreamCallback(), executor)
             .build()
 
-        controlStream = streamBuilder
         controlStream!!.start()
         log.info("Cronet QUIC 连接已发起: {}:{}", host, port)
     }
 
-    private fun createControlStreamCallback() = object : BidirectionalStream.Callback {
+    private fun createControlStreamCallback(): BidirectionalStream.Callback {
+        return ControlStreamCallback()
+    }
+
+    private inner class ControlStreamCallback : BidirectionalStream.Callback() {
         override fun onStreamReady(stream: BidirectionalStream) {
-            log.info("控制流就绪: {}", stream.url)
+            log.info("控制流就绪")
         }
 
-        override fun onResponseHeadersReceived(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?) {
-            log.info("控制流响应头: {}", info?.httpStatusCode)
+        override fun onResponseHeadersReceived(stream: BidirectionalStream, info: UrlResponseInfo) {
+            log.info("控制流响应头: {}", info.httpStatusCode)
         }
 
-        override fun onReadCompleted(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?, bytesRead: Int) {
-            val buffer = ByteBuffer.allocate(1024 * 1024)
-            val readResult = stream.read(buffer)
-            if (readResult > 0) {
-                buffer.flip()
-                val bytes = ByteArray(readResult)
+        override fun onReadCompleted(stream: BidirectionalStream, info: UrlResponseInfo,
+                                     buffer: ByteBuffer, endOfStream: Boolean) {
+            if (buffer.hasRemaining()) {
+                val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
                 handleStreamData(bytes)
             }
-            stream.read(ByteBuffer.allocate(1024 * 1024))
+            if (!endOfStream) {
+                buffer.clear()
+                stream.read(buffer)
+            }
         }
 
-        override fun onWriteCompleted(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?, bytesSent: Int) {}
+        override fun onWriteCompleted(stream: BidirectionalStream, info: UrlResponseInfo,
+                                      buffer: ByteBuffer, endOfStream: Boolean) {}
 
-        override fun onCanceled(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?) {
+        override fun onSucceeded(stream: BidirectionalStream, info: UrlResponseInfo) {
+            log.info("控制流完成")
+        }
+
+        override fun onFailed(stream: BidirectionalStream, info: UrlResponseInfo, error: CronetException) {
+            log.error("控制流失败: {}", error.message)
+        }
+
+        override fun onCanceled(stream: BidirectionalStream, info: UrlResponseInfo) {
             log.info("控制流取消")
-        }
-
-        override fun onFailure(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?, error: java.net.Proxy?) {
-            log.error("控制流失败: {}", error)
         }
     }
 
@@ -179,7 +189,11 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     private fun doLogin() {
         val loginPayload = buildLoginPayload(GlobalAppState.currentToken ?: "")
         val framed = QuicStreamProtocol.encodeFrame(loginPayload)
-        controlStream!!.write(ByteBuffer.wrap(framed))
+        val buf = ByteBuffer.allocateDirect(framed.size)
+        buf.put(framed)
+        buf.flip()
+        controlStream!!.write(buf, false)
+        controlStream!!.flush()
         log.info("登录消息已发送")
     }
 
@@ -190,7 +204,11 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
             try {
                 val payload = buildHeartbeatPayload()
                 val framed = QuicStreamProtocol.encodeFrame(payload)
-                controlStream?.write(ByteBuffer.wrap(framed))
+                val buf = ByteBuffer.allocateDirect(framed.size)
+                buf.put(framed)
+                buf.flip()
+                controlStream?.write(buf, false)
+                controlStream?.flush()
             } catch (e: Exception) {
                 log.debug("心跳发送失败: {}", e.message)
             }
@@ -209,11 +227,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                 if (existing != null) return existing
 
                 val url = "https://${ServerConfig.QUIC_HOST}:${ServerConfig.QUIC_PORT}/stream/$targetId"
-                val stream = cronetEngine!!.newBidirectionalStreamBuilder()
-                    .setHttpMethod("POST")
-                    .setUrl(url)
-                    .setExecutor(executor)
-                    .setBidirectionalStreamCallback(createSessionStreamCallback(targetId))
+                val stream = cronetEngine!!.newBidirectionalStreamBuilder(url, createSessionStreamCallback(targetId), executor)
                     .build()
 
                 stream.start()
@@ -224,34 +238,44 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
         }
     }
 
-    private fun createSessionStreamCallback(targetId: String) = object : BidirectionalStream.Callback {
+    private fun createSessionStreamCallback(targetId: String): BidirectionalStream.Callback {
+        return SessionStreamCallback(targetId)
+    }
+
+    private inner class SessionStreamCallback(private val targetId: String) : BidirectionalStream.Callback() {
         override fun onStreamReady(stream: BidirectionalStream) {
             log.debug("会话流就绪: {}", targetId)
         }
 
-        override fun onResponseHeadersReceived(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?) {}
+        override fun onResponseHeadersReceived(stream: BidirectionalStream, info: UrlResponseInfo) {}
 
-        override fun onReadCompleted(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?, bytesRead: Int) {
-            val buffer = ByteBuffer.allocate(1024 * 1024)
-            val readResult = stream.read(buffer)
-            if (readResult > 0) {
-                buffer.flip()
-                val bytes = ByteArray(readResult)
+        override fun onReadCompleted(stream: BidirectionalStream, info: UrlResponseInfo,
+                                     buffer: ByteBuffer, endOfStream: Boolean) {
+            if (buffer.hasRemaining()) {
+                val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
                 handleStreamData(bytes)
             }
-            stream.read(ByteBuffer.allocate(1024 * 1024))
+            if (!endOfStream) {
+                buffer.clear()
+                stream.read(buffer)
+            }
         }
 
-        override fun onWriteCompleted(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?, bytesSent: Int) {}
+        override fun onWriteCompleted(stream: BidirectionalStream, info: UrlResponseInfo,
+                                      buffer: ByteBuffer, endOfStream: Boolean) {}
 
-        override fun onCanceled(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?) {
+        override fun onSucceeded(stream: BidirectionalStream, info: UrlResponseInfo) {
             sessionStreams.remove(targetId)
         }
 
-        override fun onFailure(stream: BidirectionalStream, info: org.chromium.net.UrlResponseInfo?, error: java.net.Proxy?) {
+        override fun onFailed(stream: BidirectionalStream, info: UrlResponseInfo, error: CronetException) {
             sessionStreams.remove(targetId)
             log.warn("会话流失败: {}", targetId)
+        }
+
+        override fun onCanceled(stream: BidirectionalStream, info: UrlResponseInfo) {
+            sessionStreams.remove(targetId)
         }
     }
 
@@ -316,7 +340,11 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     private fun sendInternal(payload: ByteArray) {
         try {
             val framed = QuicStreamProtocol.encodeFrame(payload)
-            controlStream?.write(ByteBuffer.wrap(framed))
+            val buf = ByteBuffer.allocateDirect(framed.size)
+            buf.put(framed)
+            buf.flip()
+            controlStream?.write(buf, false)
+            controlStream?.flush()
         } catch (_: Exception) {}
     }
 

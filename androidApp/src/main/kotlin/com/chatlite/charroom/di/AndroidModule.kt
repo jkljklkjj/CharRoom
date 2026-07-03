@@ -25,9 +25,7 @@ val androidModule = module {
 
     // 提供Android特有的ChatViewModel
     single {
-        AndroidChatViewModel(
-            remoteDataSource = get<AndroidRemoteDataSource>()
-        )
+        AndroidChatViewModel()
     }
 
     // 把基础ChatViewModel指向Android实现

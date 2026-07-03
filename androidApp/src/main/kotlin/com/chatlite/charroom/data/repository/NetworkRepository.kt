@@ -2,7 +2,6 @@ package com.chatlite.charroom.data.repository
 
 import model.Message
 import model.User
-import com.chatlite.charroom.data.network.AndroidWebSocketClient
 import core.ApiEndpoints
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -21,14 +20,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import org.json.JSONObject
@@ -70,9 +61,6 @@ class NetworkRepository private constructor() {
             return getInstance()
         }
     }
-
-    private val wsClient = AndroidWebSocketClient()
-    private var scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // 预配置的 OkHttpClient：启用连接池与 HTTP/2 优先
     private val preconfiguredOkHttpClient: OkHttpClient = OkHttpClient.Builder()
@@ -222,88 +210,6 @@ class NetworkRepository private constructor() {
         } catch (e: Exception) {
             return@withContext "UNKNOWN: ${e.message}"
         }
-    }
-
-    suspend fun connectWebSocket(
-        token: String,
-        ownUserId: Int,
-        onMessage: (Message) -> Unit,
-        onStatusUpdate: (clientId: String, online: Boolean) -> Unit,
-        onAuthFailed: ((reason: String) -> Unit)? = null
-    ): Boolean = withContext(Dispatchers.IO) {
-        val connectionListener = object : AndroidWebSocketClient.ConnectionListener {
-            override fun onConnected() {
-                isConnected = true
-            }
-
-            override fun onDisconnected() {
-                isConnected = false
-                // 非用户主动断开时自动重连
-                if (currentToken != null && currentUserId != 0) {
-                    Timber.i("WebSocket意外断开，启动自动重连")
-                    reconnect("connection_closed")
-                }
-            }
-
-            override fun onAuthFailed(reason: String) {
-                isConnected = false
-                reconnectJob?.cancel()
-                reconnectAttempts = 0
-                currentToken = null
-                currentUserId = 0
-                Timber.w("WebSocket认证失败，停止自动重连: {}", reason)
-                onAuthFailed?.invoke(reason)
-            }
-        }
-
-        val success = wsClient.connect(token, ownUserId, onMessage, onStatusUpdate, onAuthFailed, connectionListener)
-        if (success) {
-            saveConnectionInfo(token, ownUserId, onMessage, onStatusUpdate, onAuthFailed)
-        }
-        success
-    }
-
-    fun sendMessage(targetId: Int, content: String, senderId: Int = 0): Boolean {
-        if (!isConnected) {
-            ensureConnected()
-        }
-        return wsClient.sendChatText(targetId, content, senderId)
-    }
-
-    fun sendAgentMessage(targetId: Int, content: String, senderId: Int = 0): Boolean {
-        if (!isConnected) {
-            ensureConnected()
-        }
-        return wsClient.sendAgentText(targetId, content, senderId)
-    }
-
-    fun sendGroupMessage(targetId: Int, content: String, senderId: Int = 0): Boolean {
-        if (!isConnected) {
-            ensureConnected()
-        }
-        return wsClient.sendGroupText(targetId, content, senderId)
-    }
-
-    fun sendCheck(targetId: Int): Boolean {
-        if (!isConnected) {
-            ensureConnected()
-        }
-        return wsClient.sendCheck(targetId)
-    }
-
-    fun sendLogout(userId: String): Boolean {
-        return wsClient.sendLogout(userId)
-    }
-
-    fun sendHeartbeat(): Boolean {
-        return wsClient.sendHeartbeat()
-    }
-
-    fun disconnectWebSocket() {
-        reconnectJob?.cancel() // 取消重连任务
-        reconnectAttempts = 0 // 重置重连次数
-        wsClient.disconnect()
-        isConnected = false
     }
 
     private suspend fun fetchList(path: String, token: String, method: String = "GET"): List<User> {
@@ -487,159 +393,4 @@ class NetworkRepository private constructor() {
         }.bodyAsText()
     }
 
-    // -------------------------- 网络状态管理 --------------------------
-
-    private var currentToken: String? = null
-    private var currentUserId: Int = 0
-    private var isConnected = false
-    private var onMessageCallback: ((Message) -> Unit)? = null
-    private var onStatusCallback: ((clientId: String, online: Boolean) -> Unit)? = null
-    private var onAuthFailedCallback: ((reason: String) -> Unit)? = null
-
-    // 重连配置
-    private val maxReconnectAttempts = 5 // 最大重连次数
-    private val initialReconnectDelay = 1000L // 初始重连延迟1秒
-    private val maxReconnectDelay = 30000L // 最大重连延迟30秒
-    private var reconnectAttempts = 0 // 当前重连尝试次数
-    private var currentReconnectDelay = initialReconnectDelay // 当前重连延迟
-    private var reconnectJob: kotlinx.coroutines.Job? = null // 重连任务
-
-    /**
-     * 网络恢复时自动重连（带指数退避）
-     */
-    fun reconnect(triggerSource: String = "manual") {
-        if (currentToken == null || currentUserId == 0 || isConnected) {
-            Timber.i("跳过重连: trigger=$triggerSource, token或用户信息无效，或已连接")
-            return
-        }
-
-        if (reconnectJob?.isActive == true) {
-            Timber.i("跳过重连: trigger=$triggerSource, 已有重连任务在执行, 当前attempt=$reconnectAttempts, 当前delay=${currentReconnectDelay}ms")
-            return
-        }
-
-        // 取消之前的重连任务并从当前状态继续/重置
-        reconnectJob?.cancel()
-        if (reconnectAttempts <= 0) {
-            currentReconnectDelay = initialReconnectDelay
-        }
-
-        reconnectJob = scope.launch {
-            var attempt = reconnectAttempts
-            var delayMs = currentReconnectDelay
-
-            while (attempt < maxReconnectAttempts && !isConnected) {
-                try {
-                    Timber.i("重连调度: trigger=$triggerSource, 第 ${attempt + 1}/$maxReconnectAttempts 次, 等待 ${delayMs}ms 后重试")
-
-                    delay(delayMs)
-
-                    if (isConnected || currentToken == null || currentUserId == 0) {
-                        Timber.i("重连中止: trigger=$triggerSource, 连接状态已变化(isConnected=$isConnected, tokenValid=${currentToken != null}, userId=$currentUserId)")
-                        break
-                    }
-
-                    val success = connectWebSocket(
-                        token = currentToken!!,
-                        ownUserId = currentUserId,
-                        onMessage = onMessageCallback ?: {},
-                        onStatusUpdate = onStatusCallback ?: { _, _ -> },
-                        onAuthFailed = onAuthFailedCallback
-                    )
-
-                        Timber.i("重连结果: trigger=$triggerSource, 第 ${attempt + 1}/$maxReconnectAttempts 次, success=$success")
-
-                    if (success) {
-                        Timber.i("WebSocket重连成功")
-                        reconnectAttempts = 0 // 重连成功，重置重试次数
-                        currentReconnectDelay = initialReconnectDelay
-                        reconnectJob = null
-                        return@launch
-                    } else {
-                        Timber.w("WebSocket重连失败，等待重试")
-                        attempt++
-                        reconnectAttempts = attempt
-                        delayMs = minOf(initialReconnectDelay * (1 shl attempt), maxReconnectDelay)
-                        currentReconnectDelay = delayMs
-                    }
-                } catch (e: CancellationException) {
-                    Timber.i("WebSocket重连任务已取消: trigger=$triggerSource, attempt=${attempt + 1}")
-                    break
-                } catch (e: Exception) {
-                    Timber.e(e, "WebSocket重连异常: trigger=$triggerSource, 第 ${attempt + 1}/$maxReconnectAttempts 次")
-                    attempt++
-                    reconnectAttempts = attempt
-                    delayMs = minOf(initialReconnectDelay * (1 shl attempt), maxReconnectDelay)
-                    currentReconnectDelay = delayMs
-                }
-            }
-
-            if (attempt >= maxReconnectAttempts) {
-                Timber.e("WebSocket重连次数超过上限，停止重连: trigger=$triggerSource")
-                // 可以通知上层重连失败
-                onAuthFailedCallback?.invoke("网络连接失败，请检查网络后重试")
-            }
-
-            reconnectJob = null
-        }
-    }
-
-    /**
-     * 网络断开时通知
-     */
-    fun onNetworkDisconnected() {
-        isConnected = false
-        reconnectAttempts = 0 // 重置重连次数
-        currentReconnectDelay = initialReconnectDelay
-        reconnectJob?.cancel() // 取消正在进行的重连任务
-        // 可以通知UI层网络已断开
-    }
-
-    /**
-     * 确保WebSocket连接正常
-     */
-    fun ensureConnected() {
-        if (!isConnected) {
-            reconnect("ensure_connected")
-        }
-    }
-
-    /**
-     * 保存连接信息，用于自动重连
-     */
-    fun saveConnectionInfo(token: String, userId: Int,
-                           onMessage: (Message) -> Unit,
-                           onStatus: (clientId: String, online: Boolean) -> Unit,
-                           onAuthFailed: ((reason: String) -> Unit)? = null) {
-        currentToken = token
-        currentUserId = userId
-        onMessageCallback = onMessage
-        onStatusCallback = onStatus
-        onAuthFailedCallback = onAuthFailed
-    }
-
-    /**
-     * 应用完全退出时调用：仅断开连接，不发送登出消息
-     */
-    suspend fun onAppQuit() {
-        timber.log.Timber.i("应用完全退出，执行退出清理流程")
-        timber.log.Timber.i("跳过logout，直接断开WebSocket连接")
-        disconnectWebSocket()
-        timber.log.Timber.i("应用退出清理完成")
-    }
-
-    /**
-     * 清除连接信息（登出时调用）
-     */
-    fun clearConnectionInfo() {
-        reconnectJob?.cancel() // 取消重连任务
-        reconnectAttempts = 0 // 重置重连次数
-        currentReconnectDelay = initialReconnectDelay
-        currentToken = null
-        currentUserId = 0
-        onMessageCallback = null
-        onStatusCallback = null
-        onAuthFailedCallback = null
-        isConnected = false
-    }
 }

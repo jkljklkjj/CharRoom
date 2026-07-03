@@ -11,8 +11,6 @@ import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.koin.core.context.GlobalContext
-import com.chatlite.charroom.presentation.viewmodel.AndroidChatViewModel
 import timber.log.Timber
 
 class NetworkChangeReceiver : BroadcastReceiver() {
@@ -46,25 +44,11 @@ class NetworkChangeReceiver : BroadcastReceiver() {
                     override fun onAvailable(network: android.net.Network) {
                         super.onAvailable(network)
                         listener?.onNetworkConnected()
-                        // 通知ViewModel网络已恢复
-                        try {
-                            val chatViewModel: AndroidChatViewModel? = GlobalContext.get().getOrNull()
-                            chatViewModel?.reconnect()
-                        } catch (e: Exception) {
-                            Timber.e(e, "网络恢复时获取ViewModel失败")
-                        }
                     }
 
                     override fun onLost(network: android.net.Network) {
                         super.onLost(network)
                         listener?.onNetworkDisconnected()
-                        // 通知ViewModel网络已断开
-                        try {
-                            val chatViewModel: AndroidChatViewModel? = GlobalContext.get().getOrNull()
-                            chatViewModel?.onNetworkDisconnected()
-                        } catch (e: Exception) {
-                            Timber.e(e, "网络断开时获取ViewModel失败")
-                        }
                     }
                 }
 

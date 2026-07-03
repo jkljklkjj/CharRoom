@@ -157,10 +157,10 @@ class QuicNettyClient {
     /**
      * 向指定 Stream 发送数据。
      */
-    fun send(streamId: Long, data: ByteBuf) {
+    fun send(streamId: Long, data: ByteArray) {
         val stream = streams[streamId]
         if (stream != null && stream.isActive) {
-            stream.writeAndFlush(data)
+            stream.writeAndFlush(io.netty.buffer.Unpooled.wrappedBuffer(data))
         } else {
             log.warn("QUIC 发送失败: stream={} 不可用 (active={})", streamId, stream?.isActive)
         }
