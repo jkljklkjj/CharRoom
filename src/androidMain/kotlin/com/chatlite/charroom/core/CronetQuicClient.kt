@@ -5,9 +5,9 @@ import core.*
 import core.state.GlobalAppState
 import core.state.GlobalChatState
 import kotlinx.coroutines.*
+import com.google.android.gms.net.CronetProviderInstaller
 import org.chromium.net.CronetEngine
 import org.chromium.net.BidirectionalStream
-import org.chromium.net.UploadDataProviders
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -125,6 +125,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     // ── QUIC 连接 ──
 
     private fun connect(host: String, port: Int) {
+        // 安装 Play Services Cronet（确保系统 Cronet 可用）
+        CronetProviderInstaller.installProvider(context)
+
         val url = "https://$host:$port/.well-known/webtransport"
 
         val streamBuilder = cronetEngine!!.newBidirectionalStreamBuilder()
