@@ -163,7 +163,7 @@ dependencies {
     // Reuse protobuf-generated classes from the root :proto module
     implementation project(':proto')
     // Cronet QUIC（Android 原生支持）
-    implementation 'org.chromium.net:chromium-net:128.0.6613.40'
+    implementation 'com.google.net.cronet:cronet-api:119.0.6045.60'
     implementation 'com.google.protobuf:protobuf-java:4.34.1'
     implementation 'com.google.protobuf:protobuf-kotlin:4.34.1'
 
