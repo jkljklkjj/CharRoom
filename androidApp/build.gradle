@@ -62,6 +62,7 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
+            java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
         }
     }
