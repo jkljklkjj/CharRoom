@@ -163,7 +163,9 @@ dependencies {
     // Reuse protobuf-generated classes from the root :proto module
     implementation project(':proto')
     // Cronet QUIC（Android 原生支持）
-    implementation 'com.google.android.gms:play-services-cronet:18.1.1'
+    implementation('com.google.android.gms:play-services-cronet:18.1.1') {
+        exclude group: 'com.google.protobuf'
+    }
     implementation 'com.google.protobuf:protobuf-java:4.34.1'
     implementation 'com.google.protobuf:protobuf-kotlin:4.34.1'
 
