@@ -128,8 +128,9 @@ compose.desktop {
             "-Dconsole.encoding=UTF-8"
         )
 
-        // CI 通过 jlink 预裁剪 JRE 并设置 JAVA_HOME，本地开发使用当前 JDK
-        javaHome = System.getProperty("java.home")
+        // CI: 通过 MINIMAL_JRE_HOME 使用 jlink 裁剪的最小 JRE 打包
+        // 本地开发: 回退到当前 JDK
+        javaHome = System.getenv("MINIMAL_JRE_HOME") ?: System.getProperty("java.home")
 
         buildTypes {
             release {

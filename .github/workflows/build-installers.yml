@@ -34,8 +34,8 @@ jobs:
             --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
-          # 设置 JAVA_HOME 让 Gradle daemon 使用裁剪后的 JRE
-          echo "JAVA_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
+          # 导出环境变量供 build.gradle.kts 读取（不影响 Gradle daemon 的 JAVA_HOME）
+          echo "MINIMAL_JRE_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
 
       - name: Prepare icons (Windows)
         shell: powershell
@@ -130,8 +130,8 @@ jobs:
             --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
-          # 设置 JAVA_HOME 让 Gradle daemon 使用裁剪后的 JRE
-          echo "JAVA_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
+          # 导出环境变量供 build.gradle.kts 读取（不影响 Gradle daemon 的 JAVA_HOME）
+          echo "MINIMAL_JRE_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
 
       - name: Prepare icons (macOS)
         run: |
@@ -264,8 +264,8 @@ jobs:
             --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
-          # 设置 JAVA_HOME 让 Gradle daemon 使用裁剪后的 JRE
-          echo "JAVA_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
+          # 导出环境变量供 build.gradle.kts 读取（不影响 Gradle daemon 的 JAVA_HOME）
+          echo "MINIMAL_JRE_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
 
       - name: Prepare icons (Linux)
         run: |
