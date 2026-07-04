@@ -34,13 +34,8 @@ jobs:
             --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
-
-      # Windows: $(pwd) 返回 /d/a/... 路径格式，Gradle 不识别，用 GITHUB_WORKSPACE + PowerShell 写入正确路径
-      - name: Configure Gradle to use minimal JRE
-        shell: powershell
-        run: |
-          $minimalJre = Join-Path $env:GITHUB_WORKSPACE "minimal-jre"
-          Add-Content -Path gradle.properties -Value "org.gradle.java.home=$minimalJre"
+          # 设置 JAVA_HOME 让 Gradle daemon 使用裁剪后的 JRE
+          echo "JAVA_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
 
       - name: Prepare icons (Windows)
         shell: powershell
@@ -135,13 +130,8 @@ jobs:
             --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
-
-      # Windows: $(pwd) 返回 /d/a/... 路径格式，Gradle 不识别，用 GITHUB_WORKSPACE + PowerShell 写入正确路径
-      - name: Configure Gradle to use minimal JRE
-        shell: powershell
-        run: |
-          $minimalJre = Join-Path $env:GITHUB_WORKSPACE "minimal-jre"
-          Add-Content -Path gradle.properties -Value "org.gradle.java.home=$minimalJre"
+          # 设置 JAVA_HOME 让 Gradle daemon 使用裁剪后的 JRE
+          echo "JAVA_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
 
       - name: Prepare icons (macOS)
         run: |
@@ -274,13 +264,8 @@ jobs:
             --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
-
-      # Windows: $(pwd) 返回 /d/a/... 路径格式，Gradle 不识别，用 GITHUB_WORKSPACE + PowerShell 写入正确路径
-      - name: Configure Gradle to use minimal JRE
-        shell: powershell
-        run: |
-          $minimalJre = Join-Path $env:GITHUB_WORKSPACE "minimal-jre"
-          Add-Content -Path gradle.properties -Value "org.gradle.java.home=$minimalJre"
+          # 设置 JAVA_HOME 让 Gradle daemon 使用裁剪后的 JRE
+          echo "JAVA_HOME=$GITHUB_WORKSPACE/minimal-jre" >> "$GITHUB_ENV"
 
       - name: Prepare icons (Linux)
         run: |
