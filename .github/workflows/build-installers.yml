@@ -31,7 +31,7 @@ jobs:
         run: |
           $JAVA_HOME/bin/jlink \
             --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.logging,java.prefs,java.naming,java.management,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
+            --add-modules java.base,java.logging,java.prefs,java.naming,java.management,java.instrument,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
 
@@ -134,7 +134,7 @@ jobs:
         run: |
           $JAVA_HOME/bin/jlink \
             --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.logging,java.prefs,java.naming,java.management,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
+            --add-modules java.base,java.logging,java.prefs,java.naming,java.management,java.instrument,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
 
@@ -275,7 +275,7 @@ jobs:
         run: |
           $JAVA_HOME/bin/jlink \
             --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.logging,java.prefs,java.naming,java.management,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
+            --add-modules java.base,java.logging,java.prefs,java.naming,java.management,java.instrument,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
             --output "$GITHUB_WORKSPACE/minimal-jre"
 
