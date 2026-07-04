@@ -80,7 +80,7 @@ jobs:
         shell: powershell
 
       - name: Build installers
-        run: .\gradlew.bat clean buildInstallers --no-daemon --configure-on-demand
+        run: .\gradlew.bat clean buildInstallers --no-daemon
 
       - name: Stage release artifacts
         run: .\gradlew.bat stageDesktopReleaseArtifacts --no-daemon
@@ -199,7 +199,7 @@ jobs:
         shell: bash
 
       - name: Build installers
-        run: ./gradlew clean buildInstallers --configure-on-demand
+        run: ./gradlew clean buildInstallers
         shell: bash
 
       - name: Stage release artifacts
@@ -325,7 +325,7 @@ jobs:
         shell: bash
 
       - name: Build installers
-        run: ./gradlew clean buildInstallers --configure-on-demand --no-daemon --configure-on-demand
+        run: ./gradlew clean buildInstallers --no-daemon
         shell: bash
 
       - name: Stage release artifacts

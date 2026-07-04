@@ -32,7 +32,7 @@ pluginManagement {
         id("org.jetbrains.compose").version(extra["compose.version"] as String)
         id("org.jetbrains.kotlin.plugin.compose").version(extra["kotlin.version"] as String)
         // Kotlin 2.3.x 需要 AGP >= 8.2.2。升级以满足依赖版本要求
-        id("com.android.application").version("8.9.1")
+        id("com.android.application").version("8.9.1")  // 桌面构建会跳过 androidApp，无需更高版本
         id("org.jetbrains.kotlin.android").version(extra["kotlin.version"] as String)
     }
 }
@@ -93,4 +93,12 @@ dependencyResolutionManagement {
 rootProject.name = "CharRoom"
 include("main")
 include("proto")
-include("androidApp")
+
+// 仅 Android 构建时包含 androidApp，桌面构建（buildInstallers）自动跳过，
+// 避免 Gradle 配置阶段触发 AGP 与新版 Gradle 的兼容性问题。
+val isAndroidBuild = gradle.startParameter.taskNames.any {
+    it.contains("android", ignoreCase = true)
+}
+if (isAndroidBuild) {
+    include("androidApp")
+}
