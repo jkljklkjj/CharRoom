@@ -145,7 +145,13 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            modules()
+            // Compose Desktop 不需要 java.desktop (Swing/AWT)、java.sql、java.xml 等模块
+            // 指定最小模块集，jlink 生成更小的运行时
+            modules(
+                "java.logging",
+                "java.prefs",
+                "jdk.unsupported"
+            )
             packageName = "chatlite"
             packageVersion = "1.0.0"
             vendor = "QingLiao"
