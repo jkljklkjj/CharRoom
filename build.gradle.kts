@@ -145,7 +145,13 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            modules("java.prefs", "jdk.unsupported")
+            // jlink 最小 JRE：仅包含运行时需要的模块，大幅减小安装包体积
+            modules(
+                "java.logging",      // 日志框架
+                "java.prefs",        // 用户偏好设置
+                "java.naming",       // JNDI（部分库间接依赖）
+                "jdk.unsupported"    // sun.misc.Unsafe（Netty/Kotlin 协程需要）
+            )
             packageName = "chatlite"
             packageVersion = "1.0.0"
             vendor = "QingLiao"
