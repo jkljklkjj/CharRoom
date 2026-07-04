@@ -8,7 +8,7 @@ buildscript {
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.9.1")
+        classpath("com.android.tools.build:gradle:8.10.0")
         classpath("com.guardsquare:proguard-gradle:7.8.2")
     }
 }
