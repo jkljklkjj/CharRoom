@@ -25,16 +25,22 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # jlink 裁剪最小 JRE（43MB vs 286MB），Compose Desktop 打包时使用
+      # jlink 裁剪最小 JRE（~50MB vs 286MB），Compose Desktop 打包时使用
       - name: Create minimal JRE
         shell: bash
         run: |
           $JAVA_HOME/bin/jlink \
             --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported \
+            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
-            --output minimal-jre
-          echo "JAVA_HOME=$(pwd)/minimal-jre" >> $GITHUB_ENV
+            --output "$GITHUB_WORKSPACE/minimal-jre"
+
+      # Windows: $(pwd) 返回 /d/a/... 路径格式，Gradle 不识别，用 GITHUB_WORKSPACE + PowerShell 写入正确路径
+      - name: Configure Gradle to use minimal JRE
+        shell: powershell
+        run: |
+          $minimalJre = Join-Path $env:GITHUB_WORKSPACE "minimal-jre"
+          Add-Content -Path gradle.properties -Value "org.gradle.java.home=$minimalJre"
 
       - name: Prepare icons (Windows)
         shell: powershell
@@ -120,16 +126,22 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # jlink 裁剪最小 JRE（43MB vs 286MB），Compose Desktop 打包时使用
+      # jlink 裁剪最小 JRE（~50MB vs 286MB），Compose Desktop 打包时使用
       - name: Create minimal JRE
         shell: bash
         run: |
           $JAVA_HOME/bin/jlink \
             --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported \
+            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
-            --output minimal-jre
-          echo "JAVA_HOME=$(pwd)/minimal-jre" >> $GITHUB_ENV
+            --output "$GITHUB_WORKSPACE/minimal-jre"
+
+      # Windows: $(pwd) 返回 /d/a/... 路径格式，Gradle 不识别，用 GITHUB_WORKSPACE + PowerShell 写入正确路径
+      - name: Configure Gradle to use minimal JRE
+        shell: powershell
+        run: |
+          $minimalJre = Join-Path $env:GITHUB_WORKSPACE "minimal-jre"
+          Add-Content -Path gradle.properties -Value "org.gradle.java.home=$minimalJre"
 
       - name: Prepare icons (macOS)
         run: |
@@ -253,16 +265,22 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # jlink 裁剪最小 JRE（43MB vs 286MB），Compose Desktop 打包时使用
+      # jlink 裁剪最小 JRE（~50MB vs 286MB），Compose Desktop 打包时使用
       - name: Create minimal JRE
         shell: bash
         run: |
           $JAVA_HOME/bin/jlink \
             --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported \
+            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
             --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
-            --output minimal-jre
-          echo "JAVA_HOME=$(pwd)/minimal-jre" >> $GITHUB_ENV
+            --output "$GITHUB_WORKSPACE/minimal-jre"
+
+      # Windows: $(pwd) 返回 /d/a/... 路径格式，Gradle 不识别，用 GITHUB_WORKSPACE + PowerShell 写入正确路径
+      - name: Configure Gradle to use minimal JRE
+        shell: powershell
+        run: |
+          $minimalJre = Join-Path $env:GITHUB_WORKSPACE "minimal-jre"
+          Add-Content -Path gradle.properties -Value "org.gradle.java.home=$minimalJre"
 
       - name: Prepare icons (Linux)
         run: |
