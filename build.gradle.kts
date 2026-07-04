@@ -128,7 +128,7 @@ compose.desktop {
             "-Dconsole.encoding=UTF-8"
         )
 
-        // 默认使用当前 JDK；createMinimalJre 任务完成后会被替换为裁剪版
+        // CI 通过 jlink 预裁剪 JRE 并设置 JAVA_HOME，本地开发使用当前 JDK
         javaHome = System.getProperty("java.home")
 
         buildTypes {
@@ -167,56 +167,6 @@ compose.desktop {
             linux {
                 val png = file("${iconsDir.path}/app.png")
                 if (png.exists()) iconFile.set(png)
-            }
-        }
-    }
-}
-
-// jlink 裁剪最小 JRE：仅包含运行时必需模块，排除 java.desktop 等未使用的大型模块
-val createMinimalJre by tasks.registering {
-    group = "build"
-    description = "Use jlink to create a minimal JRE for packaging"
-    val jdkHome = org.gradle.internal.jvm.Jvm.current().javaHome.absolutePath
-    val outputDir = layout.buildDirectory.dir("minimal-jre")
-    outputs.dir(outputDir)
-    doLast {
-        outputDir.get().asFile.deleteRecursively()
-        val modules = listOf(
-            "java.base",         // 核心（自动包含）
-            "java.logging",      // 日志
-            "java.prefs",        // 用户偏好
-            "java.naming",       // JNDI
-            "jdk.unsupported"    // sun.misc.Unsafe（Netty/Kotlin）
-        )
-        providers.exec {
-            commandLine(
-                "$jdkHome/bin/jlink",
-                "--module-path", "$jdkHome/jmods",
-                "--add-modules", modules.joinToString(","),
-                "--strip-debug",
-                "--no-header-files",
-                "--no-man-pages",
-                "--compress=zip-6",
-                "--output", outputDir.get().asFile.absolutePath
-            )
-        }
-        logger.lifecycle("✅ Minimal JRE created at ${outputDir.get().asFile.absolutePath}")
-    }
-}
-
-// 打包任务运行时动态切换 javaHome 为裁剪后的 JRE
-afterEvaluate {
-    tasks.matching {
-        it.name.startsWith("package") && it.name.contains("Release")
-    }.configureEach {
-        dependsOn(createMinimalJre)
-        doFirst {
-            // jlink 完成后，将裁剪 JRE 复制到 Compose 插件期望的 runtime 目录
-            val minimalJreDir = layout.buildDirectory.dir("minimal-jre").get().asFile
-            val composeRuntime = file("build/compose/tmp/main/release/runtime")
-            if (minimalJreDir.exists() && composeRuntime.exists()) {
-                composeRuntime.deleteRecursively()
-                minimalJreDir.copyRecursively(composeRuntime)
             }
         }
     }

@@ -25,6 +25,24 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # Kotlin 2.3.x 不支持 Java 25 版本号，强制 Gradle 使用 JDK 21
+      - name: Force Gradle JDK 21
+        shell: bash
+        run: |
+          sed -i "s|^# org.gradle.java.home=.*|org.gradle.java.home=$JAVA_HOME|" gradle.properties
+          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
+
+      # jlink 裁剪最小 JRE（43MB vs 286MB），Compose Desktop 打包时使用
+      - name: Create minimal JRE
+        shell: bash
+        run: |
+          $JAVA_HOME/bin/jlink \
+            --module-path "$JAVA_HOME/jmods" \
+            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported \
+            --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
+            --output minimal-jre
+          echo "JAVA_HOME=$(pwd)/minimal-jre" >> $GITHUB_ENV
+
       - name: Prepare icons (Windows)
         shell: powershell
         run: |
@@ -108,6 +126,24 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      # Kotlin 2.3.x 不支持 Java 25 版本号，强制 Gradle 使用 JDK 21
+      - name: Force Gradle JDK 21
+        shell: bash
+        run: |
+          sed -i "s|^# org.gradle.java.home=.*|org.gradle.java.home=$JAVA_HOME|" gradle.properties
+          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
+
+      # jlink 裁剪最小 JRE（43MB vs 286MB），Compose Desktop 打包时使用
+      - name: Create minimal JRE
+        shell: bash
+        run: |
+          $JAVA_HOME/bin/jlink \
+            --module-path "$JAVA_HOME/jmods" \
+            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported \
+            --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
+            --output minimal-jre
+          echo "JAVA_HOME=$(pwd)/minimal-jre" >> $GITHUB_ENV
 
       - name: Prepare icons (macOS)
         run: |
@@ -231,6 +267,24 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # Kotlin 2.3.x 不支持 Java 25 版本号，强制 Gradle 使用 JDK 21
+      - name: Force Gradle JDK 21
+        shell: bash
+        run: |
+          sed -i "s|^# org.gradle.java.home=.*|org.gradle.java.home=$JAVA_HOME|" gradle.properties
+          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
+
+      # jlink 裁剪最小 JRE（43MB vs 286MB），Compose Desktop 打包时使用
+      - name: Create minimal JRE
+        shell: bash
+        run: |
+          $JAVA_HOME/bin/jlink \
+            --module-path "$JAVA_HOME/jmods" \
+            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported \
+            --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
+            --output minimal-jre
+          echo "JAVA_HOME=$(pwd)/minimal-jre" >> $GITHUB_ENV
+
       - name: Prepare icons (Linux)
         run: |
           ICON_DIR=packaging/icons
@@ -301,6 +355,24 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      # Kotlin 2.3.x 不支持 Java 25 版本号，强制 Gradle 使用 JDK 21
+      - name: Force Gradle JDK 21
+        shell: bash
+        run: |
+          sed -i "s|^# org.gradle.java.home=.*|org.gradle.java.home=$JAVA_HOME|" gradle.properties
+          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
+
+      # jlink 裁剪最小 JRE（43MB vs 286MB），Compose Desktop 打包时使用
+      - name: Create minimal JRE
+        shell: bash
+        run: |
+          $JAVA_HOME/bin/jlink \
+            --module-path "$JAVA_HOME/jmods" \
+            --add-modules java.base,java.logging,java.prefs,java.naming,jdk.unsupported \
+            --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
+            --output minimal-jre
+          echo "JAVA_HOME=$(pwd)/minimal-jre" >> $GITHUB_ENV
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v2
