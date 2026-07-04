@@ -25,24 +25,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # jlink 裁剪最小 JRE（~50MB vs 286MB），Compose Desktop 打包时使用
-      - name: Create minimal JRE
-        shell: bash
-        run: |
-          $JAVA_HOME/bin/jlink \
-            --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.desktop,java.logging,java.prefs,java.naming,java.management,java.instrument,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
-            --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
-            --output "$GITHUB_WORKSPACE/minimal-jre"
-
-      # 写入 gradle.properties：Gradle daemon 用完整 JAVA_HOME，Compose 插件读 org.gradle.java.home 打包
-      - name: Set minimal JRE for packaging
-        shell: bash
-        run: |
-          # 用正斜杠避免 Windows 反斜杠转义问题
-          MINIMAL_PATH=$(echo "$GITHUB_WORKSPACE/minimal-jre" | sed 's|\\|/|g')
-          echo "org.gradle.java.home=$MINIMAL_PATH" >> gradle.properties
-          echo "Set org.gradle.java.home=$MINIMAL_PATH"
 
       - name: Prepare icons (Windows)
         shell: powershell
@@ -128,24 +110,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # jlink 裁剪最小 JRE（~50MB vs 286MB），Compose Desktop 打包时使用
-      - name: Create minimal JRE
-        shell: bash
-        run: |
-          $JAVA_HOME/bin/jlink \
-            --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.desktop,java.logging,java.prefs,java.naming,java.management,java.instrument,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
-            --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
-            --output "$GITHUB_WORKSPACE/minimal-jre"
-
-      # 写入 gradle.properties：Gradle daemon 用完整 JAVA_HOME，Compose 插件读 org.gradle.java.home 打包
-      - name: Set minimal JRE for packaging
-        shell: bash
-        run: |
-          # 用正斜杠避免 Windows 反斜杠转义问题
-          MINIMAL_PATH=$(echo "$GITHUB_WORKSPACE/minimal-jre" | sed 's|\\|/|g')
-          echo "org.gradle.java.home=$MINIMAL_PATH" >> gradle.properties
-          echo "Set org.gradle.java.home=$MINIMAL_PATH"
 
       - name: Prepare icons (macOS)
         run: |
@@ -269,24 +233,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # jlink 裁剪最小 JRE（~50MB vs 286MB），Compose Desktop 打包时使用
-      - name: Create minimal JRE
-        shell: bash
-        run: |
-          $JAVA_HOME/bin/jlink \
-            --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.desktop,java.logging,java.prefs,java.naming,java.management,java.instrument,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec \
-            --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
-            --output "$GITHUB_WORKSPACE/minimal-jre"
-
-      # 写入 gradle.properties：Gradle daemon 用完整 JAVA_HOME，Compose 插件读 org.gradle.java.home 打包
-      - name: Set minimal JRE for packaging
-        shell: bash
-        run: |
-          # 用正斜杠避免 Windows 反斜杠转义问题
-          MINIMAL_PATH=$(echo "$GITHUB_WORKSPACE/minimal-jre" | sed 's|\\|/|g')
-          echo "org.gradle.java.home=$MINIMAL_PATH" >> gradle.properties
-          echo "Set org.gradle.java.home=$MINIMAL_PATH"
 
       - name: Prepare icons (Linux)
         run: |

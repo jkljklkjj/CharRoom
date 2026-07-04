@@ -145,7 +145,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            // 模块由 jlink 任务控制，此处不再追加
+            bundleJdk = false  // 不打包 JDK，用户需安装 Java 21+（安装包减少 ~150MB）
             modules()
             packageName = "chatlite"
             packageVersion = "1.0.0"
