@@ -304,16 +304,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v2
-        with:
-          api-level: 36
-          target: android-36
-          components: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
 
       - name: Accept Android licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
       - name: Make gradlew executable
         run: chmod +x gradlew
@@ -371,44 +364,16 @@ jobs:
           name: android-apk
           path: artifacts/android
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub Release and upload artifacts
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ github.run_id }}"
-          release_name: "CharRoom build ${{ github.run_id }}"
+          name: "CharRoom build ${{ github.run_id }}"
           body: "Automated build artifacts"
           draft: false
           prerelease: false
-
-      - name: Upload artifacts to Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          upload_url=${{ steps.create_release.outputs.upload_url }}
-          upload_url="${upload_url%\{*}"
-          echo "Upload URL: $upload_url"
-          echo "Found package files:"
-          find artifacts -type f \( -iname '*.dmg' -o -iname '*.msi' -o -iname '*.deb' -o -iname '*.apk' \) | sort
-          declare -A assetNames
-          assetNames=( [msi]=chatlite.msi [dmg]=chatlite.dmg [deb]=chatlite.deb [apk]=chatlite.apk )
-          for ext in msi dmg deb apk; do
-            file=$(find artifacts -type f -iname "*.$ext" | head -n 1 || true)
-            if [ -n "$file" ]; then
-              name=${assetNames[$ext]}
-              echo "Uploading $file as $name"
-              response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$file" "$upload_url?name=$name" -w "\nHTTP_CODE:%{http_code}")
-              http_code=$(printf '%s' "$response" | tail -n1 | cut -d':' -f2)
-              body=$(printf '%s' "$response" | sed '$d')
-              if [ "$http_code" != "201" ] && [ "$http_code" != "200" ]; then
-                echo "Upload failed ($http_code):"
-                echo "$body"
-                exit 1
-              fi
-            else
-              echo "No artifact found for *.$ext"
-            fi
-          done
+          files: |
+            artifacts/**/*.msi
+            artifacts/**/*.dmg
+            artifacts/**/*.deb
+            artifacts/**/*.apk
