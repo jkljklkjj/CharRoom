@@ -234,7 +234,7 @@ tasks.register("buildInstallers") {
     })
 
     if (isWindows) {
-        dependsOn("buildTrimmedMsi")
+        dependsOn("packageReleaseMsi")
     }
 }
 
