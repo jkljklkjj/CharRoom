@@ -145,7 +145,6 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            bundleJdk = false  // 不打包 JDK，用户需安装 Java 21+（安装包减少 ~150MB）
             modules()
             packageName = "chatlite"
             packageVersion = "1.0.0"
