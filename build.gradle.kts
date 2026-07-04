@@ -128,9 +128,8 @@ compose.desktop {
             "-Dconsole.encoding=UTF-8"
         )
 
-        // 使用 jlink 裁剪的最小 JRE 构建安装包（排除未使用的 java.desktop 等模块）
-        val minimalJre = layout.buildDirectory.dir("minimal-jre")
-        javaHome = minimalJre.get().asFile.absolutePath
+        // 默认使用当前 JDK；createMinimalJre 任务完成后会被替换为裁剪版
+        javaHome = System.getProperty("java.home")
 
         buildTypes {
             release {
@@ -174,12 +173,11 @@ compose.desktop {
 }
 
 // jlink 裁剪最小 JRE：仅包含运行时必需模块，排除 java.desktop 等未使用的大型模块
-tasks.register("createMinimalJre") {
+val createMinimalJre by tasks.registering {
     group = "build"
     description = "Use jlink to create a minimal JRE for packaging"
     val jdkHome = org.gradle.internal.jvm.Jvm.current().javaHome.absolutePath
     val outputDir = layout.buildDirectory.dir("minimal-jre")
-
     outputs.dir(outputDir)
     doLast {
         outputDir.get().asFile.deleteRecursively()
@@ -190,7 +188,7 @@ tasks.register("createMinimalJre") {
             "java.naming",       // JNDI
             "jdk.unsupported"    // sun.misc.Unsafe（Netty/Kotlin）
         )
-        exec {
+        providers.exec {
             commandLine(
                 "$jdkHome/bin/jlink",
                 "--module-path", "$jdkHome/jmods",
@@ -206,9 +204,22 @@ tasks.register("createMinimalJre") {
     }
 }
 
-// 让所有 Compose 打包任务依赖 jlink 裁剪
-tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.configureEach {
-    dependsOn("createMinimalJre")
+// 打包任务运行时动态切换 javaHome 为裁剪后的 JRE
+afterEvaluate {
+    tasks.matching {
+        it.name.startsWith("package") && it.name.contains("Release")
+    }.configureEach {
+        dependsOn(createMinimalJre)
+        doFirst {
+            // jlink 完成后，将裁剪 JRE 复制到 Compose 插件期望的 runtime 目录
+            val minimalJreDir = layout.buildDirectory.dir("minimal-jre").get().asFile
+            val composeRuntime = file("build/compose/tmp/main/release/runtime")
+            if (minimalJreDir.exists() && composeRuntime.exists()) {
+                composeRuntime.deleteRecursively()
+                minimalJreDir.copyRecursively(composeRuntime)
+            }
+        }
+    }
 }
 
 tasks.register("buildInstallers") {
@@ -265,37 +276,6 @@ tasks.register("stageReleaseArtifacts") {
     group = "distribution"
     description = "Stage all release artifacts with fixed filenames"
     dependsOn("stageDesktopReleaseArtifacts", "stageAndroidReleaseArtifact")
-}
-
-// 自定义任务：使用裁剪后的最小JRE构建MSI
-tasks.register("buildTrimmedMsi") {
-    group = "distribution"
-    description = "Build MSI with trimmed minimal JRE (reduces size by ~25MB)"
-    dependsOn("packageReleaseMsi")
-
-    doLast {
-        val originalRuntime = file("build/compose/tmp/main/release/runtime")
-        val trimmedRuntime = rootProject.projectDir.parentFile.resolve("minimal-jre")
-
-        if (trimmedRuntime.exists()) {
-            // 替换原runtime为裁剪版本
-            originalRuntime.deleteRecursively()
-            trimmedRuntime.copyRecursively(originalRuntime)
-
-            // 重新打包MSI
-            delete(file("build/compose/binaries/main-release/msi/chatlite-1.0.0.msi"))
-            project.exec {
-                workingDir = rootProject.projectDir
-                if (System.getProperty("os.name").contains("Windows", ignoreCase = true)) {
-                    commandLine("gradlew.bat", "--rerun-tasks", "packageReleaseMsi")
-                } else {
-                    commandLine("./gradlew", "--rerun-tasks", "packageReleaseMsi")
-                }
-            }
-        } else {
-            logger.warn("Trimmed JRE not found at ${trimmedRuntime.absolutePath}")
-        }
-    }
 }
 
 tasks.register<Jar>("customJar") {
