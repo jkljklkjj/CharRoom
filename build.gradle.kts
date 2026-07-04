@@ -128,8 +128,9 @@ compose.desktop {
             "-Dconsole.encoding=UTF-8"
         )
 
-        // 使用当前 JDK 构建桌面包（无需工具链，兼容 Java 21+）
-        javaHome = System.getProperty("java.home")
+        // 使用 jlink 裁剪的最小 JRE 构建安装包（排除未使用的 java.desktop 等模块）
+        val minimalJre = layout.buildDirectory.dir("minimal-jre")
+        javaHome = minimalJre.get().asFile.absolutePath
 
         buildTypes {
             release {
@@ -145,13 +146,8 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            // jlink 最小 JRE：仅包含运行时需要的模块，大幅减小安装包体积
-            modules(
-                "java.logging",      // 日志框架
-                "java.prefs",        // 用户偏好设置
-                "java.naming",       // JNDI（部分库间接依赖）
-                "jdk.unsupported"    // sun.misc.Unsafe（Netty/Kotlin 协程需要）
-            )
+            // 模块由 jlink 任务控制，此处不再追加
+            modules()
             packageName = "chatlite"
             packageVersion = "1.0.0"
             vendor = "QingLiao"
@@ -175,6 +171,44 @@ compose.desktop {
             }
         }
     }
+}
+
+// jlink 裁剪最小 JRE：仅包含运行时必需模块，排除 java.desktop 等未使用的大型模块
+tasks.register("createMinimalJre") {
+    group = "build"
+    description = "Use jlink to create a minimal JRE for packaging"
+    val jdkHome = org.gradle.internal.jvm.Jvm.current().javaHome.absolutePath
+    val outputDir = layout.buildDirectory.dir("minimal-jre")
+
+    outputs.dir(outputDir)
+    doLast {
+        outputDir.get().asFile.deleteRecursively()
+        val modules = listOf(
+            "java.base",         // 核心（自动包含）
+            "java.logging",      // 日志
+            "java.prefs",        // 用户偏好
+            "java.naming",       // JNDI
+            "jdk.unsupported"    // sun.misc.Unsafe（Netty/Kotlin）
+        )
+        exec {
+            commandLine(
+                "$jdkHome/bin/jlink",
+                "--module-path", "$jdkHome/jmods",
+                "--add-modules", modules.joinToString(","),
+                "--strip-debug",
+                "--no-header-files",
+                "--no-man-pages",
+                "--compress=zip-6",
+                "--output", outputDir.get().asFile.absolutePath
+            )
+        }
+        logger.lifecycle("✅ Minimal JRE created at ${outputDir.get().asFile.absolutePath}")
+    }
+}
+
+// 让所有 Compose 打包任务依赖 jlink 裁剪
+tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.configureEach {
+    dependsOn("createMinimalJre")
 }
 
 tasks.register("buildInstallers") {
