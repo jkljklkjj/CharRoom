@@ -60,10 +60,6 @@ import model.User
 import core.FileUploader
 import component.io.FilePicker
 import core.LocalChatHistoryStore
-import component.MessageLongPressMenu
-import component.ReplyPreviewBar
-import component.EmojiPickerPanel
-import component.ForwardSelectDialog
 import component.chatHeaderBrush
 import component.messageBubbleBrush
 import com.chatlite.i18n.LocalStrings
