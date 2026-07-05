@@ -35,6 +35,13 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     private val sessionStreams = ConcurrentHashMap<String, BidirectionalStream>()
     private val executor: Executor = Executors.newSingleThreadExecutor()
 
+    // 消息去重：服务端未收到 ACK 时会重发，客户端需去重
+    private val recentMessageIds = object : LinkedHashSet<String>(256, 0.75f) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?): Boolean {
+            return size > 256
+        }
+    }
+
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
 
@@ -281,6 +288,15 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     // ── 消息处理 ──
 
+    /**
+     * 消息去重：返回 true 表示是重复消息，应跳过。
+     */
+    private fun isDuplicateMessage(messageId: String): Boolean {
+        synchronized(recentMessageIds) {
+            return !recentMessageIds.add(messageId)
+        }
+    }
+
     private fun handleStreamData(data: ByteArray) {
         try {
             val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
@@ -299,6 +315,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.CHAT.wire -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
+                            if (isDuplicateMessage(chat.messageId)) continue@forEach
                             sendAck(chat.messageId, "chat")
                             listener.onPrivateMessageReceived(
                                 senderId = chat.userId.toIntOrNull() ?: 0,
@@ -308,6 +325,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.GROUP_CHAT.wire -> if (wrapper.hasGroupChat()) {
                             val gc = wrapper.groupChat
+                            if (isDuplicateMessage(gc.messageId)) continue@forEach
                             sendAck(gc.messageId, "group:${gc.targetClientId}")
                             listener.onGroupMessageReceived(
                                 groupId = gc.targetClientId.toIntOrNull() ?: 0,
@@ -335,6 +353,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
                             val stream = wrapper.agentStream
+                            val dedupKey = "${stream.messageId}:${stream.chunk.hashCode()}"
+                            if (isDuplicateMessage(dedupKey)) continue@forEach
                             if (stream.done) {
                                 sendAck(stream.messageId, "agent")
                             }

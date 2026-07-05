@@ -33,6 +33,13 @@ class QuicClientImpl : ChatTransport {
     // 待发送消息缓冲（断线时缓存）
     private val messageQueue = ConcurrentLinkedQueue<PendingMessage>()
 
+    // 消息去重：服务端未收到 ACK 时会重发，客户端需去重
+    private val recentMessageIds = object : LinkedHashSet<String>(256, 0.75f) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?): Boolean {
+            return size > 256
+        }
+    }
+
     // 消息监听器
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
@@ -213,6 +220,10 @@ class QuicClientImpl : ChatTransport {
                         MsgType.CHAT.wire -> {
                             if (wrapper.hasChat()) {
                                 val chat = wrapper.chat
+                                if (isDuplicateMessage(chat.messageId)) {
+                                    log.debug("重复消息跳过: messageId={}", chat.messageId)
+                                    return@forEach
+                                }
                                 val senderId = chat.userId.toIntOrNull() ?: return@forEach
                                 val text = chat.content
                                 val ts = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis()
@@ -225,6 +236,10 @@ class QuicClientImpl : ChatTransport {
                         MsgType.GROUP_CHAT.wire -> {
                             if (wrapper.hasGroupChat()) {
                                 val gc = wrapper.groupChat
+                                if (isDuplicateMessage(gc.messageId)) {
+                                    log.debug("重复群聊消息跳过: messageId={}", gc.messageId)
+                                    return@forEach
+                                }
                                 val groupId = gc.targetClientId.toIntOrNull() ?: return@forEach
                                 val senderId = gc.userId.toIntOrNull() ?: return@forEach
                                 val senderName = senderId.toString()
@@ -238,6 +253,12 @@ class QuicClientImpl : ChatTransport {
                         MsgType.AGENT_CHAT_STREAM.wire -> {
                             if (wrapper.hasAgentStream()) {
                                 val stream = wrapper.agentStream
+                                // Agent 流式消息用 messageId+chunk 组合去重
+                                val dedupKey = "${stream.messageId}:${stream.chunk.hashCode()}"
+                                if (isDuplicateMessage(dedupKey)) {
+                                    log.debug("重复 Agent 流跳过: messageId={}", stream.messageId)
+                                    return@forEach
+                                }
                                 log.info("分发Agent流式消息: messageId={}, done={}", stream.messageId, stream.done)
                                 if (stream.done) {
                                     sendAckToServer(streamId, stream.messageId, "agent")
@@ -259,6 +280,15 @@ class QuicClientImpl : ChatTransport {
                     log.error("解析 Stream 数据失败: streamId={}, dataLen={}, error={}", streamId, data.size, e.message)
                 }
             }
+        }
+    }
+
+    /**
+     * 消息去重：返回 true 表示是重复消息，应跳过。
+     */
+    private fun isDuplicateMessage(messageId: String): Boolean {
+        synchronized(recentMessageIds) {
+            return !recentMessageIds.add(messageId)
         }
     }
 
