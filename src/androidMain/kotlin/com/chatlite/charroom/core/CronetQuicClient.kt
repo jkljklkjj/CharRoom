@@ -36,7 +36,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     private val executor: Executor = Executors.newSingleThreadExecutor()
 
     // 消息去重：服务端未收到 ACK 时会重发，客户端需去重
-    private val recentMessageIds = object : LinkedHashSet<String>(256, 0.75f) {
+    private val recentMessageIds = object : LinkedHashMap<String, Boolean>(256, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?): Boolean {
             return size > 256
         }
@@ -293,7 +293,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
      */
     private fun isDuplicateMessage(messageId: String): Boolean {
         synchronized(recentMessageIds) {
-            return !recentMessageIds.add(messageId)
+            if (recentMessageIds.containsKey(messageId)) return true
+            recentMessageIds[messageId] = true
+            return false
         }
     }
 
