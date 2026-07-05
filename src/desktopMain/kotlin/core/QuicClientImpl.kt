@@ -317,15 +317,21 @@ class QuicClientImpl : ChatTransport {
                         },
                         targetId = targetId
                     )
-                    // 发送 Stream 初始化首帧
-                    val initFrame = QuicStreamProtocol.createStreamInitFrame(
-                        conversationType = when (type) {
-                            MsgType.CHAT -> "private"
-                            MsgType.GROUP_CHAT -> "group"
-                            MsgType.AGENT_CHAT -> "agent"
-                        },
-                        targetId = targetId
-                    )
+                    // 发送 Stream 初始化首帧（protobuf CheckMessage，服务端期望此格式）
+                    val convType = when (type) {
+                        MsgType.CHAT -> "private"
+                        MsgType.GROUP_CHAT -> "group"
+                        MsgType.AGENT_CHAT -> "agent"
+                        else -> "private"
+                    }
+                    val checkMsg = com.chatlite.proto.MessageProtos.CheckMessage.newBuilder()
+                        .setTargetClientId("$convType:$targetId")
+                        .build()
+                    val initWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
+                        .setType(MsgType.CHECK.wire)
+                        .setCheck(checkMsg)
+                        .build()
+                    val initFrame = QuicStreamProtocol.encodeFrame(initWrapper.toByteArray())
                     transport.send(newStreamId, initFrame)
                     newStreamId
                 }
