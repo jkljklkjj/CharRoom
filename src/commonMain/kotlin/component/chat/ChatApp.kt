@@ -85,18 +85,23 @@ fun ChatApp(
     var showUserDetailScreen by remember { mutableStateOf(false) }
     var selectedDetailUserId by remember { mutableStateOf<Int?>(null) }
 
-    // 首次加载：确保token存在后才启动WebSocket连接并加载联系人
+    // 首次加载：确保token存在后才启动QUIC连接并加载联系人
     LaunchedEffect(Unit) {
         val currentToken = GlobalAppState.currentToken
         if (currentToken.isNullOrBlank()) {
-            println("[ChatApp] 错误：启动WebSocket前token为空，请先登录")
+            println("[ChatApp] 错误：启动QUIC前token为空，请先登录")
             return@LaunchedEffect
         }
-        println("[ChatApp] 准备启动WebSocket连接，token长度: ${currentToken.length}, userId: ${GlobalAppState.currentUserId}")
+        println("[ChatApp] 准备启动QUIC连接，token长度: ${currentToken.length}, userId: ${GlobalAppState.currentUserId}")
+        println("[ChatApp] Chat 实例: $Chat")
+        println("[ChatApp] Chat 是否已连接: ${Chat.isConnected()}")
         if (!Chat.isConnected()) {
-            Chat.start() // 启动WebSocket连接，触发握手流程，此时header会携带token
+            println("[ChatApp] 开始启动QUIC连接...")
+            Chat.start() // 启动QUIC连接，触发握手流程，此时header会携带token
+            println("[ChatApp] QUIC连接启动完成")
         }
 
+        println("[ChatApp] 注册消息监听器...")
         // 注册全局消息接收监听器
         Chat.addMessageReceiveListener(object : MessageReceiveListener {
             override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long) {
@@ -136,9 +141,11 @@ fun ChatApp(
             }
 
             override fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean) {
+                println("[ChatApp] 收到Agent流式消息：messageId=$messageId, content=$fullContent, done=$done")
                 chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
             }
         })
+        println("[ChatApp] 消息监听器注册完成")
 
         chatViewModel.loadContacts()
 

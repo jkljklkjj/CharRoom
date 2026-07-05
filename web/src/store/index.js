@@ -436,6 +436,35 @@ function addMessage(m) {
     setConversationSeqId(convId, m.seqId)
   }
 }
+
+/**
+ * 流式 Agent 消息：首块创建，后续块原位更新。
+ * @param {string} messageId
+ * @param {string} fullContent
+ * @param {boolean} done
+ */
+function upsertAgentStreamMessage(messageId, fullContent, done = false) {
+  if (!messageId) return
+  const existingIndex = state.messages.findIndex(m => m.messageId === messageId)
+  if (existingIndex >= 0) {
+    state.messages[existingIndex] = {
+      ...state.messages[existingIndex],
+      text: fullContent,
+      done
+    }
+  } else {
+    const agentMessage = {
+      user: '900000001', // AGENT_ASSISTANT_ID
+      text: fullContent,
+      time: new Date().toISOString(),
+      targetId: String(state.accountId),
+      messageId,
+      done
+    }
+    state.messages.push(agentMessage)
+    savePrivateMessage(agentMessage)
+  }
+}
 function addGroupMessage(m) {
   const conversationId = `-${m.groupId}`
   if (Math.abs(Number(state.selectedChatId)) === Number(m.groupId)) {
@@ -540,6 +569,7 @@ export function useStore() {
     removeUser,
     addMessage,
     addGroupMessage,
+    upsertAgentStreamMessage,
     updateMessageStatus,
     setSelectedChat,
     clearAll,

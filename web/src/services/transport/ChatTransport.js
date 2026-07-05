@@ -2,7 +2,6 @@
  * ChatTransport — 聊天传输层抽象基类。
  *
  * 定义统一的传输接口，由具体实现类提供不同的底层协议支持：
- * - WebSocketTransport: 现有 WSS 实现（降级方案）
  * - WebTransportTransport: 基于 WebTransport/QUIC 的实现（首选方案）
  *
  * 使用方式：

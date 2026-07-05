@@ -8,7 +8,7 @@ import java.util.*
  * WebRTC 视频通话管理器。
  *
  * 封装 PeerConnection 生命周期，处理 SDP 协商和 ICE 候选交换。
- * 信令消息通过外部回调收发（复用现有的 QUIC/WebSocket 消息通道）。
+ * 信令消息通过外部回调收发（复用现有的 QUIC 消息通道）。
  */
 class CallManager {
 

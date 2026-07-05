@@ -755,14 +755,14 @@ open class ChatViewModel(
                 fileSize = fileSize
             )
 
-            // 通过WebSocket发送消息
+            // 通过QUIC发送消息
             Chat.send(
                 payload = payload,
                 type = MsgType.CHAT,
                 targetClientId = user.id.toString(),
                 expectedResponses = 1
             ) { success, responses ->
-                println("[ChatViewModel] WebSocket消息发送结果: $success, messageId: $messageId")
+                println("[ChatViewModel] QUIC消息发送结果: $success, messageId: $messageId")
                 sessionScope.launch {
                     if (success) {
                         updateMessageSentStatus(messageId, true)
@@ -864,14 +864,14 @@ open class ChatViewModel(
                 fileSize = fileSize
             )
 
-            // 通过WebSocket发送群聊消息
+            // 通过QUIC发送群聊消息
             Chat.send(
                 payload = payload,
                 type = MsgType.GROUP_CHAT,
                 targetClientId = group.id.toString(),
                 expectedResponses = 1
             ) { success, responses ->
-                println("[ChatViewModel] WebSocket群消息发送结果: $success, messageId: $messageId")
+                println("[ChatViewModel] QUIC群消息发送结果: $success, messageId: $messageId")
                 sessionScope.launch {
                     if (success) {
                         updateGroupMessageSentStatus(messageId, true)

@@ -67,7 +67,8 @@ setInterval(() => {
 /**
  * 建立聊天连接。
  *
- * @param {string} wsUrl - WebSocket 基础 URL（用于降级）
+ * @param {string} hostname - 服务器地址
+ * @param {number} port - 服务器端口
  * @param {string} token - 认证 token
  * @param {string|number} userId - 用户 ID
  * @param {Object} callbacks - 事件回调

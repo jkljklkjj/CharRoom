@@ -317,7 +317,7 @@ export async function getGroupDetail(id) {
   return body
 }
 
-// 示例：调用 agent stream（后续可以改为 SSE 或 websocket 分块）
+// 示例：调用 agent stream（后续可以改为 SSE 或 WebTransport 分块）
 export async function callAgentStream(text, onTokenChunk = (chunk) => {}) {
   try {
     const res = await fetch(`${API_BASE}/agent/nl/stream`, {

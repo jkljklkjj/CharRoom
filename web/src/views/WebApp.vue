@@ -148,7 +148,7 @@ function handleResize() {
   }
 }
 
-/** 处理 WebSocket 收到的消息 */
+/** 处理 QUIC/WebTransport 收到的消息 */
 function handleIncomingMessage(msg) {
   try {
     if (msg.type === 'chat' && msg.chat) {
@@ -165,6 +165,12 @@ function handleIncomingMessage(msg) {
         time: normalizeTimestamp(msg.groupChat.timestamp),
         groupId: msg.groupChat.targetClientId
       })
+    } else if (msg.type === 'agentChatStream' && msg.agentStream) {
+      // Agent 流式消息：增量拼接内容
+      const stream = msg.agentStream
+      const messageId = stream.messageId || ''
+      if (!messageId) return
+      store.upsertAgentStreamMessage(messageId, stream.chunk || '', stream.done)
     } else if (msg.clientId !== undefined && msg.online !== undefined) {
       store.updateUserOnlineStatus(parseInt(msg.clientId), msg.online)
     }

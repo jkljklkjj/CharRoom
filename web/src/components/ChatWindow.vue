@@ -675,7 +675,7 @@ onMounted(()=>{
   scrollToBottom()
   // 监听键盘快捷键
   window.addEventListener('keydown', handleKeydown)
-  // 可在此连接 websocket 并处理 incoming messages
+  // 可在此连接 QUIC/WebTransport 并处理 incoming messages
 })
 </script>
 

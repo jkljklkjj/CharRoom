@@ -104,6 +104,7 @@ class QuicNettyClient {
         quicChannel = createQuicConnection(datagramChannel!!, address, streamInitializer)
 
         log.info("QUIC 连接已建立: {}:{}", host, port)
+        log.info("QUIC listener 是否为 null: {}", listener == null)
         listener?.onConnected()
     }
 
