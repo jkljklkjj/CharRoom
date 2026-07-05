@@ -6,6 +6,7 @@ import core.state.GlobalChatState
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * QUIC 协议客户端实现。
@@ -43,6 +44,7 @@ class QuicClientImpl : ChatTransport {
     // 消息监听器
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
+    override var agentStreamHandler: AgentStreamHandler? = null
 
     // 连接配置
     private var host: String = ServerConfig.QUIC_HOST
@@ -64,17 +66,14 @@ class QuicClientImpl : ChatTransport {
         transport.listener = object : QuicNettyClient.Listener {
             override fun onConnected() {
                 connected.set(true)
-                println("[QuicClient] onConnected 回调触发，准备启动登录流程")
                 scope.launch {
                     try {
                         doLogin()
-                        println("[QuicClient] doLogin 完成")
                         flushPendingMessages()
                         startHeartbeat()
                     } catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        println("[QuicClient] 登录流程异常: ${e.message}")
-                        e.printStackTrace()
+                        log.error("登录流程异常", e)
                     }
                 }
             }
@@ -109,9 +108,7 @@ class QuicClientImpl : ChatTransport {
      * 通过 Stream 0 发送登录消息。
      */
     private fun doLogin() {
-        println("[QuicClient] doLogin 开始，token长度: ${GlobalAppState.currentToken?.length}")
         val stream0Id = transport.openStream()
-        println("[QuicClient] 控制流已打开: streamId=$stream0Id")
         sessions[CONTROL_SESSION_KEY] = StreamSession(
             streamId = stream0Id,
             conversationId = CONTROL_SESSION_KEY,
@@ -122,7 +119,6 @@ class QuicClientImpl : ChatTransport {
         val loginPayload = buildLoginPayload(GlobalAppState.currentToken ?: "")
         val frame = QuicStreamProtocol.encodeFrame(loginPayload)
         transport.send(stream0Id, frame)
-        println("[QuicClient] QUIC 登录请求已发送 (streamId=$stream0Id)")
         log.info("QUIC 登录请求已发送 (streamId=$stream0Id)")
     }
 
@@ -156,7 +152,7 @@ class QuicClientImpl : ChatTransport {
     private suspend fun startHeartbeat() {
         while (connected.get()) {
             val interval = adaptiveHbInterval()
-            delay(interval)
+            delay(interval.milliseconds)
             if (!connected.get()) break
             try {
                 val controlStreamId = getOrCreateControlStream()
@@ -179,7 +175,6 @@ class QuicClientImpl : ChatTransport {
     private fun handleStreamData(streamId: Long, data: ByteArray) {
         // 任何服务端响应都可作为 RTT 样本（心跳确认 + 消息推送）
         recordRtt()
-        log.info("收到 Stream 数据: streamId={}, dataLen={}, listeners={}", streamId, data.size, messageListeners.size)
         // 数据已由 QuicStreamInitializer 按帧边界返回，直接透传
         synchronized(messageListeners) {
             messageListeners.forEach { listener ->
@@ -256,16 +251,17 @@ class QuicClientImpl : ChatTransport {
                                 // 流式输出：中间 chunk 按 messageId+contentHash 去重
                                 // done 消息按 messageId 去重（防止重复触发完成）
                                 val dedupKey = if (stream.done) stream.messageId
-                                    else "${stream.messageId}:${stream.chunk.hashCode()}"
+                                else "${stream.messageId}:${stream.chunk.hashCode()}"
                                 if (isDuplicateMessage(dedupKey)) {
                                     log.debug("重复 Agent 流跳过: messageId={}, done={}", stream.messageId, stream.done)
                                     return@forEach
                                 }
-                                log.info("分发Agent流式消息: messageId={}, done={}", stream.messageId, stream.done)
                                 if (stream.done) {
                                     sendAckToServer(streamId, stream.messageId, "agent")
                                 }
-                                listener.onAgentStreamChunk(
+                                // 优先使用独立 handler（绕过 listener 遍历）
+                                val handler = agentStreamHandler
+                                handler?.onAgentStreamChunk(
                                     messageId = stream.messageId,
                                     fullContent = stream.chunk,
                                     done = stream.done,

@@ -10,23 +10,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="优化包结构">
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/core/CronetQuicClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/androidMain/kotlin/com/chatlite/charroom/core/CronetQuicClient.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/ChatScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/ChatApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/ChatApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/i18n/I18n.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/i18n/I18n.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/core/ChatTransport.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/core/ChatTransport.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/presentation/viewmodel/ChatViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/component/call/CallManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/component/call/CallManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicChannelInitializer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicChannelInitializer.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicClientImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicClientImpl.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicNettyClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicNettyClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/api/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/api/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/components/ChatWindow.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/components/ChatWindow.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/locales/en.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/locales/en.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/locales/ja.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/locales/ja.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/locales/zh-CN.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/locales/zh-CN.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/services/chatSocket.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/services/chatSocket.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/services/transport/ChatTransport.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/services/transport/ChatTransport.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/store/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/store/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/views/WebApp.vue" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/views/WebApp.vue" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -179,64 +172,63 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Android App.CharRoom.executor&quot;: &quot;Run&quot;,
-    &quot;Android App.androidApp.executor&quot;: &quot;Run&quot;,
-    &quot;Android App.qingliao.CharRoom.androidApp.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [:androidApp:build].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [:androidApp:clean].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [build].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [checkRuntime].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [clean].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [customApk].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [customJar].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [customProguardReleaseJars].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [dependencies].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [packageReleaseMsi].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [package].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.CharRoom [proguardReleaseJars].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.desktop.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.下载源代码.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.升级 Gradle 包装器.executor&quot;: &quot;Run&quot;,
-    &quot;JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor&quot;: &quot;Run&quot;,
-    &quot;JAR 应用程序.在线聊天App-1.0.0.jar.executor&quot;: &quot;Run&quot;,
-    &quot;Kotlin.ChatKt.executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
-    &quot;external.system.has.shared.sources&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;模块&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Android App.CharRoom.executor": "Run",
+    "Android App.androidApp.executor": "Run",
+    "Android App.qingliao.CharRoom.androidApp.executor": "Run",
+    "Gradle.CharRoom [:androidApp:build].executor": "Run",
+    "Gradle.CharRoom [:androidApp:clean].executor": "Run",
+    "Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor": "Run",
+    "Gradle.CharRoom [build].executor": "Run",
+    "Gradle.CharRoom [checkRuntime].executor": "Run",
+    "Gradle.CharRoom [clean].executor": "Run",
+    "Gradle.CharRoom [customApk].executor": "Run",
+    "Gradle.CharRoom [customJar].executor": "Run",
+    "Gradle.CharRoom [customProguardReleaseJars].executor": "Run",
+    "Gradle.CharRoom [dependencies].executor": "Run",
+    "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
+    "Gradle.CharRoom [package].executor": "Run",
+    "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
+    "Gradle.desktop.executor": "Run",
+    "Gradle.下载源代码.executor": "Run",
+    "Gradle.升级 Gradle 包装器.executor": "Run",
+    "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
+    "JAR 应用程序.在线聊天App-1.0.0.jar.executor": "Run",
+    "Kotlin.ChatKt.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "master",
+    "go.import.settings.migrated": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "模块",
+    "project.structure.proportion": "0.17",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "terminal",
+    "ts.external.directory.path": "D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;DatabaseDriversLRU&quot;: [
-      &quot;mongo&quot;,
-      &quot;mysql&quot;,
-      &quot;redis&quot;
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "mongo",
+      "mysql",
+      "redis"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\lora\qingliao\CharRoom\src\desktopMain\resources\icons" />
@@ -833,7 +825,8 @@
       <workItem from="1783165952792" duration="506000" />
       <workItem from="1783167149308" duration="4850000" />
       <workItem from="1783173410674" duration="6043000" />
-      <workItem from="1783210593310" duration="1036000" />
+      <workItem from="1783210593310" duration="8967000" />
+      <workItem from="1783232511829" duration="6648000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
@@ -1179,7 +1172,23 @@
       <option name="project" value="LOCAL" />
       <updated>1782923265809</updated>
     </task>
-    <option name="localTasksCounter" value="44" />
+    <task id="LOCAL-00044" summary="优化包结构">
+      <option name="closed" value="true" />
+      <created>1783211834522</created>
+      <option name="number" value="00044" />
+      <option name="presentableId" value="LOCAL-00044" />
+      <option name="project" value="LOCAL" />
+      <updated>1783211834523</updated>
+    </task>
+    <task id="LOCAL-00045" summary="优化包结构">
+      <option name="closed" value="true" />
+      <created>1783211878370</created>
+      <option name="number" value="00045" />
+      <option name="presentableId" value="LOCAL-00045" />
+      <option name="project" value="LOCAL" />
+      <updated>1783211878370</updated>
+    </task>
+    <option name="localTasksCounter" value="46" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1227,6 +1236,12 @@
         <entry key="MAIN">
           <value>
             <State>
+              <option name="COLUMN_ID_WIDTH">
+                <map>
+                  <entry key="Table.Default.Author.ColumnIdWidth" value="89" />
+                  <entry key="Table.Default.Date.ColumnIdWidth" value="112" />
+                </map>
+              </option>
               <option name="FILTERS">
                 <map>
                   <entry key="branch">
@@ -1280,14 +1295,6 @@
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/build.gradle.kts</url>
-          <line>168</line>
-          <properties>
-            <option name="lambda-ordinal" value="-1" />
-          </properties>
-          <option name="timeStamp" value="26" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/FileUploader.kt</url>
           <line>72</line>
           <option name="timeStamp" value="55" />
@@ -1313,11 +1320,6 @@
           <option name="timeStamp" value="61" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/core/ProtobufBuilders.kt</url>
-          <line>8</line>
-          <option name="timeStamp" value="62" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/src/desktopMain/kotlin/core/NettyWebSocketClient.kt</url>
           <line>521</line>
           <option name="timeStamp" value="64" />
@@ -1329,6 +1331,16 @@
             <option name="lambda-ordinal" value="-1" />
           </properties>
           <option name="timeStamp" value="65" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/desktopMain/kotlin/core/QuicClientImpl.kt</url>
+          <line>169</line>
+          <option name="timeStamp" value="66" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/commonMain/kotlin/component/chat/ChatApp.kt</url>
+          <line>137</line>
+          <option name="timeStamp" value="74" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
@@ -1346,6 +1358,7 @@
       <configuration name="GradleRunConfiguration">
         <watch expression="jsonObject[&quot;code&quot;]" />
         <watch expression="isApiSuccess(response)" />
+        <watch expression="stream.done" />
       </configuration>
     </watches-manager>
   </component>

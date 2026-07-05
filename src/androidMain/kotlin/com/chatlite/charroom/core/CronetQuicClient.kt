@@ -44,6 +44,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
+    override var agentStreamHandler: AgentStreamHandler? = null
 
     // ── 生命周期 ──
 
@@ -361,12 +362,22 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                             if (stream.done) {
                                 sendAck(stream.messageId, "agent")
                             }
-                            listener.onAgentStreamChunk(
-                                messageId = stream.messageId,
-                                fullContent = stream.chunk,
-                                done = stream.done,
-                                error = stream.error
-                            )
+                            val handler = agentStreamHandler
+                            if (handler != null) {
+                                handler.onAgentStreamChunk(
+                                    messageId = stream.messageId,
+                                    fullContent = stream.chunk,
+                                    done = stream.done,
+                                    error = stream.error
+                                )
+                            } else {
+                                listener.onAgentStreamChunk(
+                                    messageId = stream.messageId,
+                                    fullContent = stream.chunk,
+                                    done = stream.done,
+                                    error = stream.error
+                                )
+                            }
                         }
                     }
                 }

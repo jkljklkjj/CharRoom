@@ -82,6 +82,11 @@ interface ChatTransport {
     fun removeAuthStateListener(listener: AuthStateListener)
 
     /**
+     * Agent 流式消息回调（绕过 listener 遍历，直接 dispatch）
+     */
+    var agentStreamHandler: AgentStreamHandler?
+
+    /**
      * 服务器连接状态
      */
     val isServerConnected: Boolean
@@ -113,6 +118,13 @@ interface MessageReceiveListener {
      * @param conversationId 会话 ID
      */
     fun onAckReceived(messageId: String, seqId: Long, conversationId: String) {}
+}
+
+/**
+ * Agent 流式消息回调函数类型
+ */
+fun interface AgentStreamHandler {
+    fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean)
 }
 
 /**

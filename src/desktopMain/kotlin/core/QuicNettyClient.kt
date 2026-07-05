@@ -35,6 +35,11 @@ class QuicNettyClient {
     /** 事件监听器 */
     var listener: Listener? = null
 
+    /** Stream 数据处理器（connect 时初始化，openStream 时复用） */
+    private var _streamHandler: QuicStreamInitializer? = null
+    private val streamHandler: QuicStreamInitializer
+        get() = _streamHandler ?: throw IllegalStateException("QUIC 未连接，streamHandler 未初始化")
+
     interface Listener {
         fun onConnected()
         fun onDisconnected(cause: Throwable?)
@@ -59,7 +64,8 @@ class QuicNettyClient {
             throw e
         }
 
-        val streamInitializer = QuicStreamInitializer(
+        // stream handler 提为字段，供 connect() 和 openStream() 共用
+        _streamHandler = QuicStreamInitializer(
             onStreamFrame = { streamId, data -> listener?.onStreamFrame(streamId, data) },
             onStreamInactive = { streamId -> streams.remove(streamId) }
         )
@@ -106,10 +112,9 @@ class QuicNettyClient {
             throw e
         }
 
-        quicChannel = createQuicConnection(datagramChannel!!, address, streamInitializer)
+        quicChannel = createQuicConnection(datagramChannel!!, address, _streamHandler!!)
 
         log.info("QUIC 连接已建立: {}:{}", host, port)
-        log.info("QUIC listener 是否为 null: {}", listener == null)
         listener?.onConnected()
     }
 
@@ -139,10 +144,7 @@ class QuicNettyClient {
         val qCh = quicChannel ?: throw IllegalStateException("Not connected")
         val f = qCh.newStreamBootstrap()
             .type(QuicStreamType.BIDIRECTIONAL)
-            .handler(QuicStreamInitializer(
-                onStreamFrame = { streamId, data -> listener?.onStreamFrame(streamId, data) },
-                onStreamInactive = { streamId -> streams.remove(streamId) }
-            ))
+            .handler(streamHandler)
             .create()
         f.awaitUninterruptibly()
         val stream = f.getNow()

@@ -37,6 +37,7 @@ import component.dialog.ApplicationDialog
 import component.user.UserDetailScreen
 import component.user.UserList
 import component.user.ProfileScreen
+import core.AgentStreamHandler
 import core.Chat
 import core.MessageReceiveListener
 import core.state.GlobalAppState
@@ -89,23 +90,15 @@ fun ChatApp(
     LaunchedEffect(Unit) {
         val currentToken = GlobalAppState.currentToken
         if (currentToken.isNullOrBlank()) {
-            println("[ChatApp] 错误：启动QUIC前token为空，请先登录")
             return@LaunchedEffect
         }
-        println("[ChatApp] 准备启动QUIC连接，token长度: ${currentToken.length}, userId: ${GlobalAppState.currentUserId}")
-        println("[ChatApp] Chat 实例: $Chat")
-        println("[ChatApp] Chat 是否已连接: ${Chat.isConnected()}")
         if (!Chat.isConnected()) {
-            println("[ChatApp] 开始启动QUIC连接...")
             Chat.start() // 启动QUIC连接，触发握手流程，此时header会携带token
-            println("[ChatApp] QUIC连接启动完成")
         }
 
-        println("[ChatApp] 注册消息监听器...")
         // 注册全局消息接收监听器
         Chat.addMessageReceiveListener(object : MessageReceiveListener {
             override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long) {
-                println("[ChatApp] 收到私聊消息：senderId=$senderId, content=$message, timestamp=$timestamp")
                 // 构建消息对象并添加到聊天状态
                 val chatMessage = Message(
                     senderId = senderId,
@@ -126,7 +119,6 @@ fun ChatApp(
                 message: String,
                 timestamp: Long
             ) {
-                println("[ChatApp] 收到群聊消息：groupId=$groupId, senderId=$senderId, senderName=$senderName, content=$message, timestamp=$timestamp")
                 // 构建群聊消息对象并添加到聊天状态
                 val groupMessage = model.GroupMessage(
                     groupId = groupId,
@@ -139,13 +131,12 @@ fun ChatApp(
                 )
                 chatViewModel.addGroupMessage(groupMessage)
             }
-
-            override fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean) {
-                println("[ChatApp] 收到Agent流式消息：messageId=$messageId, content=$fullContent, done=$done")
-                chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
-            }
         })
-        println("[ChatApp] 消息监听器注册完成")
+
+        // Agent 流式消息：独立回调，不走 listener 遍历
+        Chat.agentStreamHandler = AgentStreamHandler { messageId, fullContent, done, _ ->
+            chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
+        }
 
         chatViewModel.loadContacts()
 

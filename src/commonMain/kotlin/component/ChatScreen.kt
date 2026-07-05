@@ -72,6 +72,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -1065,8 +1066,8 @@ private fun ChatScreenContent(
                                             isInputFocused = false
                                         }
                                     }
-                                    .onKeyEvent { event ->
-                                        if (event.type == KeyEventType.KeyUp && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
+                                    .onPreviewKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
                                             submitMessage()
                                             true
                                         } else {
@@ -1100,7 +1101,6 @@ private fun ChatScreenContent(
                                 .graphicsLayer {
                                     scaleX = sendScale
                                     scaleY = sendScale
-                                    shadowElevation = if (isSendEnabled) 4f else 0f
                                 },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(

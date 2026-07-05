@@ -227,11 +227,14 @@ open class ChatViewModel(
                     messageId = messageId
                 )
                 chatState.addMessage(agentMessage)
-            } else if (existingMessage.message != fullContent) {
-                chatState.updateMessage(existingMessage.copy(message = fullContent))
             } else {
-                // 内容未变化时跳过，避免无效重组
-                return@launch
+                // 追加 chunk 到已有内容（服务端每次只发一个片段）
+                val appended = existingMessage.message + fullContent
+                if (appended != existingMessage.message) {
+                    chatState.updateMessage(existingMessage.copy(message = appended))
+                } else {
+                    return@launch
+                }
             }
 
             launch(Dispatchers.IO) {
