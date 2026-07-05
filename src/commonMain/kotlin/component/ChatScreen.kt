@@ -11,9 +11,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -43,13 +39,8 @@ import androidx.compose.material.AlertDialog
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.Text
-import androidx.compose.material.TextField
-import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -64,27 +55,14 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isShiftPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.delay
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -93,23 +71,17 @@ import kotlinx.coroutines.withContext
 import model.Message
 import model.MessageType
 import model.User
-import component.chat.formatTime
-import component.chat.formatDate
 import component.chat.isSameDay
-import component.chat.formatFileSize
 import component.chat.DateSeparator
+import component.chat.MessageBubble
+import component.chat.ChatInputBar
 import core.FileUploader
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.IconButton
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.ImageBitmap
 import component.io.FilePicker
 import component.UserAvatar
 import core.LocalChatHistoryStore
 import core.ServerConfig
-import core.loadImageBitmapWithCache
 import core.state.GlobalAppState
 import core.state.GlobalChatState
 import presentation.viewmodel.ChatViewModel
@@ -281,8 +253,6 @@ private fun ChatScreenContent(
             listState.scrollToItem(displayMessages.lastIndex)
         }
     }
-    val inputFocusRequester = remember { FocusRequester() }
-    var isInputFocused by remember { mutableStateOf(false) }
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
     // 当输入法弹起时（IME 可见），稍等布局稳定后贴底最新消息，解决键盘弹起后气泡未跟随的问题
@@ -680,26 +650,7 @@ private fun ChatScreenContent(
                 ) { index, message ->
                     // 显示日期分隔线
                     if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Surface(
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(12.dp),
-                                elevation = 0.dp,
-                                modifier = Modifier.shadow(1.dp, RoundedCornerShape(12.dp))
-                            ) {
-                                Text(
-                                    text = formatDate(message.timestamp),
-                                    style = MaterialTheme.typography.caption,
-                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                        DateSeparator(timestamp = message.timestamp)
                     }
 
                     // 动画规则：仅新消息（页面打开后新收到/新发送的）显示弹出动画
@@ -735,219 +686,57 @@ private fun ChatScreenContent(
                         modifier = Modifier
                             .fillMaxWidth()
                     ) {
-                        val bubbleBorderColor = if (message.sender) {
-                            Color.Transparent
-                        } else {
-                            MaterialTheme.colors.primary.copy(alpha = if (isDarkMode) 0.24f else 0.14f)
-                        }
-                        val bubbleTextColor = if (message.sender) {
-                            MaterialTheme.colors.onPrimary
-                        } else {
-                            MaterialTheme.colors.onSurface
-                        }
-                        val bubbleShape = bubbleShape(message.sender)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = if (message.sender) Arrangement.End else Arrangement.Start
-                        ) {
-                                    Row(verticalAlignment = Alignment.Bottom) {
-                                if (message.sender && !message.isSent) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = s["chat.resend"],
-                                        tint = MaterialTheme.colors.secondary,
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clickable { resendMessage(chatViewModel, user, message) }
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                }
-
-                                // If message is from the other user, show their avatar on the left
-                                if (!message.sender) {
-                                    // 消息头像：使用统一的头像组件
+                        Column {
+                            MessageBubble(
+                                message = message,
+                                isMine = message.sender,
+                                isDarkMode = isDarkMode,
+                                maxBubbleWidth = maxBubbleWidth,
+                                bubbleBrush = refinedMessageBubbleBrush(message.sender, isDarkMode),
+                                showTimestamp = true,
+                                senderAvatar = {
                                     UserAvatar(
                                         user = user,
                                         size = 32.dp,
                                         onClick = { onAvatarClick?.invoke(user) }
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .widthIn(max = maxBubbleWidth)
-                                        .shadow(
-                                            elevation = if (message.sender) 6.dp else 3.dp,
-                                            shape = RoundedCornerShape(18.dp),
-                                            ambientColor = Color.Black.copy(alpha = 0.1f),
-                                            spotColor = Color.Black.copy(alpha = 0.08f)
-                                        )
-                                        .clip(bubbleShape)
-                                        .background(refinedMessageBubbleBrush(message.sender, isDarkMode))
-                                        .border(1.dp, bubbleBorderColor, bubbleShape)
-                                        .combinedClickable(
-                                            onClick = {},
-                                            onLongClick = {
-                                                longPressMessage = message
-                                                showLongPressMenu = true
-                                            }
-                                        )
-                                        .let {
-                                            // 发送中的消息添加半透明效果
-                                            if (message.sender && !message.isSent) {
-                                                it.alpha(0.7f)
-                                            } else {
-                                                it
-                                            }
-                                        }
-                                        .padding(horizontal = 11.dp, vertical = 9.dp)
-                                ) {
-                                    Column {
-                                        // 显示引用的消息
-                                        message.replyToContent?.let { replyContent ->
-                                            Surface(
-                                                color = MaterialTheme.colors.surface.copy(alpha = 0.3f),
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(bottom = 6.dp)
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier.padding(8.dp)
-                                                ) {
-                                                    Text(
-                                                        text = s["chat.reply.to"].format(message.replyToSender.orEmpty()),
-                                                        style = MaterialTheme.typography.caption,
-                                                        color = MaterialTheme.colors.primary,
-                                                        maxLines = 1
-                                                    )
-                                                    Text(
-                                                        text = replyContent,
-                                                        style = MaterialTheme.typography.body2,
-                                                        color = bubbleTextColor.copy(alpha = 0.8f),
-                                                        maxLines = 2,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // 消息内容
-                                        when (message.messageType) {
-                                            MessageType.TEXT -> {
-                                                Text(
-                                                    text = message.message,
-                                                    style = MaterialTheme.typography.body1,
-                                                    color = bubbleTextColor
-                                                )
-                                            }
-                                            MessageType.IMAGE -> {
-                                                message.fileUrl?.let { url ->
-                                                    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-                                                    LaunchedEffect(url) {
-                                                        imageBitmap = loadImageBitmapWithCache(url, url)
-                                                    }
-                                                    imageBitmap?.let { bitmap ->
-                                                        Image(
-                                                            bitmap = bitmap,
-                                                            contentDescription = s["chat.image"],
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .heightIn(max = 200.dp)
-                                                                .clip(RoundedCornerShape(8.dp))
-                                                        )
-                                                    } ?: Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(150.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        CircularProgressIndicator(
-                                                            modifier = Modifier.size(24.dp),
-                                                            color = bubbleTextColor
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            MessageType.FILE -> {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.AttachFile,
-                                                        contentDescription = s["chat.file"],
-                                                        tint = bubbleTextColor,
-                                                        modifier = Modifier.size(24.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(
-                                                            text = message.fileName.orEmpty(),
-                                                            style = MaterialTheme.typography.body1,
-                                                            color = bubbleTextColor,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                        Text(
-                                                            text = formatFileSize(message.fileSize ?: 0),
-                                                            style = MaterialTheme.typography.caption,
-                                                            color = bubbleTextColor.copy(alpha = 0.7f)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // 气泡内时间戳
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = formatTime(message.timestamp),
-                                            style = MaterialTheme.typography.caption,
-                                            color = bubbleTextColor.copy(alpha = 0.6f),
-                                            modifier = Modifier.align(
-                                                if (message.sender) Alignment.End else Alignment.Start
-                                            )
-                                        )
-                                    }
-                                }
-
-                                // 如果是自己发送的消息，在右侧显示自己的头像
-                                if (message.sender) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    // 我的头像：使用统一的头像组件
-                                    if (currentUser != null) {
+                                },
+                                myAvatar = if (currentUser != null) {
+                                    {
                                         UserAvatar(
                                             user = currentUser!!,
                                             size = 32.dp,
                                             onClick = { onMyAvatarClick?.invoke() }
                                         )
                                     }
+                                } else null,
+                                onResend = { resendMessage(chatViewModel, user, message) },
+                                onLongClick = {
+                                    longPressMessage = message
+                                    showLongPressMenu = true
                                 }
+                            )
 
-                                // 长按菜单
-                                if (longPressMessage?.messageId == message.messageId) {
-                                    MessageLongPressMenu(
-                                        expanded = showLongPressMenu,
-                                        onDismiss = { showLongPressMenu = false },
-                                        message = message,
-                                        isSelf = message.sender,
-                                        onCopy = { copyMessage(message) },
-                                        onDelete = { deleteMessage(message) },
-                                        onForward = {
-                                            forwardMessage = message
-                                            showLongPressMenu = false
-                                            showForwardDialog = true
-                                        },
-                                        onReply = {
-                                            replyToMessage = message
-                                            showLongPressMenu = false
-                                        },
-                                        onShare = { /* shareText unavailable on Android */ }
-                                    )
-                                }
+                            // 长按菜单
+                            if (longPressMessage?.messageId == message.messageId) {
+                                MessageLongPressMenu(
+                                    expanded = showLongPressMenu,
+                                    onDismiss = { showLongPressMenu = false },
+                                    message = message,
+                                    isSelf = message.sender,
+                                    onCopy = { copyMessage(message) },
+                                    onDelete = { deleteMessage(message) },
+                                    onForward = {
+                                        forwardMessage = message
+                                        showLongPressMenu = false
+                                        showForwardDialog = true
+                                    },
+                                    onReply = {
+                                        replyToMessage = message
+                                        showLongPressMenu = false
+                                    },
+                                    onShare = { /* shareText unavailable on Android */ }
+                                )
                             }
                         }
                     }
@@ -983,161 +772,32 @@ private fun ChatScreenContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         Column {
-            // 引用回复预览栏
-            ReplyPreviewBar(
-                replyToMessage = replyToMessage,
-                senderName = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
-                onCancel = { replyToMessage = null }
-            )
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.36f else 0.8f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.06f)),
-                elevation = 0.dp
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 表情按钮
-                        val emojiInteraction = remember { MutableInteractionSource() }
-                        val emojiScale = rememberElasticScale(emojiInteraction, pressedScale = 0.86f)
-                        IconButton(
-                            onClick = { showEmojiPanel = !showEmojiPanel },
-                            interactionSource = emojiInteraction,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .graphicsLayer { scaleX = emojiScale; scaleY = emojiScale }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEmotions,
-                                contentDescription = s["chat.emoji"],
-                                tint = MaterialTheme.colors.primary.copy(alpha = 0.7f)
-                            )
-                        }
-
-                        // 附件按钮
-                        val attachInteraction = remember { MutableInteractionSource() }
-                        val attachScale = rememberElasticScale(attachInteraction, pressedScale = 0.86f)
-                        IconButton(
-                            onClick = { pickImage() },
-                            interactionSource = attachInteraction,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .graphicsLayer { scaleX = attachScale; scaleY = attachScale },
-                            enabled = !isUploading && !isSending
-                        ) {
-                            if (isUploading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colors.primary
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.AttachFile,
-                                    contentDescription = s["chat.attachment"],
-                                    tint = MaterialTheme.colors.primary.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-
-                        // 输入框背景容器
-                        Surface(
-                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = 0.dp
-                        ) {
-                            TextField(
-                                value = messageText,
-                                onValueChange = { messageText = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(inputFocusRequester)
-                                    .onFocusChanged { state ->
-                                        val focused = state.isFocused
-                                        if (focused && !isInputFocused) {
-                                            isInputFocused = true
-                                            scope.launch {
-                                                if (filteredMessages.isNotEmpty()) {
-                                                    listState.animateScrollToItem(filteredMessages.lastIndex)
-                                                }
-                                            }
-                                        } else if (!focused) {
-                                            isInputFocused = false
-                                        }
-                                    }
-                                    .onPreviewKeyEvent { event ->
-                                        if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
-                                            submitMessage()
-                                            true
-                                        } else {
-                                            false
-                                        }
-                                    },
-                                placeholder = { Text(s["chat.placeholder"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
-                                colors = TextFieldDefaults.textFieldColors(
-                                    backgroundColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    cursorColor = MaterialTheme.colors.primary
-                                ),
-                                maxLines = 5,
-                                textStyle = MaterialTheme.typography.body1
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(4.dp))
-
-                        // 发送按钮 - 带渐变和阴影
-                        val sendInteraction = remember { MutableInteractionSource() }
-                        val sendScale = rememberElasticScale(sendInteraction, pressedScale = 0.9f)
-                        val isSendEnabled = !isSending && (messageText.isNotBlank() || replyToMessage != null)
-                        Button(
-                            onClick = { submitMessage() },
-                            enabled = isSendEnabled,
-                            interactionSource = sendInteraction,
-                            modifier = Modifier
-                                .height(36.dp)
-                                .graphicsLayer {
-                                    scaleX = sendScale
-                                    scaleY = sendScale
-                                },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                backgroundColor = MaterialTheme.colors.primary,
-                                contentColor = MaterialTheme.colors.onPrimary,
-                                disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.35f)
-                            )
-                        ) {
-                            if (isSending) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colors.onPrimary
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = s["chat.send"],
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // 表情面板
-                    if (showEmojiPanel) {
-                        EmojiPickerPanel(
-                            onEmojiSelected = ::onEmojiSelected,
-                            modifier = Modifier.fillMaxWidth()
+            ChatInputBar(
+                messageText = messageText,
+                onTextChange = { messageText = it },
+                onSubmit = { submitMessage() },
+                isSending = isSending,
+                isUploading = isUploading,
+                replyPreview = replyToMessage?.let { _ ->
+                    {
+                        ReplyPreviewBar(
+                            replyToMessage = replyToMessage,
+                            senderName = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
+                            onCancel = { replyToMessage = null }
                         )
                     }
-                }
+                },
+                onClearReply = { replyToMessage = null },
+                onEmojiClick = { showEmojiPanel = !showEmojiPanel },
+                onAttachClick = { pickImage() }
+            )
+
+            // 表情面板
+            if (showEmojiPanel) {
+                EmojiPickerPanel(
+                    onEmojiSelected = ::onEmojiSelected,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

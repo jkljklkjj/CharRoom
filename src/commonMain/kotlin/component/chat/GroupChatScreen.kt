@@ -7,10 +7,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,28 +17,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.material.TextFieldDefaults
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -54,26 +40,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isShiftPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.delay
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -84,30 +58,17 @@ import model.GroupMessage
 import model.MessageType
 import model.User
 import core.FileUploader
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material.IconButton
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.ImageBitmap
 import component.io.FilePicker
 import core.LocalChatHistoryStore
-import core.ServerConfig
-import core.loadImageBitmapWithCache
 import component.MessageLongPressMenu
 import component.ReplyPreviewBar
 import component.EmojiPickerPanel
 import component.ForwardSelectDialog
 import component.chatHeaderBrush
 import component.messageBubbleBrush
-import component.rememberElasticScale
-import component.sidebarHeaderBrush
 import com.chatlite.i18n.LocalStrings
-import com.chatlite.i18n.currentStrings
-import core.GlobalApiService
 import core.state.GlobalAppState
 import model.Message
-import model.MessageIdGenerator
 import presentation.viewmodel.ChatViewModel
 
 /**
@@ -157,8 +118,6 @@ fun GroupChatScreen(
     }
     var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val inputFocusRequester = remember { FocusRequester() }
-    var isInputFocused by remember { mutableStateOf(false) }
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
     // 键盘弹起时滚动到底部，等待布局稳定后执行
@@ -466,26 +425,7 @@ fun GroupChatScreen(
 
                     // 显示日期分隔线
                     if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Surface(
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(12.dp),
-                                elevation = 0.dp,
-                                modifier = Modifier.shadow(1.dp, RoundedCornerShape(12.dp))
-                            ) {
-                                Text(
-                                    text = formatDate(message.timestamp),
-                                    style = MaterialTheme.typography.caption,
-                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                        DateSeparator(timestamp = message.timestamp)
                     }
 
                     // 动画规则：仅新消息（页面打开后新收到/新发送的）显示弹出动画
@@ -510,307 +450,83 @@ fun GroupChatScreen(
                                 stiffness = Spring.StiffnessLow
                             )
                         ) else fadeIn(initialAlpha = 1f), // 历史消息无动画直接显示
-                        modifier = Modifier
-                            .fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        val bubbleBorderColor = if (isMine) {
-                            Color.Transparent
-                        } else {
-                            MaterialTheme.colors.primary.copy(alpha = if (isDarkMode) 0.24f else 0.14f)
-                        }
-                        val bubbleTextColor = if (isMine) {
-                            MaterialTheme.colors.onPrimary
-                        } else {
-                            MaterialTheme.colors.onSurface
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
-                        ) {
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                if (isMine && !message.isSent) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = s["chat.resend"],
-                                        tint = MaterialTheme.colors.secondary,
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clickable { resendGroupMessage(chatViewModel, group, message) }
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                }
-
-                                // If message is from others, show their avatar on the left
-                                if (!isMine) {
-                                    val senderUser = allUsers.find { it.id == message.senderId }
-                                    var senderAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
-                                        LaunchedEffect(senderUser?.avatarUrl, senderUser?.avatarKey, isViewportReady) {
-                                            senderAvatar = if (isViewportReady && senderUser != null && !senderUser.avatarUrl.isNullOrBlank()) {
-                                            loadImageBitmapWithCache(senderUser.avatarUrl, senderUser.avatarKey)
-                                        } else {
-                                            null
-                                        }
-                                    }
-                                    if (senderAvatar != null) {
-                                        Image(
-                                            bitmap = senderAvatar!!,
-                                            contentDescription = "avatar",
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .clickable {
-                                                    senderUser?.let { onAvatarClick?.invoke(it) }
-                                                }
+                        Column {
+                            MessageBubble(
+                                message = message,
+                                isMine = isMine,
+                                isDarkMode = isDarkMode,
+                                maxBubbleWidth = maxBubbleWidth,
+                                bubbleBrush = messageBubbleBrush(isMine, isDarkMode),
+                                showSenderName = true,
+                                senderName = message.senderName,
+                                showTimestamp = false,
+                                senderAvatar = if (!isMine) {
+                                    {
+                                        val senderUser = allUsers.find { it.id == message.senderId }
+                                        AvatarImage(
+                                            avatarUrl = senderUser?.avatarUrl,
+                                            avatarKey = senderUser?.avatarKey,
+                                            isViewportReady = isViewportReady,
+                                            onClick = { senderUser?.let { onAvatarClick?.invoke(it) } }
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                    } else {
-                                        // 如果对方没有头像，展示首字母占位符，保持布局一致
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                    brush = sidebarHeaderBrush(isDarkMode),
-                                                    shape = CircleShape
-                                                )
-                                                .clickable {
-                                                    senderUser?.let { onAvatarClick?.invoke(it) }
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = message.senderName.firstOrNull()?.toString() ?: "U",
-                                                color = Color.White,
-                                                style = MaterialTheme.typography.caption
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(8.dp))
                                     }
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .widthIn(max = maxBubbleWidth) // 最大宽度为屏幕的40%，内容短自动适配
-                                        .shadow(
-                                            elevation = if (isMine) 4.dp else 2.dp,
-                                            shape = RoundedCornerShape(18.dp)
+                                } else null,
+                                myAvatar = if (isMine) {
+                                    {
+                                        AvatarImage(
+                                            avatarUrl = currentUser?.avatarUrl,
+                                            avatarKey = currentUser?.avatarKey,
+                                            isViewportReady = isViewportReady,
+                                            onClick = { onMyAvatarClick?.invoke() }
                                         )
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(messageBubbleBrush(isMine, isDarkMode))
-                                        .border(1.dp, bubbleBorderColor, RoundedCornerShape(18.dp))
-                                        .combinedClickable(
-                                            onClick = {},
-                                            onLongClick = {
-                                                longPressMessage = message
-                                                showLongPressMenu = true
-                                            }
-                                        )
-                                        .let {
-                                            // 发送中的消息添加半透明效果
-                                            if (isMine && !message.isSent) {
-                                                it.alpha(0.7f)
-                                            } else {
-                                                it
-                                            }
-                                        }
-                                        .padding(horizontal = 11.dp, vertical = 9.dp)
-                                ) {
-                                    Column {
-                                        // 显示发送者名称（非自己发送的消息）
-                                        if (!isMine) {
-                                            Text(
-                                                text = message.senderName,
-                                                style = MaterialTheme.typography.caption,
-                                                color = MaterialTheme.colors.primary,
-                                                modifier = Modifier.padding(bottom = 4.dp)
-                                            )
-                                        }
-
-                                        // 显示引用的消息
-                                        message.replyToContent?.let { replyContent ->
-                                            Surface(
-                                                color = MaterialTheme.colors.surface.copy(alpha = 0.3f),
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(bottom = 6.dp)
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier.padding(8.dp)
-                                                ) {
-                                                    Text(
-                                                        text = s["chat.reply.to"].format(message.replyToSender.orEmpty()),
-                                                        style = MaterialTheme.typography.caption,
-                                                        color = MaterialTheme.colors.primary,
-                                                        maxLines = 1
-                                                    )
-                                                    Text(
-                                                        text = replyContent,
-                                                        style = MaterialTheme.typography.body2,
-                                                        color = bubbleTextColor.copy(alpha = 0.8f),
-                                                        maxLines = 2,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // 消息内容
-                                        when (message.messageType) {
-                                            MessageType.TEXT -> {
-                                                Text(
-                                                    text = message.text,
-                                                    style = MaterialTheme.typography.body1,
-                                                    color = bubbleTextColor
-                                                )
-                                            }
-                                            MessageType.IMAGE -> {
-                                                message.fileUrl?.let { url ->
-                                                    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-                                                    LaunchedEffect(url) {
-                                                        imageBitmap = loadImageBitmapWithCache(url, url)
-                                                    }
-                                                    imageBitmap?.let { bitmap ->
-                                                        Image(
-                                                            bitmap = bitmap,
-                                                            contentDescription = s["chat.image"],
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .heightIn(max = 200.dp)
-                                                                .clip(RoundedCornerShape(8.dp))
-                                                        )
-                                                    } ?: Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(150.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        CircularProgressIndicator(
-                                                            modifier = Modifier.size(24.dp),
-                                                            color = bubbleTextColor
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            MessageType.FILE -> {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.AttachFile,
-                                                        contentDescription = s["chat.file"],
-                                                        tint = bubbleTextColor,
-                                                        modifier = Modifier.size(24.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(
-                                                            text = message.fileName.orEmpty(),
-                                                            style = MaterialTheme.typography.body1,
-                                                            color = bubbleTextColor,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                        Text(
-                                                            text = formatFileSize(message.fileSize ?: 0),
-                                                            style = MaterialTheme.typography.caption,
-                                                            color = bubbleTextColor.copy(alpha = 0.7f)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // 已移除聊天气泡内的时间戳显示
                                     }
+                                } else null,
+                                onResend = { resendGroupMessage(chatViewModel, group, message) },
+                                onLongClick = {
+                                    longPressMessage = message
+                                    showLongPressMenu = true
                                 }
+                            )
 
-                                // 如果是自己发送的消息，在右侧显示自己的头像
-                                if (isMine) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    var myAvatar by remember { mutableStateOf<ImageBitmap?>(null) }
-                                    LaunchedEffect(currentUser?.avatarUrl, currentUser?.avatarKey, isViewportReady) {
-                                        val user = currentUser
-                                        myAvatar = if (isViewportReady && user != null && !user.avatarUrl.isNullOrBlank()) {
-                                            loadImageBitmapWithCache(user.avatarUrl, user.avatarKey)
-                                        } else {
-                                            null
-                                        }
-                                    }
-                                    if (myAvatar != null) {
-                                        Image(
-                                            bitmap = myAvatar!!,
-                                            contentDescription = s["user.my.avatar"],
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .clickable {
-                                                    onMyAvatarClick?.invoke()
-                                                }
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                    brush = sidebarHeaderBrush(isDarkMode),
-                                                    shape = CircleShape
-                                                )
-                                                .clickable {
-                                                    onMyAvatarClick?.invoke()
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = currentUser?.username?.firstOrNull()?.toString() ?: s["chat.me"],
-                                                color = Color.White,
-                                                style = MaterialTheme.typography.caption
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // 长按菜单
-                                if (longPressMessage?.messageId == message.messageId) {
-                                    // 将GroupMessage转换为Message适配公共组件
-                                    val adapterMessage = Message(
-                                        senderId = message.senderId,
-                                        message = message.text,
-                                        sender = isMine,
-                                        receiverId = group.id,
-                                        timestamp = message.timestamp,
-                                        isSent = message.isSent,
-                                        messageId = message.messageId,
-                                        replyToMessageId = message.replyToMessageId,
-                                        replyToContent = message.replyToContent,
-                                        replyToSender = message.replyToSender,
-                                        messageType = message.messageType,
-                                        fileUrl = message.fileUrl,
-                                        fileName = message.fileName,
-                                        fileSize = message.fileSize
-                                    )
-                                    MessageLongPressMenu(
-                                        expanded = showLongPressMenu,
-                                        onDismiss = { showLongPressMenu = false },
-                                        message = adapterMessage,
-                                        isSelf = isMine,
-                                        onCopy = { copyMessage(message) },
-                                        onDelete = { deleteMessage(message) },
-                                        onForward = {
-                                            forwardMessage = message
-                                            showLongPressMenu = false
-                                            showForwardDialog = true
-                                        },
-                                        onReply = {
-                                            replyToMessage = message
-                                            showLongPressMenu = false
-                                        },
-                                        onShare = { /* shareText unavailable on Android */ }
-                                    )
-                                }
+                            // 长按菜单
+                            if (longPressMessage?.messageId == message.messageId) {
+                                // 将GroupMessage转换为Message适配公共组件
+                                val adapterMessage = Message(
+                                    senderId = message.senderId,
+                                    message = message.text,
+                                    sender = isMine,
+                                    receiverId = group.id,
+                                    timestamp = message.timestamp,
+                                    isSent = message.isSent,
+                                    messageId = message.messageId,
+                                    replyToMessageId = message.replyToMessageId,
+                                    replyToContent = message.replyToContent,
+                                    replyToSender = message.replyToSender,
+                                    messageType = message.messageType,
+                                    fileUrl = message.fileUrl,
+                                    fileName = message.fileName,
+                                    fileSize = message.fileSize
+                                )
+                                MessageLongPressMenu(
+                                    expanded = showLongPressMenu,
+                                    onDismiss = { showLongPressMenu = false },
+                                    message = adapterMessage,
+                                    isSelf = isMine,
+                                    onCopy = { copyMessage(message) },
+                                    onDelete = { deleteMessage(message) },
+                                    onForward = {
+                                        forwardMessage = message
+                                        showLongPressMenu = false
+                                        showForwardDialog = true
+                                    },
+                                    onReply = {
+                                        replyToMessage = message
+                                        showLongPressMenu = false
+                                    },
+                                    onShare = { /* shareText unavailable on Android */ }
+                                )
                             }
                         }
                     }
@@ -856,153 +572,49 @@ fun GroupChatScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Column {
-            // 引用回复预览栏
-            replyToMessage?.let { msg ->
-                // 将GroupMessage转换为Message适配公共组件
-                val adapterMessage = Message(
-                    senderId = msg.senderId,
-                    message = msg.text,
-                    sender = msg.senderId == GlobalAppState.currentUserId,
-                    receiverId = group.id,
-                    timestamp = msg.timestamp,
-                    isSent = msg.isSent,
-                    messageId = msg.messageId,
-                    replyToMessageId = msg.replyToMessageId,
-                    replyToContent = msg.replyToContent,
-                    replyToSender = msg.replyToSender,
-                    messageType = msg.messageType,
-                    fileUrl = msg.fileUrl,
-                    fileName = msg.fileName,
-                    fileSize = msg.fileSize
-                )
-                ReplyPreviewBar(
-                    replyToMessage = adapterMessage,
-                    senderName = msg.senderName.orEmpty(),
-                    onCancel = { replyToMessage = null }
-                )
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.36f else 0.8f),
-                shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-                elevation = 0.dp
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 表情按钮
-                        IconButton(
-                            onClick = { showEmojiPanel = !showEmojiPanel },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEmotions,
-                                contentDescription = s["chat.emoji"],
-                                tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
-
-                        // 附件按钮
-                        IconButton(
-                            onClick = {
-                                // 弹出选择菜单：图片/文件
-                                // 这里简化处理，先选择图片，后续可以扩展
-                                pickImage()
-                            },
-                            modifier = Modifier.size(40.dp),
-                            enabled = !isUploading && !isSending
-                        ) {
-                            if (isUploading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colors.primary
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.AttachFile,
-                                    contentDescription = s["chat.attachment"],
-                                    tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-
-                        TextField(
-                            value = messageText,
-                            onValueChange = { messageText = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(inputFocusRequester)
-                                .onFocusChanged { state ->
-                                    val focused = state.isFocused
-                                    if (focused && !isInputFocused) {
-                                        isInputFocused = true
-                                        scope.launch {
-                                            if (filteredMessages.isNotEmpty()) {
-                                                listState.animateScrollToItem(filteredMessages.lastIndex)
-                                            }
-                                        }
-                                    } else if (!focused) {
-                                        isInputFocused = false
-                                    }
-                                }
-                                .onPreviewKeyEvent { event ->
-                                    if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && !event.isShiftPressed && !isSending) {
-                                        submitMessage()
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                },
-                            placeholder = { Text(s["chat.placeholder"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)) },
-                            colors = TextFieldDefaults.textFieldColors(
-                                backgroundColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            maxLines = 5, // 最多显示5行，超过后滚动
-                            textStyle = MaterialTheme.typography.body1
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        val sendInteraction = remember { MutableInteractionSource() }
-                        val sendScale = rememberElasticScale(sendInteraction, pressedScale = 0.9f)
-                        Button(
-                            onClick = { submitMessage() },
-                            enabled = !isSending && (messageText.isNotBlank() || replyToMessage != null),
-                            interactionSource = sendInteraction,
-                            modifier = Modifier
-                                .height(42.dp)
-                                .graphicsLayer {
-                                    scaleX = sendScale
-                                    scaleY = sendScale
-                                },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                backgroundColor = MaterialTheme.colors.primary,
-                                contentColor = MaterialTheme.colors.onPrimary,
-                                disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
-                            )
-                        ) {
-                            Text(if (isSending) s["chat.sending"] else s["chat.send"])
-                        }
-                    }
-
-                    // 表情面板
-                    if (showEmojiPanel) {
-                        EmojiPickerPanel(
-                            onEmojiSelected = ::onEmojiSelected,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+        // 聊天输入框
+        ChatInputBar(
+            messageText = messageText,
+            onTextChange = { messageText = it },
+            onSubmit = { submitMessage() },
+            isSending = isSending,
+            isUploading = isUploading,
+            replyPreview = replyToMessage?.let { msg ->
+                {
+                    // 将GroupMessage转换为Message适配公共组件
+                    val adapterMessage = Message(
+                        senderId = msg.senderId,
+                        message = msg.text,
+                        sender = msg.senderId == GlobalAppState.currentUserId,
+                        receiverId = group.id,
+                        timestamp = msg.timestamp,
+                        isSent = msg.isSent,
+                        messageId = msg.messageId,
+                        replyToMessageId = msg.replyToMessageId,
+                        replyToContent = msg.replyToContent,
+                        replyToSender = msg.replyToSender,
+                        messageType = msg.messageType,
+                        fileUrl = msg.fileUrl,
+                        fileName = msg.fileName,
+                        fileSize = msg.fileSize
+                    )
+                    ReplyPreviewBar(
+                        replyToMessage = adapterMessage,
+                        senderName = msg.senderName.orEmpty(),
+                        onCancel = { replyToMessage = null }
+                    )
                 }
-            }
+            },
+            onEmojiClick = { showEmojiPanel = !showEmojiPanel },
+            onAttachClick = { pickImage() }
+        )
+
+        // 表情面板
+        if (showEmojiPanel) {
+            EmojiPickerPanel(
+                onEmojiSelected = ::onEmojiSelected,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 
@@ -1075,4 +687,3 @@ fun resendGroupMessage(chatViewModel: ChatViewModel, group: Group, message: Grou
 }
 
 // formatTime, formatDate, isSameDay, formatFileSize 已提取到 component.chat.ChatUtils
-

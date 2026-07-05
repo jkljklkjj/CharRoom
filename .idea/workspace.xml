@@ -9,9 +9,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="优化包结构">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="优化包结构" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -817,7 +815,7 @@
       <workItem from="1783167149308" duration="4850000" />
       <workItem from="1783173410674" duration="6043000" />
       <workItem from="1783210593310" duration="8967000" />
-      <workItem from="1783232511829" duration="7768000" />
+      <workItem from="1783232511829" duration="8138000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />
