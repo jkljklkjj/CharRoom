@@ -59,20 +59,25 @@ class QuicNettyClient {
             throw e
         }
 
-        val streamInitializer = QuicStreamInitializer { streamId, data ->
-            listener?.onStreamFrame(streamId, data)
-        }
+        val streamInitializer = QuicStreamInitializer(
+            onStreamFrame = { streamId, data -> listener?.onStreamFrame(streamId, data) },
+            onStreamInactive = { streamId -> streams.remove(streamId) }
+        )
 
         val codec = try {
             QuicClientCodecBuilder()
                 .sslContext(sslCtx)
-                .maxIdleTimeout(30000, TimeUnit.MILLISECONDS)
-                .initialCongestionWindowPackets(2)
+                // 与服务端对齐：QUIC 取双方 min，客户端必须和服务端一致或更大
+                .maxIdleTimeout(600_000, TimeUnit.MILLISECONDS)        // 10 min，与服务端对齐
+                .initialCongestionWindowPackets(10)                    // 与服务端 QuicProperties 对齐
                 .congestionControlAlgorithm(QuicCongestionControlAlgorithm.BBR)
-                // 服务端使用 Http3.newQuicServerCodecBuilder，需要创建 HTTP/3 控制流（unidirectional）
-                .initialMaxStreamsUnidirectional(100)
-                // 同时允许足够多的双向流（会话流复用）
-                .initialMaxStreamsBidirectional(100)
+                // 流量控制：必须显式设正值，默认 0 = 对端不能发数据
+                .initialMaxData(16_777_216L)                         // 连接级 16 MB
+                .initialMaxStreamDataBidirectionalLocal(4_194_304L)   // 服务端→客户端 4 MB
+                .initialMaxStreamDataBidirectionalRemote(4_194_304L)  // 客户端→服务端 4 MB
+                // 流数量：与服务端对齐，支持多会话并发
+                .initialMaxStreamsBidirectional(256)
+                .initialMaxStreamsUnidirectional(128)
                 .build()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -134,9 +139,10 @@ class QuicNettyClient {
         val qCh = quicChannel ?: throw IllegalStateException("Not connected")
         val f = qCh.newStreamBootstrap()
             .type(QuicStreamType.BIDIRECTIONAL)
-            .handler(QuicStreamInitializer { streamId, data ->
-                listener?.onStreamFrame(streamId, data)
-            })
+            .handler(QuicStreamInitializer(
+                onStreamFrame = { streamId, data -> listener?.onStreamFrame(streamId, data) },
+                onStreamInactive = { streamId -> streams.remove(streamId) }
+            ))
             .create()
         f.awaitUninterruptibly()
         val stream = f.getNow()

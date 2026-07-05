@@ -124,12 +124,12 @@ class QuicClientImpl : ChatTransport {
     private var lastHeartbeatSend = 0L
     private var hbSendInProgress = false
 
-    /** 自适应心跳间隔：基于 P90 RTT，范围 5-25s（服务端 idle timeout=30s）。 */
+    /** 自适应心跳间隔：基于 P90 RTT，范围 5-15s（服务端 alive-ttl=30s，留余量）。 */
     private fun adaptiveHbInterval(): Long {
-        if (rttWindow.size < 3) return 20_000L
+        if (rttWindow.size < 3) return 10_000L
         val sorted = rttWindow.sorted()
         val p90 = sorted[(sorted.size * 0.9).toInt().coerceAtMost(sorted.size - 1)]
-        return (p90 * 5).coerceIn(5_000, 25_000)
+        return (p90 * 3).coerceIn(5_000, 15_000)
     }
 
     /** 收到服务端响应时记录 RTT。 */
