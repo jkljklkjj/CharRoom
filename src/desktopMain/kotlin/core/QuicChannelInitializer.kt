@@ -24,19 +24,17 @@ class QuicStreamInitializer(
         ch.pipeline().addLast(object : SimpleChannelInboundHandler<ByteBuf>() {
             override fun channelRead0(ctx: ChannelHandlerContext, msg: ByteBuf) {
                 val readable = msg.readableBytes()
-                println("[StreamData] streamId=${ch.streamId()}, readableBytes=$readable")
-                if (readable < 4) {
-                    println("[StreamData] 数据不足 4 字节，跳过")
-                    return
-                }
+                if (readable < 4) return
                 val bytes = ByteArray(readable)
                 msg.readBytes(bytes)
-                val (payload, _) = QuicStreamProtocol.decodeFrame(bytes) ?: run {
-                    println("[StreamData] 帧解码失败: dataLen=$readable")
-                    return
+                // 循环解码：QUIC 流可能在一次 channelRead0 中包含多帧数据
+                var offset = 0
+                while (offset < bytes.size) {
+                    val result = QuicStreamProtocol.decodeFrame(bytes, offset) ?: break
+                    val (payload, consumed) = result
+                    onStreamFrame(ch.streamId(), payload)
+                    offset += consumed
                 }
-                println("[StreamData] 帧解码成功: payloadLen=${payload.size}")
-                onStreamFrame(ch.streamId(), payload)
             }
 
             override fun channelInactive(ctx: ChannelHandlerContext) {
