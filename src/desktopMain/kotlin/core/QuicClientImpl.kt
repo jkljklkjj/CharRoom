@@ -216,6 +216,8 @@ class QuicClientImpl : ChatTransport {
                                 val senderId = chat.userId.toIntOrNull() ?: return@forEach
                                 val text = chat.content
                                 val ts = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                                val myId = GlobalAppState.currentUserId ?: 0
+                                sendAckToServer(streamId, chat.messageId, "${minOf(myId, senderId)}:${maxOf(myId, senderId)}")
                                 log.info("分发私聊消息: senderId={}, text={}", senderId, text)
                                 listener.onPrivateMessageReceived(senderId, text, ts)
                             }
@@ -228,6 +230,7 @@ class QuicClientImpl : ChatTransport {
                                 val senderName = senderId.toString()
                                 val text = gc.content
                                 val ts = System.currentTimeMillis()
+                                sendAckToServer(streamId, gc.messageId, "group:$groupId")
                                 log.info("分发群聊消息: groupId={}, senderId={}", groupId, senderId)
                                 listener.onGroupMessageReceived(groupId, senderId, senderName, text, ts)
                             }
@@ -236,6 +239,9 @@ class QuicClientImpl : ChatTransport {
                             if (wrapper.hasAgentStream()) {
                                 val stream = wrapper.agentStream
                                 log.info("分发Agent流式消息: messageId={}, done={}", stream.messageId, stream.done)
+                                if (stream.done) {
+                                    sendAckToServer(streamId, stream.messageId, "agent")
+                                }
                                 listener.onAgentStreamChunk(
                                     messageId = stream.messageId,
                                     fullContent = stream.chunk,
@@ -253,6 +259,29 @@ class QuicClientImpl : ChatTransport {
                     log.error("解析 Stream 数据失败: streamId={}, dataLen={}, error={}", streamId, data.size, e.message)
                 }
             }
+        }
+    }
+
+    /**
+     * 向服务端发送 ACK，确认消息已收到。
+     * 服务端 PendingMessageManager 依赖 ACK 停止重发。
+     */
+    private fun sendAckToServer(streamId: Long, messageId: String, conversationId: String) {
+        try {
+            val ackMsg = com.chatlite.proto.MessageProtos.AckMessage.newBuilder()
+                .setMessageId(messageId)
+                .setSuccess(true)
+                .setConversationId(conversationId)
+                .build()
+            val ackWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
+                .setType(MsgType.ACK.wire)
+                .setAck(ackMsg)
+                .build()
+            val frame = QuicStreamProtocol.encodeFrame(ackWrapper.toByteArray())
+            transport.send(streamId, frame)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            log.warn("发送 ACK 失败: messageId={}, error={}", messageId, e.message)
         }
     }
 
