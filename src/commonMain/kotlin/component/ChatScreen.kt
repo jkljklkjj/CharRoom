@@ -93,6 +93,11 @@ import kotlinx.coroutines.withContext
 import model.Message
 import model.MessageType
 import model.User
+import component.chat.formatTime
+import component.chat.formatDate
+import component.chat.isSameDay
+import component.chat.formatFileSize
+import component.chat.DateSeparator
 import core.FileUploader
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.heightIn
@@ -1181,65 +1186,4 @@ private fun ChatScreenContent(
     }
 }
 
-/**
- * 格式化消息时间
- */
-private fun formatTime(timestamp: Long): String {
-    return try {
-        val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-        sdf.format(java.util.Date(timestamp))
-    } catch (_: Exception) {
-        ""
-    }
-}
-
-/**
- * 格式化日期
- */
-private fun formatDate(timestamp: Long): String {
-    return try {
-        val now = System.currentTimeMillis()
-        val msgDate = java.util.Date(timestamp)
-        val nowDate = java.util.Date(now)
-
-        val sdfDay = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-        val msgDay = sdfDay.format(msgDate)
-        val nowDay = sdfDay.format(nowDate)
-
-        return when {
-            msgDay == nowDay -> currentStrings["chat.today"]
-            msgDay == sdfDay.format(java.util.Date(now - 86400000)) -> currentStrings["chat.yesterday"]
-            else -> {
-                val sdf = java.text.SimpleDateFormat(currentStrings["chat.date.format"], java.util.Locale.getDefault())
-                sdf.format(msgDate)
-            }
-        }
-    } catch (_: Exception) {
-        ""
-    }
-}
-
-/**
- * 判断两个时间戳是否是同一天
- */
-private fun isSameDay(timestamp1: Long, timestamp2: Long): Boolean {
-    return try {
-        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-        sdf.format(java.util.Date(timestamp1)) == sdf.format(java.util.Date(timestamp2))
-    } catch (_: Exception) {
-        false
-    }
-}
-
-/**
- * 格式化文件大小
- */
-@Suppress("DefaultLocale")
-private fun formatFileSize(size: Long): String {
-    return when {
-        size < 1024 -> "$size B"
-        size < 1024 * 1024 -> String.format("%.1f KB", size / 1024.0)
-        size < 1024 * 1024 * 1024 -> String.format("%.1f MB", size / (1024.0 * 1024))
-        else -> String.format("%.1f GB", size / (1024.0 * 1024 * 1024))
-    }
-}
+// formatTime, formatDate, isSameDay, formatFileSize 已提取到 component.chat.ChatUtils
