@@ -299,6 +299,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.CHAT.wire -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
+                            sendAck(chat.messageId, "chat")
                             listener.onPrivateMessageReceived(
                                 senderId = chat.userId.toIntOrNull() ?: 0,
                                 message = chat.content,
@@ -307,6 +308,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.GROUP_CHAT.wire -> if (wrapper.hasGroupChat()) {
                             val gc = wrapper.groupChat
+                            sendAck(gc.messageId, "group:${gc.targetClientId}")
                             listener.onGroupMessageReceived(
                                 groupId = gc.targetClientId.toIntOrNull() ?: 0,
                                 senderId = gc.userId.toIntOrNull() ?: 0,
@@ -333,6 +335,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
                             val stream = wrapper.agentStream
+                            if (stream.done) {
+                                sendAck(stream.messageId, "agent")
+                            }
                             listener.onAgentStreamChunk(
                                 messageId = stream.messageId,
                                 fullContent = stream.chunk,
@@ -343,6 +348,24 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                     }
                 }
             }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * 向服务端发送 ACK，确认消息已收到。
+     */
+    private fun sendAck(messageId: String, conversationId: String) {
+        try {
+            val ackMsg = com.chatlite.proto.MessageProtos.AckMessage.newBuilder()
+                .setMessageId(messageId)
+                .setSuccess(true)
+                .setConversationId(conversationId)
+                .build()
+            val ackWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
+                .setType(MsgType.ACK.wire)
+                .setAck(ackMsg)
+                .build()
+            sendInternal(ackWrapper.toByteArray())
         } catch (_: Exception) {}
     }
 
