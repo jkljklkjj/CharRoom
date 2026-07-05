@@ -317,7 +317,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.CHAT.wire -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
-                            if (isDuplicateMessage(chat.messageId)) continue@forEach
+                            if (isDuplicateMessage(chat.messageId)) return@forEach
                             sendAck(chat.messageId, "chat")
                             listener.onPrivateMessageReceived(
                                 senderId = chat.userId.toIntOrNull() ?: 0,
@@ -327,7 +327,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.GROUP_CHAT.wire -> if (wrapper.hasGroupChat()) {
                             val gc = wrapper.groupChat
-                            if (isDuplicateMessage(gc.messageId)) continue@forEach
+                            if (isDuplicateMessage(gc.messageId)) return@forEach
                             sendAck(gc.messageId, "group:${gc.targetClientId}")
                             listener.onGroupMessageReceived(
                                 groupId = gc.targetClientId.toIntOrNull() ?: 0,
@@ -357,7 +357,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                             val stream = wrapper.agentStream
                             val dedupKey = if (stream.done) stream.messageId
                                 else "${stream.messageId}:${stream.chunk.hashCode()}"
-                            if (isDuplicateMessage(dedupKey)) continue@forEach
+                            if (isDuplicateMessage(dedupKey)) return@forEach
                             if (stream.done) {
                                 sendAck(stream.messageId, "agent")
                             }
