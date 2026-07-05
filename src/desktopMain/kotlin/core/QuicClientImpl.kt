@@ -253,10 +253,12 @@ class QuicClientImpl : ChatTransport {
                         MsgType.AGENT_CHAT_STREAM.wire -> {
                             if (wrapper.hasAgentStream()) {
                                 val stream = wrapper.agentStream
-                                // Agent 流式消息用 messageId+chunk 组合去重
-                                val dedupKey = "${stream.messageId}:${stream.chunk.hashCode()}"
+                                // 流式输出：中间 chunk 按 messageId+contentHash 去重
+                                // done 消息按 messageId 去重（防止重复触发完成）
+                                val dedupKey = if (stream.done) stream.messageId
+                                    else "${stream.messageId}:${stream.chunk.hashCode()}"
                                 if (isDuplicateMessage(dedupKey)) {
-                                    log.debug("重复 Agent 流跳过: messageId={}", stream.messageId)
+                                    log.debug("重复 Agent 流跳过: messageId={}, done={}", stream.messageId, stream.done)
                                     return@forEach
                                 }
                                 log.info("分发Agent流式消息: messageId={}, done={}", stream.messageId, stream.done)

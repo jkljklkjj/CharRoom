@@ -353,7 +353,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
                             val stream = wrapper.agentStream
-                            val dedupKey = "${stream.messageId}:${stream.chunk.hashCode()}"
+                            val dedupKey = if (stream.done) stream.messageId
+                                else "${stream.messageId}:${stream.chunk.hashCode()}"
                             if (isDuplicateMessage(dedupKey)) continue@forEach
                             if (stream.done) {
                                 sendAck(stream.messageId, "agent")
