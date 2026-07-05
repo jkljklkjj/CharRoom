@@ -1,4 +1,4 @@
-package component
+package component.chat
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -80,6 +80,13 @@ import androidx.compose.material.IconButton
 import androidx.compose.ui.draw.alpha
 import component.io.FilePicker
 import component.UserAvatar
+import component.chatHeaderBrush
+import component.rememberElasticScale
+import component.refinedMessageBubbleBrush
+import component.MessageLongPressMenu
+import component.ReplyPreviewBar
+import component.EmojiPickerPanel
+import component.ForwardSelectDialog
 import core.LocalChatHistoryStore
 import core.ServerConfig
 import core.state.GlobalAppState
@@ -88,6 +95,7 @@ import presentation.viewmodel.ChatViewModel
 import com.chatlite.i18n.LocalStrings
 import com.chatlite.i18n.Strings
 import com.chatlite.i18n.currentStrings
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 发送消息
@@ -761,7 +769,7 @@ private fun ChatScreenContent(
             val latestMessage = userMessages.lastOrNull()
             LaunchedEffect(latestMessage?.messageId, latestMessage?.message) {
                 if (latestMessage != null) {
-                    kotlinx.coroutines.delay(16)
+                    kotlinx.coroutines.delay(16.milliseconds)
                     runCatching {
                         listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
                     }
