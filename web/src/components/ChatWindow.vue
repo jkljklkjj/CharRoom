@@ -39,7 +39,7 @@
     </div>
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
-    <div class="messages" ref="msgList" v-if="currentChatId !== null">
+    <div class="messages" ref="msgList" v-if="currentChatId !== null" @scroll="onMessageScroll">
       <div v-for="(m,i) in currentMessages" :key="i" :class="['msg', {me: m.user==='you'}]" @contextmenu.prevent="showMessageContextMenu($event, m)">
         <div class="row">
           <div class="avatar-col">
@@ -259,6 +259,26 @@ watch(currentChatId, () => {
   _scrollInit = false
   scrollToBottom(false)
 }, { immediate: true })
+
+// 向上滚动加载更多历史消息
+let _loadingOlder = false
+function onMessageScroll() {
+  const el = msgList.value
+  if (!el || _loadingOlder) return
+  // 距顶部 100px 时触发加载
+  if (el.scrollTop < 100) {
+    const hasMore = isGroupChat.value ? store.state.hasMoreGroupMessages : store.state.hasMoreMessages
+    if (!hasMore) return
+    _loadingOlder = true
+    const prevHeight = el.scrollHeight
+    store.loadOlderMessages()
+    // 加载后保持滚动位置不变
+    nextTick(() => {
+      el.scrollTop = el.scrollHeight - prevHeight
+      _loadingOlder = false
+    })
+  }
+}
 
 // 新消息到达：仅在接近底部时跟随（无动画）
 // 通过监听数组长度变化触发，因为 .push() 不改变引用
