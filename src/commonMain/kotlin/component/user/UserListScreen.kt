@@ -346,7 +346,9 @@ fun UserList(
                                         metadata = mapOf("username" to user.username)
                                     )
                                 )
-                            } catch (_: Exception) {}
+                            } catch (e: Exception) {
+                                if (e is kotlinx.coroutines.CancellationException) throw e
+                            }
                             if (Chat.isServerConnected && user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                                 val checkPayload = buildCheckPayload(user.id.toString())
                                 Chat.send(checkPayload, MsgType.CHECK, user.id.toString(), 1) { success, _ ->

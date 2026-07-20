@@ -52,7 +52,9 @@ fun TokenQuotaScreen(
         try {
             quota = withContext(Dispatchers.IO) { getTokenQuota(token) }
             prices = withContext(Dispatchers.IO) { getTokenPrices(token) }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+        }
         loading = false
     }
 

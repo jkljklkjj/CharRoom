@@ -171,7 +171,9 @@ fun AddUserOrGroupDialog(
                                     metadata = mapOf("ui" to "add_user_or_group_dialog", "entity" to if (isUser) "user" else "group")
                                 )
                             )
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                        }
                         isSubmitting = true
                         responseMessage = null
                         isResponseSuccess = false
