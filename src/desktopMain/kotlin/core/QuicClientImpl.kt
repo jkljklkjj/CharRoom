@@ -74,7 +74,6 @@ class QuicClientImpl : ChatTransport {
                     } catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
                         println("[QuicClient] 登录流程异常: ${e.message}")
-                        e.printStackTrace()
                     }
                 }
             }

@@ -464,7 +464,9 @@ open class ChatViewModel(
                 }
                 println("[ChatViewModel] 批量在线状态已更新: ${statusMap.size} 人")
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+        }
 
         println("[ChatViewModel] 开始同步 ${friends.size} 个好友的会话")
 
@@ -953,7 +955,9 @@ open class ChatViewModel(
             file.writeBytes(data.datasource.local.CryptoUtil.encrypt(
                 json.encodeToString(seqIds).encodeToByteArray()
             ))
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+        }
     }
 
     /**
@@ -972,7 +976,9 @@ open class ChatViewModel(
                     chatState.updateConversationSeqId(convId, seqId)
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+        }
     }
 
     /**

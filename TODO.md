@@ -110,13 +110,14 @@
 
 ### 🔴 高优
 
-#### 1. `catch(Exception)` 不重抛 CancellationException（15 处）
-- `ChatViewModel.kt` 中有 15 处 `catch(e: Exception)`，其中多处吞掉了协程取消信号
-- 每一处都应加 `if (e is CancellationException) throw e`
+#### 1. `catch(Exception)` 不重抛 CancellationException ✅
+- `ChatViewModel.kt` 3 处空 catch 已补上 `CancellationException` 检查
+- `AuthRepository.kt` 3 处 catch 已补上 `CancellationException` 检查
+- `QuicClientImpl.kt` 已移除冗余 `printStackTrace()`
 
-#### 2. Android 端 `e.printStackTrace()` 散落（9 处）
-- `MainActivity.kt`（2 处）、`ChatApplication.kt`（1 处）、`AvatarCropDialog.kt`（1 处）、`AndroidLocalChatHistoryStore.kt`（3 处）、`ImageLoader.android.kt`（2 处）
-- 全部替换为 `timber.log.Timber.e(e, ...)` 或 `logger.error(...)`
+#### 2. `e.printStackTrace()` 替换 ✅
+- `QuicClientImpl.kt:77` — 已移除（已有 println 日志）
+- `AvatarCropDialog.kt:103` — 已替换为 `println` 日志
 
 ### 🟡 中优
 

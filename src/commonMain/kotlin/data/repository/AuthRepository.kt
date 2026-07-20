@@ -95,6 +95,7 @@ class AuthRepository(
             localDataSource.clearAuth()
             _authState.value = AuthState.Error(currentStrings["auth.auto.login.failed"])
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             // Catch auto-login exception to avoid crash
             localDataSource.clearAuth()
             val errorMessage = e.message ?: currentStrings["auth.network.failed"]
@@ -133,6 +134,7 @@ class AuthRepository(
                 errorState
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             // Catch all login exceptions to avoid crash
             val errorMessage = e.message ?: currentStrings["auth.network.retry"]
             val errorState = AuthState.Error(currentStrings["auth.login.error"].format(errorMessage))
@@ -177,6 +179,7 @@ class AuthRepository(
                 Result.failure(Exception(currentStrings["auth.code.send.failed"]))
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Result.failure(e)
         }
     }

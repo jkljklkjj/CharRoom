@@ -100,7 +100,7 @@ object DesktopAvatarCropDialog : AvatarCropDialogProvider {
                     imageBitmap = argbImage.toComposeImageBitmap()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                println("[AvatarCropDialog] 图片加载失败: ${e.message}")
             }
         }
     }
