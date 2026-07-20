@@ -2,6 +2,7 @@ import { reactive, readonly } from 'vue'
 import i18n from '../i18n'
 
 const STORAGE_PREFIX = 'charroom_chat_history_'
+const PAGE_SIZE = 50 // 每次加载的消息条数
 
 const state = reactive({
   users: [],
@@ -16,7 +17,10 @@ const state = reactive({
   accountId: '',
   pendingRegister: null,
   selectedChatId: null,
-  loginValid: false // 标记token是否已经通过有效性验证
+  loginValid: false,
+  // 分页状态
+  hasMoreMessages: true,
+  hasMoreGroupMessages: true
 })
 
 function sanitizeId(value) {
@@ -223,29 +227,68 @@ function saveGroupMessage(message) {
 }
 
 function loadConversation(id, isGroup = false) {
-  console.log('loadConversation called, id=', id, 'isGroup=', isGroup)
   if (!id) {
     state.selectedChatId = null
     state.messages = []
     state.groupMessages = []
-    console.log('id is falsy, selectedChatId reset to null')
+    state.hasMoreMessages = true
+    state.hasMoreGroupMessages = true
     return
   }
   state.selectedChatId = id
   clearConversationUnread(id)
-  console.log('selectedChatId set to', state.selectedChatId)
   if (state.accountId) {
     if (isGroup) {
       state.messages = []
-      state.groupMessages = loadGroupConversation(state.accountId, Math.abs(Number(id)))
+      const all = loadGroupConversation(state.accountId, Math.abs(Number(id)))
+      state.groupMessages = all.slice(-PAGE_SIZE)
+      state.hasMoreGroupMessages = all.length > PAGE_SIZE
     } else {
       state.groupMessages = []
-      state.messages = loadPrivateConversation(state.accountId, id)
+      const all = loadPrivateConversation(state.accountId, id)
+      state.messages = all.slice(-PAGE_SIZE)
+      state.hasMoreMessages = all.length > PAGE_SIZE
     }
   } else {
-    // accountId为空时，只设置选中ID，不加载历史消息
     state.messages = []
     state.groupMessages = []
+    state.hasMoreMessages = true
+    state.hasMoreGroupMessages = true
+  }
+}
+
+/**
+ * 加载更多历史消息（向上滚动时调用）。
+ * @returns {boolean} 是否还有更多消息
+ */
+function loadOlderMessages() {
+  if (!state.selectedChatId || !state.accountId) return false
+
+  const isGroup = Number(state.selectedChatId) < 0
+  if (isGroup) {
+    if (!state.hasMoreGroupMessages) return false
+    const all = loadGroupConversation(state.accountId, Math.abs(Number(state.selectedChatId)))
+    const currentCount = state.groupMessages.length
+    const older = all.slice(Math.max(0, all.length - currentCount - PAGE_SIZE), all.length - currentCount)
+    if (older.length === 0) {
+      state.hasMoreGroupMessages = false
+      return false
+    }
+    state.groupMessages = [...older, ...state.groupMessages]
+    state.hasMoreGroupMessages = all.length - currentCount - older.length > 0
+    return true
+  } else {
+    if (!state.hasMoreMessages) return false
+    const all = loadPrivateConversation(state.accountId, state.selectedChatId)
+    const currentCount = state.messages.length
+    const older = all.slice(Math.max(0, all.length - currentCount - PAGE_SIZE), all.length - currentCount)
+    if (older.length === 0) {
+      state.hasMoreMessages = false
+      return false
+    }
+    state.messages = [...older, ...state.messages]
+    state.hasMoreMessages = all.length - currentCount - older.length > 0
+    return true
   }
 }
 
@@ -616,7 +659,8 @@ export function useStore() {
     setCachedAvatar,
     trimMessages,
     trimGroupMessages,
-    deleteMessage
+    deleteMessage,
+    loadOlderMessages
   }
 }
 
