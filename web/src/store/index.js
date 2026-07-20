@@ -557,6 +557,33 @@ function setPendingRegister(obj) { state.pendingRegister = obj }
 function clearPendingRegister() { state.pendingRegister = null }
 function setLoginValid(valid) { state.loginValid = valid }
 
+/**
+ * 裁剪私聊消息到指定数量（保留最新的 max 条）。
+ */
+function trimMessages(max) {
+  if (state.messages.length > max) {
+    state.messages.splice(0, state.messages.length - max)
+  }
+}
+
+/**
+ * 裁剪群聊消息到指定数量（保留最新的 max 条）。
+ */
+function trimGroupMessages(max) {
+  if (state.groupMessages.length > max) {
+    state.groupMessages.splice(0, state.groupMessages.length - max)
+  }
+}
+
+/**
+ * 删除指定消息。
+ */
+function deleteMessage(message, isGroup = false) {
+  const arr = isGroup ? state.groupMessages : state.messages
+  const idx = arr.indexOf(message)
+  if (idx > -1) arr.splice(idx, 1)
+}
+
 export function useStore() {
   return {
     state: readonly(state),
@@ -586,7 +613,10 @@ export function useStore() {
     cacheUsers,
     loadCachedUsers,
     getCachedAvatar,
-    setCachedAvatar
+    setCachedAvatar,
+    trimMessages,
+    trimGroupMessages,
+    deleteMessage
   }
 }
 

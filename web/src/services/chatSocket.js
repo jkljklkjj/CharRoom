@@ -422,7 +422,8 @@ function scheduleReconnect(hostname, port, token, userId) {
 
   reconnectTimer = setTimeout(() => {
     if (!stopReconnect) {
-      connect(hostname, port, token, userId, handlers).catch(() => {
+      connect(hostname, port, token, userId, handlers).catch(e => {
+        console.warn('重连失败:', e)
         isReconnecting = false
       })
       // 指数退避 + jitter 随机化，避免重连风暴

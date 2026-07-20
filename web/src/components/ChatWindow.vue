@@ -133,14 +133,8 @@ if (typeof document !== 'undefined') {
     const MAX = 200
     const MIN = 50
     const target = hidden ? MIN : MAX
-    // 私聊消息截断
-    if (store.state.messages.length > target) {
-      store.state.messages.splice(0, store.state.messages.length - target)
-    }
-    // 群聊消息截断
-    if (store.state.groupMessages.length > target) {
-      store.state.groupMessages.splice(0, store.state.groupMessages.length - target)
-    }
+    store.trimMessages(target)
+    store.trimGroupMessages(target)
   })
 }
 const { t } = useI18n()
@@ -648,15 +642,7 @@ function replyMessage() {
 // 删除消息（仅自己的消息）
 function deleteMessage() {
   if (!selectedMessage.value) return
-  // 从 store 中删除（需要 store 支持，这里只做本地删除）
-  const idx = currentMessages.value.findIndex(m => m === selectedMessage.value)
-  if (idx > -1) {
-    if (isGroupChat.value) {
-      store.state.groupMessages.splice(idx, 1)
-    } else {
-      store.state.messages.splice(idx, 1)
-    }
-  }
+  store.deleteMessage(selectedMessage.value, isGroupChat.value)
   closeContextMenu()
 }
 
