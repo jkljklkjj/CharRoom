@@ -123,8 +123,8 @@ import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
 
 const store = useStore()
-// 暴露 store 给 chatSocket 的 ACK 超时检查使用
-if (typeof window !== 'undefined') window.__chatStore = store
+// 注入 store 引用给 chatSocket（替代 window.__chatStore hack）
+chatSocket.setStore(store)
 
 // 前后台自适应：切后台时释放部分消息内存
 if (typeof document !== 'undefined') {

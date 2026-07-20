@@ -11,6 +11,8 @@ let handlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerr
 let reconnectTimer = null
 let heartbeatTimer = null
 let heartbeatTimeoutTimer = null
+let ackCheckTimer = null      // ACK 超时检查定时器
+let cacheCleanupTimer = null  // 消息去重缓存清理定时器
 let heartbeatInterval = 30000 // 30秒心跳
 let heartbeatTimeout = 10000  // 心跳超时10秒
 let currentReconnectDelay = 1000
@@ -31,53 +33,63 @@ const pendingAcks = new Map()
 const ACK_CONFIRM_MS = 8000   // 0-8s: 已发送（乐观）
 const ACK_TIMEOUT_MS = 16000  // 8-16s: 发送中 → 16s+: 失败
 
-// 每秒检查待确认消息，更新状态
-setInterval(() => {
-  const now = Date.now()
-  const store = window.__chatStore
-  if (!store) return
-  for (const [msgId, info] of pendingAcks) {
-    const age = now - info.sendTime
-    if (age >= ACK_TIMEOUT_MS && !info.failed) {
-      info.failed = true
-      store.updateMessageStatus(msgId, 'failed')
-    } else if (age >= ACK_CONFIRM_MS && !info.warned) {
-      info.warned = true
-      store.updateMessageStatus(msgId, 'sending')
-    }
-  }
-}, 1000)
-
 // 优先级队列：多个队列按优先级处理
 const PRIORITY_HIGH = 0   // ACK
 const PRIORITY_NORMAL = 1 // 聊天消息
 const PRIORITY_LOW = 2    // 心跳
 const priorityQueues = { [PRIORITY_HIGH]: [], [PRIORITY_NORMAL]: [], [PRIORITY_LOW]: [] }
 
-// 定期清理过期消息 ID
-setInterval(() => {
-  const now = Date.now()
-  for (const [id, ts] of messageCache) {
-    if (now - ts > MESSAGE_TTL) messageCache.delete(id)
-  }
-}, 60_000)
+// ── Store 引用（依赖注入，替代 window.__chatStore） ──
+
+let storeRef = null
+
+/**
+ * 注入 store 引用，chatSocket 内部需要读写 store 时使用。
+ * 应在 App 初始化时调用一次。
+ */
+export function setStore(store) {
+  storeRef = store
+}
+
+// ── 定时器生命周期管理 ──
+
+function startTimers() {
+  stopTimers()
+
+  // 每秒检查待确认消息，更新状态
+  ackCheckTimer = setInterval(() => {
+    if (!storeRef) return
+    const now = Date.now()
+    for (const [msgId, info] of pendingAcks) {
+      const age = now - info.sendTime
+      if (age >= ACK_TIMEOUT_MS && !info.failed) {
+        info.failed = true
+        storeRef.updateMessageStatus(msgId, 'failed')
+      } else if (age >= ACK_CONFIRM_MS && !info.warned) {
+        info.warned = true
+        storeRef.updateMessageStatus(msgId, 'sending')
+      }
+    }
+  }, 1000)
+
+  // 每分钟清理过期消息 ID
+  cacheCleanupTimer = setInterval(() => {
+    const now = Date.now()
+    for (const [id, ts] of messageCache) {
+      if (now - ts > MESSAGE_TTL) messageCache.delete(id)
+    }
+  }, 60_000)
+}
+
+function stopTimers() {
+  if (ackCheckTimer) { clearInterval(ackCheckTimer); ackCheckTimer = null }
+  if (cacheCleanupTimer) { clearInterval(cacheCleanupTimer); cacheCleanupTimer = null }
+}
 
 // ── 公共 API ────────────────────────────────────
 
 /**
  * 建立聊天连接。
- *
- * @param {string} hostname - 服务器地址
- * @param {number} port - 服务器端口
- * @param {string} token - 认证 token
- * @param {string|number} userId - 用户 ID
- * @param {Object} callbacks - 事件回调
- * @param {Function} [callbacks.onopen]
- * @param {Function} [callbacks.onmessage]
- * @param {Function} [callbacks.onclose]
- * @param {Function} [callbacks.onerror]
- * @param {Function} [callbacks.onAuthFailed]
- * @returns {Promise<ChatTransport>}
  */
 export async function connect(hostname, port, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed } = {}) {
   console.log('🔌 尝试建立连接:', { hostname, port, hasToken: !!token, userId })
@@ -118,6 +130,9 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
     isReconnecting = false
     currentReconnectDelay = 1000
 
+    // 启动定时器（连接生命周期内）
+    startTimers()
+
     // 发送登录消息
     sendLogin(token)
     // 启动心跳
@@ -157,10 +172,6 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 }
 
 /**
- * 发送登录消息（通过传输层）。
- * @param {string} token
- */
-/**
  * 获取或生成本地设备 ID（持久化到 localStorage）
  */
 function getDeviceId() {
@@ -175,7 +186,6 @@ function getDeviceId() {
 
 /** 判断当前设备类型 */
 function getDeviceType() {
-  // Web 端固定为 "web"；KMP 客户端（Android/iOS/Desktop）自行设值
   return 'web'
 }
 
@@ -197,86 +207,71 @@ async function sendLogin(token) {
 
 /**
  * 发送 protobuf 编码的消息。
- * @param {Object} wrapperObj - 消息对象
- * @returns {Promise<boolean>}
  */
-/**
- * 根据消息类型确定优先级。
- */
-function getMessagePriority(wrapperObj) {
-  switch (wrapperObj.type) {
-    case 'ack': return PRIORITY_HIGH
-    case 'chat':
-    case 'groupChat': return PRIORITY_NORMAL
-    case 'heartbeat': return PRIORITY_LOW
-    default: return PRIORITY_NORMAL
-  }
-}
-
-/**
- * 根据消息类型获取流路由选项。
- */
-function getStreamOptions(wrapperObj) {
-  const opts = { streamType: 'control' }
-  if (wrapperObj.type === 'chat' && wrapperObj.chat?.targetClientId) {
-    opts.streamType = 'chat'
-    opts.conversationId = wrapperObj.chat.targetClientId
-  } else if (wrapperObj.type === 'groupChat' && wrapperObj.groupChat?.targetClientId) {
-    opts.streamType = 'chat'
-    opts.conversationId = 'group:' + wrapperObj.groupChat.targetClientId
-  }
-  return opts
-}
-
 export async function sendWrapper(wrapperObj) {
-  try {
-    const buffer = await encodeMessage(wrapperObj)
-    const streamOptions = getStreamOptions(wrapperObj)
-
-    // 注册待确认消息（chat/groupChat 类型的消息带 messageId）
-    const msgId = wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId || null
-    if (msgId) {
-      pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
+  if (!transport || !transport.isConnected()) {
+    // 未连接时加入队列
+    if (pendingQueue.length < MAX_QUEUE_SIZE) {
+      const buffer = await encodeMessage(wrapperObj)
+      pendingQueue.push({ buffer, wrapperObj })
     }
-
-    if (transport && transport.isConnected()) {
-      return transport.send(buffer, streamOptions)
-    }
-
-    // 连接未建立，按优先级加入队列（同时保存流路由信息）
-    const priority = getMessagePriority(wrapperObj)
-    const queue = priorityQueues[priority]
-    const entry = { buffer, streamOptions }
-    const totalQueued = Object.values(priorityQueues).reduce((sum, q) => sum + q.length, 0)
-    if (totalQueued < MAX_QUEUE_SIZE) {
-      queue.push(entry)
-      console.log(`消息加入队列 (pri=${priority}), 总队列长度:`, totalQueued + 1)
-    } else {
-      if (priority <= PRIORITY_NORMAL) {
-        const lowQueue = priorityQueues[PRIORITY_LOW]
-        if (lowQueue.length > 0) {
-          lowQueue.shift()
-          queue.push(entry)
-          console.log(`消息入队 (pri=${priority}), 踢掉一条低优先级消息`)
-        } else {
-          console.warn('消息队列已满，丢弃高优先级消息')
-        }
-      } else {
-        console.warn('消息队列已满，丢弃低优先级消息')
-      }
-    }
-    return false
-  } catch (e) {
-    console.error('发送消息失败:', e)
     return false
   }
+
+  const buffer = await encodeMessage(wrapperObj)
+
+  // 消息去重检查
+  const msgId = wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId
+  if (msgId) {
+    if (messageCache.has(msgId)) return false
+    messageCache.set(msgId, Date.now())
+  }
+
+  // 确定流类型和会话 ID
+  const streamType = getStreamType(wrapperObj)
+  const conversationId = resolveConversationId(wrapperObj)
+
+  const sent = transport.send(buffer, { streamType, conversationId })
+
+  // 乐观 UI：跟踪待确认消息
+  if (sent && msgId && wrapperObj.type === 'chat') {
+    pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
+    if (storeRef) storeRef.updateMessageStatus(msgId, 'optimistic')
+  }
+
+  return sent
 }
 
 /**
- * 刷新消息队列（按优先级从高到低发送）。
+ * 根据消息类型确定流类型。
  */
+function getStreamType(wrapperObj) {
+  const type = wrapperObj.type
+  if (type === 'ack' || type === 'heartbeat' || type === 'login' || type === 'logout') {
+    return 'control'
+  }
+  if (type === 'chat' || type === 'group_chat' || type === 'agent_chat') {
+    return 'chat'
+  }
+  return 'control'
+}
+
+/**
+ * 从消息对象中解析 conversationId。
+ */
+function resolveConversationId(wrapperObj) {
+  if (wrapperObj.chat) {
+    const target = wrapperObj.chat.targetClientId || ''
+    const sender = wrapperObj.chat.userId || currentUserId || ''
+    return `${sender}:${target}`
+  }
+  if (wrapperObj.groupChat) {
+    return `group:${wrapperObj.groupChat.targetClientId || ''}`
+  }
+  return ''
+}
+
 function flushQueue() {
-  if (!loggedIn) return
   const total = Object.values(priorityQueues).reduce((sum, q) => sum + q.length, 0)
   if (total === 0) return
 
@@ -299,8 +294,6 @@ function flushQueue() {
 
 /**
  * 发送 ACK 确认消息。
- * @param {string} messageId
- * @returns {Promise<boolean>}
  */
 export async function sendAck(messageId) {
   if (!currentUserId || !messageId) return false
@@ -320,6 +313,7 @@ export function close() {
     reconnectTimer = null
   }
   stopHeartbeat()
+  stopTimers()
 
   if (transport) {
     transport.close()
@@ -331,60 +325,25 @@ export function close() {
   messageCache.clear()
   pendingAcks.clear()
   currentUserId = null
+  loggedIn = false
 }
 
 export function readyState() {
   return transport && transport.isConnected() ? 1 /* OPEN */ : 3 /* CLOSED */
 }
 
-export function isConnected() {
-  return transport !== null && transport.isConnected()
-}
-
-// ── 自适应心跳 ──────────────────────────────────
-
-// RTT 滑动窗口（用于自适应心跳间隔）
-const rttWindow = []
-let lastHbSendTime = 0
-
-/** 自适应心跳间隔：基于 P90 RTT，范围 8-27s */
-function adaptiveHbInterval() {
-  if (rttWindow.length < 3) return 30000
-  const sorted = [...rttWindow].sort((a, b) => a - b)
-  const p90 = sorted[Math.floor(sorted.length * 0.9)]
-  return Math.max(8000, Math.min(27000, p90 * 5))
-}
-
-/** 收到服务端响应时记录 RTT */
-function recordRtt() {
-  if (!lastHbSendTime) return
-  const rtt = Date.now() - lastHbSendTime
-  if (rtt < 0 || rtt > 60000) return
-  rttWindow.push(rtt)
-  if (rttWindow.length > 10) rttWindow.shift()
-  lastHbSendTime = 0
-
-  // 动态调整心跳间隔
-  const newInterval = adaptiveHbInterval()
-  if (Math.abs(newInterval - heartbeatInterval) > 3000) {
-    heartbeatInterval = newInterval
-    console.debug(`❤️ 心跳间隔自适应调整为 ${heartbeatInterval}ms (RTT=${rtt}ms)`)
-    stopHeartbeat()
-    startHeartbeat()
-  }
-}
+// ── 心跳 ────────────────────────────────────────
 
 function startHeartbeat() {
   stopHeartbeat()
-  lastHeartbeatResponseTime = Date.now()
 
-  const tick = () => {
+  function tick() {
     if (!transport || !transport.isConnected()) return
 
-    const timeSinceLastResponse = Date.now() - lastHeartbeatResponseTime
-    if (timeSinceLastResponse > heartbeatInterval + 10000) {
-      console.log(`❤️ 心跳超时 (${timeSinceLastResponse}ms)，关闭连接`)
-      transport.close()
+    // 心跳超时检查
+    if (lastHeartbeatResponseTime > 0 && Date.now() - lastHeartbeatResponseTime > heartbeatInterval + heartbeatTimeout) {
+      console.warn('心跳超时，关闭连接')
+      if (transport) transport.close()
       return
     }
 
@@ -392,8 +351,8 @@ function startHeartbeat() {
     sendWrapper({
       type: 'heartbeat',
       heartbeat: { timestamp: Date.now() }
-    }).catch(() => {
-      console.log('心跳发送失败，关闭连接')
+    }).catch(e => {
+      console.warn('心跳发送失败:', e)
       if (transport) transport.close()
     })
   }
@@ -439,7 +398,6 @@ function scheduleReconnect(hostname, port, token, userId) {
 
 /**
  * 处理收到的消息（二进制数据）。
- * @param {ArrayBuffer} rawData
  */
 async function handleMessage(rawData) {
   let processedData = rawData
@@ -464,7 +422,6 @@ async function handleMessage(rawData) {
     recordRtt()
 
     // 带 success 字段的响应（ResponseMessage / AckMessage）
-    // protobuf 结构: { type, response: { success, message } }
     const isSuccess = processedData.success
       || (processedData.response && processedData.response.success)
     if (isSuccess !== undefined) {
@@ -493,14 +450,13 @@ async function handleMessage(rawData) {
       lastHeartbeatResponseTime = Date.now()
       const ack = processedData.ack || processedData
       const ackedMsgId = ack.messageId
-      const store = window.__chatStore
       if (ackedMsgId && pendingAcks.has(ackedMsgId)) {
         pendingAcks.delete(ackedMsgId)
-        if (store) store.updateMessageStatus(ackedMsgId, 'sent')
+        if (storeRef) storeRef.updateMessageStatus(ackedMsgId, 'sent')
       }
       // 更新 seqId 游标（用于增量同步断点续拉）
-      if (ack.seqId != null && ack.conversationId && store) {
-        store.setConversationSeqId(ack.conversationId, ack.seqId)
+      if (ack.seqId != null && ack.conversationId && storeRef) {
+        storeRef.setConversationSeqId(ack.conversationId, ack.seqId)
       }
       return
     }
@@ -514,99 +470,65 @@ async function handleMessage(rawData) {
     if (processedData.type === 'chat' && processedData.chat) {
       showNotification(processedData.chat)
     } else if (processedData.type === 'group_chat' && processedData.groupChat) {
-      showNotification(processedData.groupChat, true)
+      showNotification(processedData.groupChat)
+    }
+
+    // 同步响应
+    if (processedData.type === 'response' && processedData.response) {
+      // 传给上层
     }
   }
 
-  // 消息去重和ACK
-  if (processedData && typeof processedData === 'object') {
-    let messageId = null
-    let isChatOrGroupMessage = false
-
-    if (processedData.chat && processedData.chat.messageId) {
-      messageId = processedData.chat.messageId
-      isChatOrGroupMessage = true
-    } else if (processedData.groupChat && processedData.groupChat.messageId) {
-      messageId = processedData.groupChat.messageId
-      isChatOrGroupMessage = true
-    } else if (processedData.agentChat && processedData.agentChat.messageId) {
-      messageId = processedData.agentChat.messageId
-      isChatOrGroupMessage = true
-    }
-
-    if (messageId) {
-      if (messageCache.has(messageId)) {
-        console.log('收到重复消息，忽略:', messageId)
-        return
-      }
-      messageCache.set(messageId, Date.now())
-      if (messageCache.size > MAX_MESSAGE_CACHE) {
-        const oldest = messageCache.entries().next().value
-        if (oldest) messageCache.delete(oldest[0])
-      }
-
-      if (isChatOrGroupMessage) {
-        sendAck(messageId).catch(e => console.warn("sendAck failed:", e))
-      }
-    }
+  // 传给上层回调
+  if (handlers.onmessage) {
+    handlers.onmessage(processedData)
   }
-
-  if (handlers.onmessage) handlers.onmessage(processedData)
 }
 
-// ── XSS 防护 ────────────────────────────────────
+// ── RTT 记录 ────────────────────────────────────
 
-export function sanitizeMessage(content) {
-  return DOMPurify.sanitize(content, {
-    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'code', 'pre', 'br'],
-    ALLOWED_ATTR: ['href', 'title', 'target', 'class'],
-    ALLOW_UNKNOWN_PROTOCOLS: false,
-    FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
-  })
+let lastHbSendTime = 0
+let rttSamples = []
+const MAX_RTT_SAMPLES = 10
+
+function recordRtt() {
+  if (lastHbSendTime > 0) {
+    const rtt = Date.now() - lastHbSendTime
+    rttSamples.push(rtt)
+    if (rttSamples.length > MAX_RTT_SAMPLES) rttSamples.shift()
+  }
 }
 
-// ── 通知 ────────────────────────────────────────
+/**
+ * 获取平均 RTT（毫秒）。
+ */
+export function getAverageRtt() {
+  if (rttSamples.length === 0) return 0
+  return Math.round(rttSamples.reduce((a, b) => a + b, 0) / rttSamples.length)
+}
 
-function showNotification(message, isGroup = false) {
+// ── 浏览器通知 ──────────────────────────────────
+
+function showNotification(msg) {
   if (document.visibilityState === 'visible') return
-  if (!('Notification' in window)) return
-  if (Notification.permission !== 'granted') {
-    Notification.requestPermission()
-    return
-  }
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
 
-  const userId = currentUserId ? String(currentUserId) : ''
-  const senderId = String(message.userId || '')
-  if (senderId === userId) return
-
-  const title = i18n.global.t(isGroup ? 'notification.groupMessage' : 'notification.newMessage')
-  const body = message.content || i18n.global.t('notification.body')
-
-  const notification = new Notification(title, {
-    body,
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
-    tag: isGroup ? `group-${message.targetClientId}` : `user-${senderId}`,
-    renotify: true,
-    silent: false
-  })
-
-  // 3 秒后自动关闭通知
-  setTimeout(() => notification.close(), 3000)
-
-  notification.onclick = () => {
-    window.focus()
-    notification.close()
-  }
+  const title = msg.senderName || msg.senderId || '新消息'
+  const body = msg.content || '[图片或其他内容]'
+  try {
+    new Notification(DOMPurify.sanitize(title), {
+      body: DOMPurify.sanitize(body),
+      icon: '/favicon.ico'
+    })
+  } catch (_) { /* ignore notification errors */ }
 }
 
-// 页面加载时申请通知权限
-if ('Notification' in window && Notification.permission === 'default') {
-  document.addEventListener('click', function requestPermission() {
-    Notification.requestPermission()
-    document.removeEventListener('click', requestPermission)
-  }, { once: true })
+export default {
+  connect,
+  close,
+  sendWrapper,
+  sendAck,
+  readyState,
+  getAverageRtt,
+  setStore
 }
-
-export default { connect, sendWrapper, sendAck, close, readyState, isConnected, sanitizeMessage }
