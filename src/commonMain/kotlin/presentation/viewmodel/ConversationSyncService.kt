@@ -197,7 +197,6 @@ class ConversationSyncService(
                 println("[SyncService] 会话 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条")
 
                 if (isGroup) {
-                    val group = chatRepository.fetchGroups().find { it.id == targetId }
                     for (msg in newMessages) {
                         val groupMsg = GroupMessage(
                             groupId = targetId,

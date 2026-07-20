@@ -20,7 +20,7 @@ object AppConfig {
     const val APP_NAME = "轻聊"
 
     /**
-     * 是否为调试版本
+     * 是否为调试版本（生产环境应设为 false）
      */
-    const val DEBUG = true
+    val DEBUG: Boolean = System.getProperty("app.debug", "true").toBoolean()
 }

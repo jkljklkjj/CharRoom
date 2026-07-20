@@ -1058,7 +1058,7 @@ suspend fun sendPrivateMessage(
     replyToMessageId: String? = null
 ): Boolean {
     return try {
-        println("[ApiClient] 发送私聊消息请求：token=${token.take(10)}..., receiverId=$receiverId, content=$content, messageType=$messageType")
+        println("[ApiClient] 发送私聊消息请求: receiverId=$receiverId, messageType=$messageType")
         val response = httpClient.post(ApiEndpoints.url("/message/send/private")) {
             header("Authorization", "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -1075,10 +1075,8 @@ suspend fun sendPrivateMessage(
             setBody(body)
         }
         println("[ApiClient] 响应状态: ${response.status}")
-        val responseBody = response.body<String>()
-        println("[ApiClient] 响应内容: $responseBody")
         val apiResponse = response.body<ApiResponse<Unit>>()
-        println("[ApiClient] 解析结果: isSuccess=${apiResponse.isSuccess}, code=${apiResponse.code}, message=${apiResponse.message}")
+        println("[ApiClient] 解析结果: isSuccess=${apiResponse.isSuccess}, code=${apiResponse.code}")
         apiResponse.isSuccess
     } catch (e: Exception) {
         println("[ApiClient] 发送消息异常: ${e.message}, 堆栈: ${e.stackTraceToString()}")

@@ -20,7 +20,7 @@ enum class ThrottleOp {
  */
 class Throttle(private val defaultDelayMs: Long = 300L) {
 
-    private val lastRun = mutableMapOf<ThrottleOp, Long>()
+    private val lastRun = java.util.concurrent.ConcurrentHashMap<ThrottleOp, Long>()
 
     /**
      * 检查是否需要节流。

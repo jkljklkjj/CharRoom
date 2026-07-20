@@ -117,19 +117,19 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     override fun sendText(content: String, callback: (Boolean) -> Unit) = callback(false)
 
     override fun addMessageReceiveListener(listener: MessageReceiveListener) {
-        messageListeners.add(listener)
+        synchronized(messageListeners) { messageListeners.add(listener) }
     }
 
     override fun removeMessageReceiveListener(listener: MessageReceiveListener) {
-        messageListeners.remove(listener)
+        synchronized(messageListeners) { messageListeners.remove(listener) }
     }
 
     override fun addAuthStateListener(listener: AuthStateListener) {
-        authStateListeners.add(listener)
+        synchronized(authStateListeners) { authStateListeners.add(listener) }
     }
 
     override fun removeAuthStateListener(listener: AuthStateListener) {
-        authStateListeners.remove(listener)
+        synchronized(authStateListeners) { authStateListeners.remove(listener) }
     }
 
     override val isServerConnected: Boolean get() = connected.get()
@@ -195,12 +195,16 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     private fun doLogin() {
         val loginPayload = buildLoginPayload(GlobalAppState.currentToken ?: "")
+        val stream = controlStream ?: run {
+            log.warn("doLogin 失败: controlStream 为 null")
+            return
+        }
         val framed = QuicStreamProtocol.encodeFrame(loginPayload)
         val buf = ByteBuffer.allocateDirect(framed.size)
         buf.put(framed)
         buf.flip()
-        controlStream!!.write(buf, false)
-        controlStream!!.flush()
+        stream.write(buf, false)
+        stream.flush()
         log.info("登录消息已发送")
     }
 
@@ -371,7 +375,10 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            log.warn("handleStreamData 异常: ${e.message}")
+        }
     }
 
     /**
@@ -389,7 +396,10 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                 .setAck(ackMsg)
                 .build()
             sendInternal(ackWrapper.toByteArray())
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            log.warn("sendAck 异常: ${e.message}")
+        }
     }
 
     private fun sendInternal(payload: ByteArray) {
@@ -400,7 +410,10 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
             buf.flip()
             controlStream?.write(buf, false)
             controlStream?.flush()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            log.warn("sendInternal 异常: ${e.message}")
+        }
     }
 
     private fun notifyAuthInvalidated(reason: String) {

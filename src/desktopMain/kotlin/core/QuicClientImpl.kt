@@ -20,14 +20,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 class QuicClientImpl : ChatTransport {
 
     private val log = LoggerFactory.getLogger(QuicClientImpl::class.java)
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // 实际传输层
     private val transport = QuicNettyClient()
     private val connected = AtomicBoolean(false)
 
-    // Session 管理: conversationId -> StreamSession
-    private val sessions = mutableMapOf<String, StreamSession>()
+    // Session 管理: conversationId -> StreamSession（线程安全）
+    private val sessions = java.util.concurrent.ConcurrentHashMap<String, StreamSession>()
     private val CONTROL_SESSION_KEY = "__control__"
 
     // 待发送消息缓冲（断线时缓存）
@@ -125,8 +125,8 @@ class QuicClientImpl : ChatTransport {
         log.info("QUIC 登录请求已发送 (streamId=$stream0Id)")
     }
 
-    // 心跳自适应 RTT 跟踪
-    private val rttWindow = mutableListOf<Long>()
+    // 心跳自适应 RTT 跟踪（线程安全）
+    private val rttWindow = java.util.Collections.synchronizedList(mutableListOf<Long>())
     private var lastHeartbeatSend = 0L
     private var hbSendInProgress = false
 
@@ -453,6 +453,7 @@ class QuicClientImpl : ChatTransport {
         transport.shutdown()
         sessions.clear()
         messageQueue.clear()
+        scope.coroutineContext.cancel()
     }
 
     override fun addMessageReceiveListener(listener: MessageReceiveListener) {
