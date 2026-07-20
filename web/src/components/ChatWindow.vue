@@ -587,7 +587,7 @@ async function handleFileUpload(file) {
     store.addMessage(m)
   }
 
-  await chatSocket.sendWrapper(wrapper).catch(() => {})
+  await chatSocket.sendWrapper(wrapper).catch(e => console.warn('消息发送失败:', e))
   scrollToBottom()
 }
 

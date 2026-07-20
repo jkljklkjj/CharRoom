@@ -424,7 +424,7 @@ onMounted(async () => {
       chatSocket.sendWrapper({
         type: 'logout',
         logout: { userId: String(store.state.accountId) }
-      }).catch(() => {})
+      }).catch(e => console.debug('登出消息发送失败:', e))
     }
   })
 })
