@@ -51,7 +51,7 @@
               <span class="sender">{{ m.user === 'you' ? $t('chat.myself') : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : $t('chat.groupChat')) }}</span>
               <span class="time">{{ formatRelativeTime(m.time) }}</span>
               <span v-if="m.user === 'you' && m.isSent === 'sending'" class="status sending" title="发送中">⏳</span>
-              <span v-else-if="m.user === 'you' && m.isSent === 'failed'" class="status failed" title="发送失败">⚠</span>
+              <span v-else-if="m.user === 'you' && m.isSent === 'failed'" class="status failed" title="点击重试" @click.stop="retryMessage(m)">⚠</span>
             </div>
             <!-- 图片消息 -->
             <div v-if="isImageMessage(m.text)" class="image-message">
@@ -464,6 +464,38 @@ function send(){
   scrollToBottom()
 }
 
+/**
+ * 重试发送失败的消息。
+ */
+async function retryMessage(m) {
+  if (!m || !m.text) return
+  const to = currentChatId.value
+  if (!to) return
+
+  // 生成新的 messageId
+  const newMessageId = 'local_' + Date.now()
+  const wrapper = isGroupChat.value
+    ? {
+        type: 'group_chat',
+        groupChat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: newMessageId }
+      }
+    : {
+        type: 'chat',
+        chat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: newMessageId }
+      }
+
+  // 更新状态为发送中
+  store.updateMessageStatus(m.messageId, 'sending')
+  m.messageId = newMessageId
+
+  try {
+    await chatSocket.sendWrapper(wrapper)
+  } catch (e) {
+    console.warn("重试失败:", e.message)
+    store.updateMessageStatus(newMessageId, 'failed')
+  }
+}
+
 // 处理粘贴事件
 function handlePaste(e) {
   const items = e.clipboardData?.items
@@ -716,6 +748,12 @@ onMounted(()=>{
     transform: translateY(0);
   }
 }
+
+/* 消息状态图标 */
+.status { font-size: 12px; margin-left: 4px; }
+.status.sending { opacity: 0.6; }
+.status.failed { color: #e74c3c; cursor: pointer; }
+.status.failed:hover { text-decoration: underline; }
 
 /* 自己发的消息：在右边，橙色气泡，头像在右侧 */
 .msg.me{
