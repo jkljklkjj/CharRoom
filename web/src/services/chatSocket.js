@@ -2,6 +2,7 @@ import { encodeMessage, decodeMessage } from '../proto'
 import DOMPurify from 'dompurify'
 import i18n from '../i18n'
 import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
+import { saveToQueue, getAllPending, removeMessage, clearQueue } from './offlineQueue'
 
 // ── 内部变量 ────────────────────────────────────
 
@@ -131,6 +132,9 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 
     // 发送登录消息
     sendLogin(token)
+
+    // 刷新 IndexedDB 离线队列
+    flushOfflineQueue()
     // 启动心跳
     startHeartbeat()
     if (handlers.onopen) handlers.onopen()
@@ -206,10 +210,16 @@ async function sendLogin(token) {
  */
 export async function sendWrapper(wrapperObj) {
   if (!transport || !transport.isConnected()) {
-    // 未连接时加入队列
+    // 未连接时：存入内存队列 + IndexedDB 持久化
     if (pendingQueue.length < MAX_QUEUE_SIZE) {
       const buffer = await encodeMessage(wrapperObj)
       pendingQueue.push({ buffer, wrapperObj })
+      // 持久化到 IndexedDB（PWA 离线场景）
+      if (wrapperObj.type === 'chat' || wrapperObj.type === 'group_chat') {
+        saveToQueue(wrapperObj, buffer, {}).catch(e =>
+          console.warn('[OfflineQueue] 保存到 IndexedDB 失败:', e)
+        )
+      }
     }
     return false
   }
@@ -232,6 +242,8 @@ export async function sendWrapper(wrapperObj) {
   // 乐观 UI：跟踪待确认消息（私聊 + 群聊）
   if (sent && msgId && (wrapperObj.type === 'chat' || wrapperObj.type === 'group_chat')) {
     pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
+    // 发送成功，从 IndexedDB 离线队列中移除
+    removeMessage(msgId).catch(() => {})
   }
 
   return sent
@@ -284,6 +296,36 @@ function flushQueue() {
         break
       }
     }
+  }
+}
+
+/**
+ * 刷新 IndexedDB 离线队列：网络恢复后自动重发离线消息。
+ */
+async function flushOfflineQueue() {
+  try {
+    const pending = await getAllPending()
+    if (pending.length === 0) return
+
+    console.log(`[OfflineQueue] 发送离线队列中的 ${pending.length} 条消息`)
+    for (const entry of pending) {
+      try {
+        const buffer = new Uint8Array(entry.buffer).buffer
+        const streamType = entry.opts?.streamType || getStreamType(entry.wrapperObj)
+        const conversationId = entry.opts?.conversationId || resolveConversationId(entry.wrapperObj)
+
+        if (transport && transport.isConnected()) {
+          transport.send(buffer, { streamType, conversationId })
+          await removeMessage(entry.messageId)
+        } else {
+          break // 连接断开，停止发送
+        }
+      } catch (e) {
+        console.warn('[OfflineQueue] 发送失败:', entry.messageId, e)
+      }
+    }
+  } catch (e) {
+    console.warn('[OfflineQueue] flushOfflineQueue 异常:', e)
   }
 }
 
@@ -579,5 +621,9 @@ export default {
   sendAck,
   readyState,
   getAverageRtt,
-  setStore
+  setStore,
+  getOfflineQueueSize: async () => {
+    const { getQueueSize } = await import('./offlineQueue')
+    return getQueueSize()
+  }
 }
