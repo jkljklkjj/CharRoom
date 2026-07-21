@@ -83,9 +83,10 @@
   - 后端已支持 TOOL_CALL/TOOL_RESULT/USAGE
   - KMP 需扩展 `onAgentStreamChunk` 处理工具调用展示
 
-- [ ] **离线消息队列持久化**
-  - 当前 `pendingMessages` 仅内存，应用重启丢失
-  - 应持久化到本地 DB（SQLDelight）
+- [x] **离线消息队列持久化** ✅
+  - LocalChatHistoryStore 新增 savePendingMessages / restorePendingMessages
+  - 桌面端：pending_messages.json 持久化
+  - 启动时自动恢复，发送完成后清理
 
 ### 🔵 低优
 
