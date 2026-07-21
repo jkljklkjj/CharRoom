@@ -56,18 +56,14 @@ export function setStore(store) {
 function startTimers() {
   stopTimers()
 
-  // 每秒检查待确认消息，更新状态
+  // 每秒检查待确认消息，超时标记为失败
   ackCheckTimer = setInterval(() => {
     if (!storeRef) return
     const now = Date.now()
     for (const [msgId, info] of pendingAcks) {
-      const age = now - info.sendTime
-      if (age >= ACK_TIMEOUT_MS && !info.failed) {
+      if (now - info.sendTime >= ACK_TIMEOUT_MS && !info.failed) {
         info.failed = true
         storeRef.updateMessageStatus(msgId, 'failed')
-      } else if (age >= ACK_CONFIRM_MS && !info.warned) {
-        info.warned = true
-        storeRef.updateMessageStatus(msgId, 'sending')
       }
     }
   }, 1000)
@@ -233,10 +229,9 @@ export async function sendWrapper(wrapperObj) {
 
   const sent = transport.send(buffer, { streamType, conversationId })
 
-  // 乐观 UI：跟踪待确认消息
-  if (sent && msgId && wrapperObj.type === 'chat') {
+  // 乐观 UI：跟踪待确认消息（私聊 + 群聊）
+  if (sent && msgId && (wrapperObj.type === 'chat' || wrapperObj.type === 'group_chat')) {
     pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
-    if (storeRef) storeRef.updateMessageStatus(msgId, 'optimistic')
   }
 
   return sent

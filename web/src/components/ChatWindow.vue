@@ -439,7 +439,7 @@ function send(){
 
   const localMessageId = 'local_' + Date.now()
   m.messageId = localMessageId
-  // isSent 不设值 → 无图标（乐观：0-8s 安静展示，8-16s 才出⏳）
+  m.isSent = 'sending' // 立即显示发送中状态
 
   const to = currentChatId.value
   const wrapper = isGroupChat.value
@@ -751,9 +751,14 @@ onMounted(()=>{
 
 /* 消息状态图标 */
 .status { font-size: 12px; margin-left: 4px; }
-.status.sending { opacity: 0.6; }
+.status.sending { opacity: 0.5; animation: pulse 1.5s infinite; }
 .status.failed { color: #e74c3c; cursor: pointer; }
 .status.failed:hover { text-decoration: underline; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
 
 /* 自己发的消息：在右边，橙色气泡，头像在右侧 */
 .msg.me{
