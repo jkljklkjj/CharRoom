@@ -469,6 +469,18 @@ async function handleMessage(rawData) {
       return
     }
 
+    // sync_hint：服务端推送的增量同步提示，触发客户端拉取新消息
+    // 格式：{ type: "sync_hint", ack: { clientId: conversationId, message: seqId } }
+    if (processedData.type === 'sync_hint') {
+      const hint = processedData.ack || processedData
+      const conversationId = hint.clientId
+      const seqId = parseInt(hint.message, 10)
+      if (conversationId && seqId > 0 && storeRef) {
+        storeRef.setConversationSeqId(conversationId, seqId)
+        if (handlers.onmessage) handlers.onmessage(processedData)
+      }
+    }
+
     // 用户在线状态更新
     if (processedData.clientId !== undefined && processedData.online !== undefined) {
       // 传给上层
