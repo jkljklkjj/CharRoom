@@ -37,9 +37,9 @@
 - [x] **Agent 工具调用 UI 展示** ✅
   - TOOL_CALL / TOOL_RESULT / USAGE 已在 WebApp.vue 中展示
 
-- [ ] **消息重试 UI**
-  - 发送失败（isSent=failed）的消息支持点击重试
-  - 重新编码 protobuf 并发送
+- [x] **消息重试 UI** ✅
+  - ⚠ 失败图标可点击，触发 retryMessage()
+  - 生成新 messageId，重新编码 protobuf 发送
 
 ### 🔵 长期
 
