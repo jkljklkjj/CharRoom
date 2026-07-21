@@ -9,11 +9,12 @@
   - 主线程仅在 Worker 不可用时 fallback
   - 新增 getWorkerStatus() 调试接口
 
-- [ ] **乐观 UI + 服务端确认回滚**
-  - 发送消息立即显示（isSent=optimistic）
-  - ACK 返回后替换为服务端 seqId
-  - 超时 16s 标记为 failed，支持重试
-  - 现状：`pendingAcks` 已有基础逻辑，但 UI 状态更新不完整
+- [x] **乐观 UI + 服务端确认回滚** ✅
+  - 消息创建时立即显示 ⏳（sending）
+  - ACK 返回后清除状态（sent）
+  - 超时 16s 标记为 ⚠（failed），支持点击重试
+  - 群聊消息也纳入 pendingAcks 跟踪
+  - ⏳ 添加脉冲动画
 
 - [x] **sync_hint 触发增量同步** ✅
   - 新增 syncConversation(conversationId, seqId) 函数
