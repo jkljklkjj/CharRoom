@@ -79,9 +79,13 @@
   - Cronet（QUIC）用于实时传输，Ktor+OkHttp 用于 REST API
   - 不同协议不同场景，强行统一反而过度设计
 
-- [ ] **Agent 工具调用 UI**
-  - 后端已支持 TOOL_CALL/TOOL_RESULT/USAGE
-  - KMP 需扩展 `onAgentStreamChunk` 处理工具调用展示
+- [x] **Agent 工具调用 UI** ✅
+  - onAgentStreamChunk 扩展参数：streamType, toolName, toolResult, inputTokens, outputTokens
+  - ChatApp 按 streamType 分发展示
+
+- [x] **消息重试 UI** ✅
+  - 失败消息显示「重发」按钮
+  - ChatViewModel.retryMessage() 重新发送
 
 - [x] **离线消息队列持久化** ✅
   - LocalChatHistoryStore 新增 savePendingMessages / restorePendingMessages
