@@ -154,6 +154,9 @@ fun ChatApp(
         })
         println("[ChatApp] 消息监听器注册完成")
 
+        // 恢复离线待发送消息队列
+        chatViewModel.restorePendingMessages()
+
         chatViewModel.loadContacts()
 
         // 加载本地聊天历史

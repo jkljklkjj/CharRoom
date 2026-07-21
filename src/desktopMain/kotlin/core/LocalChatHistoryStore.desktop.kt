@@ -220,6 +220,77 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(emptyMap())
     }
 
+    override fun savePendingMessages(privatePending: List<Message>, groupPending: List<GroupMessage>) {
+        runCatching {
+            val userHome = System.getProperty("user.home")
+            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            if (!folder.exists()) folder.mkdirs()
+            val file = java.io.File(folder, "pending_messages.json")
+            val node = objectMapper.createObjectNode()
+            val privateArray = objectMapper.createArrayNode()
+            privatePending.forEach { privateArray.add(messageToJson(it)) }
+            node.set<ArrayNode>("private", privateArray)
+            val groupArray = objectMapper.createArrayNode()
+            groupPending.forEach { groupMsg ->
+                groupArray.add(objectMapper.createObjectNode().apply {
+                    put("groupId", groupMsg.groupId)
+                    put("senderName", groupMsg.senderName)
+                    put("text", groupMsg.text)
+                    put("senderId", groupMsg.senderId)
+                    put("timestamp", groupMsg.timestamp)
+                    put("isSent", groupMsg.isSent)
+                    put("messageId", groupMsg.messageId)
+                })
+            }
+            node.set<ArrayNode>("group", groupArray)
+            file.writeText(objectMapper.writeValueAsString(node))
+        }.onFailure {
+            logger.warn(it) { "savePendingMessages failed" }
+        }
+    }
+
+    override fun restorePendingMessages(): Pair<List<Message>, List<GroupMessage>> {
+        return runCatching {
+            val userHome = System.getProperty("user.home")
+            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            val file = java.io.File(folder, "pending_messages.json")
+            if (!file.exists()) return@runCatching Pair(emptyList<Message>(), emptyList<GroupMessage>())
+            val text = file.readText()
+            if (text.isBlank()) return@runCatching Pair(emptyList<Message>(), emptyList<GroupMessage>())
+            val node = objectMapper.readTree(text) as? ObjectNode
+                ?: return@runCatching Pair(emptyList<Message>(), emptyList<GroupMessage>())
+
+            val privateList = (node.get("private") as? ArrayNode)?.mapNotNull { item ->
+                (item as? ObjectNode)?.let { jsonToMessage(it, false) as? Message }
+            } ?: emptyList()
+
+            val groupList = (node.get("group") as? ArrayNode)?.mapNotNull { item ->
+                (item as? ObjectNode)?.let { json ->
+                    GroupMessage(
+                        groupId = json.path("groupId").asInt(0),
+                        senderName = json.path("senderName").asText(""),
+                        text = json.path("text").asText(""),
+                        senderId = json.path("senderId").asInt(0),
+                        timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
+                        isSent = json.path("isSent").asBoolean(true),
+                        messageId = json.path("messageId").asText("")
+                    )
+                }
+            } ?: emptyList()
+
+            Pair(privateList, groupList)
+        }.getOrDefault(Pair(emptyList(), emptyList()))
+    }
+
+    override fun clearPendingMessages() {
+        runCatching {
+            val userHome = System.getProperty("user.home")
+            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            val file = java.io.File(folder, "pending_messages.json")
+            if (file.exists()) file.delete()
+        }
+    }
+
     // 内部方法
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {

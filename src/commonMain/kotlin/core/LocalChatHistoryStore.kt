@@ -104,6 +104,21 @@ interface LocalChatHistoryStoreProvider {
      * @return conversationId -> seqId 映射
      */
     fun restoreConversationSeqIds(): Map<String, Long>
+
+    /**
+     * 保存离线待发送消息队列
+     */
+    fun savePendingMessages(privatePending: List<Message>, groupPending: List<GroupMessage>)
+
+    /**
+     * 恢复离线待发送消息队列
+     */
+    fun restorePendingMessages(): Pair<List<Message>, List<GroupMessage>>
+
+    /**
+     * 清空离线待发送消息队列
+     */
+    fun clearPendingMessages()
 }
 
 /**

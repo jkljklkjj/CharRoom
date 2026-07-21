@@ -374,6 +374,33 @@ open class ChatViewModel(
     private val pendingGroupMessages = mutableListOf<GroupMessage>()
 
     /**
+     * 从本地存储恢复离线待发送消息队列。
+     */
+    fun restorePendingMessages() {
+        try {
+            val (private, group) = LocalChatHistoryStore.restorePendingMessages()
+            if (private.isNotEmpty() || group.isNotEmpty()) {
+                pendingMessages.addAll(private)
+                pendingGroupMessages.addAll(group)
+                println("[ChatViewModel] 恢复离线队列: ${private.size} 条私聊, ${group.size} 条群聊")
+            }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+        }
+    }
+
+    /**
+     * 保存离线待发送消息队列到本地存储。
+     */
+    private fun savePendingMessages() {
+        try {
+            LocalChatHistoryStore.savePendingMessages(pendingMessages, pendingGroupMessages)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+        }
+    }
+
+    /**
      * 分页拉取离线消息
      */
     open suspend fun fetchOfflineMessages(page: Int = 0, pageSize: Int = 50): Boolean {
@@ -395,6 +422,7 @@ open class ChatViewModel(
                 pendingGroupMessages.sortedBy { it.timestamp }.forEach { chatState.addGroupMessage(it) }
                 pendingMessages.clear()
                 pendingGroupMessages.clear()
+                LocalChatHistoryStore.clearPendingMessages()
             }
 
             hasMore
