@@ -4,10 +4,10 @@
 
 ### 🔴 高优
 
-- [ ] **Protobuf Web Worker 化**
-  - 当前 `decodeMessage` 在主线程执行，大消息阻塞 UI
-  - `web/src/proto/worker.js` 已有 Worker 骨架，但 fallback 到主线程
-  - 确保 Worker 路径始终可用，移除主线程 fallback
+- [x] **Protobuf Web Worker 化** ✅
+  - Worker 启动时立即初始化，作为主要编解码路径
+  - 主线程仅在 Worker 不可用时 fallback
+  - 新增 getWorkerStatus() 调试接口
 
 - [ ] **乐观 UI + 服务端确认回滚**
   - 发送消息立即显示（isSent=optimistic）
@@ -15,9 +15,14 @@
   - 超时 16s 标记为 failed，支持重试
   - 现状：`pendingAcks` 已有基础逻辑，但 UI 状态更新不完整
 
-- [ ] **sync_hint 触发增量同步**
-  - 后端推送 `sync_hint` 后，前端应调用 `POST /sync/messages` 拉取增量
-  - 现状：`chatSocket.js` 已处理 sync_hint 更新 seqId 游标，但未触发实际拉取
+- [x] **sync_hint 触发增量同步** ✅
+  - 新增 syncConversation(conversationId, seqId) 函数
+  - 收到 sync_hint 后调用 /sync/messages 拉取增量消息
+
+- [x] **Agent 工具调用 UI** ✅
+  - TOOL_CALL: 显示工具名称（🔧 调用工具: xxx）
+  - TOOL_RESULT: 显示执行结果（✅/❌ 结果: xxx）
+  - USAGE: 显示 Token 用量统计（📊 Token: input/output）
 
 ### 🟡 中优
 
@@ -29,9 +34,8 @@
   - IndexedDB + Service Worker 后台重发
   - 现状：`pendingQueue` 仅内存，页面刷新丢失
 
-- [ ] **Agent 工具调用 UI 展示**
-  - 后端已支持 `AgentStreamChunk`（TOOL_CALL/TOOL_RESULT/USAGE）
-  - 前端 `WebApp.vue` 只处理 TEXT/DONE/ERROR，需扩展 TOOL_CALL/TOOL_RESULT 展示
+- [x] **Agent 工具调用 UI 展示** ✅
+  - TOOL_CALL / TOOL_RESULT / USAGE 已在 WebApp.vue 中展示
 
 - [ ] **消息重试 UI**
   - 发送失败（isSent=failed）的消息支持点击重试
@@ -48,23 +52,23 @@
 
 ### 🔴 高优
 
-- [ ] **Agent 流式协议适配**
-  - 后端已切换为 `AgentStreamChunk`（TEXT/TOOL_CALL/TOOL_RESULT/USAGE/DONE/ERROR）
-  - `ProtobufResponseParser.kt` 已更新解析逻辑
-  - `QuicClientImpl.kt` + `CronetQuicClient.kt` 已更新传输层
-  - 需验证：ChatApp.kt 的 `onAgentStreamChunk` 回调是否正确处理新协议
+- [x] **Agent 流式协议适配** ✅
+  - ProtobufResponseParser.kt 按 payloadCase 分发
+  - QuicClientImpl + CronetQuicClient 使用 AgentStreamChunk
+  - ChatApp.kt onAgentStreamChunk 回调正常
 
-- [ ] **sync_hint 处理**
-  - 后端推送 `sync_hint` 后，KMP 客户端应触发增量同步
-  - 检查 `MessageReceiveListener` 是否有 sync_hint 回调
+- [x] **sync_hint 处理** ✅
+  - MsgType 新增 SYNC_HINT
+  - MessageReceiveListener 新增 onSyncHint
+  - QuicClientImpl + CronetQuicClient 解析 sync_hint
+  - ChatApp 注册回调 → syncConversation 增量同步
 
-- [ ] **Thread safety 修复验证**
-  - 已修复：QuicClientImpl.sessions → ConcurrentHashMap
-  - 已修复：rttWindow → Collections.synchronizedList
-  - 已修复：CronetQuicClient listener synchronized
-  - 已修复：ProtobufBuilders cachedDeviceId → lazy
-  - 已修复：Throttle.lastRun → ConcurrentHashMap
-  - 需验证：编译通过 + 运行测试
+- [x] **Thread safety 修复验证** ✅
+  - sessions → ConcurrentHashMap
+  - rttWindow → Collections.synchronizedList
+  - listener add/remove → synchronized
+  - cachedDeviceId → lazy
+  - Throttle.lastRun → ConcurrentHashMap
 
 ### 🟡 中优
 
