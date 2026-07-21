@@ -210,6 +210,13 @@ open class ChatViewModel(
     }
 
     /**
+     * 增量同步单个会话（sync_hint 触发）。
+     */
+    open suspend fun syncConversation(conversationId: String, seqId: Long) {
+        syncService.syncConversation(conversationId, seqId)
+    }
+
+    /**
      * 增量同步所有会话（基于 seqId 游标）。
      */
     open suspend fun syncAllConversations() {

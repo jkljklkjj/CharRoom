@@ -103,6 +103,29 @@ class ConversationSyncService(
     }
 
     /**
+     * 增量同步单个会话（sync_hint 触发）。
+     */
+    suspend fun syncConversation(conversationId: String, serverSeqId: Long) {
+        val currentUserId = GlobalAppState.currentUserId ?: return
+        val lastSeqId = chatState.getConversationSeqId(conversationId)
+        if (serverSeqId <= lastSeqId) return
+
+        val isGroup = conversationId.startsWith("group:")
+        val targetId = if (isGroup) {
+            conversationId.removePrefix("group:").toIntOrNull() ?: return
+        } else {
+            // user:1:2 格式，取对方 ID
+            val parts = conversationId.split(":")
+            if (parts.size >= 3) {
+                val ids = listOf(parts[1].toIntOrNull() ?: 0, parts[2].toIntOrNull() ?: 0)
+                ids.first { it != currentUserId }
+            } else return
+        }
+
+        syncConversation(currentUserId, targetId, isGroup)
+    }
+
+    /**
      * 全量增量同步（基于 seqId 游标）。
      */
     suspend fun syncAllConversations() {

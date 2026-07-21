@@ -144,6 +144,13 @@ fun ChatApp(
                 println("[ChatApp] 收到Agent流式消息：messageId=$messageId, content=$fullContent, done=$done")
                 chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
             }
+
+            override fun onSyncHint(conversationId: String, seqId: Long) {
+                println("[ChatApp] 收到 sync_hint: conversationId=$conversationId, seqId=$seqId")
+                scope.launch(Dispatchers.IO) {
+                    chatViewModel.syncConversation(conversationId, seqId)
+                }
+            }
         })
         println("[ChatApp] 消息监听器注册完成")
 

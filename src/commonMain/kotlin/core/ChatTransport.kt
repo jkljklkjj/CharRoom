@@ -113,6 +113,14 @@ interface MessageReceiveListener {
      * @param conversationId 会话 ID
      */
     fun onAckReceived(messageId: String, seqId: Long, conversationId: String) {}
+
+    /**
+     * 收到同步提示（默认空实现，按需覆盖）。
+     * 服务端推送 sync_hint 通知客户端有新消息，客户端应调用 /sync/messages 拉取增量。
+     * @param conversationId 会话 ID
+     * @param seqId 服务端最新 seqId
+     */
+    fun onSyncHint(conversationId: String, seqId: Long) {}
 }
 
 /**
@@ -135,7 +143,8 @@ enum class MsgType(val wire: String) {
     CHECK("check"),
     HEARTBEAT("heartbeat"),
     ACK("ack"),
-    RESPONSE("response"); // 通用响应消息
+    RESPONSE("response"),
+    SYNC_HINT("sync_hint");
 }
 
 // 全局传输层实现，由各平台入口初始化

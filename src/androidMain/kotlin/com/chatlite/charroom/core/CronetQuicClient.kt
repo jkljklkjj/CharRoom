@@ -357,6 +357,15 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 }
                             }
                         }
+                        MsgType.SYNC_HINT.wire -> if (wrapper.hasAck()) {
+                            val ack = wrapper.ack
+                            val conversationId = ack.clientId
+                            val seqId = ack.message?.toLongOrNull() ?: 0L
+                            if (conversationId.isNotBlank() && seqId > 0) {
+                                log.info("收到 sync_hint: conversationId={}, seqId={}", conversationId, seqId)
+                                listener.onSyncHint(conversationId, seqId)
+                            }
+                        }
                         MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
                             val stream = wrapper.agentStream
                             val requestId = stream.requestId

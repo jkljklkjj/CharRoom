@@ -276,6 +276,18 @@ class QuicClientImpl : ChatTransport {
                                 )
                             }
                         }
+                        MsgType.SYNC_HINT.wire -> {
+                            // sync_hint: 服务端通知有新消息，解析 conversationId + seqId
+                            if (wrapper.hasAck()) {
+                                val ack = wrapper.ack
+                                val conversationId = ack.clientId
+                                val seqId = ack.message?.toLongOrNull() ?: 0L
+                                if (conversationId.isNotBlank() && seqId > 0) {
+                                    log.info("收到 sync_hint: conversationId={}, seqId={}", conversationId, seqId)
+                                    listener.onSyncHint(conversationId, seqId)
+                                }
+                            }
+                        }
                         else -> {
                             log.warn("未知消息类型: type={}", wrapper.type)
                         }
