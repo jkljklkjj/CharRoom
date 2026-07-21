@@ -5,65 +5,74 @@ let protoWorker = null
 let workerId = 0
 const workerCallbacks = new Map()
 let workerReady = false
+let workerInitFailed = false
 
 /**
- * 尝试初始化 Web Worker。
- * 不支持 Worker 的环境回退到主线程解码。
+ * 初始化 Web Worker（仅执行一次）。
+ * Worker 是主要的编解码路径，主线程仅在 Worker 不可用时作为 fallback。
  */
-function getWorker() {
-  if (protoWorker) return protoWorker
+function initWorker() {
+  if (protoWorker || workerInitFailed) return
   try {
     protoWorker = new Worker('/proto/worker.js')
     protoWorker.onmessage = (e) => {
       const { type, id, result, error } = e.data
       if (type === 'init') { workerReady = true; return }
-      if (type === 'error') { console.warn('[ProtoWorker]', error); return }
+      if (type === 'error') {
+        console.warn('[ProtoWorker] init error:', error)
+        workerInitFailed = true
+        workerReady = false
+        return
+      }
       const cb = workerCallbacks.get(id)
       if (cb) { cb(result); workerCallbacks.delete(id) }
     }
+    protoWorker.onerror = (e) => {
+      console.warn('[ProtoWorker] worker error:', e.message)
+      workerInitFailed = true
+      workerReady = false
+    }
     protoWorker.postMessage({ type: 'init', id: -1 })
-    return protoWorker
   } catch (e) {
-    console.warn('[ProtoWorker] Worker 不可用，回退主线程', e.message)
-    protoWorker = null
-    return null
+    console.warn('[ProtoWorker] Worker 不可用:', e.message)
+    workerInitFailed = true
   }
 }
 
+// 启动时立即初始化 Worker
+if (typeof Worker !== 'undefined') {
+  initWorker()
+}
+
 function workerEncode(wrapperObj) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    if (!protoWorker || !workerReady) { reject(new Error('worker not ready')); return }
     const id = ++workerId
     workerCallbacks.set(id, resolve)
-    getWorker().postMessage({ type: 'encode', id, payload: wrapperObj })
+    protoWorker.postMessage({ type: 'encode', id, payload: wrapperObj })
   })
 }
 
 function workerDecode(arrayBuffer) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    if (!protoWorker || !workerReady) { reject(new Error('worker not ready')); return }
     const id = ++workerId
     workerCallbacks.set(id, resolve)
     // 使用 transferable 传输 ArrayBuffer，避免拷贝
-    getWorker().postMessage({ type: 'decode', id, payload: arrayBuffer }, [arrayBuffer])
+    protoWorker.postMessage({ type: 'decode', id, payload: arrayBuffer }, [arrayBuffer])
   })
 }
 
-// ── 公共 API ──────────────────────────────────────────
+// ── 主线程 fallback（仅在 Worker 不可用时使用） ──────
 
-export function loadProto() {
+async function loadProto() {
   if (!rootPromise) {
     rootPromise = protobuf.load('/proto/message.proto')
   }
   return rootPromise
 }
 
-export async function encodeMessage(wrapperObj) {
-  // 尝试 Worker，失败回退主线程
-  if (getWorker() && workerReady) {
-    try {
-      return await workerEncode(wrapperObj)
-    } catch (_) { /* fallthrough */ }
-  }
-  // 主线程解码
+async function mainThreadEncode(wrapperObj) {
   const root = await loadProto()
   const Wrapper = root.lookupType('com.chatlite.proto.MessageWrapper')
   const err = Wrapper.verify(wrapperObj)
@@ -73,20 +82,43 @@ export async function encodeMessage(wrapperObj) {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.length)
 }
 
-export async function decodeMessage(arrayBuffer) {
-  // 尝试 Worker，失败回退主线程
-  if (getWorker() && workerReady) {
-    try {
-      return await workerDecode(arrayBuffer)
-    } catch (_) { /* fallthrough */ }
-  }
-  // 主线程解码
+async function mainThreadDecode(arrayBuffer) {
   const root = await loadProto()
   const Wrapper = root.lookupType('com.chatlite.proto.MessageWrapper')
   const uint8 = new Uint8Array(arrayBuffer)
   const msg = Wrapper.decode(uint8)
-  const obj = Wrapper.toObject(msg, { longs: String, enums: String, defaults: true })
-  return obj
+  return Wrapper.toObject(msg, { longs: String, enums: String, defaults: true })
 }
 
-export default { loadProto, encodeMessage, decodeMessage }
+// ── 公共 API ──────────────────────────────────────────
+
+/**
+ * 编码 MessageWrapper → ArrayBuffer。
+ * 优先使用 Web Worker，fallback 到主线程。
+ */
+export async function encodeMessage(wrapperObj) {
+  if (workerReady) {
+    try { return await workerEncode(wrapperObj) } catch (_) { /* fallback */ }
+  }
+  return mainThreadEncode(wrapperObj)
+}
+
+/**
+ * 解码 ArrayBuffer → MessageWrapper 对象。
+ * 优先使用 Web Worker（transferable 零拷贝），fallback 到主线程。
+ */
+export async function decodeMessage(arrayBuffer) {
+  if (workerReady) {
+    try { return await workerDecode(arrayBuffer) } catch (_) { /* fallback */ }
+  }
+  return mainThreadDecode(arrayBuffer)
+}
+
+/**
+ * 获取 Worker 状态（调试用）。
+ */
+export function getWorkerStatus() {
+  return { ready: workerReady, failed: workerInitFailed }
+}
+
+export default { loadProto, encodeMessage, decodeMessage, getWorkerStatus }

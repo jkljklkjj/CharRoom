@@ -176,6 +176,22 @@ function handleIncomingMessage(msg) {
       if (streamType === 0 && stream.text !== undefined) {
         // 文本片段：增量拼接
         store.upsertAgentStreamMessage(requestId, stream.text, false)
+      } else if (streamType === 1 && stream.toolCall) {
+        // 工具调用：显示工具名称和参数
+        const tc = stream.toolCall
+        const toolInfo = `\n\n🔧 调用工具: ${tc.name}`
+        store.upsertAgentStreamMessage(requestId, toolInfo, false)
+      } else if (streamType === 2 && stream.toolResult) {
+        // 工具结果：显示执行结果
+        const tr = stream.toolResult
+        const status = tr.success ? '✅' : '❌'
+        const resultText = `\n${status} 结果: ${tr.result || '(空)'}`
+        store.upsertAgentStreamMessage(requestId, resultText, false)
+      } else if (streamType === 3 && stream.usage) {
+        // Token 用量：显示统计
+        const u = stream.usage
+        const usageText = `\n\n📊 Token: ${u.inputTokens} 输入 / ${u.outputTokens} 输出`
+        store.upsertAgentStreamMessage(requestId, usageText, false)
       } else if (streamType === 4) {
         // 流结束
         store.upsertAgentStreamMessage(requestId, '', true)
@@ -184,7 +200,16 @@ function handleIncomingMessage(msg) {
         const errorMsg = stream.error.message || 'Agent 处理失败'
         store.upsertAgentStreamMessage(requestId, `\n\n❌ ${errorMsg}`, true)
       }
-      // TOOL_CALL / TOOL_RESULT / USAGE：后续可扩展 UI 展示
+    } else if (msg.type === 'sync_hint') {
+      // sync_hint：服务端推送的增量同步提示
+      const hint = msg.ack || msg
+      const conversationId = hint.clientId
+      const seqId = parseInt(hint.message, 10)
+      if (conversationId && seqId > 0) {
+        store.setConversationSeqId(conversationId, seqId)
+        // 触发增量同步
+        syncConversation(conversationId, seqId)
+      }
     } else if (msg.clientId !== undefined && msg.online !== undefined) {
       store.updateUserOnlineStatus(parseInt(msg.clientId), msg.online)
     }
@@ -194,6 +219,50 @@ function handleIncomingMessage(msg) {
 }
 
 /** 登录后拉取所有会话的离线消息 */
+/**
+ * 增量同步单个会话（sync_hint 触发）。
+ * @param {string} conversationId - 会话 ID
+ * @param {number} serverSeqId - 服务端最新 seqId
+ */
+async function syncConversation(conversationId, serverSeqId) {
+  const lastSeqId = store.getConversationSeqId(conversationId)
+  if (serverSeqId <= lastSeqId) return
+
+  try {
+    const result = await api.syncMessages(conversationId, lastSeqId, 50)
+    if (!result || !result.messages || result.messages.length === 0) return
+
+    const accountId = store.state.accountId
+    for (const msg of result.messages) {
+      const isMe = String(msg.senderId) === String(accountId)
+      if (conversationId.startsWith('group:')) {
+        store.addGroupMessage({
+          user: String(msg.senderId),
+          text: msg.message,
+          time: msg.timestamp,
+          groupId: conversationId.replace('group:', ''),
+          seqId: msg.seqId
+        })
+      } else {
+        store.addMessage({
+          user: isMe ? 'you' : String(msg.senderId),
+          text: msg.message,
+          time: msg.timestamp,
+          targetId: isMe ? String(msg.receiverId) : String(msg.senderId),
+          seqId: msg.seqId
+        })
+      }
+    }
+
+    if (result.nextSeqId) {
+      store.setConversationSeqId(conversationId, result.nextSeqId)
+    }
+    console.log(`📡 增量同步 ${conversationId}: ${result.messages.length} 条消息`)
+  } catch (e) {
+    console.warn('增量同步失败:', conversationId, e)
+  }
+}
+
 async function syncAllConversations() {
   const accountId = store.state.accountId
   if (!accountId) return
