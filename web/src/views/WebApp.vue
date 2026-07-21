@@ -166,11 +166,25 @@ function handleIncomingMessage(msg) {
         groupId: msg.groupChat.targetClientId
       })
     } else if (msg.type === 'agentChatStream' && msg.agentStream) {
-      // Agent 流式消息：增量拼接内容
+      // Agent 流式消息（AgentStreamChunk 协议）
       const stream = msg.agentStream
-      const messageId = stream.messageId || ''
-      if (!messageId) return
-      store.upsertAgentStreamMessage(messageId, stream.chunk || '', stream.done)
+      const requestId = stream.requestId || ''
+      if (!requestId) return
+
+      const streamType = stream.type
+      // 0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
+      if (streamType === 0 && stream.text !== undefined) {
+        // 文本片段：增量拼接
+        store.upsertAgentStreamMessage(requestId, stream.text, false)
+      } else if (streamType === 4) {
+        // 流结束
+        store.upsertAgentStreamMessage(requestId, '', true)
+      } else if (streamType === 5 && stream.error) {
+        // 错误
+        const errorMsg = stream.error.message || 'Agent 处理失败'
+        store.upsertAgentStreamMessage(requestId, `\n\n❌ ${errorMsg}`, true)
+      }
+      // TOOL_CALL / TOOL_RESULT / USAGE：后续可扩展 UI 展示
     } else if (msg.clientId !== undefined && msg.online !== undefined) {
       store.updateUserOnlineStatus(parseInt(msg.clientId), msg.online)
     }

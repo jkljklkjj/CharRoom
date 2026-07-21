@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package com.chatlite.proto;
 
+import "agent_stream.proto";
+
 option java_package = "com.chatlite.proto";
 option java_outer_classname = "MessageProtos";
 option java_multiple_files = false;
@@ -87,15 +89,6 @@ message AgentChatMessage {
     repeated ClientAction clientActions = 5; // 可选的行为序列
 }
 
-// Agent 流式消息
-message AgentStreamMessage {
-    string chunk = 1;         // 流式输出片段
-    bool done = 2;            // 是否为流结束标记
-    bool error = 3;           // 是否为错误消息
-    string message = 4;       // 错误或结束说明
-    string messageId = 5;     // 可选的客户端调用关联ID
-}
-
 // 检查在线状态消息
 message CheckMessage {
     string targetClientId = 1;  // 要检查的客户端ID
@@ -135,7 +128,7 @@ message MessageWrapper {
         CheckMessage check = 5;
         HeartbeatMessage heartbeat = 6;
         LogoutMessage logout = 7;
-        AgentStreamMessage agentStream = 8;
+        AgentStreamChunk agentStream = 8;    // Agent 流式输出
         AckMessage ack = 10;
         ResponseMessage response = 11;
     }

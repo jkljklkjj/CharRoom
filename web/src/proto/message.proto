@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package com.chatlite.proto;
 
+import "agent_stream.proto";
+
 option java_package = "com.chatlite.proto";
 option java_outer_classname = "MessageProtos";
 option java_multiple_files = false;
@@ -26,7 +28,7 @@ message ChatMessage {
     string content = 2;       // 消息内容
     string userId = 3;        // 发送者用户ID
     string timestamp = 4;      // 时间戳
-    optional string messageId = 5;      // 消息唯一ID（用于ACK确认）
+    optional string messageId = 5;      // 消息唯一ID（用于ACK确认而非数据库）
     repeated ClientAction clientActions = 6; // 可选的行为序列
 
     // 引用回复相关字段
@@ -39,6 +41,10 @@ message ChatMessage {
     optional string fileUrl = 11;          // 文件/图片URL
     optional string fileName = 12;         // 文件名称
     optional int64 fileSize = 13;          // 文件大小
+
+    // 消息序列号（增量同步用）
+    optional int64 seqId = 14;             // 会话级单调递增序列号
+    optional string conversationId = 15;   // 会话ID（格式: "user:{uid1}:{uid2}"）
 }
 
 // 群聊消息
@@ -59,6 +65,10 @@ message GroupChatMessage {
     optional string fileUrl = 10;          // 文件/图片URL
     optional string fileName = 11;         // 文件名称
     optional int64 fileSize = 12;          // 文件大小
+
+    // 消息序列号（增量同步用）
+    optional int64 seqId = 13;             // 群聊级单调递增序列号
+    optional string conversationId = 14;   // 会话ID（格式: "group:{gid}"）
 }
 
 // 客户端行为描述
@@ -77,15 +87,6 @@ message AgentChatMessage {
     string userId = 3;        // 发送者用户ID
     string timestamp = 4;      // 时间戳
     repeated ClientAction clientActions = 5; // 可选的行为序列
-}
-
-// Agent 流式消息
-message AgentStreamMessage {
-    string chunk = 1;         // 流式输出片段
-    bool done = 2;            // 是否为流结束标记
-    bool error = 3;           // 是否为错误消息
-    string message = 4;       // 错误或结束说明
-    string messageId = 5;     // 可选的客户端调用关联ID
 }
 
 // 检查在线状态消息
@@ -111,6 +112,8 @@ message AckMessage {
     optional bool success = 3;      // 是否成功，默认true
     optional string clientId = 4;   // 客户端ID (用于CheckMessage响应)
     optional bool online = 5;       // 是否在线 (用于CheckMessage响应)
+    optional int64 seqId = 6;       // 当前会话的 seqId（乐观 UI 更新游标用）
+    optional string conversationId = 7; // 会话ID
 }
 
 // 通用消息包装器
@@ -125,7 +128,7 @@ message MessageWrapper {
         CheckMessage check = 5;
         HeartbeatMessage heartbeat = 6;
         LogoutMessage logout = 7;
-        AgentStreamMessage agentStream = 8;
+        AgentStreamChunk agentStream = 8;    // Agent 流式输出
         AckMessage ack = 10;
         ResponseMessage response = 11;
     }

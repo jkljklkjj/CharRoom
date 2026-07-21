@@ -252,23 +252,27 @@ class QuicClientImpl : ChatTransport {
                         MsgType.AGENT_CHAT_STREAM.wire -> {
                             if (wrapper.hasAgentStream()) {
                                 val stream = wrapper.agentStream
-                                // 流式输出：中间 chunk 按 messageId+contentHash 去重
-                                // done 消息按 messageId 去重（防止重复触发完成）
-                                val dedupKey = if (stream.done) stream.messageId
-                                    else "${stream.messageId}:${stream.chunk.hashCode()}"
+                                val requestId = stream.requestId
+                                val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
+                                val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
+                                val text = if (stream.hasText()) stream.text else ""
+
+                                // 去重：done 按 requestId，chunk 按 requestId+contentHash
+                                val dedupKey = if (isDone) requestId
+                                    else "${requestId}:${text.hashCode()}"
                                 if (isDuplicateMessage(dedupKey)) {
-                                    log.debug("重复 Agent 流跳过: messageId={}, done={}", stream.messageId, stream.done)
+                                    log.debug("重复 Agent 流跳过: requestId={}, done={}", requestId, isDone)
                                     return@forEach
                                 }
-                                log.info("分发Agent流式消息: messageId={}, done={}", stream.messageId, stream.done)
-                                if (stream.done) {
-                                    sendAckToServer(streamId, stream.messageId, "agent")
+                                log.info("分发Agent流式消息: requestId={}, type={}, done={}", requestId, stream.type, isDone)
+                                if (isDone) {
+                                    sendAckToServer(streamId, requestId, "agent")
                                 }
                                 listener.onAgentStreamChunk(
-                                    messageId = stream.messageId,
-                                    fullContent = stream.chunk,
-                                    done = stream.done,
-                                    error = stream.error
+                                    messageId = requestId,
+                                    fullContent = text,
+                                    done = isDone,
+                                    error = isError
                                 )
                             }
                         }

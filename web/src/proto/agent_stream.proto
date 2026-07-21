@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package com.chatlite.proto;
+
+option java_package = "com.chatlite.proto";
+option java_outer_classname = "AgentStreamProtos";
+option java_multiple_files = false;
+
+// ============================================================
+// Agent 流式响应协议
+// ============================================================
+// 独立于 message.proto，专注 Agent LLM 流式输出场景。
+// 支持：文本片段、工具调用/结果、Token 用量、错误、结束标记。
+
+// 流式消息类型
+enum AgentStreamType {
+    STREAM_TEXT = 0;        // 文本片段
+    STREAM_TOOL_CALL = 1;   // 工具调用请求
+    STREAM_TOOL_RESULT = 2; // 工具执行结果
+    STREAM_USAGE = 3;       // Token 用量统计
+    STREAM_DONE = 4;        // 流结束
+    STREAM_ERROR = 5;       // 错误
+}
+
+// 工具调用信息
+message ToolCall {
+    string id = 1;          // 调用 ID（用于关联 ToolResult）
+    string name = 2;        // 工具名称
+    string arguments = 3;   // 工具参数（JSON 字符串）
+}
+
+// 工具执行结果
+message ToolResult {
+    string tool_call_id = 1;  // 关联的 ToolCall.id
+    string result = 2;        // 执行结果（JSON 字符串）
+    bool success = 3;         // 是否执行成功
+}
+
+// Token 用量统计
+message TokenUsage {
+    int32 input_tokens = 1;
+    int32 output_tokens = 2;
+    int32 total_tokens = 3;
+    string model = 4;         // 模型名称
+}
+
+// 错误信息
+message StreamError {
+    string code = 1;          // 错误码（如 RATE_LIMITED, TIMEOUT）
+    string message = 2;       // 人类可读错误描述
+}
+
+// ============================================================
+// Agent 流式消息（顶层信封）
+// ============================================================
+message AgentStreamChunk {
+    AgentStreamType type = 1;
+    string request_id = 2;      // 关联的请求 ID
+    string trace_id = 3;        // 链路追踪 ID
+
+    oneof payload {
+        string text = 10;                   // type=TEXT
+        ToolCall tool_call = 11;            // type=TOOL_CALL
+        ToolResult tool_result = 12;        // type=TOOL_RESULT
+        TokenUsage usage = 13;              // type=USAGE
+        StreamError error = 14;             // type=ERROR
+    }
+}

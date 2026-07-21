@@ -63,11 +63,48 @@ fun parseProtoResponse(bytes: ByteArray): ApiUnwrap {
             MessageProtos.MessageWrapper.PayloadCase.AGENTSTREAM -> {
                 val v = wrapper.agentStream
                 val payload = mapper.createObjectNode()
-                payload.put("chunk", v.chunk)
-                payload.put("done", v.done)
-                payload.put("error", v.error)
-                payload.put("message", v.message)
-                payload.put("messageId", v.messageId)
+                payload.put("type", v.typeValue)  // 0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
+                payload.put("requestId", v.requestId)
+                payload.put("traceId", v.traceId)
+
+                when (v.payloadCase) {
+                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.TEXT -> {
+                        payload.put("text", v.text)
+                    }
+                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.TOOL_CALL -> {
+                        val tc = v.toolCall
+                        val toolCallNode = mapper.createObjectNode()
+                        toolCallNode.put("id", tc.id)
+                        toolCallNode.put("name", tc.name)
+                        toolCallNode.put("arguments", tc.arguments)
+                        payload.set<ObjectNode>("toolCall", toolCallNode)
+                    }
+                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.TOOL_RESULT -> {
+                        val tr = v.toolResult
+                        val toolResultNode = mapper.createObjectNode()
+                        toolResultNode.put("toolCallId", tr.toolCallId)
+                        toolResultNode.put("result", tr.result)
+                        toolResultNode.put("success", tr.success)
+                        payload.set<ObjectNode>("toolResult", toolResultNode)
+                    }
+                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.USAGE -> {
+                        val u = v.usage
+                        val usageNode = mapper.createObjectNode()
+                        usageNode.put("inputTokens", u.inputTokens)
+                        usageNode.put("outputTokens", u.outputTokens)
+                        usageNode.put("totalTokens", u.totalTokens)
+                        usageNode.put("model", u.model)
+                        payload.set<ObjectNode>("usage", usageNode)
+                    }
+                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.ERROR -> {
+                        val e = v.error
+                        val errorNode = mapper.createObjectNode()
+                        errorNode.put("code", e.code)
+                        errorNode.put("message", e.message)
+                        payload.set<ObjectNode>("error", errorNode)
+                    }
+                    else -> {}
+                }
                 node.set<ObjectNode>("payload", payload)
             }
             MessageProtos.MessageWrapper.PayloadCase.PAYLOAD_NOT_SET, null -> {
