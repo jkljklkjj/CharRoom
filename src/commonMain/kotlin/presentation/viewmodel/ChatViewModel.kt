@@ -340,6 +340,29 @@ open class ChatViewModel(
         )
     }
 
+    // ═══ 消息重试 ═════════════════════════════════════════
+
+    /**
+     * 重试发送失败的消息。
+     */
+    fun retryMessage(message: Message) {
+        val user = chatState.users.value.find { it.id == message.receiverId } ?: return
+        // 更新状态为发送中
+        chatState.updateMessageSentStatus(message.messageId, true)
+        // 重新发送
+        messageSender.sendPrivateMessage(
+            user = user,
+            messageText = message.message,
+            messageType = message.messageType,
+            fileUrl = message.fileUrl,
+            fileName = message.fileName,
+            fileSize = message.fileSize,
+            replyToMessageId = message.replyToMessageId,
+            replyToContent = message.replyToContent,
+            replyToSender = message.replyToSender
+        )
+    }
+
     // ═══ 个人资料 ═════════════════════════════════════════
 
     /**

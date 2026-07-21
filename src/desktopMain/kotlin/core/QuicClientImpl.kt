@@ -268,11 +268,23 @@ class QuicClientImpl : ChatTransport {
                                 if (isDone) {
                                     sendAckToServer(streamId, requestId, "agent")
                                 }
+
+                                // 提取工具调用/结果/用量信息
+                                val toolName = if (stream.hasToolCall()) stream.toolCall.name else null
+                                val toolResult = if (stream.hasToolResult()) stream.toolResult.result else null
+                                val inputTokens = if (stream.hasUsage()) stream.usage.inputTokens else 0
+                                val outputTokens = if (stream.hasUsage()) stream.usage.outputTokens else 0
+
                                 listener.onAgentStreamChunk(
                                     messageId = requestId,
                                     fullContent = text,
                                     done = isDone,
-                                    error = isError
+                                    error = isError,
+                                    streamType = stream.typeValue,
+                                    toolName = toolName,
+                                    toolResult = toolResult,
+                                    inputTokens = inputTokens,
+                                    outputTokens = outputTokens
                                 )
                             }
                         }

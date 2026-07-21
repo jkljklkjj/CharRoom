@@ -102,9 +102,22 @@ interface MessageReceiveListener {
     fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long)
 
     /**
-     * 收到聊天助手流式输出（默认空实现，按需覆盖）
+     * 收到聊天助手流式输出（默认空实现，按需覆盖）。
+     * @param messageId 请求 ID
+     * @param fullContent 文本内容（type=TEXT 时有值）
+     * @param done 是否结束
+     * @param error 是否错误
+     * @param streamType 流类型：0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
+     * @param toolName 工具名称（type=TOOL_CALL 时有值）
+     * @param toolResult 工具结果（type=TOOL_RESULT 时有值）
+     * @param inputTokens 输入 token 数（type=USAGE 时有值）
+     * @param outputTokens 输出 token 数（type=USAGE 时有值）
      */
-    fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean) {}
+    fun onAgentStreamChunk(
+        messageId: String, fullContent: String, done: Boolean, error: Boolean,
+        streamType: Int = 0, toolName: String? = null, toolResult: String? = null,
+        inputTokens: Int = 0, outputTokens: Int = 0
+    ) {}
 
     /**
      * 收到 ACK 确认（默认空实现，按需覆盖）

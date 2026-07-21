@@ -947,11 +947,24 @@ private fun ChatScreenContent(
                     }
 
                     if (message.sender && !message.isSent) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
                                 text = s["chat.send.failed"],
                                 style = MaterialTheme.typography.caption,
                                 color = MaterialTheme.colors.error
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = s["chat.resend"],
+                                style = MaterialTheme.typography.caption,
+                                color = MaterialTheme.colors.primary,
+                                modifier = Modifier.clickable {
+                                    chatViewModel.retryMessage(message)
+                                }
                             )
                         }
                     }

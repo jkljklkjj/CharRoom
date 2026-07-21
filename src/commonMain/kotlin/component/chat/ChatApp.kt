@@ -140,9 +140,41 @@ fun ChatApp(
                 chatViewModel.addGroupMessage(groupMessage)
             }
 
-            override fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean) {
-                println("[ChatApp] 收到Agent流式消息：messageId=$messageId, content=$fullContent, done=$done")
-                chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
+            override fun onAgentStreamChunk(
+                messageId: String, fullContent: String, done: Boolean, error: Boolean,
+                streamType: Int, toolName: String?, toolResult: String?,
+                inputTokens: Int, outputTokens: Int
+            ) {
+                // 0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
+                when (streamType) {
+                    0 -> {
+                        // 文本片段
+                        chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
+                    }
+                    1 -> {
+                        // 工具调用
+                        val info = "\n\n🔧 调用工具: ${toolName ?: "未知"}"
+                        chatViewModel.upsertAgentStreamMessage(messageId, info)
+                    }
+                    2 -> {
+                        // 工具结果
+                        val info = "\n✅ 结果: ${toolResult ?: "(空)"}"
+                        chatViewModel.upsertAgentStreamMessage(messageId, info)
+                    }
+                    3 -> {
+                        // Token 用量
+                        val info = "\n\n📊 Token: $inputTokens 输入 / $outputTokens 输出"
+                        chatViewModel.upsertAgentStreamMessage(messageId, info)
+                    }
+                    4 -> {
+                        // 流结束
+                        chatViewModel.upsertAgentStreamMessage(messageId, "")
+                    }
+                    5 -> {
+                        // 错误
+                        chatViewModel.upsertAgentStreamMessage(messageId, "\n\n❌ Agent 处理失败")
+                    }
+                }
             }
 
             override fun onSyncHint(conversationId: String, seqId: Long) {
