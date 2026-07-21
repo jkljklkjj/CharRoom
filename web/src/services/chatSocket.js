@@ -340,17 +340,21 @@ function startHeartbeat() {
   function tick() {
     if (!transport || !transport.isConnected()) return
 
+    // 自适应心跳间隔
+    const currentInterval = adaptiveHeartbeatInterval()
+
     // 心跳超时检查
-    if (lastHeartbeatResponseTime > 0 && Date.now() - lastHeartbeatResponseTime > heartbeatInterval + heartbeatTimeout) {
+    if (lastHeartbeatResponseTime > 0 && Date.now() - lastHeartbeatResponseTime > currentInterval + heartbeatTimeout) {
       console.warn('心跳超时，关闭连接')
       if (transport) transport.close()
       return
     }
 
-    lastHbSendTime = Date.now()
+    const now = Date.now()
+    recordHeartbeatSent(now)
     sendWrapper({
       type: 'heartbeat',
-      heartbeat: { timestamp: Date.now() }
+      heartbeat: { timestamp: now }
     }).catch(e => {
       console.warn('心跳发送失败:', e)
       if (transport) transport.close()
@@ -417,9 +421,7 @@ async function handleMessage(rawData) {
 
   // 处理服务端响应
   if (processedData && typeof processedData === 'object') {
-    // 任何来自服务端的成功消息都视为心跳有效，同时记录 RTT
     lastHeartbeatResponseTime = Date.now()
-    recordRtt()
 
     // 带 success 字段的响应（ResponseMessage / AckMessage）
     const isSuccess = processedData.success
@@ -445,10 +447,16 @@ async function handleMessage(rawData) {
       lastHeartbeatResponseTime = Date.now()
       return
     }
-    // ACK 确认：更新消息状态 + seqId 游标
+    // ACK 确认：更新消息状态 + seqId 游标 + RTT 测量
     if (processedData.type === 'ack') {
       lastHeartbeatResponseTime = Date.now()
       const ack = processedData.ack || processedData
+
+      // 心跳 ACK 回传 timestamp 用于精确 RTT 测量
+      if (ack.timestamp > 0 && (!ack.messageId || ack.messageId === '')) {
+        recordRttFromAck(ack.timestamp)
+      }
+
       const ackedMsgId = ack.messageId
       if (ackedMsgId && pendingAcks.has(ackedMsgId)) {
         pendingAcks.delete(ackedMsgId)
@@ -485,17 +493,32 @@ async function handleMessage(rawData) {
   }
 }
 
-// ── RTT 记录 ────────────────────────────────────
+// ── RTT 记录（基于服务端回传 timestamp） ───────────
 
 let lastHbSendTime = 0
+let lastHbTimestamp = 0   // 发送心跳时的客户端时间戳
 let rttSamples = []
 const MAX_RTT_SAMPLES = 10
 
-function recordRtt() {
-  if (lastHbSendTime > 0) {
+/**
+ * 记录心跳发送时间。
+ * @param {number} timestamp - 发送时的 Date.now()
+ */
+function recordHeartbeatSent(timestamp) {
+  lastHbSendTime = Date.now()
+  lastHbTimestamp = timestamp
+}
+
+/**
+ * 收到心跳 ACK 时调用，用服务端回传的 timestamp 计算精确 RTT。
+ * @param {number} serverEchoTimestamp - 服务端回传的客户端时间戳
+ */
+function recordRttFromAck(serverEchoTimestamp) {
+  if (lastHbTimestamp > 0 && serverEchoTimestamp === lastHbTimestamp) {
     const rtt = Date.now() - lastHbSendTime
     rttSamples.push(rtt)
     if (rttSamples.length > MAX_RTT_SAMPLES) rttSamples.shift()
+    lastHbTimestamp = 0 // 防止重复计算
   }
 }
 
@@ -505,6 +528,25 @@ function recordRtt() {
 export function getAverageRtt() {
   if (rttSamples.length === 0) return 0
   return Math.round(rttSamples.reduce((a, b) => a + b, 0) / rttSamples.length)
+}
+
+/**
+ * 获取 P90 RTT（毫秒）。
+ */
+export function getP90Rtt() {
+  if (rttSamples.length === 0) return 0
+  const sorted = [...rttSamples].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length * 0.9)]
+}
+
+/**
+ * 自适应心跳间隔：基于 P90 RTT，范围 10-30 秒。
+ * 目标：心跳间隔 = RTT * 3，留余量避免 bufferbloat 误触断连。
+ */
+function adaptiveHeartbeatInterval() {
+  if (rttSamples.length < 3) return 30000 // 样本不足时用默认 30s
+  const p90 = getP90Rtt()
+  return Math.max(10000, Math.min(30000, p90 * 3))
 }
 
 // ── 浏览器通知 ──────────────────────────────────
