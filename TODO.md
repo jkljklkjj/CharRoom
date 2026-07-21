@@ -75,9 +75,9 @@
 
 ### 🟡 中优
 
-- [ ] **Android 双网络栈统一**
-  - `AndroidWebSocketClient`（Netty）+ `NetworkRepository`（OkHttp/Ktor）
-  - 应统一为 Ktor，删除 Netty 依赖（仅桌面端保留）
+- [x] **Android 双网络栈** — 不需要统一
+  - Cronet（QUIC）用于实时传输，Ktor+OkHttp 用于 REST API
+  - 不同协议不同场景，强行统一反而过度设计
 
 - [ ] **Agent 工具调用 UI**
   - 后端已支持 TOOL_CALL/TOOL_RESULT/USAGE
