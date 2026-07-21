@@ -1,98 +1,23 @@
 # TODO — CharRoom 全栈项目
 
+---
+
 ## 🌐 前端 Web
-
-### 🔴 高优
-
-- [x] **Protobuf Web Worker 化** ✅
-  - Worker 启动时立即初始化，作为主要编解码路径
-  - 主线程仅在 Worker 不可用时 fallback
-  - 新增 getWorkerStatus() 调试接口
-
-- [x] **乐观 UI + 服务端确认回滚** ✅
-  - 消息创建时立即显示 ⏳（sending）
-  - ACK 返回后清除状态（sent）
-  - 超时 16s 标记为 ⚠（failed），支持点击重试
-  - 群聊消息也纳入 pendingAcks 跟踪
-  - ⏳ 添加脉冲动画
-
-- [x] **sync_hint 触发增量同步** ✅
-  - 新增 syncConversation(conversationId, seqId) 函数
-  - 收到 sync_hint 后调用 /sync/messages 拉取增量消息
-
-- [x] **Agent 工具调用 UI** ✅
-  - TOOL_CALL: 显示工具名称（🔧 调用工具: xxx）
-  - TOOL_RESULT: 显示执行结果（✅/❌ 结果: xxx）
-  - USAGE: 显示 Token 用量统计（📊 Token: input/output）
-
-### 🟡 中优
 
 - [ ] **离线首屏加载策略**
   - 虚拟滚动 + 分页 + seqId 增量同步
   - 现状：消息分页已实现（PAGE_SIZE=50），但无虚拟滚动
+  - 评估：分页已足够，虚拟滚动可能不需要
 
-- [x] **PWA 离线队列持久化** ✅
-  - IndexedDB 存储待发送消息（offlineQueue.js）
-  - 连接恢复后自动重发
-  - 发送成功后自动清理
-  - export getOfflineQueueSize() 供 UI 显示
+- [ ] **WebTransport Datagram**（长期）
+  - 不可靠传输，心跳/状态同步
 
-- [x] **Agent 工具调用 UI 展示** ✅
-  - TOOL_CALL / TOOL_RESULT / USAGE 已在 WebApp.vue 中展示
-
-- [x] **消息重试 UI** ✅
-  - ⚠ 失败图标可点击，触发 retryMessage()
-  - 生成新 messageId，重新编码 protobuf 发送
-
-### 🔵 长期
-
-- [ ] WebTransport Datagram（不可靠传输，心跳/状态同步）
-- [ ] WASM 编解码（protobuf.wasm 提速 3-5×）
+- [ ] **WASM 编解码**（长期）
+  - protobuf.wasm 提速 3-5×
 
 ---
 
 ## 📱 KMP 客户端
-
-### 🔴 高优
-
-- [x] **Agent 流式协议适配** ✅
-  - ProtobufResponseParser.kt 按 payloadCase 分发
-  - QuicClientImpl + CronetQuicClient 使用 AgentStreamChunk
-  - ChatApp.kt onAgentStreamChunk 回调正常
-
-- [x] **sync_hint 处理** ✅
-  - MsgType 新增 SYNC_HINT
-  - MessageReceiveListener 新增 onSyncHint
-  - QuicClientImpl + CronetQuicClient 解析 sync_hint
-  - ChatApp 注册回调 → syncConversation 增量同步
-
-- [x] **Thread safety 修复验证** ✅
-  - sessions → ConcurrentHashMap
-  - rttWindow → Collections.synchronizedList
-  - listener add/remove → synchronized
-  - cachedDeviceId → lazy
-  - Throttle.lastRun → ConcurrentHashMap
-
-### 🟡 中优
-
-- [x] **Android 双网络栈** — 不需要统一
-  - Cronet（QUIC）用于实时传输，Ktor+OkHttp 用于 REST API
-  - 不同协议不同场景，强行统一反而过度设计
-
-- [x] **Agent 工具调用 UI** ✅
-  - onAgentStreamChunk 扩展参数：streamType, toolName, toolResult, inputTokens, outputTokens
-  - ChatApp 按 streamType 分发展示
-
-- [x] **消息重试 UI** ✅
-  - 失败消息显示「重发」按钮
-  - ChatViewModel.retryMessage() 重新发送
-
-- [x] **离线消息队列持久化** ✅
-  - LocalChatHistoryStore 新增 savePendingMessages / restorePendingMessages
-  - 桌面端：pending_messages.json 持久化
-  - 启动时自动恢复，发送完成后清理
-
-### 🔵 低优
 
 - [ ] build.gradle Groovy → Kotlin DSL 迁移
 - [ ] fat JAR 打包改用 Shadow plugin
@@ -102,7 +27,7 @@
 
 ## 🖥 CLI 客户端
 
-### 🟡 中优
+### 中优
 
 - [ ] `/msg <userId> <text>` 直聊命令
 - [ ] 密码输入安全（Windows 下 `System.console()` 返回 null）
@@ -110,7 +35,7 @@
 - [ ] 离线消息拉取（登录后调用 syncMessages）
 - [ ] 自动重连（连接断开后指数退避重试）
 
-### 🔵 低优
+### 低优
 
 - [ ] 命令历史与自动补全（jline3）
 - [ ] 终端彩色输出
@@ -121,9 +46,9 @@
 
 ## 前后端协同
 
-| # | 问题 | 状态 | 建议 |
-|---|------|------|------|
-| 1 | 消息 ID 双标准 | 后端 UUID，客户端自算 | 统一由后端生成 |
-| 2 | 群组 ID 符号约定 | Android 负值，Web 正值 | 统一为正值 |
-| 3 | 设备管理协议 | 登录有 deviceType，无踢下线 | 实现 DeviceMessage |
-| 4 | Protobuf 版本演进 | 无版本字段 | buf breaking CI 检测 |
+| # | 问题 | 建议 |
+|---|------|------|
+| 1 | 消息 ID 双标准 | 统一由后端生成 |
+| 2 | 群组 ID 符号约定 | 统一为正值 |
+| 3 | 设备管理协议 | 实现 DeviceMessage |
+| 4 | Protobuf 版本演进 | buf breaking CI 检测 |
