@@ -31,9 +31,11 @@
   - 虚拟滚动 + 分页 + seqId 增量同步
   - 现状：消息分页已实现（PAGE_SIZE=50），但无虚拟滚动
 
-- [ ] **PWA 离线队列持久化**
-  - IndexedDB + Service Worker 后台重发
-  - 现状：`pendingQueue` 仅内存，页面刷新丢失
+- [x] **PWA 离线队列持久化** ✅
+  - IndexedDB 存储待发送消息（offlineQueue.js）
+  - 连接恢复后自动重发
+  - 发送成功后自动清理
+  - export getOfflineQueueSize() 供 UI 显示
 
 - [x] **Agent 工具调用 UI 展示** ✅
   - TOOL_CALL / TOOL_RESULT / USAGE 已在 WebApp.vue 中展示
