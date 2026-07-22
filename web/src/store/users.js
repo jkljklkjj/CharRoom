@@ -107,13 +107,8 @@ export function mergeUsers(incoming) {
     }
   }
 
-  const incomingIds = new Set(incoming.map(u => u.id))
-  for (const [id, _u] of existingById) {
-    if (!incomingIds.has(id) && id > 0) {
-      existingById.delete(id)
-      changed = true
-    }
-  }
+  // 注意：merge 只做合并，不删除已有用户（缓存可能不完整）
+  // 显式删除应通过 removeUser() 或 fetchFriends() 后的 setUsers() 处理
 
   if (changed) {
     state.users = Array.from(existingById.values())

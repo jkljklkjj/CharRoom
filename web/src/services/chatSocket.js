@@ -474,8 +474,11 @@ async function handleMessage(rawData) {
       || (processedData.response && processedData.response.success)
     if (isSuccess !== undefined) {
       if (isSuccess) {
-        loggedIn = true
-        flushQueue()
+        // 仅在首次登录成功时刷新队列，避免心跳/ACK 等响应触发 flush
+        if (!loggedIn) {
+          loggedIn = true
+          flushQueue()
+        }
       } else {
         const msg = (processedData.response ? processedData.response.message : processedData.message || '').toLowerCase()
         if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {

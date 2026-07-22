@@ -320,8 +320,12 @@ export async function getGroupDetail(id) {
 // 示例：调用 agent stream（后续可以改为 SSE 或 WebTransport 分块）
 export async function callAgentStream(text, onTokenChunk = (chunk) => {}) {
   try {
+    const headers = { 'Content-Type': 'text/plain' }
+    if (store.state.token) {
+      headers.Authorization = `Bearer ${store.state.token}`
+    }
     const res = await fetch(`${API_BASE}/agent/nl/stream`, {
-      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text
+      method: 'POST', headers, body: text
     })
     if (!res.ok) return ''
     const reader = res.body.getReader()

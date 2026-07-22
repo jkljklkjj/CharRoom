@@ -4,23 +4,50 @@
 
 ## 🌐 前端 Web
 
-- [ ] **离线首屏加载策略**
-  - 虚拟滚动 + 分页 + seqId 增量同步
-  - 现状：消息分页已实现（PAGE_SIZE=50），但无虚拟滚动
-  - 评估：分页已足够，虚拟滚动可能不需要
+- [x] WebTransport 断连修复（transport.closed + _safeOnClose）
+- [x] isReconnecting 锁死修复
+- [x] flushQueue 门控（仅登录成功后触发）
+- [x] XSS 漏洞修复（DOMPurify）
+- [x] seqId 全链路贯通（接收消息提取 seqId）
 
-- [ ] **WebTransport Datagram**（长期）
-  - 不可靠传输，心跳/状态同步
+- [ ] localStorage O(n) 消息持久化 → IndexedDB
+- [ ] v-for index key → messageId key
+- [ ] DOMPurify 预清洗
 
-- [ ] **WASM 编解码**（长期）
-  - protobuf.wasm 提速 3-5×
+- [ ] WebTransport Datagram（长期）
+- [ ] WASM 编解码（长期）
 
 ---
 
 ## 📱 KMP 客户端
 
+### P0 — Bug
+
+- [x] **seqId 全链路贯通** — MessageReceiveListener 增加 seqId/conversationId 参数
+- [ ] **`forwardMessage` 忽略 targetUser** — 转发到原群组而非目标用户（GroupChatScreen.kt:291）
+- [ ] **`ConversationSyncService` 和 `MessageSender` 是死代码** — 从未实例化，与 ChatViewModel 重复
+- [ ] **`MessageIdGenerator` 分钟级时间戳碰撞** — 同用户同内容同分钟产生相同 ID
+
+### P1 — 性能
+
+- [ ] `syncAllConversations` 每页重建 existingIds Set → 循环外构建，增量更新
+- [ ] `ChatScreen` 收集全局 allMessages 但只用 per-conversation slice → 移除不必要的 collectAsState
+- [ ] `UserListScreen` 收集全量消息计算 subtitle → 缓存 preview
+- [ ] `ChatState` emit 每次创建新 List → 结构相等性检查
+
+### P2 — 代码质量
+
+- [ ] `println()` 替换为 Kermit logger
+- [ ] 三层 API 封装合并（ApiClient → ApiService → RemoteDataSource）
+- [ ] Koin DI 模块从未使用，Global 单例泛滥
+- [ ] `ChatScreen` 和 `GroupChatScreen` 70% 代码重复 → 提取公共逻辑
+- [ ] `LocalDataSourceImpl` 用 `java.io.File` — 非 KMP 兼容
+- [ ] `Util.kt` 用 Jackson 而非 kotlinx-serialization — 死代码
+- [ ] `formatDate()` 硬编码中文字符串 — 未用 i18n
+
+### 低优
+
 - [ ] build.gradle Groovy → Kotlin DSL 迁移
-- [ ] fat JAR 打包改用 Shadow plugin
 - [ ] 静态分析（detekt / ktlint）
 
 ---

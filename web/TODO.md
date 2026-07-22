@@ -1,61 +1,49 @@
 # TODO — CharRoom (Frontend)
 
-## 🔴 High Priority
+## 🔴 P0 — Bug（已完成）
 
-### 1. WebTransportTransport `onclose` 从未被调用
-- **文件**: `WebTransportTransport.js:116-138`
-- **问题**: `_startReading` 读取循环退出时（`done === true` 或异常），未调用 `this._onclose`。
-- **影响**: WebTransport 断开后不触发重连，页面永久断线。
-- **修复**: 在循环退出/异常时调用 `this._onclose()`。
+- [x] **WebTransport `_onclose` 不触发** — 监听 `transport.closed` + `_safeOnClose()` 防重复
+- [x] **`isReconnecting` 永久锁死** — `onclose` 重置 + `.finally()` 兜底
+- [x] **transport.ready 无 timeout** — `Promise.race` 15s 超时
+- [x] **`flushQueue` 非登录响应也触发** — 加 `loggedIn` 门控，仅登录成功后 flush 一次
+- [x] **XSS 漏洞** — `DOMPurify.sanitize()` 替代手工转义
+- [x] **seqId 全链路贯通** — 接收消息从 payload 提取 seqId 更新游标
 
-### 2. `isReconnecting` 在重连失败后永久 locked
-- **文件**: `chatSocket.js:303`
-- **问题**: `isReconnecting = true` 设好后调用的 `connect()` 返回的 Promise 未被 catch，异常时 `isReconnecting` 永不重置。
-- **影响**: 后续所有断线事件都因 `!isReconnecting` 检查不通过而跳过重连。
-- **修复**: `.catch(() => { isReconnecting = false })`。
+## 🟡 P1 — 性能优化
 
-### 3. transport.ready / createBidirectionalStream 无 timeout
-- **文件**: `WebTransportTransport.js:46, 50`
-- **问题**: `await this._transport.ready` 和 `await this._transport.createBidirectionalStream()` 无超时机制。
-- **影响**: QUIC 握手 hang 住时前端永久卡在连接状态。
-- **修复**: 用 `Promise.race` 加超时（如 15s）。
+- [ ] **localStorage O(n) 消息持久化** — 每条消息读写全量 JSON，500 条消息时严重退化 → 改用 IndexedDB 或写缓冲
+- [ ] **`v-for` 用 index 做 key** — 加载历史消息时全量 DOM 重建 → 改用 `messageId` 做 key
+- [ ] **DOMPurify 每次渲染每条消息都调用** — 100 条消息 = 100 次 sanitize → 预清洗存入 store
+- [ ] **`rebuildConversationStates` 每次用户列表变化读所有会话** — 缓存 preview，仅消息变化时重建
+- [ ] **`currentMessages` computed 每次创建新数组** — `slice()` 导致不必要 re-render → memoize 结果
+- [ ] **`sortedUsers` 每次 reactive 变化都 map+sort** — debounce 或 `cache:false`
 
-## 🟡 Medium Priority
+## 🟢 P2 — 代码质量
 
-### 4. `flushQueue` 可能在 login 前执行
-- **文件**: `chatSocket.js:347-348`
-- **问题**: `flushQueue()` 在任何 `success` 响应时触发，可能发生在 login 响应之前。
-- **修复**: 增加 `flushed` 标记，确保 login 成功后只 flush 一次。
+- [ ] **`mergeUsers` 删除缓存中存在但 API 返回中不存在的用户** — 应只删 API 明确返回的
+- [ ] **循环依赖 `messages.js` ↔ `users.js`** — 首次调用 `updateConversationState` 静默丢失 → 拆分到第三个模块
+- [ ] **`getDeviceId()` / `getDeviceType()` 重复定义** — 提取到 `utils/device.js`
+- [ ] **`avatarSrc()` 逻辑重复** — 提取到 `utils/format.js`
+- [ ] **debug `console.log` 未清理** — `api/index.js`, `SidebarUsers.vue`
+- [ ] **`window.$toast` 全局模式脆弱** — 改用 provide/inject 或独立 service
+- [ ] **`callAgentStream` 未用 `safeFetch`** — 无 auth token
+- [ ] **`TokenQuotaDialog` 相对 URL + `credentials:include`** — CSRF 风险
+- [ ] **双 `onMounted` + async onMounted** — 合并为单个 onMounted
+- [ ] **`time()` 函数死代码** — ChatWindow.vue
+- [ ] **`removeUser` 用 splice** — 改用 filter 保持一致性
 
-### 5. `transport.send()` 返回的 Promise 未处理
-- **文件**: `WebTransportTransport.js:81`, `chatSocket.js:191`
-- **问题**: `streamWriter.write(data)` 返回的 Promise 未被 await/catch，写失败静默丢弃。
-- **修复**: 捕获并调用 `_onerror`。
+## 🔵 P3 — 安全
 
-### 6. 多 catch(() => {}) 吞掉所有错误
-- **文件**: `chatSocket.js:408`, `ChatWindow.vue:326,411,440`
-- **问题**: `.catch(() => {})` 忽略所有异常，调试困难。
-- **修复**: 至少 `console.warn` 记录错误。
+- [ ] **Token 存 localStorage** — XSS 可窃取 → httpOnly cookie 或 sessionStorage
+- [ ] **`v-html` 依赖 DOMPurify 配置不变** — 添加安全注释
 
-### 7. Vue reactive 状态直接 splice ✅ 已修复
-- **文件**: `store/messages.js`
-- **问题**: `state.messages.splice(idx, 1)` 绕过 `readonly` 包装，Vue 不追踪。
-- **修复**: 改用 `state.messages = state.messages.filter(m => m !== message)` 和 `slice()` 代替 `splice()`。
+## ⚪ P4 — 功能缺失（vs KMP）
 
-### 8. 多 catch(() => {}) 吞掉所有错误 ✅ 已修复
-- **文件**: `chatSocket.js`
-- **问题**: `.catch(() => {})` 忽略所有异常，调试困难。
-- **修复**: 改为 `.catch(e => console.warn(...))` 记录错误。
-
-### 9. initials() 函数去重 ✅ 已修复
-- **文件**: `ChatWindow.vue`, `SidebarUsers.vue`
-- **问题**: 两个组件重复定义相同的 `initials()` 函数。
-- **修复**: 提取到 `utils/format.js` 共享模块。
-
-## 🔵 Low Priority
-
-- [x] `initials()` 函数去重（提取到 `utils/format.js`）
-- [x] `loadHistory` 死函数清理（已从 messages.js 和 index.js 中移除）
-- [ ] 生产环境 console.log 剥离
-- [ ] `formatText` XSS 防护增强（DOMPurify）
-- [ ] protobuf 加载失败重试机制
+- [ ] Emoji 选择器
+- [ ] 消息转发（ForwardSelectDialog）
+- [ ] 回复预览栏（ReplyPreviewBar）
+- [ ] 用户资料编辑 / 头像裁剪
+- [ ] 群组管理 UI
+- [ ] 文件下载支持（非图片文件只发文件名）
+- [ ] 相对时间实时更新（formatRelativeTime 不刷新）
+- [ ] 退出确认弹窗

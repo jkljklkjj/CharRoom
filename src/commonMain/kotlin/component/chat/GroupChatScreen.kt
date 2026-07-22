@@ -286,12 +286,11 @@ fun GroupChatScreen(
     }
 
     /**
-     * 转发消息
+     * 转发消息到指定用户（私聊）
      */
     fun forwardMessage(message: GroupMessage, targetUser: User) {
-        sendGroupMessage(
-            chatViewModel = chatViewModel,
-            group = group,
+        chatViewModel.sendPrivateMessage(
+            user = targetUser,
             messageText = message.text,
             messageType = message.messageType,
             fileUrl = message.fileUrl,
