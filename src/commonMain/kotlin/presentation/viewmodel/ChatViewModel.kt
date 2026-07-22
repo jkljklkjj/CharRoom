@@ -192,6 +192,46 @@ open class ChatViewModel(
     }
 
     /**
+     * 重试发送失败的消息
+     */
+    fun retryMessage(message: Message) {
+        sessionScope.launch {
+            val user = chatState.users.value.find { it.id == message.senderId }
+            if (user == null) {
+                logger.warn("retryMessage: 找不到用户 {}", message.senderId)
+                return@launch
+            }
+
+            val timestamp = message.timestamp
+            val messageId = message.messageId
+
+            val payload = buildChatPayload(
+                targetClientId = user.id.toString(),
+                content = message.message,
+                timestamp = timestamp,
+                replyToMessageId = message.replyToMessageId,
+                replyToContent = message.replyToContent,
+                replyToSender = message.replyToSender,
+                messageType = message.messageType.ordinal,
+                fileUrl = message.fileUrl,
+                fileName = message.fileName,
+                fileSize = message.fileSize
+            )
+
+            Chat.send(
+                payload = payload,
+                type = MsgType.CHAT,
+                targetClientId = user.id.toString(),
+                expectedResponses = 1
+            ) { success, _ ->
+                sessionScope.launch {
+                    updateMessageSentStatus(messageId, success)
+                }
+            }
+        }
+    }
+
+    /**
      * 原位更新私聊消息内容（用于流式输出）
      */
     fun updateMessage(updatedMessage: Message) {

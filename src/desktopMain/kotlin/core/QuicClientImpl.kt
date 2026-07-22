@@ -248,25 +248,40 @@ class QuicClientImpl : ChatTransport {
                         MsgType.AGENT_CHAT_STREAM.wire -> {
                             if (wrapper.hasAgentStream()) {
                                 val stream = wrapper.agentStream
-                                // 流式输出：中间 chunk 按 messageId+contentHash 去重
-                                // done 消息按 messageId 去重（防止重复触发完成）
-                                val dedupKey = if (stream.done) stream.messageId
-                                else "${stream.messageId}:${stream.chunk.hashCode()}"
+                                val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
+                                val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
+                                val text = if (stream.hasText()) stream.text else ""
+
+                                // 去重：done 按 requestId，chunk 按 requestId+contentHash
+                                val dedupKey = if (isDone) stream.requestId
+                                else "${stream.requestId}:${text.hashCode()}"
                                 if (isDuplicateMessage(dedupKey)) {
-                                    log.debug("重复 Agent 流跳过: messageId={}, done={}", stream.messageId, stream.done)
+                                    log.debug("重复 Agent 流跳过: requestId={}, done={}", stream.requestId, isDone)
                                     return@forEach
                                 }
-                                if (stream.done) {
-                                    sendAckToServer(streamId, stream.messageId, "agent")
+                                if (isDone) {
+                                    sendAckToServer(streamId, stream.requestId, "agent")
                                 }
                                 // 优先使用独立 handler（绕过 listener 遍历）
                                 val handler = agentStreamHandler
                                 handler?.onAgentStreamChunk(
-                                    messageId = stream.messageId,
-                                    fullContent = stream.chunk,
-                                    done = stream.done,
-                                    error = stream.error
+                                    messageId = stream.requestId,
+                                    fullContent = text,
+                                    done = isDone,
+                                    error = isError
                                 )
+                            }
+                        }
+                        MsgType.SYNC_HINT.wire -> {
+                            // sync_hint: 服务端通知有新消息，解析 conversationId + seqId
+                            if (wrapper.hasAck()) {
+                                val ack = wrapper.ack
+                                val conversationId = ack.clientId
+                                val seqId = ack.message?.toLongOrNull() ?: 0L
+                                if (conversationId.isNotBlank() && seqId > 0) {
+                                    log.info("收到 sync_hint: conversationId={}, seqId={}", conversationId, seqId)
+                                    listener.onSyncHint(conversationId, seqId)
+                                }
                             }
                         }
                         else -> {
@@ -356,7 +371,7 @@ class QuicClientImpl : ChatTransport {
     private fun getOrCreateStream(type: MsgType, targetId: String): Long {
         return when (type) {
             MsgType.LOGIN, MsgType.LOGOUT, MsgType.HEARTBEAT,
-            MsgType.CHECK, MsgType.ACK, MsgType.RESPONSE, MsgType.AGENT_CHAT_STREAM -> {
+            MsgType.CHECK, MsgType.ACK, MsgType.RESPONSE, MsgType.AGENT_CHAT_STREAM, MsgType.SYNC_HINT -> {
                 getOrCreateControlStream()
             }
             MsgType.CHAT, MsgType.GROUP_CHAT, MsgType.AGENT_CHAT -> {

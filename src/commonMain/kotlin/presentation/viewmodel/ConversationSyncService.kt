@@ -289,7 +289,7 @@ class ConversationSyncService(
         }
     }
 
-    private fun loadConversationSeqIds() {
+    private suspend fun loadConversationSeqIds() {
         try {
             val savedSeqIds = LocalChatHistoryStore.restoreConversationSeqIds()
             for ((convId, seqId) in savedSeqIds) {

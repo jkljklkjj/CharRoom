@@ -78,8 +78,10 @@ class MessageSender(
                 fileSize = fileSize
             )
 
-            scope.launch { chatState.upsertUser(user) }
-            chatState.addMessage(message)
+            scope.launch {
+                chatState.upsertUser(user)
+                chatState.addMessage(message)
+            }
 
             val payload = buildChatPayload(
                 targetClientId = user.id.toString(),
@@ -166,7 +168,7 @@ class MessageSender(
                 fileSize = fileSize
             )
 
-            chatState.addGroupMessage(groupMessage)
+            scope.launch { chatState.addGroupMessage(groupMessage) }
 
             val payload = buildGroupChatPayload(
                 targetClientId = group.id.toString(),
