@@ -222,10 +222,12 @@ class QuicClientImpl : ChatTransport {
                                 val senderId = chat.userId.toIntOrNull() ?: return@forEach
                                 val text = chat.content
                                 val ts = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                                val seqId = chat.seqId
+                                val convId = chat.conversationId
                                 val myId = GlobalAppState.currentUserId ?: 0
                                 sendAckToServer(streamId, chat.messageId, "${minOf(myId, senderId)}:${maxOf(myId, senderId)}")
-                                log.info("分发私聊消息: senderId={}, text={}", senderId, text)
-                                listener.onPrivateMessageReceived(senderId, text, ts)
+                                log.info("分发私聊消息: senderId={}, text={}, seqId={}", senderId, text, seqId)
+                                listener.onPrivateMessageReceived(senderId, text, ts, seqId, convId)
                             }
                         }
                         MsgType.GROUP_CHAT.wire -> {
@@ -240,9 +242,11 @@ class QuicClientImpl : ChatTransport {
                                 val senderName = senderId.toString()
                                 val text = gc.content
                                 val ts = System.currentTimeMillis()
+                                val seqId = gc.seqId
+                                val convId = gc.conversationId
                                 sendAckToServer(streamId, gc.messageId, "group:$groupId")
-                                log.info("分发群聊消息: groupId={}, senderId={}", groupId, senderId)
-                                listener.onGroupMessageReceived(groupId, senderId, senderName, text, ts)
+                                log.info("分发群聊消息: groupId={}, senderId={}, seqId={}", groupId, senderId, seqId)
+                                listener.onGroupMessageReceived(groupId, senderId, senderName, text, ts, seqId, convId)
                             }
                         }
                         MsgType.AGENT_CHAT_STREAM.wire -> {

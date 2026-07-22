@@ -98,13 +98,19 @@ interface ChatTransport {
 interface MessageReceiveListener {
     /**
      * 收到私聊消息
+     * @param seqId 会话级序列号（用于增量同步游标，0 表示服务端未携带）
+     * @param conversationId 会话 ID（如 "user:1:2"）
      */
-    fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long)
+    fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
+                                 seqId: Long = 0, conversationId: String = "")
 
     /**
      * 收到群聊消息
+     * @param seqId 会话级序列号（用于增量同步游标，0 表示服务端未携带）
+     * @param conversationId 会话 ID（如 "group:42"）
      */
-    fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long)
+    fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long,
+                               seqId: Long = 0, conversationId: String = "")
 
     /**
      * 收到聊天助手流式输出（默认空实现，按需覆盖）。

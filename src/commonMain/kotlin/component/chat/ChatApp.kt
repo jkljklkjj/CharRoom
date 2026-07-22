@@ -97,7 +97,8 @@ fun ChatApp(
 
         // 注册全局消息接收监听器
         Chat.addMessageReceiveListener(object : MessageReceiveListener {
-            override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long) {
+            override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
+                                                  seqId: Long, conversationId: String) {
                 // 构建消息对象并添加到聊天状态
                 val chatMessage = Message(
                     senderId = senderId,
@@ -106,17 +107,22 @@ fun ChatApp(
                     receiverId = GlobalAppState.currentUserId ?: 0,
                     timestamp = timestamp,
                     isSent = true,
-                    messageId = "recv_${senderId}_$timestamp"
+                    messageId = "recv_${senderId}_$timestamp",
+                    seqId = seqId,
+                    conversationId = conversationId
                 )
                 chatViewModel.addMessage(chatMessage)
+                // 从消息 payload 更新增量同步游标
+                if (seqId > 0 && conversationId.isNotBlank()) {
+                    scope.launch {
+                        GlobalChatState.updateConversationSeqId(conversationId, seqId)
+                    }
+                }
             }
 
             override fun onGroupMessageReceived(
-                groupId: Int,
-                senderId: Int,
-                senderName: String,
-                message: String,
-                timestamp: Long
+                groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long,
+                seqId: Long, conversationId: String
             ) {
                 // 构建群聊消息对象并添加到聊天状态
                 val groupMessage = model.GroupMessage(
@@ -126,9 +132,17 @@ fun ChatApp(
                     senderId = senderId,
                     timestamp = timestamp,
                     isSent = true,
-                    messageId = "recv_group_${groupId}_${senderId}_$timestamp"
+                    messageId = "recv_group_${groupId}_${senderId}_$timestamp",
+                    seqId = seqId,
+                    conversationId = conversationId
                 )
                 chatViewModel.addGroupMessage(groupMessage)
+                // 从消息 payload 更新增量同步游标
+                if (seqId > 0 && conversationId.isNotBlank()) {
+                    scope.launch {
+                        GlobalChatState.updateConversationSeqId(conversationId, seqId)
+                    }
+                }
             }
         })
 

@@ -323,7 +323,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                             listener.onPrivateMessageReceived(
                                 senderId = chat.userId.toIntOrNull() ?: 0,
                                 message = chat.content,
-                                timestamp = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                                timestamp = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis(),
+                                seqId = chat.seqId,
+                                conversationId = chat.conversationId
                             )
                         }
                         MsgType.GROUP_CHAT.wire -> if (wrapper.hasGroupChat()) {
@@ -335,7 +337,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 senderId = gc.userId.toIntOrNull() ?: 0,
                                 senderName = "用户${gc.userId}",
                                 message = gc.content,
-                                timestamp = gc.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                                timestamp = gc.timestamp.toLongOrNull() ?: System.currentTimeMillis(),
+                                seqId = gc.seqId,
+                                conversationId = gc.conversationId
                             )
                         }
                         MsgType.AGENT_CHAT.wire -> if (wrapper.hasChat()) {
