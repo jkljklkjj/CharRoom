@@ -8,6 +8,7 @@
 - [x] **`flushQueue` 非登录响应也触发** — 加 `loggedIn` 门控，仅登录成功后 flush 一次
 - [x] **XSS 漏洞** — `DOMPurify.sanitize()` 替代手工转义
 - [x] **seqId 全链路贯通** — 接收消息从 payload 提取 seqId 更新游标
+- [x] **好友列表增量更新** — acceptFriend 返回用户信息，前端增量添加
 
 ## 🟡 P1 — 性能优化
 
