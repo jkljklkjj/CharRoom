@@ -15,6 +15,24 @@ enum class MessageType {
     FILE   // 文件消息
 }
 
+/**
+ * 聊天消息公共接口，统一私聊 Message 和群聊 GroupMessage 的字段访问。
+ */
+interface ChatMessage {
+    val chatMessageId: String
+    val chatText: String
+    val chatSenderId: Int
+    val chatTimestamp: Long
+    val chatIsSent: Boolean
+    val chatMessageType: MessageType
+    val chatFileUrl: String?
+    val chatFileName: String?
+    val chatFileSize: Long?
+    val chatReplyToMessageId: String?
+    val chatReplyToContent: String?
+    val chatReplyToSender: String?
+}
+
 @Serializable
 data class User(
     val id: Int,
@@ -46,7 +64,20 @@ data class Message(
     val fileSize: Long? = null,            // 文件大小
     val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
     val conversationId: String = ""        // 会话ID
-) {
+) : ChatMessage {
+    override val chatMessageId get() = messageId
+    override val chatText get() = message
+    override val chatSenderId get() = senderId
+    override val chatTimestamp get() = timestamp
+    override val chatIsSent get() = isSent
+    override val chatMessageType get() = messageType
+    override val chatFileUrl get() = fileUrl
+    override val chatFileName get() = fileName
+    override val chatFileSize get() = fileSize
+    override val chatReplyToMessageId get() = replyToMessageId
+    override val chatReplyToContent get() = replyToContent
+    override val chatReplyToSender get() = replyToSender
+
     /**
      * 复制消息并更新发送状态
      */
@@ -88,7 +119,20 @@ data class GroupMessage(
     val fileSize: Long? = null,            // 文件大小
     val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
     val conversationId: String = ""        // 会话ID
-) {
+) : ChatMessage {
+    override val chatMessageId get() = messageId
+    override val chatText get() = text
+    override val chatSenderId get() = senderId
+    override val chatTimestamp get() = timestamp
+    override val chatIsSent get() = isSent
+    override val chatMessageType get() = messageType
+    override val chatFileUrl get() = fileUrl
+    override val chatFileName get() = fileName
+    override val chatFileSize get() = fileSize
+    override val chatReplyToMessageId get() = replyToMessageId
+    override val chatReplyToContent get() = replyToContent
+    override val chatReplyToSender get() = replyToSender
+
     /**
      * 复制消息并更新发送状态
      */

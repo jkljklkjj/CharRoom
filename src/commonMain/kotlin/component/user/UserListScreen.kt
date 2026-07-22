@@ -1,6 +1,6 @@
 package component.user
 
-import component.ChatScreen
+import component.chat.ChatScreen
 import component.chat.GroupChatScreen
 import component.*
 

@@ -44,6 +44,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
+    override var agentStreamHandler: AgentStreamHandler? = null
 
     // ── 生命周期 ──
 
@@ -117,19 +118,19 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     override fun sendText(content: String, callback: (Boolean) -> Unit) = callback(false)
 
     override fun addMessageReceiveListener(listener: MessageReceiveListener) {
-        synchronized(messageListeners) { messageListeners.add(listener) }
+        messageListeners.add(listener)
     }
 
     override fun removeMessageReceiveListener(listener: MessageReceiveListener) {
-        synchronized(messageListeners) { messageListeners.remove(listener) }
+        messageListeners.remove(listener)
     }
 
     override fun addAuthStateListener(listener: AuthStateListener) {
-        synchronized(authStateListeners) { authStateListeners.add(listener) }
+        authStateListeners.add(listener)
     }
 
     override fun removeAuthStateListener(listener: AuthStateListener) {
-        synchronized(authStateListeners) { authStateListeners.remove(listener) }
+        authStateListeners.remove(listener)
     }
 
     override val isServerConnected: Boolean get() = connected.get()
@@ -195,16 +196,12 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     private fun doLogin() {
         val loginPayload = buildLoginPayload(GlobalAppState.currentToken ?: "")
-        val stream = controlStream ?: run {
-            log.warn("doLogin 失败: controlStream 为 null")
-            return
-        }
         val framed = QuicStreamProtocol.encodeFrame(loginPayload)
         val buf = ByteBuffer.allocateDirect(framed.size)
         buf.put(framed)
         buf.flip()
-        stream.write(buf, false)
-        stream.flush()
+        controlStream!!.write(buf, false)
+        controlStream!!.flush()
         log.info("登录消息已发送")
     }
 
@@ -357,53 +354,35 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 }
                             }
                         }
-                        MsgType.SYNC_HINT.wire -> if (wrapper.hasAck()) {
-                            val ack = wrapper.ack
-                            val conversationId = ack.clientId
-                            val seqId = ack.message?.toLongOrNull() ?: 0L
-                            if (conversationId.isNotBlank() && seqId > 0) {
-                                log.info("收到 sync_hint: conversationId={}, seqId={}", conversationId, seqId)
-                                listener.onSyncHint(conversationId, seqId)
-                            }
-                        }
                         MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
                             val stream = wrapper.agentStream
-                            val requestId = stream.requestId
-                            val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
-                            val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
-                            val text = if (stream.hasText()) stream.text else ""
-                            val dedupKey = if (isDone) requestId
-                                else "${requestId}:${text.hashCode()}"
+                            val dedupKey = if (stream.done) stream.messageId
+                                else "${stream.messageId}:${stream.chunk.hashCode()}"
                             if (isDuplicateMessage(dedupKey)) return@forEach
-                            if (isDone) {
-                                sendAck(requestId, "agent")
+                            if (stream.done) {
+                                sendAck(stream.messageId, "agent")
                             }
-
-                            // 提取工具调用/结果/用量信息
-                            val toolName = if (stream.hasToolCall()) stream.toolCall.name else null
-                            val toolResult = if (stream.hasToolResult()) stream.toolResult.result else null
-                            val inputTokens = if (stream.hasUsage()) stream.usage.inputTokens else 0
-                            val outputTokens = if (stream.hasUsage()) stream.usage.outputTokens else 0
-
-                            listener.onAgentStreamChunk(
-                                messageId = requestId,
-                                fullContent = text,
-                                done = isDone,
-                                error = isError,
-                                streamType = stream.typeValue,
-                                toolName = toolName,
-                                toolResult = toolResult,
-                                inputTokens = inputTokens,
-                                outputTokens = outputTokens
-                            )
+                            val handler = agentStreamHandler
+                            if (handler != null) {
+                                handler.onAgentStreamChunk(
+                                    messageId = stream.messageId,
+                                    fullContent = stream.chunk,
+                                    done = stream.done,
+                                    error = stream.error
+                                )
+                            } else {
+                                listener.onAgentStreamChunk(
+                                    messageId = stream.messageId,
+                                    fullContent = stream.chunk,
+                                    done = stream.done,
+                                    error = stream.error
+                                )
+                            }
                         }
                     }
                 }
             }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            log.warn("handleStreamData 异常: ${e.message}")
-        }
+        } catch (_: Exception) {}
     }
 
     /**
@@ -421,10 +400,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                 .setAck(ackMsg)
                 .build()
             sendInternal(ackWrapper.toByteArray())
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            log.warn("sendAck 异常: ${e.message}")
-        }
+        } catch (_: Exception) {}
     }
 
     private fun sendInternal(payload: ByteArray) {
@@ -435,10 +411,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
             buf.flip()
             controlStream?.write(buf, false)
             controlStream?.flush()
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            log.warn("sendInternal 异常: ${e.message}")
-        }
+        } catch (_: Exception) {}
     }
 
     private fun notifyAuthInvalidated(reason: String) {

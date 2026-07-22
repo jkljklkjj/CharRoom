@@ -6,6 +6,7 @@ import core.state.GlobalChatState
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * QUIC 协议客户端实现。
@@ -20,14 +21,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 class QuicClientImpl : ChatTransport {
 
     private val log = LoggerFactory.getLogger(QuicClientImpl::class.java)
-    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // 实际传输层
     private val transport = QuicNettyClient()
     private val connected = AtomicBoolean(false)
 
-    // Session 管理: conversationId -> StreamSession（线程安全）
-    private val sessions = java.util.concurrent.ConcurrentHashMap<String, StreamSession>()
+    // Session 管理: conversationId -> StreamSession
+    private val sessions = mutableMapOf<String, StreamSession>()
     private val CONTROL_SESSION_KEY = "__control__"
 
     // 待发送消息缓冲（断线时缓存）
@@ -43,6 +44,7 @@ class QuicClientImpl : ChatTransport {
     // 消息监听器
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
+    override var agentStreamHandler: AgentStreamHandler? = null
 
     // 连接配置
     private var host: String = ServerConfig.QUIC_HOST
@@ -64,16 +66,14 @@ class QuicClientImpl : ChatTransport {
         transport.listener = object : QuicNettyClient.Listener {
             override fun onConnected() {
                 connected.set(true)
-                println("[QuicClient] onConnected 回调触发，准备启动登录流程")
                 scope.launch {
                     try {
                         doLogin()
-                        println("[QuicClient] doLogin 完成")
                         flushPendingMessages()
                         startHeartbeat()
                     } catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        println("[QuicClient] 登录流程异常: ${e.message}")
+                        log.error("登录流程异常", e)
                     }
                 }
             }
@@ -108,9 +108,7 @@ class QuicClientImpl : ChatTransport {
      * 通过 Stream 0 发送登录消息。
      */
     private fun doLogin() {
-        println("[QuicClient] doLogin 开始，token长度: ${GlobalAppState.currentToken?.length}")
         val stream0Id = transport.openStream()
-        println("[QuicClient] 控制流已打开: streamId=$stream0Id")
         sessions[CONTROL_SESSION_KEY] = StreamSession(
             streamId = stream0Id,
             conversationId = CONTROL_SESSION_KEY,
@@ -121,14 +119,13 @@ class QuicClientImpl : ChatTransport {
         val loginPayload = buildLoginPayload(GlobalAppState.currentToken ?: "")
         val frame = QuicStreamProtocol.encodeFrame(loginPayload)
         transport.send(stream0Id, frame)
-        println("[QuicClient] QUIC 登录请求已发送 (streamId=$stream0Id)")
         log.info("QUIC 登录请求已发送 (streamId=$stream0Id)")
     }
 
-    // 心跳自适应 RTT 跟踪（线程安全）
-    private val rttWindow = java.util.Collections.synchronizedList(mutableListOf<Long>())
-    @Volatile private var lastHeartbeatSend = 0L
-    @Volatile private var hbSendInProgress = false
+    // 心跳自适应 RTT 跟踪
+    private val rttWindow = mutableListOf<Long>()
+    private var lastHeartbeatSend = 0L
+    private var hbSendInProgress = false
 
     /** 自适应心跳间隔：基于 P90 RTT，范围 5-15s（服务端 alive-ttl=30s，留余量）。 */
     private fun adaptiveHbInterval(): Long {
@@ -155,7 +152,7 @@ class QuicClientImpl : ChatTransport {
     private suspend fun startHeartbeat() {
         while (connected.get()) {
             val interval = adaptiveHbInterval()
-            delay(interval)
+            delay(interval.milliseconds)
             if (!connected.get()) break
             try {
                 val controlStreamId = getOrCreateControlStream()
@@ -178,19 +175,13 @@ class QuicClientImpl : ChatTransport {
     private fun handleStreamData(streamId: Long, data: ByteArray) {
         // 任何服务端响应都可作为 RTT 样本（心跳确认 + 消息推送）
         recordRtt()
-        log.info("收到 Stream 数据: streamId={}, dataLen={}, listeners={}", streamId, data.size, messageListeners.size)
         // 数据已由 QuicStreamInitializer 按帧边界返回，直接透传
-        // 只解析一次 protobuf，然后分发给所有 listener
-        val wrapper = try {
-            com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
-        } catch (e: Exception) {
-            log.error("protobuf 解析失败: ${e.message}")
-            return
-        }
-        log.debug("解析消息类型: type={}", wrapper.type)
         synchronized(messageListeners) {
             messageListeners.forEach { listener ->
                 try {
+                    // 尝试解析为 protobuf MessageWrapper 并分发
+                    val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
+                    log.debug("解析消息类型: type={}", wrapper.type)
                     when (wrapper.type) {
                         MsgType.ACK.wire -> {
                             if (wrapper.hasAck()) {
@@ -257,52 +248,25 @@ class QuicClientImpl : ChatTransport {
                         MsgType.AGENT_CHAT_STREAM.wire -> {
                             if (wrapper.hasAgentStream()) {
                                 val stream = wrapper.agentStream
-                                val requestId = stream.requestId
-                                val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
-                                val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
-                                val text = if (stream.hasText()) stream.text else ""
-
-                                // 去重：done 按 requestId，chunk 按 requestId+contentHash
-                                val dedupKey = if (isDone) requestId
-                                    else "${requestId}:${text.hashCode()}"
+                                // 流式输出：中间 chunk 按 messageId+contentHash 去重
+                                // done 消息按 messageId 去重（防止重复触发完成）
+                                val dedupKey = if (stream.done) stream.messageId
+                                else "${stream.messageId}:${stream.chunk.hashCode()}"
                                 if (isDuplicateMessage(dedupKey)) {
-                                    log.debug("重复 Agent 流跳过: requestId={}, done={}", requestId, isDone)
+                                    log.debug("重复 Agent 流跳过: messageId={}, done={}", stream.messageId, stream.done)
                                     return@forEach
                                 }
-                                log.info("分发Agent流式消息: requestId={}, type={}, done={}", requestId, stream.type, isDone)
-                                if (isDone) {
-                                    sendAckToServer(streamId, requestId, "agent")
+                                if (stream.done) {
+                                    sendAckToServer(streamId, stream.messageId, "agent")
                                 }
-
-                                // 提取工具调用/结果/用量信息
-                                val toolName = if (stream.hasToolCall()) stream.toolCall.name else null
-                                val toolResult = if (stream.hasToolResult()) stream.toolResult.result else null
-                                val inputTokens = if (stream.hasUsage()) stream.usage.inputTokens else 0
-                                val outputTokens = if (stream.hasUsage()) stream.usage.outputTokens else 0
-
-                                listener.onAgentStreamChunk(
-                                    messageId = requestId,
-                                    fullContent = text,
-                                    done = isDone,
-                                    error = isError,
-                                    streamType = stream.typeValue,
-                                    toolName = toolName,
-                                    toolResult = toolResult,
-                                    inputTokens = inputTokens,
-                                    outputTokens = outputTokens
+                                // 优先使用独立 handler（绕过 listener 遍历）
+                                val handler = agentStreamHandler
+                                handler?.onAgentStreamChunk(
+                                    messageId = stream.messageId,
+                                    fullContent = stream.chunk,
+                                    done = stream.done,
+                                    error = stream.error
                                 )
-                            }
-                        }
-                        MsgType.SYNC_HINT.wire -> {
-                            // sync_hint: 服务端通知有新消息，解析 conversationId + seqId
-                            if (wrapper.hasAck()) {
-                                val ack = wrapper.ack
-                                val conversationId = ack.clientId
-                                val seqId = ack.message?.toLongOrNull() ?: 0L
-                                if (conversationId.isNotBlank() && seqId > 0) {
-                                    log.info("收到 sync_hint: conversationId={}, seqId={}", conversationId, seqId)
-                                    listener.onSyncHint(conversationId, seqId)
-                                }
                             }
                         }
                         else -> {
@@ -486,9 +450,6 @@ class QuicClientImpl : ChatTransport {
         transport.shutdown()
         sessions.clear()
         messageQueue.clear()
-        scope.coroutineContext.cancel()
-        // 重建 scope，以便后续 start() 可以正常工作
-        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     }
 
     override fun addMessageReceiveListener(listener: MessageReceiveListener) {

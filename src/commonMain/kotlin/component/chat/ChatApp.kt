@@ -31,12 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import component.ChatScreen
 import component.dialog.AddUserOrGroupDialog
 import component.dialog.ApplicationDialog
 import component.user.UserDetailScreen
 import component.user.UserList
 import component.user.ProfileScreen
+import core.AgentStreamHandler
 import core.Chat
 import core.MessageReceiveListener
 import core.state.GlobalAppState
@@ -89,23 +89,15 @@ fun ChatApp(
     LaunchedEffect(Unit) {
         val currentToken = GlobalAppState.currentToken
         if (currentToken.isNullOrBlank()) {
-            println("[ChatApp] 错误：启动QUIC前token为空，请先登录")
             return@LaunchedEffect
         }
-        println("[ChatApp] 准备启动QUIC连接，token长度: ${currentToken.length}, userId: ${GlobalAppState.currentUserId}")
-        println("[ChatApp] Chat 实例: $Chat")
-        println("[ChatApp] Chat 是否已连接: ${Chat.isConnected()}")
         if (!Chat.isConnected()) {
-            println("[ChatApp] 开始启动QUIC连接...")
             Chat.start() // 启动QUIC连接，触发握手流程，此时header会携带token
-            println("[ChatApp] QUIC连接启动完成")
         }
 
-        println("[ChatApp] 注册消息监听器...")
         // 注册全局消息接收监听器
         Chat.addMessageReceiveListener(object : MessageReceiveListener {
             override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long) {
-                println("[ChatApp] 收到私聊消息：senderId=$senderId, content=$message, timestamp=$timestamp")
                 // 构建消息对象并添加到聊天状态
                 val chatMessage = Message(
                     senderId = senderId,
@@ -126,7 +118,6 @@ fun ChatApp(
                 message: String,
                 timestamp: Long
             ) {
-                println("[ChatApp] 收到群聊消息：groupId=$groupId, senderId=$senderId, senderName=$senderName, content=$message, timestamp=$timestamp")
                 // 构建群聊消息对象并添加到聊天状态
                 val groupMessage = model.GroupMessage(
                     groupId = groupId,
@@ -139,55 +130,12 @@ fun ChatApp(
                 )
                 chatViewModel.addGroupMessage(groupMessage)
             }
-
-            override fun onAgentStreamChunk(
-                messageId: String, fullContent: String, done: Boolean, error: Boolean,
-                streamType: Int, toolName: String?, toolResult: String?,
-                inputTokens: Int, outputTokens: Int
-            ) {
-                // 0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
-                when (streamType) {
-                    0 -> {
-                        // 文本片段
-                        chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
-                    }
-                    1 -> {
-                        // 工具调用
-                        val info = "\n\n🔧 调用工具: ${toolName ?: "未知"}"
-                        chatViewModel.upsertAgentStreamMessage(messageId, info)
-                    }
-                    2 -> {
-                        // 工具结果
-                        val info = "\n✅ 结果: ${toolResult ?: "(空)"}"
-                        chatViewModel.upsertAgentStreamMessage(messageId, info)
-                    }
-                    3 -> {
-                        // Token 用量
-                        val info = "\n\n📊 Token: $inputTokens 输入 / $outputTokens 输出"
-                        chatViewModel.upsertAgentStreamMessage(messageId, info)
-                    }
-                    4 -> {
-                        // 流结束
-                        chatViewModel.upsertAgentStreamMessage(messageId, "")
-                    }
-                    5 -> {
-                        // 错误
-                        chatViewModel.upsertAgentStreamMessage(messageId, "\n\n❌ Agent 处理失败")
-                    }
-                }
-            }
-
-            override fun onSyncHint(conversationId: String, seqId: Long) {
-                println("[ChatApp] 收到 sync_hint: conversationId=$conversationId, seqId=$seqId")
-                scope.launch(Dispatchers.IO) {
-                    chatViewModel.syncConversation(conversationId, seqId)
-                }
-            }
         })
-        println("[ChatApp] 消息监听器注册完成")
 
-        // 恢复离线待发送消息队列
-        chatViewModel.restorePendingMessages()
+        // Agent 流式消息：独立回调，不走 listener 遍历
+        Chat.agentStreamHandler = AgentStreamHandler { messageId, fullContent, done, _ ->
+            chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
+        }
 
         chatViewModel.loadContacts()
 
