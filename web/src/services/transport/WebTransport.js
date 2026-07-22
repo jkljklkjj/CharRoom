@@ -33,6 +33,16 @@ export class WebTransport extends ChatTransport {
     this._incomingReader = null
 
     this._readerActive = false
+    this._closedCalled = false  // 防止 _onclose 重复调用
+  }
+
+  /**
+   * 安全调用 _onclose，防止重复触发。
+   */
+  _safeOnClose() {
+    if (this._closedCalled) return
+    this._closedCalled = true
+    if (this._onclose) this._onclose()
   }
 
   /**
@@ -41,6 +51,7 @@ export class WebTransport extends ChatTransport {
    */
   async connect(url, token) {
     this._url = url
+    this._closedCalled = false  // 重置关闭标记
 
     if (typeof globalThis.WebTransport === 'undefined') {
       throw new Error('浏览器不支持 WebTransport API')
@@ -48,6 +59,17 @@ export class WebTransport extends ChatTransport {
 
     try {
       this._transport = new globalThis.WebTransport(url)
+
+      // 监听 transport.closed —— 服务端断开或网络异常时触发
+      this._transport.closed.then((info) => {
+        console.log('WebTransport.closed 触发:', info)
+        this._readerActive = false
+        this._safeOnClose()
+      }).catch((e) => {
+        console.debug('WebTransport.closed 异常:', e)
+        this._readerActive = false
+        this._safeOnClose()
+      })
 
       // QUIC 握手 + HTTP/3，15s 超时
       const TIMEOUT_MS = 15000
@@ -113,6 +135,7 @@ export class WebTransport extends ChatTransport {
       this._transport = null
     }
     this._connected = false
+    this._safeOnClose()
     console.log('WebTransport 已关闭')
   }
 
@@ -157,7 +180,7 @@ export class WebTransport extends ChatTransport {
       }
     } finally {
       this._readerActive = false
-      if (this._onclose) this._onclose()
+      this._safeOnClose()
     }
   }
 

@@ -121,6 +121,7 @@ import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
+import DOMPurify from 'dompurify'
 
 const store = useStore()
 // 注入 store 引用给 chatSocket（替代 window.__chatStore hack）
@@ -389,15 +390,11 @@ function getFileIcon(filename) {
   return '📄'
 }
 
-// 文本格式化（支持简单的 markdown）
+// 文本格式化（使用 DOMPurify 防止 XSS）
 function formatText(text) {
   if (!text || typeof text !== "string") return ''
-  // 转义 HTML 防止 XSS
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  return escaped
+  // 使用 DOMPurify 清洗，禁止所有 HTML 标签，只保留纯文本
+  return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })
 }
 
 // textarea 自动高度

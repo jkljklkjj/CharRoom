@@ -147,8 +147,10 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
   transport.onclose = (event) => {
     console.log('❌ 连接关闭')
     stopHeartbeat()
+    // 重置重连标记，防止永久锁死（onclose 可能在 connect().catch() 之前触发）
+    isReconnecting = false
 
-    if (!stopReconnect && !isReconnecting) {
+    if (!stopReconnect) {
       scheduleReconnect(hostname, port, token, currentUserId)
     }
 
@@ -429,6 +431,8 @@ function scheduleReconnect(hostname, port, token, userId) {
     if (!stopReconnect) {
       connect(hostname, port, token, userId, handlers).catch(e => {
         console.warn('重连失败:', e)
+      }).finally(() => {
+        // 无论成功失败，都重置 isReconnecting（成功时 onopen 也会重置）
         isReconnecting = false
       })
       // 指数退避 + jitter 随机化，避免重连风暴
