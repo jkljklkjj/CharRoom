@@ -500,20 +500,25 @@ onMounted(async () => {
   }
 
   loading.value = false
+})
 
-  // 页面关闭时发送登出消息
-  window.addEventListener('beforeunload', () => {
-    if (store.state.token) {
-      chatSocket.sendWrapper({
-        type: 'logout',
-        logout: { userId: String(store.state.accountId) }
-      }).catch(e => console.debug('登出消息发送失败:', e))
-    }
-  })
+// 页面关闭时发送登出消息
+const handleBeforeUnload = () => {
+  if (store.state.token) {
+    chatSocket.sendWrapper({
+      type: 'logout',
+      logout: { userId: String(store.state.accountId) }
+    }).catch(e => console.debug('登出消息发送失败:', e))
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 

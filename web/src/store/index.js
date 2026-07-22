@@ -8,7 +8,7 @@ import { setUsers, setGroups, mergeUsers, cacheUsers, loadCachedUsers,
          getCachedAvatar, setCachedAvatar } from './users'
 import { addMessage, addGroupMessage, upsertAgentStreamMessage,
          updateMessageStatus, setSelectedChat, loadConversation,
-         loadOlderMessages, loadHistory, trimMessages, trimGroupMessages,
+         loadOlderMessages, trimMessages, trimGroupMessages,
          deleteMessage, getConversationSeqId, setConversationSeqId } from './messages'
 
 export function useStore() {
@@ -44,8 +44,7 @@ export function useStore() {
     trimMessages,
     trimGroupMessages,
     deleteMessage,
-    loadOlderMessages,
-    loadHistory
+    loadOlderMessages
   }
 }
 

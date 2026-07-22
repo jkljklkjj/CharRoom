@@ -39,10 +39,10 @@ class ChatState {
     val groupMessages: StateFlow<List<GroupMessage>> = _groupMessageCache.state
 
     // 按会话分桶的私聊消息（ChatScreen 按会话 O(1) 访问，不 filter 全量）
-    private val _privateMessageCaches = mutableMapOf<Int, MessageLruCache<Message>>()
+    private val _privateMessageCaches = java.util.concurrent.ConcurrentHashMap<Int, MessageLruCache<Message>>()
 
     // 按群组分桶的群聊消息
-    private val _groupMessageCaches = mutableMapOf<Int, MessageLruCache<GroupMessage>>()
+    private val _groupMessageCaches = java.util.concurrent.ConcurrentHashMap<Int, MessageLruCache<GroupMessage>>()
 
     // 当前选中的聊天对象
     private val _selectedChatTarget = MutableStateFlow<User?>(null)

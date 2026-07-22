@@ -127,16 +127,15 @@ const store = useStore()
 chatSocket.setStore(store)
 
 // 前后台自适应：切后台时释放部分消息内存
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    const hidden = document.hidden
-    const MAX = 200
-    const MIN = 50
-    const target = hidden ? MIN : MAX
-    store.trimMessages(target)
-    store.trimGroupMessages(target)
-  })
+const handleVisibilityChange = () => {
+  const hidden = document.hidden
+  const MAX = 200
+  const MIN = 50
+  const target = hidden ? MIN : MAX
+  store.trimMessages(target)
+  store.trimGroupMessages(target)
 }
+
 const { t } = useI18n()
 const text = ref('')
 const msgList = ref(null)
@@ -160,19 +159,19 @@ function handleResize() {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   clearTimeout(resizeTimer)
 })
 
 // 当前选中的聊天 ID
 const currentChatId = computed(() => {
-  const val = store.state.selectedChatId
-  console.log('🟡 ChatWindow currentChatId computed, val=', val, 'type=', typeof val)
-  return val
+  return store.state.selectedChatId
 })
 
 // 当前选中的聊天用户
@@ -199,9 +198,14 @@ function handleClickOutside() { if (showFriendMenu.value) showFriendMenu.value =
 async function showFriendInfo() {
   showFriendMenu.value = false; showInfoModal.value = true; friendInfo.value = null
   if (!currentChatUser.value) return
-  const { getUserDetail } = await import('../api')
-  const data = await getUserDetail(currentChatUser.value.id)
-  friendInfo.value = data?.data || currentChatUser.value
+  try {
+    const { getUserDetail } = await import('../api')
+    const data = await getUserDetail(currentChatUser.value.id)
+    friendInfo.value = data?.data || currentChatUser.value
+  } catch (e) {
+    console.warn('获取用户详情失败:', e)
+    friendInfo.value = currentChatUser.value
+  }
 }
 
 function confirmDeleteFriend() { showFriendMenu.value = false; showDeleteConfirm.value = true }
@@ -334,10 +338,7 @@ function getAvatar(userId){
   return v ? (u.avatarUrl + (u.avatarUrl.includes('?') ? '&v=' : '?v=') + encodeURIComponent(v)) : u.avatarUrl
 }
 
-function initials(name) {
-  if (!name) return 'U'
-  return name.split(' ').map(s => s[0]).slice(0,2).join('').toUpperCase()
-}
+import { initials } from '../utils/format'
 
 // 图片消息检测与解析
 function isImageMessage(text) {
@@ -657,8 +658,8 @@ function closeContextMenu() {
 // 复制消息内容
 function copyMessage() {
   if (!selectedMessage.value) return
-  navigator.clipboard.writeText(selectedMessage.value.text).then(() => {
-    console.log('Message copied successfully')
+  navigator.clipboard.writeText(selectedMessage.value.text).catch(e => {
+    console.warn('复制失败:', e)
   })
   closeContextMenu()
 }

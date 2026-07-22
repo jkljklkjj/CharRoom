@@ -54,14 +54,11 @@ export function updateConversationState(conversationId, patch = {}) {
   const key = getConversationKey(conversationId)
   if (!key) return
   const current = state.conversationStates[key] || { lastIncomingMessageTime: 0, unreadCount: 0 }
-  state.conversationStates = {
-    ...state.conversationStates,
-    [key]: {
-      lastIncomingMessageTime: Math.max(current.lastIncomingMessageTime || 0, patch.lastIncomingMessageTime || 0),
-      unreadCount: patch.unreadCount != null
-        ? Math.max(0, patch.unreadCount)
-        : Math.max(0, (current.unreadCount || 0) + (patch.unreadDelta || 0))
-    }
+  state.conversationStates[key] = {
+    lastIncomingMessageTime: Math.max(current.lastIncomingMessageTime || 0, patch.lastIncomingMessageTime || 0),
+    unreadCount: patch.unreadCount != null
+      ? Math.max(0, patch.unreadCount)
+      : Math.max(0, (current.unreadCount || 0) + (patch.unreadDelta || 0))
   }
 }
 
@@ -178,16 +175,14 @@ export function removeUser(id) {
 }
 
 export function updateUserOnlineStatus(userId, online) {
-  state.users = state.users.map(user => {
-    if (user.id === userId) {
-      return {
-        ...user,
-        online: online,
-        status: online ? i18n.global.t('sidebar.online') : i18n.global.t('sidebar.offline')
-      }
+  const idx = state.users.findIndex(user => user.id === userId)
+  if (idx >= 0) {
+    state.users[idx] = {
+      ...state.users[idx],
+      online: online,
+      status: online ? i18n.global.t('sidebar.online') : i18n.global.t('sidebar.offline')
     }
-    return user
-  })
+  }
 }
 
 // ── 头像缓存 ──────────────────────────────────

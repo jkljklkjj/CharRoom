@@ -139,13 +139,6 @@ export function loadOlderMessages() {
   }
 }
 
-export function loadHistory(accountId) {
-  const id = accountId || state.accountId
-  if (!id) return
-  state.messages = []
-  state.groupMessages = []
-}
-
 // ── 消息操作 ──────────────────────────────────
 
 export function addMessage(m) {
@@ -231,20 +224,22 @@ export function setSelectedChat(id) {
 
 export function trimMessages(max) {
   if (state.messages.length > max) {
-    state.messages.splice(0, state.messages.length - max)
+    state.messages = state.messages.slice(state.messages.length - max)
   }
 }
 
 export function trimGroupMessages(max) {
   if (state.groupMessages.length > max) {
-    state.groupMessages.splice(0, state.groupMessages.length - max)
+    state.groupMessages = state.groupMessages.slice(state.groupMessages.length - max)
   }
 }
 
 export function deleteMessage(message, isGroup = false) {
-  const arr = isGroup ? state.groupMessages : state.messages
-  const idx = arr.indexOf(message)
-  if (idx > -1) arr.splice(idx, 1)
+  if (isGroup) {
+    state.groupMessages = state.groupMessages.filter(m => m !== message)
+  } else {
+    state.messages = state.messages.filter(m => m !== message)
+  }
 }
 
 // 从 users.js 延迟导入，避免循环依赖

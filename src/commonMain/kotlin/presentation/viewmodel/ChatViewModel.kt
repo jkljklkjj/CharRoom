@@ -433,12 +433,18 @@ open class ChatViewModel(
         isLoadingMore = page > 0
 
         return try {
-            val messages = chatRepository.getOfflineMessagesPage(page, pageSize)
-            if (messages.isEmpty()) return false
+            val maxPages = 50 // 防止无限循环
+            var currentPage = page
+            var hasMore = true
 
-            chatState.prependMessages(messages.sortedBy { it.timestamp }, markAsUnread = true)
+            while (hasMore && currentPage - page < maxPages) {
+                val messages = chatRepository.getOfflineMessagesPage(currentPage, pageSize)
+                if (messages.isEmpty()) break
 
-            val hasMore = fetchOfflineMessages(page + 1, pageSize)
+                chatState.prependMessages(messages.sortedBy { it.timestamp }, markAsUnread = true)
+                currentPage++
+                hasMore = messages.size >= pageSize
+            }
 
             if (!hasMore) {
                 pendingMessages.sortedBy { it.timestamp }.forEach { chatState.addMessage(it) }

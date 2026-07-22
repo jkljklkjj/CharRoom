@@ -203,8 +203,9 @@ class ConversationSyncService(
         var lastSeqId = chatState.getConversationSeqId(conversationId)
         var hasMore = true
         var pageCount = 0
+        val maxPages = 100 // 防止无限循环
 
-        while (hasMore) {
+        while (hasMore && pageCount < maxPages) {
             try {
                 val result = chatRepository.syncMessages(conversationId, lastSeqId, 50)
                 if (result.messages.isEmpty()) break

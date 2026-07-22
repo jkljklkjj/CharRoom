@@ -127,8 +127,8 @@ class QuicClientImpl : ChatTransport {
 
     // 心跳自适应 RTT 跟踪（线程安全）
     private val rttWindow = java.util.Collections.synchronizedList(mutableListOf<Long>())
-    private var lastHeartbeatSend = 0L
-    private var hbSendInProgress = false
+    @Volatile private var lastHeartbeatSend = 0L
+    @Volatile private var hbSendInProgress = false
 
     /** 自适应心跳间隔：基于 P90 RTT，范围 5-15s（服务端 alive-ttl=30s，留余量）。 */
     private fun adaptiveHbInterval(): Long {
@@ -180,12 +180,17 @@ class QuicClientImpl : ChatTransport {
         recordRtt()
         log.info("收到 Stream 数据: streamId={}, dataLen={}, listeners={}", streamId, data.size, messageListeners.size)
         // 数据已由 QuicStreamInitializer 按帧边界返回，直接透传
+        // 只解析一次 protobuf，然后分发给所有 listener
+        val wrapper = try {
+            com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
+        } catch (e: Exception) {
+            log.error("protobuf 解析失败: ${e.message}")
+            return
+        }
+        log.debug("解析消息类型: type={}", wrapper.type)
         synchronized(messageListeners) {
             messageListeners.forEach { listener ->
                 try {
-                    // 尝试解析为 protobuf MessageWrapper 并分发
-                    val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
-                    log.debug("解析消息类型: type={}", wrapper.type)
                     when (wrapper.type) {
                         MsgType.ACK.wire -> {
                             if (wrapper.hasAck()) {
@@ -482,6 +487,8 @@ class QuicClientImpl : ChatTransport {
         sessions.clear()
         messageQueue.clear()
         scope.coroutineContext.cancel()
+        // 重建 scope，以便后续 start() 可以正常工作
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     }
 
     override fun addMessageReceiveListener(listener: MessageReceiveListener) {

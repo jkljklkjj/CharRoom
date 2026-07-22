@@ -115,10 +115,7 @@ function avatarSrc(u) {
   return v ? (u.avatarUrl + (u.avatarUrl.includes('?') ? '&v=' : '?v=') + encodeURIComponent(v)) : u.avatarUrl
 }
 
-function initials(name) {
-  if (!name) return 'U'
-  return name.split(' ').map(s => s[0]).slice(0,2).join('').toUpperCase()
-}
+import { initials } from '../utils/format'
 
 function select(u) {
   console.log('SidebarUsers.select triggered, u.id=', u.id, 'type=', typeof u.id)
@@ -158,9 +155,12 @@ function toggleFriendRequests() {
 }
 
 async function loadFriendRequests() {
-  const requests = await api.getFriendRequests()
-  console.log('Friend requests raw data:', requests)
-  friendRequests.value = requests
+  try {
+    const requests = await api.getFriendRequests()
+    friendRequests.value = requests
+  } catch (e) {
+    console.warn('加载好友申请失败:', e)
+  }
 }
 
 async function handleAccept(userId) {
@@ -206,8 +206,12 @@ watch(() => store.state.loginValid, (newVal) => {
 })
 
 async function loadFriends() {
-  const friends = await api.getFriends()
-  store.setUsers(friends)
+  try {
+    const friends = await api.getFriends()
+    store.setUsers(friends)
+  } catch (e) {
+    console.warn('加载好友列表失败:', e)
+  }
 }
 </script>
 

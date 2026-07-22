@@ -63,7 +63,7 @@ class AppState {
      * 获取当前用户ID（优先从 auth state 的 userProfile 获取，
      * 也可由 QUIC 登录响应直接设置，用于 auth state 尚未含 userProfile 的场景）。
      */
-    var currentUserId: Int? = null
+    @Volatile var currentUserId: Int? = null
         private set
 
     /**

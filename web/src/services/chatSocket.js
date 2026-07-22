@@ -230,6 +230,11 @@ export async function sendWrapper(wrapperObj) {
   const msgId = wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId
   if (msgId) {
     if (messageCache.has(msgId)) return false
+    // 限制缓存大小
+    if (messageCache.size >= MAX_MESSAGE_CACHE) {
+      const firstKey = messageCache.keys().next().value
+      messageCache.delete(firstKey)
+    }
     messageCache.set(msgId, Date.now())
   }
 
@@ -243,7 +248,7 @@ export async function sendWrapper(wrapperObj) {
   if (sent && msgId && (wrapperObj.type === 'chat' || wrapperObj.type === 'group_chat')) {
     pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
     // 发送成功，从 IndexedDB 离线队列中移除
-    removeMessage(msgId).catch(() => {})
+    removeMessage(msgId).catch(e => console.warn('[OfflineQueue] 移除消息失败:', e))
   }
 
   return sent

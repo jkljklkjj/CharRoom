@@ -37,15 +37,25 @@
 - **问题**: `.catch(() => {})` 忽略所有异常，调试困难。
 - **修复**: 至少 `console.warn` 记录错误。
 
-### 7. Vue reactive 状态直接 splice
-- **文件**: `ChatWindow.vue:506-508`
-- **问题**: `store.state.messages.splice(idx, 1)` 绕过 `readonly` 包装，Vue 不追踪。
-- **修复**: 通过 store 的 mutation 方法删除消息。
+### 7. Vue reactive 状态直接 splice ✅ 已修复
+- **文件**: `store/messages.js`
+- **问题**: `state.messages.splice(idx, 1)` 绕过 `readonly` 包装，Vue 不追踪。
+- **修复**: 改用 `state.messages = state.messages.filter(m => m !== message)` 和 `slice()` 代替 `splice()`。
+
+### 8. 多 catch(() => {}) 吞掉所有错误 ✅ 已修复
+- **文件**: `chatSocket.js`
+- **问题**: `.catch(() => {})` 忽略所有异常，调试困难。
+- **修复**: 改为 `.catch(e => console.warn(...))` 记录错误。
+
+### 9. initials() 函数去重 ✅ 已修复
+- **文件**: `ChatWindow.vue`, `SidebarUsers.vue`
+- **问题**: 两个组件重复定义相同的 `initials()` 函数。
+- **修复**: 提取到 `utils/format.js` 共享模块。
 
 ## 🔵 Low Priority
 
-- `loadHistory` 死函数清理
-- 去重 `initials()` 函数
-- 生产环境 console.log 剥离
-- `formatText` XSS 防护增强（DOMPurify）
-- protobuf 加载失败重试机制
+- [x] `initials()` 函数去重（提取到 `utils/format.js`）
+- [x] `loadHistory` 死函数清理（已从 messages.js 和 index.js 中移除）
+- [ ] 生产环境 console.log 剥离
+- [ ] `formatText` XSS 防护增强（DOMPurify）
+- [ ] protobuf 加载失败重试机制

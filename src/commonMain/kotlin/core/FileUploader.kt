@@ -93,6 +93,7 @@ object FileUploader {
                 null
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             println("Avatar upload error: ${e.message}")
             null
         }
