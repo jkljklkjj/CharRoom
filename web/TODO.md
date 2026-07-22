@@ -11,12 +11,12 @@
 
 ## 🟡 P1 — 性能优化
 
+- [x] **`v-for` 用 index 做 key** — 改用 `messageId` 做 key，避免全量 DOM 重建
+- [x] **DOMPurify 每次渲染每条消息都调用** — 预清洗存入 store，`formatText` 简化为直接返回
+- [x] **`rebuildConversationStates` 每次用户列表变化读所有会话** — 添加 `previewCache`，仅消息变化时 invalidate
+- [x] **`currentMessages` computed 每次创建新数组** — memoize 结果，仅长度变化时重新 slice
+- [x] **`sortedUsers` 每次 reactive 变化都 map+sort** — hash-based memoize，仅数据变化时重排
 - [ ] **localStorage O(n) 消息持久化** — 每条消息读写全量 JSON，500 条消息时严重退化 → 改用 IndexedDB 或写缓冲
-- [ ] **`v-for` 用 index 做 key** — 加载历史消息时全量 DOM 重建 → 改用 `messageId` 做 key
-- [ ] **DOMPurify 每次渲染每条消息都调用** — 100 条消息 = 100 次 sanitize → 预清洗存入 store
-- [ ] **`rebuildConversationStates` 每次用户列表变化读所有会话** — 缓存 preview，仅消息变化时重建
-- [ ] **`currentMessages` computed 每次创建新数组** — `slice()` 导致不必要 re-render → memoize 结果
-- [ ] **`sortedUsers` 每次 reactive 变化都 map+sort** — debounce 或 `cache:false`
 
 ## 🟢 P2 — 代码质量
 
