@@ -156,15 +156,25 @@ function handleIncomingMessage(msg) {
         user: String(msg.chat.userId || 'unknown'),
         text: msg.chat.content,
         time: normalizeTimestamp(msg.chat.timestamp),
-        targetId: msg.chat.targetClientId
+        targetId: msg.chat.targetClientId,
+        seqId: msg.chat.seqId || undefined
       })
+      // 从消息 payload 中更新 seqId 游标（后端全链路携带 seqId）
+      if (msg.chat.seqId && msg.chat.conversationId) {
+        store.setConversationSeqId(msg.chat.conversationId, msg.chat.seqId)
+      }
     } else if (msg.type === 'group_chat' && msg.groupChat) {
       store.addGroupMessage({
         user: String(msg.groupChat.userId),
         text: msg.groupChat.content,
         time: normalizeTimestamp(msg.groupChat.timestamp),
-        groupId: msg.groupChat.targetClientId
+        groupId: msg.groupChat.targetClientId,
+        seqId: msg.groupChat.seqId || undefined
       })
+      // 从消息 payload 中更新 seqId 游标
+      if (msg.groupChat.seqId && msg.groupChat.conversationId) {
+        store.setConversationSeqId(msg.groupChat.conversationId, msg.groupChat.seqId)
+      }
     } else if (msg.type === 'agentChatStream' && msg.agentStream) {
       // Agent 流式消息（AgentStreamChunk 协议）
       const stream = msg.agentStream
