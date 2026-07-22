@@ -229,16 +229,13 @@ export async function getFriendRequests() {
 }
 
 export async function acceptFriend(requesterId) {
-  console.log('acceptFriend 传入参数:', requesterId, '类型:', typeof requesterId)
   const friendId = parseInt(requesterId)
-  console.log('acceptFriend 转换后参数:', friendId, '类型:', typeof friendId)
   const body = JSON.stringify({ friendId })
-  console.log('acceptFriend 请求体:', body)
-  const { ok } = await safeFetch(`${API_BASE}/friends/accept`, {
+  const { ok, body: resp } = await safeFetch(`${API_BASE}/friends/accept`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body
   })
-  console.log('acceptFriend 返回结果:', ok)
-  return ok
+  // 返回新好友的用户信息（增量更新用）
+  return ok ? (resp?.data || null) : null
 }
 
 export async function rejectFriend(requesterId) {

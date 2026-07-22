@@ -180,14 +180,13 @@ async function loadFriendRequests() {
 }
 
 async function handleAccept(userId) {
-  const ok = await api.acceptFriend(userId)
-  if (ok) {
+  const friend = await api.acceptFriend(userId)
+  if (friend) {
     window.$toast.success(t('sidebar.frAccepted'))
     // 移除已处理的申请
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
-    // 刷新好友列表
-    const friends = await api.getFriends()
-    store.setUsers(friends)
+    // 增量添加新好友（不重新请求整个列表）
+    store.addUser(friend)
   } else {
     window.$toast.error(t('sidebar.frAcceptFailed'))
   }
