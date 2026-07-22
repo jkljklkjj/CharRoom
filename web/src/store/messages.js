@@ -2,6 +2,26 @@ import { state, PAGE_SIZE } from './state'
 import { getPrivateConversationId, loadPrivateConversation, loadGroupConversation,
          buildPrivateHistoryKey, buildGroupHistoryKey, normalizeTimeValue,
          getConversationKey } from './storage'
+import DOMPurify from 'dompurify'
+
+// 延迟导入 users.js 避免循环依赖
+let _invalidateConversationPreview = null
+function invalidatePreview(conversationId) {
+  if (!_invalidateConversationPreview) {
+    import('./users.js').then(m => { _invalidateConversationPreview = m.invalidateConversationPreview })
+    return
+  }
+  _invalidateConversationPreview(conversationId)
+}
+
+/**
+ * 预清洗消息文本，避免每次渲染都调用 DOMPurify。
+ * 在消息存入 store 时执行一次，而非每次 v-html 渲染时执行。
+ */
+function sanitizeText(text) {
+  if (!text || typeof text !== 'string') return ''
+  return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })
+}
 
 // ── seqId 持久化 ──────────────────────────────
 
@@ -144,16 +164,20 @@ export function loadOlderMessages() {
 export function addMessage(m) {
   const chatId = getPrivateConversationId(m)
   if (!chatId) return
+  // 预清洗文本，避免每次渲染调用 DOMPurify
+  const sanitized = m.text != null ? { ...m, text: sanitizeText(m.text) } : m
   if (String(state.selectedChatId) === String(chatId)) {
-    state.messages.push(m)
+    state.messages.push(sanitized)
   }
   if (String(m.user) !== 'you') {
     updateConversationState(chatId, {
       lastIncomingMessageTime: normalizeTimeValue(m.time || m.timestamp),
       unreadDelta: String(state.selectedChatId) === String(chatId) ? 0 : 1
     })
+    // 清除预览缓存，下次 rebuild 时重新读取
+    invalidatePreview(chatId)
   }
-  savePrivateMessage(m)
+  savePrivateMessage(sanitized)
   if (m.seqId != null) {
     const partnerId = chatId
     const ids = [Number(state.accountId), Number(partnerId)].sort((a, b) => a - b)
@@ -187,16 +211,20 @@ export function upsertAgentStreamMessage(messageId, fullContent, done = false) {
 
 export function addGroupMessage(m) {
   const conversationId = `-${m.groupId}`
+  // 预清洗文本，避免每次渲染调用 DOMPurify
+  const sanitized = m.text != null ? { ...m, text: sanitizeText(m.text) } : m
   if (Math.abs(Number(state.selectedChatId)) === Number(m.groupId)) {
-    state.groupMessages.push(m)
+    state.groupMessages.push(sanitized)
   }
   if (String(m.user) !== String(state.accountId)) {
     updateConversationState(conversationId, {
       lastIncomingMessageTime: normalizeTimeValue(m.time || m.timestamp),
       unreadDelta: Math.abs(Number(state.selectedChatId)) === Number(m.groupId) ? 0 : 1
     })
+    // 清除预览缓存，下次 rebuild 时重新读取
+    invalidatePreview(conversationId)
   }
-  saveGroupMessage(m)
+  saveGroupMessage(sanitized)
   if (m.seqId != null) {
     const convId = 'group:' + m.groupId
     setConversationSeqId(convId, m.seqId)

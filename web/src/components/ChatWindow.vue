@@ -40,7 +40,7 @@
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
     <div class="messages" ref="msgList" v-if="currentChatId !== null" @scroll="onMessageScroll">
-      <div v-for="(m,i) in currentMessages" :key="i" :class="['msg', {me: m.user==='you'}]" @contextmenu.prevent="showMessageContextMenu($event, m)">
+      <div v-for="(m,i) in currentMessages" :key="m.messageId || (m.time + '_' + m.user + '_' + i)" :class="['msg', {me: m.user==='you'}]" @contextmenu.prevent="showMessageContextMenu($event, m)">
         <div class="row">
           <div class="avatar-col">
             <img v-if="getAvatar(m.user)" :src="getAvatar(m.user)" class="msg-avatar" />
@@ -121,7 +121,6 @@ import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
-import DOMPurify from 'dompurify'
 
 const store = useStore()
 // 注入 store 引用给 chatSocket（替代 window.__chatStore hack）
@@ -234,11 +233,20 @@ const isMobile = computed(() => {
   return windowWidth.value < 768
 })
 
-// 当前会话的消息列表（私聊或群聊）
+// 当前会话的消息列表（私聊或群聊）— memoize 避免每次 reactive 变化都 slice
+let _cachedMsgs = null
+let _cachedMsgsLen = 0
+let _cachedChatId = null
 const currentMessages = computed(() => {
   if (currentChatId.value == null) return []
   const msgs = isGroupChat.value ? store.state.groupMessages : store.state.messages
-  // 只保留最新 100 条（类似 QQ），消除大量消息时的滚动开销
+  // 仅在数组长度变化或切换会话时重新 slice
+  if (msgs === _cachedMsgs && msgs.length === _cachedMsgsLen && currentChatId.value === _cachedChatId) {
+    return _cachedMsgsLen > 100 ? _cachedMsgs.slice(_cachedMsgsLen - 100) : _cachedMsgs
+  }
+  _cachedMsgs = msgs
+  _cachedMsgsLen = msgs.length
+  _cachedChatId = currentChatId.value
   return msgs.length > 100 ? msgs.slice(msgs.length - 100) : msgs
 })
 
@@ -390,11 +398,10 @@ function getFileIcon(filename) {
   return '📄'
 }
 
-// 文本格式化（使用 DOMPurify 防止 XSS）
+// 文本格式化（文本已在 store 中预清洗，此处直接返回）
 function formatText(text) {
   if (!text || typeof text !== "string") return ''
-  // 使用 DOMPurify 清洗，禁止所有 HTML 标签，只保留纯文本
-  return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })
+  return text
 }
 
 // textarea 自动高度

@@ -5,10 +5,18 @@ import i18n from '../i18n'
 
 // ── 会话状态 ──────────────────────────────────
 
-function loadConversationPreview(accountId, conversationId) {
+// 缓存会话预览，避免每次用户列表变化都读 localStorage
+const previewCache = new Map() // key: "accountId:conversationId" → { lastIncomingMessageTime, loadedAt }
+
+function loadConversationPreview(accountId, conversationId, forceRefresh = false) {
   const id = sanitizeId(conversationId)
   if (!accountId || !id) {
     return { lastIncomingMessageTime: 0, unreadCount: 0 }
+  }
+
+  const cacheKey = `${accountId}:${id}`
+  if (!forceRefresh && previewCache.has(cacheKey)) {
+    return previewCache.get(cacheKey)
   }
 
   const isGroup = isGroupConversationId(id)
@@ -27,10 +35,12 @@ function loadConversationPreview(accountId, conversationId) {
     }
   })
 
-  return { lastIncomingMessageTime, unreadCount: 0 }
+  const preview = { lastIncomingMessageTime, unreadCount: 0 }
+  previewCache.set(cacheKey, preview)
+  return preview
 }
 
-export function rebuildConversationStates() {
+export function rebuildConversationStates(forceRefresh = false) {
   if (!state.accountId || !Array.isArray(state.users)) {
     state.conversationStates = {}
     return
@@ -40,7 +50,7 @@ export function rebuildConversationStates() {
   const nextStates = {}
   state.users.forEach(user => {
     if (!user || user.id == null) return
-    const preview = loadConversationPreview(state.accountId, user.id)
+    const preview = loadConversationPreview(state.accountId, user.id, forceRefresh)
     const existing = existingStates[String(user.id)] || {}
     nextStates[String(user.id)] = {
       lastIncomingMessageTime: preview.lastIncomingMessageTime,
@@ -48,6 +58,18 @@ export function rebuildConversationStates() {
     }
   })
   state.conversationStates = nextStates
+}
+
+/**
+ * 当消息变化时调用，清除特定会话的预览缓存。
+ * 这样下次 rebuildConversationStates 时会重新读取 localStorage。
+ */
+export function invalidateConversationPreview(conversationId) {
+  if (!state.accountId) return
+  const id = sanitizeId(conversationId)
+  if (id) {
+    previewCache.delete(`${state.accountId}:${id}`)
+  }
 }
 
 export function updateConversationState(conversationId, patch = {}) {
@@ -78,7 +100,8 @@ export function clearConversationUnread(conversationId) {
 
 export function setUsers(list) {
   state.users = list
-  rebuildConversationStates()
+  // 用户列表完全替换，需要强制刷新预览缓存
+  rebuildConversationStates(true)
 }
 
 export function setGroups(list) {
@@ -151,7 +174,8 @@ export function loadCachedUsers() {
 export function addUser(u) {
   if (!state.users.some(x => x.id === u.id)) {
     state.users.push(u)
-    rebuildConversationStates()
+    // 新用户需要强制刷新预览缓存
+    rebuildConversationStates(true)
   }
 }
 

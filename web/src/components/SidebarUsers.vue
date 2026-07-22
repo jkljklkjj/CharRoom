@@ -80,8 +80,23 @@ const showFriendRequests = ref(false)
 const friendRequests = ref([])
 const searchQuery = ref('')
 
+// 排序后的用户列表 — memoize 避免每次 conversationStates 变化都重排
+let _sortedUsers = null
+let _sortedUsersHash = ''
 const sortedUsers = computed(() => {
-  return [...store.state.users]
+  // 构建 hash 用于检测变化
+  const usersHash = store.state.users.map(u => u.id).join(',')
+  const statesHash = Object.entries(store.state.conversationStates)
+    .map(([k, v]) => `${k}:${v.lastIncomingMessageTime}:${v.unreadCount}`)
+    .join('|')
+  const hash = `${usersHash}__${statesHash}`
+
+  if (hash === _sortedUsersHash && _sortedUsers) {
+    return _sortedUsers
+  }
+
+  _sortedUsersHash = hash
+  _sortedUsers = [...store.state.users]
     .map((user, index) => ({
       ...user,
       __index: index,
@@ -97,6 +112,7 @@ const sortedUsers = computed(() => {
       if (unreadDiff !== 0) return unreadDiff
       return a.__index - b.__index
     })
+  return _sortedUsers
 })
 
 const filteredUsers = computed(() => {
