@@ -347,7 +347,19 @@ function connectChat(token, accountId) {
   const port = transportConfig.port || 8080
   chatSocket.connect(host, port, token, String(accountId), {
     onmessage: handleIncomingMessage,
-    onAuthFailed: () => logout()
+    onAuthFailed: () => logout(),
+    onFriendAccepted: async (accepterId) => {
+      // 好友请求被接受，增量添加新好友
+      try {
+        const friend = await api.getUserDetail(accepterId)
+        if (friend?.data) {
+          store.addUser(friend.data)
+          window.$toast?.success?.(t('chat.friendAccepted') || '好友已添加')
+        }
+      } catch (e) {
+        console.warn('获取新好友信息失败:', e)
+      }
+    }
   })
 }
 
@@ -410,6 +422,24 @@ async function initUserSession(accessToken, refreshToken) {
   const friends = await api.getFriends()
   store.mergeUsers(friends || [])   // 静默 merge，不重建 DOM
   store.cacheUsers(friends || [])   // 缓存到 localStorage
+
+  // 同步离线期间的好友接受通知
+  try {
+    const notifications = await api.getFriendNotifications()
+    if (notifications && notifications.length > 0) {
+      for (const n of notifications) {
+        // 获取新好友信息并添加到列表
+        const friend = await api.getUserDetail(n.accepterId)
+        if (friend?.data) {
+          store.addUser(friend.data)
+        }
+      }
+      // 标记通知已读
+      await api.markFriendNotificationsRead()
+    }
+  } catch (e) {
+    console.warn('同步好友通知失败:', e)
+  }
 
   // 批量拉取好友在线状态
   if (friends && friends.length > 0) {

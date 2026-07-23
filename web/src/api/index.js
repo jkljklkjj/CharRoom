@@ -239,15 +239,28 @@ export async function acceptFriend(requesterId) {
 }
 
 export async function rejectFriend(requesterId) {
-  console.log('rejectFriend 传入参数:', requesterId, '类型:', typeof requesterId)
   const friendId = parseInt(requesterId)
-  console.log('rejectFriend 转换后参数:', friendId, '类型:', typeof friendId)
   const body = JSON.stringify({ friendId })
-  console.log('rejectFriend 请求体:', body)
   const { ok } = await safeFetch(`${API_BASE}/friends/reject`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body
   })
-  console.log('rejectFriend 返回结果:', ok)
+  return ok
+}
+
+/**
+ * 获取未读好友通知（登录时调用）
+ */
+export async function getFriendNotifications() {
+  const { ok, body } = await safeFetch(`${API_BASE}/friends/notifications`, { method: 'GET' })
+  if (!ok) return []
+  return body?.data || []
+}
+
+/**
+ * 标记好友通知已读
+ */
+export async function markFriendNotificationsRead() {
+  const { ok } = await safeFetch(`${API_BASE}/friends/notifications/read`, { method: 'POST' })
   return ok
 }
 

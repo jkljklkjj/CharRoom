@@ -88,7 +88,7 @@ function stopTimers() {
 /**
  * 建立聊天连接。
  */
-export async function connect(hostname, port, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed } = {}) {
+export async function connect(hostname, port, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed, onFriendAccepted } = {}) {
   console.log('🔌 尝试建立连接:', { hostname, port, hasToken: !!token, userId })
 
   if (!token || typeof token !== 'string' || token.trim() === '') {
@@ -109,7 +109,8 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
     onmessage: onmessage || handlers.onmessage,
     onclose: onclose || handlers.onclose,
     onerror: onerror || handlers.onerror,
-    onAuthFailed: onAuthFailed || (() => {})
+    onAuthFailed: onAuthFailed || (() => {}),
+    onFriendAccepted: onFriendAccepted || (() => {})
   }
 
   // 断开旧的连接
@@ -533,6 +534,14 @@ async function handleMessage(rawData) {
     // 用户在线状态更新
     if (processedData.clientId !== undefined && processedData.online !== undefined) {
       // 传给上层
+    }
+
+    // 好友请求被接受通知
+    if (processedData.type === 'friend_accepted' && processedData.ack) {
+      const accepterId = processedData.ack.clientId
+      if (accepterId && handlers.onFriendAccepted) {
+        handlers.onFriendAccepted(parseInt(accepterId))
+      }
     }
 
     // 新消息通知
