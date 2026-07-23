@@ -1,48 +1,252 @@
 # detekt 配置文件
-# 基于默认配置，调整为项目适用的规则
+# 基于 Kotlin 最佳实践 + Compose + KMP 项目特点
 
 build:
-  maxIssues: 10
+  maxIssues: 0  # 零容忍，所有问题必须修复
+
+# ── 复杂度规则 ──────────────────────────────────
 
 complexity:
   LongMethod:
-    threshold: 60
+    threshold: 50  # 方法不超过 50 行
+    ignoreAnnotated: ['Composable']
   LongParameterList:
-    functionThreshold: 8
-    constructorThreshold: 10
+    functionThreshold: 6  # 函数参数不超过 6 个
+    constructorThreshold: 8  # 构造函数参数不超过 8 个
   ComplexMethod:
-    threshold: 15
+    threshold: 10  # 分支不超过 10 个
+    ignoreAnnotated: ['Composable']
   TooManyFunctions:
-    thresholdInClass: 25
+    thresholdInClass: 20  # 类中函数不超过 20 个
+    thresholdInFiles: 25  # 文件中函数不超过 25 个
+  LargeClass:
+    threshold: 500  # 类不超过 500 行
+  TooManyExpressions:
+    threshold: 100
+  TooManyoperators:
+    threshold: 10
+
+# ── 命名规则 ──────────────────────────────────
 
 naming:
   FunctionNaming:
-    # Composable 函数使用 PascalCase
+    # Composable 函数使用 PascalCase，普通函数使用 camelCase
     functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ignoreAnnotated: ['Composable']
+  ClassNaming:
+    classPattern: '[A-Z][a-zA-Z0-9]*'
   TopLevelPropertyNaming:
     constantPattern: '[A-Z][A-Za-z0-9_]*'
+  MemberNameNaming:
+    # 允许 UI 状态使用 camelCase
+    propertyPattern: '[a-z][a-zA-Z0-9_]*'
+  BooleanPropertyNaming:
+    # 布尔属性使用 is 前缀
+    propertyPattern: '(is|has|should)[A-Z][a-zA-Z0-9_]*'
+
+# ── 代码风格规则 ──────────────────────────────────
 
 style:
   MaxLineLength:
     maxLineLength: 120
     ignoreBacktickIdentifiers: true
+    ignoreAnnotated: ['Composable']
   MagicNumber:
-    active: false
+    active: false  # Compose 项目常量多，禁用
   ReturnCount:
-    max: 3
+    max: 2  # 函数最多 2 个 return
+    ignoreAnnotated: ['Composable']
   WildcardImport:
     active: false
+  SpreadOperator:
+    active: true  # 禁止 spread 操作符（性能问题）
+  ForbiddenComment:
+    active: true
+    comments:
+      - 'TODO'
+      - 'FIXME'
+      - 'HACK'
+  UnusedPrivateMember:
+    active: true
+  UnusedPrivateFunction:
+    active: true
+  ExpressionBodySyntax:
+    active: true
+    maxLineLength: 60
+  SingleExpressionFunction:
+    active: true
+    maxLineLength: 60
+  RedundantVisibilityModifier:
+    active: true
+  RedundantModifier:
+    active: true
+  ExplicitBackingFieldAccess:
+    active: true
+
+# ── 空代码块规则 ──────────────────────────────────
 
 empty-blocks:
   EmptyFunctionBlock:
     ignoreOverridden: true
+    ignorePrivate: true
+  EmptyClassBlock:
+    active: true
+  EmptyDefaultConstructor:
+    active: true
+
+# ── 异常处理规则 ──────────────────────────────────
 
 exceptions:
   TooGenericExceptionCaught:
+    active: true  # 捕获具体异常
+    exceptionNames:
+      - 'kotlinx.coroutines.CancellationException'  # 允许
+  TooGenericExceptionThrown:
+    active: true
+  PrintStackTrace:
+    active: true  # 禁止 printStackTrace
+  ThrowingExceptionInMain:
+    active: true
+  ThrowingExceptionDuringFinally:
+    active: true
+
+# ── 性能规则 ──────────────────────────────────
+
+performance:
+  ForLoopWithRangeWhen:
+    active: true
+  UnnecessaryCompanionObject:
+    active: true
+  UnnecessaryRepetition:
+    active: true
+  UnnecessaryStringTemplate:
+    active: true
+  UnnecessaryTemporalToString:
+    active: true
+  UnnecessaryToTypedArray:
+    active: true
+  SpreadOperator:
+    active: true  # 禁止 spread 操作符
+
+# ── 可空性规则 ──────────────────────────────────
+
+style:
+  ReturnCount:
+    max: 2
+  SafeCast:
+    active: true
+  UnnecessarySafeCall:
+    active: true
+  UnnecessaryLet:
+    active: true
+  UnnecessarySafeCall:
+    active: true
+
+# ── 代码味道 ──────────────────────────────────
+
+code-smell:
+  BooleanExpressionArgument:
+    active: true
+  ComplexCondition:
+    active: true
+  DataClassContainsFunctions:
+    active: true
+  DataClassShouldBeRecord:
+    active: false  # Kotlin 没有 Record
+  Dynasty:
+    enabled: false
+  FeatureEnvy:
+    active: true
+  LargeClass:
+    active: true
+  LongMethod:
+    active: true
+  LongParameterList:
+    active: true
+  MethodOverloading:
+    active: true
+  MissingSpaceInLowPriorityMessage:
+    active: true
+  NestedBlockDepth:
+    threshold: 4
+  ReturnsCount:
+    enabled: true
+  TooManyFunctions:
+    active: true
+  TooManyFunctions:
+    active: true
+  ProtectedConstructorInFinalClass:
+    active: true
+  ComplexCondition:
+    threshold: 3
+
+# ── KMP 特定规则 ──────────────────────────────────
+
+naming:
+  # expect/actual 类命名
+  ClassNaming:
+    classPattern: '[A-Z][a-zA-Z0-9]*'
+
+# ── Compose 特定规则 ──────────────────────────────────
+
+complexity:
+  LongMethod:
+    ignoreAnnotated: ['Composable']
+  LongParameterList:
+    functionThreshold: 12  # Composable 函数参数可能较多
+  ComplexMethod:
+    ignoreAnnotated: ['Composable']
+
+# ── 格式化规则 ──────────────────────────────────
+
+formatting:
+  autoCorrect: true
+  MaxLineLength:
+    maxLineLength: 120
+  Indentation:
+    indentSize: 4
+    continuationIndentSize: 4
+  NoWildcardImports:
+    active: false
+  TrailingCommaOnCallSite:
+    active: false
+  TrailingCommaOnDeclarationSite:
     active: false
 
-indentation:
-  continuationIndentSize: 8
+# ── 注解规则 ──────────────────────────────────
 
-import-ordering:
-  autoCorrect: false
+annotations:
+  MissingJvmStatic:
+    active: false
+  OverridingDeprecatedMember:
+    active: true
+  RedundantAnnotation:
+    active: true
+
+# ── 潜在问题 ──────────────────────────────────
+
+potential-bugs:
+  EqualsAlwaysReturnsTrueOrFalse:
+    active: true
+  EqualsOnHashCode:
+    active: true
+  IgnoredReturnValue:
+    active: true
+  IncorrectCleanup:
+    active: true
+  IteratorNotThrowingNoSuchElementException:
+    active: true
+  LateinitVal:
+    active: true
+  UnconditionalThrowStatement:
+    active: true
+  UnreachableCode:
+    active: true
+
+# ── 文档规则 ──────────────────────────────────
+
+doc:
+  KDocReferencesPublicProperty:
+    active: true
+  KDocStyle:
+    active: true
