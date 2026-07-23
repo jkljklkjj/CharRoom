@@ -22,7 +22,7 @@ export function createTransport() {
   if (!isWebTransportSupported()) {
     throw new Error('当前浏览器不支持 WebTransport (QUIC)')
   }
-  console.log('🔀 TransportFactory: 使用 WebTransport (QUIC)')
+  console.debug('🔀 TransportFactory: 使用 WebTransport (QUIC)')
   return new WebTransport()
 }
 

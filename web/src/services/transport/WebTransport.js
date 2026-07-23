@@ -62,7 +62,7 @@ export class WebTransport extends ChatTransport {
 
       // 监听 transport.closed —— 服务端断开或网络异常时触发
       this._transport.closed.then((info) => {
-        console.log('WebTransport.closed 触发:', info)
+        console.debug('WebTransport.closed 触发:', info)
         this._readerActive = false
         this._safeOnClose()
       }).catch((e) => {
@@ -79,7 +79,7 @@ export class WebTransport extends ChatTransport {
           setTimeout(() => reject(new Error('WebTransport 连接超时')), TIMEOUT_MS)
         ),
       ])
-      console.log('✅ WebTransport 连接成功:', url)
+      console.debug('✅ WebTransport 连接成功:', url)
 
       // 创建控制流
       await this._createControlStream()
@@ -136,7 +136,7 @@ export class WebTransport extends ChatTransport {
     }
     this._connected = false
     this._safeOnClose()
-    console.log('WebTransport 已关闭')
+    console.debug('WebTransport 已关闭')
   }
 
   isConnected() {

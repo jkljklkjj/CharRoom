@@ -90,7 +90,7 @@ function stopTimers() {
  * 建立聊天连接。
  */
 export async function connect(hostname, port, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed, onFriendAccepted } = {}) {
-  console.log('🔌 尝试建立连接:', { hostname, port, hasToken: !!token, userId })
+  console.debug('🔌 尝试建立连接:', { hostname, port, hasToken: !!token, userId })
 
   if (!token || typeof token !== 'string' || token.trim() === '') {
     console.error('❌ 连接失败：token为空')
@@ -125,7 +125,7 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 
   // 设置事件回调
   transport.onopen = () => {
-    console.log('✅ 连接成功')
+    console.debug('✅ 连接成功')
     isReconnecting = false
     currentReconnectDelay = 1000
 
@@ -147,7 +147,7 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
   }
 
   transport.onclose = (event) => {
-    console.log('❌ 连接关闭')
+    console.debug('❌ 连接关闭')
     stopHeartbeat()
     // 重置重连标记，防止永久锁死（onclose 可能在 connect().catch() 之前触发）
     isReconnecting = false
@@ -185,7 +185,7 @@ async function sendLogin(token) {
         deviceId: getDeviceId()
       }
     })
-    console.log('📤 登录消息已发送, 结果:', result)
+    console.debug('📤 登录消息已发送, 结果:', result)
   } catch (err) {
     console.error('❌ 发送登录消息失败:', err)
   }
@@ -273,7 +273,7 @@ function flushQueue() {
   const total = Object.values(priorityQueues).reduce((sum, q) => sum + q.length, 0)
   if (total === 0) return
 
-  console.log('发送队列中的消息，共', total, '条')
+  console.debug('发送队列中的消息，共', total, '条')
   for (const priority of [PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW]) {
     const queue = priorityQueues[priority]
     while (queue.length > 0) {
@@ -298,7 +298,7 @@ async function flushOfflineQueue() {
     const pending = await getAllPending()
     if (pending.length === 0) return
 
-    console.log(`[OfflineQueue] 发送离线队列中的 ${pending.length} 条消息`)
+    console.debug(`[OfflineQueue] 发送离线队列中的 ${pending.length} 条消息`)
     for (const entry of pending) {
       try {
         const buffer = new Uint8Array(entry.buffer).buffer
@@ -409,7 +409,7 @@ function scheduleReconnect(hostname, port, token, userId) {
   if (reconnectTimer) clearTimeout(reconnectTimer)
 
   isReconnecting = true
-  console.log(`将在 ${currentReconnectDelay}ms 后尝试重连...`)
+  console.debug(`将在 ${currentReconnectDelay}ms 后尝试重连...`)
 
   reconnectTimer = setTimeout(() => {
     if (!stopReconnect) {
@@ -466,7 +466,7 @@ async function handleMessage(rawData) {
       } else {
         const msg = (processedData.response ? processedData.response.message : processedData.message || '').toLowerCase()
         if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
-          console.log('🔑 认证失败，停止重连')
+          console.debug('🔑 认证失败，停止重连')
           stopReconnect = true
           handlers.onAuthFailed(msg)
         }

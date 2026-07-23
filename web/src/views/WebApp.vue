@@ -267,7 +267,7 @@ async function syncConversation(conversationId, serverSeqId) {
     if (result.nextSeqId) {
       store.setConversationSeqId(conversationId, result.nextSeqId)
     }
-    console.log(`📡 增量同步 ${conversationId}: ${result.messages.length} 条消息`)
+    console.debug(`📡 增量同步 ${conversationId}: ${result.messages.length} 条消息`)
   } catch (e) {
     console.warn('增量同步失败:', conversationId, e)
   }
@@ -276,11 +276,11 @@ async function syncConversation(conversationId, serverSeqId) {
 async function syncAllConversations() {
   const accountId = store.state.accountId
   if (!accountId) return
-  console.log("📡 拉取离线消息...")
+  console.debug("📡 拉取离线消息...")
   try {
     const allMessages = await api.getOfflineMessages()
     if (!allMessages || allMessages.length === 0) return
-    console.log("📩 拉取到", allMessages.length, "条离线消息")
+    console.debug("📩 拉取到", allMessages.length, "条离线消息")
 
     // 按 conversationId 分组
     const privateByConv = {}
@@ -334,7 +334,7 @@ async function syncAllConversations() {
       if (maxSeqId > 0) store.setConversationSeqId(convId, maxSeqId)
     }
 
-    console.log(`📡 增量同步完成: ${allMessages.length} 条, ${Object.keys(privateByConv).length} 个私聊会话, ${Object.keys(groupByConv).length} 个群聊`)
+    console.debug(`📡 增量同步完成: ${allMessages.length} 条, ${Object.keys(privateByConv).length} 个私聊会话, ${Object.keys(groupByConv).length} 个群聊`)
   } catch (e) {
     console.warn("⚠️ 拉取离线消息失败:", e.message)
   }

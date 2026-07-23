@@ -160,6 +160,8 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('keydown', handleKeydown)
+  scrollToBottom()
 })
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
@@ -212,9 +214,13 @@ function confirmDeleteFriend() { showFriendMenu.value = false; showDeleteConfirm
 
 async function doDeleteFriend() {
   if (!currentChatUser.value) return
-  const { delFriend } = await import('../api')
-  const ok = await delFriend(currentChatUser.value.id)
-  if (ok) { store.removeUser(currentChatUser.value.id) }
+  try {
+    const { delFriend } = await import('../api')
+    const ok = await delFriend(currentChatUser.value.id)
+    if (ok) { store.removeUser(currentChatUser.value.id) }
+  } catch (e) {
+    console.warn('删除好友失败:', e)
+  }
   showDeleteConfirm.value = false
 }
 
@@ -614,21 +620,23 @@ async function handleFileUpload(file) {
     content = `📎 ${file.name} (${(file.size / 1024).toFixed(1)}KB)`
   }
 
+  const localMessageId = 'local_' + Date.now()
   const m = {
     user: 'you',
     text: file.type.startsWith('image/') ? `![${file.name}](${content})` : content,
     time: new Date().toISOString(),
-    targetId: currentChatId.value
+    targetId: currentChatId.value,
+    messageId: localMessageId
   }
 
   const wrapper = isGroupChat.value
     ? {
         type: 'group_chat',
-        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
+        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time, messageId: localMessageId }
       }
     : {
         type: 'chat',
-        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time }
+        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time, messageId: localMessageId }
       }
 
   if (isGroupChat.value) {
@@ -676,7 +684,7 @@ async function shareMessage() {
       title: t('chat.shareTitle')
     })
   } catch (err) {
-    console.log('Share cancelled or failed:', err)
+    console.debug('Share cancelled or failed:', err)
   }
   closeContextMenu()
 }
@@ -711,14 +719,6 @@ function handleKeydown(e) {
     showDeleteConfirm.value = false
   }
 }
-
-onMounted(()=>{
-  // 组件挂载时滚动到底部
-  scrollToBottom()
-  // 监听键盘快捷键
-  window.addEventListener('keydown', handleKeydown)
-  // 可在此连接 QUIC/WebTransport 并处理 incoming messages
-})
 </script>
 
 <style scoped>
