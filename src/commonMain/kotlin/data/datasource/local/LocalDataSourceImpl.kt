@@ -6,31 +6,34 @@ import model.Message
 import model.User
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import java.io.File
 
 /**
  * 本地数据源实现
  * 基于 AES-256/GCM 加密文件存储，防止本地数据泄露。
+ * 使用 FileProvider 接口实现 KMP 兼容。
  */
 class LocalDataSourceImpl(
-    private val authFile: File = File(System.getProperty("user.home"), ".qingliao/auth.enc"),
-    private val friendsFile: File = File(System.getProperty("user.home"), ".qingliao/friends.enc"),
-    private val groupsFile: File = File(System.getProperty("user.home"), ".qingliao/groups.enc"),
-    private val profileFile: File = File(System.getProperty("user.home"), ".qingliao/profile.enc"),
-    private val messagesFile: File = File(System.getProperty("user.home"), ".qingliao/messages.enc"),
-    private val groupMessagesFile: File = File(System.getProperty("user.home"), ".qingliao/group_messages.enc")
+    private val provider: FileProvider = fileProvider
 ) : LocalDataSource {
+
+    private val dataDir = provider.getAppDataDir()
+    private val authFile = "$dataDir/auth.enc"
+    private val friendsFile = "$dataDir/friends.enc"
+    private val groupsFile = "$dataDir/groups.enc"
+    private val profileFile = "$dataDir/profile.enc"
+    private val messagesFile = "$dataDir/messages.enc"
+    private val groupMessagesFile = "$dataDir/group_messages.enc"
 
     // ── 写入辅助：加密后写入文件 ────────────────────
 
-    private fun writeEncrypted(file: File, text: String) {
-        file.parentFile?.mkdirs()
-        file.writeBytes(CryptoUtil.encrypt(text.encodeToByteArray()))
+    private fun writeEncrypted(path: String, text: String) {
+        provider.mkdirs(dataDir)
+        provider.writeFile(path, CryptoUtil.encrypt(text.encodeToByteArray()))
     }
 
-    private fun readEncrypted(file: File): String? {
-        if (!file.exists()) return null
-        return String(CryptoUtil.decrypt(file.readBytes()))
+    private fun readEncrypted(path: String): String? {
+        if (!provider.fileExists(path)) return null
+        return String(CryptoUtil.decrypt(provider.readFile(path)!!))
     }
 
     // ── Auth 凭证（加密存储） ───────────────────────
@@ -69,7 +72,7 @@ class LocalDataSourceImpl(
 
     override suspend fun clearAuth() {
         try {
-            if (authFile.exists()) authFile.delete()
+            provider.deleteFile(authFile)
         } catch (_: Exception) {
         }
     }
@@ -138,7 +141,7 @@ class LocalDataSourceImpl(
     override suspend fun clearAll() {
         clearAuth()
         listOf(profileFile, friendsFile, groupsFile, messagesFile, groupMessagesFile).forEach {
-            runCatching { if (it.exists()) it.delete() }
+            runCatching { provider.deleteFile(it) }
         }
     }
 }

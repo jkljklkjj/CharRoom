@@ -18,6 +18,8 @@ import java.awt.TrayIcon
 import java.util.prefs.Preferences
 import com.chatlite.i18n.currentStrings
 import component.BackHandlerImpl
+import data.datasource.local.DesktopFileProvider
+import data.datasource.local.fileProvider
 import component.DesktopBackHandler
 import component.DesktopFilePicker
 import component.io.FilePicker
@@ -56,6 +58,7 @@ fun main() = application {
     ImageLoaderImpl = DesktopImageLoader
     LocalChatHistoryStore = DesktopLocalChatHistoryStore
     AvatarCropDialogImpl = DesktopAvatarCropDialog
+    data.datasource.local.fileProvider = DesktopFileProvider()
 
     // 初始化平台信息
     CurrentPlatform = AppPlatform.DESKTOP
