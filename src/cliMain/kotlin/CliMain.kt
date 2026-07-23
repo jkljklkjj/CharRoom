@@ -28,6 +28,9 @@ class ChatLiteCli(private val args: Array<String>) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val localDataSource = LocalDataSourceImpl()
     private lateinit var transport: ChatTransport
+    private var isReconnecting = false
+    private var reconnectDelay = 1000L
+    private val maxReconnectDelay = 30000L
 
     suspend fun run() {
         // 初始化 DI
@@ -63,6 +66,11 @@ class ChatLiteCli(private val args: Array<String>) {
             transport.addAuthStateListener { reason ->
                 println("\n⚠️ 登录失效: $reason")
             }
+
+            // 启动连接状态监控
+            scope.launch {
+                monitorConnection(token)
+            }
             try {
                 transport.start()
                 log.info { "QUIC 连接完成" }
@@ -83,6 +91,46 @@ class ChatLiteCli(private val args: Array<String>) {
         transport.logoutAndDisconnect()
         scope.cancel()
         println("再见")
+    }
+
+    // ── 连接监控与自动重连 ──
+
+    private suspend fun monitorConnection(token: String) {
+        while (true) {
+            delay(5000) // 每5秒检查一次连接状态
+            if (!transport.isConnected() && !isReconnecting) {
+                println("\n🔌 连接断开，尝试重连...")
+                attemptReconnect(token)
+            }
+        }
+    }
+
+    private suspend fun attemptReconnect(token: String) {
+        isReconnecting = true
+        var attempts = 0
+
+        while (isReconnecting && attempts < 10) {
+            attempts++
+            println("🔄 重连尝试 $attempts/10 (等待 ${reconnectDelay}ms)...")
+
+            try {
+                delay(reconnectDelay)
+                transport.start()
+                println("✅ 重连成功")
+                isReconnecting = false
+                reconnectDelay = 1000L // 重置延迟
+                return
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                println("❌ 重连失败: ${e.message}")
+                // 指数退避
+                reconnectDelay = (reconnectDelay * 2).coerceAtMost(maxReconnectDelay)
+            }
+        }
+
+        println("❌ 重连失败次数过多，停止重连")
+        isReconnecting = false
+        reconnectDelay = 1000L
     }
 
     private suspend fun loginWithArgs(): Boolean {
@@ -205,7 +253,12 @@ class ChatLiteCli(private val args: Array<String>) {
   /group send <id> <text>  — 发送群聊消息
   /status                  — 连接状态
   /help                    — 此帮助
-  /exit                    — 退出""".trimIndent())
+  /exit, /quit             — 退出
+
+特性:
+  • 自动重连：连接断开后自动尝试重连（指数退避，最多10次）
+  • 离线消息：登录后自动拉取离线消息
+  • 安全输入：密码输入不回显（使用 readPassword）""".trimIndent())
     }
 
     private fun parseArgs() {
