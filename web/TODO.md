@@ -17,7 +17,7 @@
 - [x] **`rebuildConversationStates` 每次用户列表变化读所有会话** — 添加 `previewCache`，仅消息变化时 invalidate
 - [x] **`currentMessages` computed 每次创建新数组** — memoize 结果，仅长度变化时重新 slice
 - [x] **`sortedUsers` 每次 reactive 变化都 map+sort** — hash-based memoize，仅数据变化时重排
-- [ ] **localStorage O(n) 消息持久化** — 每条消息读写全量 JSON，500 条消息时严重退化 → 改用 IndexedDB 或写缓冲
+- [x] **localStorage O(n) 消息持久化** — 迁移到 IndexedDB，O(1) 追加
 
 ## 🟢 P2 — 代码质量
 

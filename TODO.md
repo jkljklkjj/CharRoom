@@ -11,8 +11,7 @@
 - [x] seqId 全链路贯通（接收消息提取 seqId）
 - [x] v-for key 改用 messageId
 - [x] DOMPurify 预清洗
-
-- [ ] localStorage O(n) 消息持久化 → IndexedDB
+- [x] localStorage O(n) 消息持久化 → IndexedDB
 
 - [ ] WebTransport Datagram（长期）
 - [ ] WASM 编解码（长期）
