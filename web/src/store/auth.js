@@ -25,6 +25,8 @@ export function clearAll() {
       .filter(key => key.startsWith(prefix))
       .forEach(key => localStorage.removeItem(key))
     try { localStorage.removeItem(`charroom_seqids_${state.accountId}`) } catch (_) {}
+    // 清除 IndexedDB 消息数据
+    import('../utils/messageDB').then(m => m.clearAllMessages(state.accountId)).catch(() => {})
   }
   state.users = []
   state.groups = []

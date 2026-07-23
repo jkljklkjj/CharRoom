@@ -1,8 +1,10 @@
 import { state, PAGE_SIZE } from './state'
-import { getPrivateConversationId, loadPrivateConversation, loadGroupConversation,
-         buildPrivateHistoryKey, buildGroupHistoryKey, normalizeTimeValue,
+import { getPrivateConversationId, normalizeTimeValue,
          getConversationKey } from './storage'
 import DOMPurify from 'dompurify'
+import { getMessages as dbGetMessages, appendMessage as dbAppendMessage } from '../utils/messageDB'
+
+// 延迟导入 users.js 避免循环依赖
 
 // 延迟导入 users.js 避免循环依赖
 let _updateConversationState = null
@@ -85,39 +87,30 @@ export function setConversationSeqId(conversationId, seqId) {
 
 // ── 消息持久化 ────────────────────────────────
 
-function savePrivateMessage(message) {
+async function savePrivateMessage(message) {
   if (!state.accountId) return
   const chatId = getPrivateConversationId(message)
   if (!chatId) return
-
   try {
-    const raw = localStorage.getItem(buildPrivateHistoryKey(state.accountId, chatId))
-    const parsed = raw ? JSON.parse(raw) : []
-    const existing = Array.isArray(parsed) ? parsed : []
-    existing.push(message)
-    localStorage.setItem(buildPrivateHistoryKey(state.accountId, chatId), JSON.stringify(existing))
+    await dbAppendMessage(state.accountId, chatId, message)
   } catch (e) {
-    console.warn('Failed to save private message', e)
+    console.warn('[MessageDB] 保存私聊消息失败:', e)
   }
 }
 
-function saveGroupMessage(message) {
+async function saveGroupMessage(message) {
   if (!state.accountId || !message.groupId) return
-
+  const conversationId = `group:${message.groupId}`
   try {
-    const raw = localStorage.getItem(buildGroupHistoryKey(state.accountId, message.groupId))
-    const parsed = raw ? JSON.parse(raw) : []
-    const existing = Array.isArray(parsed) ? parsed : []
-    existing.push(message)
-    localStorage.setItem(buildGroupHistoryKey(state.accountId, message.groupId), JSON.stringify(existing))
+    await dbAppendMessage(state.accountId, conversationId, message)
   } catch (e) {
-    console.warn('Failed to save group message', e)
+    console.warn('[MessageDB] 保存群聊消息失败:', e)
   }
 }
 
 // ── 会话加载 + 分页 ───────────────────────────
 
-export function loadConversation(id, isGroup = false) {
+export async function loadConversation(id, isGroup = false) {
   if (!id) {
     state.selectedChatId = null
     state.messages = []
@@ -130,12 +123,13 @@ export function loadConversation(id, isGroup = false) {
   if (state.accountId) {
     if (isGroup) {
       state.messages = []
-      const all = loadGroupConversation(state.accountId, Math.abs(Number(id)))
+      const conversationId = `group:${Math.abs(Number(id))}`
+      const all = await dbGetMessages(state.accountId, conversationId)
       state.groupMessages = all.slice(-PAGE_SIZE)
       state.hasMoreGroupMessages = all.length > PAGE_SIZE
     } else {
       state.groupMessages = []
-      const all = loadPrivateConversation(state.accountId, id)
+      const all = await dbGetMessages(state.accountId, String(id))
       state.messages = all.slice(-PAGE_SIZE)
       state.hasMoreMessages = all.length > PAGE_SIZE
     }
@@ -147,13 +141,14 @@ export function loadConversation(id, isGroup = false) {
   }
 }
 
-export function loadOlderMessages() {
+export async function loadOlderMessages() {
   if (!state.selectedChatId || !state.accountId) return false
 
   const isGroup = Number(state.selectedChatId) < 0
   if (isGroup) {
     if (!state.hasMoreGroupMessages) return false
-    const all = loadGroupConversation(state.accountId, Math.abs(Number(state.selectedChatId)))
+    const conversationId = `group:${Math.abs(Number(state.selectedChatId))}`
+    const all = await dbGetMessages(state.accountId, conversationId)
     const currentCount = state.groupMessages.length
     const older = all.slice(Math.max(0, all.length - currentCount - PAGE_SIZE), all.length - currentCount)
     if (older.length === 0) {
@@ -165,7 +160,7 @@ export function loadOlderMessages() {
     return true
   } else {
     if (!state.hasMoreMessages) return false
-    const all = loadPrivateConversation(state.accountId, state.selectedChatId)
+    const all = await dbGetMessages(state.accountId, String(state.selectedChatId))
     const currentCount = state.messages.length
     const older = all.slice(Math.max(0, all.length - currentCount - PAGE_SIZE), all.length - currentCount)
     if (older.length === 0) {
