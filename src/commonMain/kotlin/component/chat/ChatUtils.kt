@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chatlite.i18n.currentStrings
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -34,11 +35,11 @@ fun formatDate(timestamp: Long): String {
 
     return when {
         cal.get(Calendar.YEAR) == today.get(Calendar.YEAR)
-                && cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR) -> "今天"
+                && cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR) -> currentStrings["chat.today"]
         cal.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR)
-                && cal.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR) -> "昨天"
-        cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) -> SimpleDateFormat("M月d日", Locale.getDefault()).format(Date(timestamp))
-        else -> SimpleDateFormat("yyyy年M月d日", Locale.getDefault()).format(Date(timestamp))
+                && cal.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR) -> currentStrings["chat.yesterday"]
+        cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) -> SimpleDateFormat("M/d", Locale.getDefault()).format(Date(timestamp))
+        else -> SimpleDateFormat("yyyy/M/d", Locale.getDefault()).format(Date(timestamp))
     }
 }
 

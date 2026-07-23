@@ -3,6 +3,7 @@ package presentation.viewmodel
 import core.Chat
 import core.GlobalApiService
 import core.LocalChatHistoryStore
+import core.AppLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import core.MsgType
 import core.ServerConfig.AGENT_ASSISTANT_ID
@@ -75,7 +76,7 @@ open class ChatViewModel(
     var selectedUser: User?
         get() = chatState.selectedChatTarget.value
         set(value) {
-            println("[ChatViewModel DEBUG] Setting selectedUser: ${value?.id} - ${value?.username}")
+            AppLogger.d(" Setting selectedUser: ${value?.id} - ${value?.username}")
             sessionScope.launch {
                 chatState.selectChatTarget(value)
             }
@@ -138,7 +139,7 @@ open class ChatViewModel(
             // 离线消息拉取中，先缓存到临时队列，避免顺序混乱
             if (isFetchingOfflineMessages && !message.sender) {
                 pendingMessages.add(message)
-                println("[ChatViewModel] 离线消息拉取中，私聊消息已缓存: messageId=${message.messageId}")
+                AppLogger.d(" 离线消息拉取中，私聊消息已缓存: messageId=${message.messageId}")
                 return@launch
             }
 
@@ -377,10 +378,10 @@ open class ChatViewModel(
                 if (maxSeqId > 0L) chatState.updateConversationSeqId(convId, maxSeqId)
             }
 
-            println("[ChatViewModel] 增量同步完成: ${allMessages.size} 条消息, ${privateByConv.size} 个私聊会话, ${groupByConv.size} 个群聊会话")
+            AppLogger.d(" 增量同步完成: ${allMessages.size} 条消息, ${privateByConv.size} 个私聊会话, ${groupByConv.size} 个群聊会话")
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 增量同步失败: ${e.message}")
+            AppLogger.d(" 增量同步失败: ${e.message}")
         }
     }
 
@@ -390,17 +391,17 @@ open class ChatViewModel(
     fun fetchRequests() {
         sessionScope.launch(Dispatchers.IO) {
             try {
-                println("[ChatViewModel] 开始拉取好友和群聊请求")
+                AppLogger.d(" 开始拉取好友和群聊请求")
                 val friendRequests = chatRepository.fetchFriendRequests()
                 val groupRequests = chatRepository.fetchGroupRequests()
 
                 _friendRequests.value = friendRequests
                 _groupRequests.value = groupRequests
 
-                println("[ChatViewModel] 拉取请求完成: 好友请求 ${friendRequests.size} 条, 群聊请求 ${groupRequests.size} 条")
+                AppLogger.d(" 拉取请求完成: 好友请求 ${friendRequests.size} 条, 群聊请求 ${groupRequests.size} 条")
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                println("[ChatViewModel] 拉取请求失败: ${e.message}")
+                AppLogger.d(" 拉取请求失败: ${e.message}")
                 logger.error(e) { "ChatViewModel error" }
             }
         }
@@ -465,10 +466,10 @@ open class ChatViewModel(
      * 对每个好友构建 conversationId，从服务器拉取增量消息，去重后加入消息列表。
      */
     open suspend fun syncAllConversations() {
-        println("[ChatViewModel] 开始增量同步所有会话")
+        AppLogger.d(" 开始增量同步所有会话")
 
         val currentUserId = GlobalAppState.currentUserId ?: run {
-            println("[ChatViewModel] 当前用户ID为空，跳过同步")
+            AppLogger.d(" 当前用户ID为空，跳过同步")
             return
         }
 
@@ -479,11 +480,11 @@ open class ChatViewModel(
                 for ((convId, seqId) in savedSeqIds) {
                     chatState.updateConversationSeqId(convId, seqId)
                 }
-                println("[ChatViewModel] 从本地恢复了 ${savedSeqIds.size} 个会话的 seqId 游标")
+                AppLogger.d(" 从本地恢复了 ${savedSeqIds.size} 个会话的 seqId 游标")
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 恢复 seqId 游标失败: ${e.message}")
+            AppLogger.d(" 恢复 seqId 游标失败: ${e.message}")
         }
 
         // 2. 获取好友列表
@@ -491,7 +492,7 @@ open class ChatViewModel(
             chatRepository.fetchFriends()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 获取好友列表失败: ${e.message}")
+            AppLogger.d(" 获取好友列表失败: ${e.message}")
             return
         }
 
@@ -505,11 +506,11 @@ open class ChatViewModel(
                     val userId = userIdStr.toIntOrNull() ?: continue
                     chatState.updateUserOnlineStatus(userId, online)
                 }
-                println("[ChatViewModel] 批量在线状态已更新: ${statusMap.size} 人")
+                AppLogger.d(" 批量在线状态已更新: ${statusMap.size} 人")
             }
         } catch (_: Exception) { }
 
-        println("[ChatViewModel] 开始同步 ${friends.size} 个好友的会话")
+        AppLogger.d(" 开始同步 ${friends.size} 个好友的会话")
 
         // 3. 对每个好友进行增量同步
         for (friend in friends) {
@@ -531,7 +532,7 @@ open class ChatViewModel(
                     val existingIds = chatState.messages.value.map { it.messageId }.toSet()
                     val newMessages = result.messages.filter { it.messageId !in existingIds }
 
-                    println("[ChatViewModel] 会话 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条, lastSeqId=$lastSeqId, nextSeqId=${result.nextSeqId}, hasMore=${result.hasMore}")
+                    AppLogger.d(" 会话 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条, lastSeqId=$lastSeqId, nextSeqId=${result.nextSeqId}, hasMore=${result.hasMore}")
 
                     // 按时间戳顺序逐条插入
                     for (msg in newMessages) {
@@ -547,7 +548,7 @@ open class ChatViewModel(
                     hasMore = result.hasMore && result.messages.size >= 50
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    println("[ChatViewModel] 同步会话 $conversationId 失败: ${e.message}")
+                    AppLogger.d(" 同步会话 $conversationId 失败: ${e.message}")
                     break
                 }
             }
@@ -556,7 +557,7 @@ open class ChatViewModel(
         // 4. 增量同步群聊消息
         try {
             val groups = chatRepository.fetchGroups()
-            println("[ChatViewModel] 开始同步 ${groups.size} 个群聊")
+            AppLogger.d(" 开始同步 ${groups.size} 个群聊")
             for (group in groups) {
                 val conversationId = "group:${group.id}"
                 var lastSeqId = chatState.getConversationSeqId(conversationId)
@@ -572,7 +573,7 @@ open class ChatViewModel(
                         val existingIds = chatState.groupMessages.value.map { it.messageId }.toSet()
                         val newMessages = result.messages.filter { it.messageId !in existingIds }
 
-                        println("[ChatViewModel] 群聊 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条")
+                        AppLogger.d(" 群聊 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条")
 
                         for (msg in newMessages) {
                             val groupMsg = GroupMessage(
@@ -596,28 +597,28 @@ open class ChatViewModel(
                         hasMore = result.hasMore && result.messages.size >= 50
                     } catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        println("[ChatViewModel] 同步群聊 $conversationId 失败: ${e.message}")
+                        AppLogger.d(" 同步群聊 $conversationId 失败: ${e.message}")
                         break
                     }
                 }
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 获取群聊列表失败: ${e.message}")
+            AppLogger.d(" 获取群聊列表失败: ${e.message}")
         }
 
         // 6. 持久化 seqId 游标
         try {
             LocalChatHistoryStore.saveConversationSeqIds(chatState.conversationSeqIds.value)
-            println("[ChatViewModel] seqId 游标已持久化到本地存储")
+            AppLogger.d(" seqId 游标已持久化到本地存储")
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 持久化 seqId 游标失败: ${e.message}")
+            AppLogger.d(" 持久化 seqId 游标失败: ${e.message}")
         }
 
         // 7. 保存消息到本地存储
         saveChatHistoryToLocal()
-        println("[ChatViewModel] 增量同步完成")
+        AppLogger.d(" 增量同步完成")
     }
 
     /**
@@ -626,7 +627,7 @@ open class ChatViewModel(
      */
     open suspend fun fetchOfflineMessages(page: Int = 0, pageSize: Int = 50): Boolean {
         if (isFetchingOfflineMessages) {
-            println("[ChatViewModel] 已有离线消息拉取任务在进行中，跳过重复请求")
+            AppLogger.d(" 已有离线消息拉取任务在进行中，跳过重复请求")
             return false
         }
 
@@ -634,26 +635,26 @@ open class ChatViewModel(
         isLoadingMore = page > 0 // 第一页不显示加载状态
 
         return try {
-            println("[ChatViewModel] 开始拉取离线消息，页码: $page, 每页大小: $pageSize")
+            AppLogger.d(" 开始拉取离线消息，页码: $page, 每页大小: $pageSize")
 
             // 分页拉取离线消息（需要API支持分页参数，这里假设接口已经支持）
             val messages = chatRepository.getOfflineMessagesPage(page, pageSize)
 
             if (messages.isEmpty()) {
-                println("[ChatViewModel] 离线消息拉取完成，没有更多消息")
+                AppLogger.d(" 离线消息拉取完成，没有更多消息")
                 return false
             }
 
             // 分页拉取的离线消息本身就是按时间从旧到新排序的，直接批量前置插入
             chatState.prependMessages(messages.sortedBy { it.timestamp }, markAsUnread = true)
-            println("[ChatViewModel] 成功拉取离线消息 ${messages.size} 条，页码: $page，批量插入完成")
+            AppLogger.d(" 成功拉取离线消息 ${messages.size} 条，页码: $page，批量插入完成")
 
             // 递归拉取下一页
             val hasMore = fetchOfflineMessages(page + 1, pageSize)
 
             // 所有页面拉取完成后，处理缓存的临时消息
             if (!hasMore) {
-                println("[ChatViewModel] 所有离线消息拉取完成，开始处理缓存的临时消息，共 ${pendingMessages.size} 条私聊, ${pendingGroupMessages.size} 条群聊")
+                AppLogger.d(" 所有离线消息拉取完成，开始处理缓存的临时消息，共 ${pendingMessages.size} 条私聊, ${pendingGroupMessages.size} 条群聊")
                 pendingMessages.sortedBy { it.timestamp }.forEach { chatState.addMessage(it) }
                 pendingGroupMessages.sortedBy { it.timestamp }.forEach { chatState.addGroupMessage(it) }
                 pendingMessages.clear()
@@ -663,7 +664,7 @@ open class ChatViewModel(
             hasMore
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 拉取离线消息失败: ${e.message}")
+            AppLogger.d(" 拉取离线消息失败: ${e.message}")
             logger.error(e) { "ChatViewModel error" }
             false
         } finally {
@@ -749,7 +750,7 @@ open class ChatViewModel(
             return
         }
         val currentUserId = GlobalAppState.currentUserId
-        println("[ChatViewModel] 准备发送私聊消息，currentUserId: $currentUserId, 接收者: ${user.id}")
+        AppLogger.d(" 准备发送私聊消息，currentUserId: $currentUserId, 接收者: ${user.id}")
 
         val senderId = currentUserId ?: 0 // 0=未知，服务端从连接推导
 
@@ -782,7 +783,7 @@ open class ChatViewModel(
 
             // 添加到本地消息列表
             addMessage(message)
-            println("[ChatViewModel] 本地消息已添加，messageId: $messageId")
+            AppLogger.d(" 本地消息已添加，messageId: $messageId")
 
             // 构建 protobuf 消息（userId 服务端会从 QUIC 连接推导，传 0 即可）
             val payload = buildChatPayload(
@@ -805,11 +806,11 @@ open class ChatViewModel(
                 targetClientId = user.id.toString(),
                 expectedResponses = 1
             ) { success, responses ->
-                println("[ChatViewModel] QUIC消息发送结果: $success, messageId: $messageId")
+                AppLogger.d(" QUIC消息发送结果: $success, messageId: $messageId")
                 sessionScope.launch {
                     if (success) {
                         updateMessageSentStatus(messageId, true)
-                        println("[ChatViewModel] 消息状态已更新，success: $success, messageId: $messageId")
+                        AppLogger.d(" 消息状态已更新，success: $success, messageId: $messageId")
                         onDone()
                     } else {
                         onDone()
@@ -822,7 +823,7 @@ open class ChatViewModel(
                         ) { retrySuccess, _ ->
                             sessionScope.launch {
                                 updateMessageSentStatus(messageId, retrySuccess)
-                                println("[ChatViewModel] 消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
+                                AppLogger.d(" 消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
                             }
                         }
                     }
@@ -830,7 +831,7 @@ open class ChatViewModel(
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 发送消息流程异常: ${e.message}")
+            AppLogger.d(" 发送消息流程异常: ${e.message}")
             logger.error(e) { "ChatViewModel error" }
             sessionScope.launch {
                 onDone() // 发生任何异常都要恢复UI状态
@@ -859,7 +860,7 @@ open class ChatViewModel(
         }
         // 获取当前用户信息
         val currentUserId = GlobalAppState.currentUserId
-        println("[ChatViewModel] 准备发送群聊消息，currentUserId: $currentUserId, 群组: ${group.id}")
+        AppLogger.d(" 准备发送群聊消息，currentUserId: $currentUserId, 群组: ${group.id}")
 
         val senderId = currentUserId ?: 0
         val senderName = if (currentUserId != null) {
@@ -892,7 +893,7 @@ open class ChatViewModel(
 
             // 添加到本地消息列表
             addGroupMessage(groupMessage)
-            println("[ChatViewModel] 本地群消息已添加，messageId: $messageId")
+            AppLogger.d(" 本地群消息已添加，messageId: $messageId")
 
             // 构建 protobuf 消息（userId 服务端会从 QUIC 连接推导）
             val payload = buildGroupChatPayload(
@@ -914,11 +915,11 @@ open class ChatViewModel(
                 targetClientId = group.id.toString(),
                 expectedResponses = 1
             ) { success, responses ->
-                println("[ChatViewModel] QUIC群消息发送结果: $success, messageId: $messageId")
+                AppLogger.d(" QUIC群消息发送结果: $success, messageId: $messageId")
                 sessionScope.launch {
                     if (success) {
                         updateGroupMessageSentStatus(messageId, true)
-                        println("[ChatViewModel] 群消息状态已更新，success: $success, messageId: $messageId")
+                        AppLogger.d(" 群消息状态已更新，success: $success, messageId: $messageId")
                         onDone()
                     } else {
                         onDone()
@@ -931,7 +932,7 @@ open class ChatViewModel(
                         ) { retrySuccess, _ ->
                             sessionScope.launch {
                                 updateGroupMessageSentStatus(messageId, retrySuccess)
-                                println("[ChatViewModel] 群消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
+                                AppLogger.d(" 群消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
                             }
                         }
                     }
@@ -939,7 +940,7 @@ open class ChatViewModel(
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 发送群消息流程异常: ${e.message}")
+            AppLogger.d(" 发送群消息流程异常: ${e.message}")
             logger.error(e) { "ChatViewModel error" }
             sessionScope.launch {
                 onDone() // 发生任何异常都要恢复UI状态
@@ -1028,10 +1029,10 @@ open class ChatViewModel(
             val privateMessages = chatState.messages.value
             val groupMessages = chatState.groupMessages.value
             LocalChatHistoryStore.save(accountId, privateMessages, groupMessages)
-//            println("[ChatViewModel] 聊天历史已保存到本地，私聊消息: ${privateMessages.size}条, 群聊消息: ${groupMessages.size}条")
+//            AppLogger.d(" 聊天历史已保存到本地，私聊消息: ${privateMessages.size}条, 群聊消息: ${groupMessages.size}条")
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("[ChatViewModel] 保存聊天历史到本地失败: ${e.message}")
+            AppLogger.d(" 保存聊天历史到本地失败: ${e.message}")
             logger.error(e) { "ChatViewModel error" }
         }
     }
@@ -1049,11 +1050,11 @@ open class ChatViewModel(
                     // 加载到聊天状态
                     chatState.prependMessages(history.privateMessages, markAsUnread = false)
                     chatState.prependGroupMessages(history.groupMessages, markAsUnread = false)
-                    println("[ChatViewModel] 从本地加载聊天历史，私聊消息: ${history.privateMessages.size}条, 群聊消息: ${history.groupMessages.size}条")
+                    AppLogger.d(" 从本地加载聊天历史，私聊消息: ${history.privateMessages.size}条, 群聊消息: ${history.groupMessages.size}条")
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                println("[ChatViewModel] 从本地加载聊天历史失败: ${e.message}")
+                AppLogger.d(" 从本地加载聊天历史失败: ${e.message}")
                 logger.error(e) { "ChatViewModel error" }
             }
         }

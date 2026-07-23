@@ -552,14 +552,5 @@ private fun buildLastMessageTime(
         messages.lastOrNull { it.senderId == user.id || it.receiverId == user.id }?.timestamp
     }
 
-    return timestamp?.let { formatTime(it) } ?: ""
-}
-
-private fun formatTime(timestamp: Long): String {
-    return try {
-        val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-        sdf.format(java.util.Date(timestamp))
-    } catch (_: Exception) {
-        ""
-    }
+    return timestamp?.let { component.chat.formatTime(it) } ?: ""
 }
