@@ -4,8 +4,13 @@ import core.state.AuthState
 import core.state.GlobalAppState
 import data.datasource.local.LocalDataSource
 import data.datasource.local.LocalDataSourceImpl
-import data.datasource.remote.RemoteDataSource
-import data.datasource.remote.RemoteDataSourceImpl
+import core.validateToken
+import core.getUserInfo
+import core.refreshTokenBundle
+import core.loginTokens
+import core.register
+import core.verifyRegister
+import core.sendRegisterVerifyCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,9 +19,9 @@ import com.chatlite.i18n.currentStrings
 /**
  * Authentication Repository
  * Handles authentication business logic, coordinates remote and local data sources
+ * 直接调用 ApiClient 函数，移除 RemoteDataSource 中间层
  */
 class AuthRepository(
-    private val remoteDataSource: RemoteDataSource,
     private val localDataSource: LocalDataSource
 ) {
     private val _authState = MutableStateFlow<AuthState>(AuthState.Unauthenticated)
@@ -39,13 +44,13 @@ class AuthRepository(
 
         try {
             // Try to validate token
-            val validated = remoteDataSource.validateToken(savedToken)
+            val validated = validateToken(savedToken)
             if (validated != null && validated.accessToken.isNotBlank()) {
                 // Token is valid, update local storage
                 localDataSource.saveAuth(savedAccount, validated.accessToken, validated.refreshToken)
                 // Get user profile (失败时兜底用本地缓存的 userId)
                 val userProfile = runCatching {
-                    remoteDataSource.getUserInfo(validated.accessToken)
+                    getUserInfo(validated.accessToken)
                 }.getOrNull()
                 if (userProfile == null) {
                     // getUserInfo 失败时从本地存储恢复 userId
@@ -67,11 +72,11 @@ class AuthRepository(
 
             // Token is invalid, try to refresh
             if (!savedRefreshToken.isNullOrBlank()) {
-                val refreshed = remoteDataSource.refreshToken(savedRefreshToken)
+                val refreshed = refreshTokenBundle(savedRefreshToken)
                 if (refreshed != null && refreshed.accessToken.isNotBlank()) {
                     localDataSource.saveAuth(savedAccount, refreshed.accessToken, refreshed.refreshToken)
                     val userProfile = runCatching {
-                        remoteDataSource.getUserInfo(refreshed.accessToken)
+                        getUserInfo(refreshed.accessToken)
                     }.getOrNull()
                     if (userProfile == null) {
                         val savedUserId = localDataSource.getSavedUserId()
@@ -110,11 +115,11 @@ class AuthRepository(
         _authState.value = AuthState.Loading
 
         return try {
-            val result = remoteDataSource.login(account, password)
+            val result = loginTokens(account, password)
             if (result != null && result.accessToken.isNotBlank()) {
                 // Login successful, save locally
                 val userProfile = runCatching {
-                    remoteDataSource.getUserInfo(result.accessToken)
+                    getUserInfo(result.accessToken)
                 }.getOrNull()
                 val userId = userProfile?.id ?: 0
                 localDataSource.saveAuth(account, result.accessToken, result.refreshToken, userId)
@@ -147,8 +152,8 @@ class AuthRepository(
      * Register
      */
     suspend fun register(username: String, password: String): Result<Int> {
-        val result = remoteDataSource.register(username, password)
-        return if (result != -1) {
+        val result = core.register(username, password)
+        return if (result != null && result != -1) {
             Result.success(result)
         } else {
             Result.failure(Exception(currentStrings["auth.register.failed"]))
@@ -159,8 +164,8 @@ class AuthRepository(
      * Verify registration (consistent with web logic)
      */
     suspend fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = ""): Result<Int> {
-        val result = remoteDataSource.verifyRegister(username, password, email, verifyCode)
-        return if (result != -1) {
+        val result = core.verifyRegister(username, password, email, verifyCode)
+        return if (result != null && result != -1) {
             Result.success(result)
         } else {
             Result.failure(Exception(currentStrings["auth.register.failed"]))
@@ -172,7 +177,7 @@ class AuthRepository(
      */
     suspend fun sendRegisterVerifyCode(email: String): Result<Boolean> {
         return try {
-            val success = remoteDataSource.sendRegisterVerifyCode(email)
+            val success = core.sendRegisterVerifyCode(email)
             if (success) {
                 Result.success(true)
             } else {
@@ -218,6 +223,5 @@ class AuthRepository(
  * Global singleton, compatible with legacy code
  */
 val GlobalAuthRepository = AuthRepository(
-    remoteDataSource = RemoteDataSourceImpl(),
     localDataSource = LocalDataSourceImpl()
 )

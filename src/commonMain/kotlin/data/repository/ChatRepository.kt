@@ -2,8 +2,25 @@ package data.repository
 
 import data.datasource.local.LocalDataSource
 import data.datasource.local.LocalDataSourceImpl
-import data.datasource.remote.RemoteDataSource
-import data.datasource.remote.RemoteDataSourceImpl
+import core.getFriendList
+import core.getGroupList
+import core.getUserInfo
+import core.addFriend
+import core.addGroup
+import core.getUserDetail
+import core.getGroupDetail
+import core.getOfflineMessages
+import core.syncMessages
+import core.updateUserProfile
+import core.sendEmailUpdateVerifyCode
+import core.updateEmail
+import core.getFriendRequests
+import core.getGroupRequests
+import core.acceptFriend
+import core.rejectFriend
+import core.deleteFriend
+import core.acceptGroupApplication
+import core.rejectGroupApplication
 import model.Group
 import model.Message
 import model.User
@@ -13,9 +30,9 @@ import model.withAgentAssistant
 /**
  * 聊天Repository
  * 处理聊天相关业务逻辑：用户、好友、群组、消息等
+ * 直接调用 ApiClient 函数，移除 RemoteDataSource 中间层
  */
 class ChatRepository(
-    private val remoteDataSource: RemoteDataSource,
     private val localDataSource: LocalDataSource,
     private val authRepository: AuthRepository
 ) {
@@ -24,7 +41,7 @@ class ChatRepository(
      */
     suspend fun getCurrentUserProfile(): User? {
         val token = authRepository.getCurrentToken() ?: return null
-        return remoteDataSource.getUserInfo(token)
+        return getUserInfo(token)
     }
 
     /**
@@ -32,7 +49,7 @@ class ChatRepository(
      */
     suspend fun fetchFriends(): List<User> {
         val token = authRepository.getCurrentToken() ?: return emptyList()
-        val remoteFriends = remoteDataSource.getFriendList(token)
+        val remoteFriends = getFriendList(token)
         // 保存到本地
         localDataSource.saveFriends(remoteFriends)
         return remoteFriends
@@ -43,7 +60,7 @@ class ChatRepository(
      */
     suspend fun fetchGroups(): List<User> {
         val token = authRepository.getCurrentToken() ?: return emptyList()
-        val remoteGroups = remoteDataSource.getGroupList(token)
+        val remoteGroups = getGroupList(token)
         val uiGroups = remoteGroups.map { it.toUiUser() }
         // 保存到本地
         localDataSource.saveGroups(uiGroups)
@@ -80,7 +97,7 @@ class ChatRepository(
      */
     suspend fun addFriend(account: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.addFriend(token, account)
+        return core.addFriend(token, account)
     }
 
     /**
@@ -88,7 +105,7 @@ class ChatRepository(
      */
     suspend fun addGroup(groupId: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.addGroup(token, groupId)
+        return core.addGroup(token, groupId).isSuccess
     }
 
     /**
@@ -96,7 +113,7 @@ class ChatRepository(
      */
     suspend fun getUserDetail(userId: String): User? {
         val token = authRepository.getCurrentToken() ?: return null
-        return remoteDataSource.getUserDetail(token, userId)
+        return getUserDetail(token, userId)
     }
 
     /**
@@ -104,7 +121,7 @@ class ChatRepository(
      */
     suspend fun getGroupDetail(groupId: String): User? {
         val token = authRepository.getCurrentToken() ?: return null
-        val group = remoteDataSource.getGroupDetail(token, groupId)
+        val group = getGroupDetail(token, groupId)
         return group?.toUiUser()
     }
 
@@ -113,7 +130,7 @@ class ChatRepository(
      */
     suspend fun getOfflineMessages(): List<Message> {
         val token = authRepository.getCurrentToken() ?: return emptyList()
-        return remoteDataSource.getOfflineMessages(token)
+        return getOfflineMessages(token)
     }
 
     /**
@@ -121,7 +138,7 @@ class ChatRepository(
      */
     suspend fun syncMessages(conversationId: String, lastSeqId: Long, limit: Int = 50): core.SyncMessagesResult {
         val token = authRepository.getCurrentToken() ?: return core.SyncMessagesResult()
-        return remoteDataSource.syncMessages(token, conversationId, lastSeqId, limit)
+        return syncMessages(token, conversationId, lastSeqId, limit)
     }
 
     /**
@@ -130,7 +147,7 @@ class ChatRepository(
     suspend fun getOfflineMessagesPage(page: Int = 0, pageSize: Int = 50): List<Message> {
         val token = authRepository.getCurrentToken() ?: return emptyList()
         // 如果API还不支持分页，先调用全量接口分页返回（兼容模式）
-        val allMessages = remoteDataSource.getOfflineMessages(token)
+        val allMessages = getOfflineMessages(token)
         val start = page * pageSize
         val end = minOf(start + pageSize, allMessages.size)
         return if (start < allMessages.size) allMessages.subList(start, end) else emptyList()
@@ -146,7 +163,7 @@ class ChatRepository(
         password: String? = null
     ): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.updateUserProfile(token, username, phone, signature, password)
+        return updateUserProfile(token, username, phone, signature, password)
     }
 
     /**
@@ -154,7 +171,7 @@ class ChatRepository(
      */
     suspend fun sendEmailUpdateVerifyCode(email: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.sendEmailUpdateVerifyCode(token, email)
+        return sendEmailUpdateVerifyCode(token, email)
     }
 
     /**
@@ -162,7 +179,7 @@ class ChatRepository(
      */
     suspend fun updateEmail(newEmail: String, verifyCode: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.updateEmail(token, newEmail, verifyCode)
+        return updateEmail(token, newEmail, verifyCode)
     }
 
     /**
@@ -170,7 +187,13 @@ class ChatRepository(
      */
     suspend fun fetchFriendRequests(): List<User> {
         val token = authRepository.getCurrentToken() ?: return emptyList()
-        return remoteDataSource.getFriendRequests(token)
+        return getFriendRequests(token).map { request ->
+            User(
+                id = request.id,
+                username = request.senderName,
+                avatarUrl = request.senderAvatar
+            )
+        }
     }
 
     /**
@@ -178,7 +201,13 @@ class ChatRepository(
      */
     suspend fun fetchGroupRequests(): List<User> {
         val token = authRepository.getCurrentToken() ?: return emptyList()
-        return remoteDataSource.getGroupRequests(token)
+        return getGroupRequests(token).map { request ->
+            User(
+                id = request.id,
+                username = request.senderName,
+                avatarUrl = request.senderAvatar
+            )
+        }
     }
 
     /**
@@ -186,7 +215,7 @@ class ChatRepository(
      */
     suspend fun acceptFriend(requestId: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.acceptFriend(token, requestId)
+        return acceptFriend(token, requestId)
     }
 
     /**
@@ -194,7 +223,7 @@ class ChatRepository(
      */
     suspend fun rejectFriend(requestId: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.rejectFriend(token, requestId)
+        return rejectFriend(token, requestId)
     }
 
     /**
@@ -202,7 +231,7 @@ class ChatRepository(
      */
     suspend fun deleteFriend(friendId: Int): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.deleteFriend(token, friendId)
+        return deleteFriend(token, friendId)
     }
 
     /**
@@ -210,7 +239,7 @@ class ChatRepository(
      */
     suspend fun acceptGroupApplication(groupId: String, userId: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.acceptGroupApplication(token, groupId, userId)
+        return acceptGroupApplication(token, groupId, userId)
     }
 
     /**
@@ -218,7 +247,7 @@ class ChatRepository(
      */
     suspend fun rejectGroupApplication(groupId: String, userId: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return remoteDataSource.rejectGroupApplication(token, groupId, userId)
+        return rejectGroupApplication(token, groupId, userId)
     }
 }
 
@@ -226,7 +255,6 @@ class ChatRepository(
  * 全局单例，兼容旧代码
  */
 val GlobalChatRepository = ChatRepository(
-    remoteDataSource = RemoteDataSourceImpl(),
     localDataSource = LocalDataSourceImpl(),
     authRepository = GlobalAuthRepository
 )
