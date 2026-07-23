@@ -126,6 +126,7 @@ const filteredUsers = computed(() => {
 })
 
 import { initials, avatarSrc } from '../utils/format'
+import { toast } from '../utils/toast'
 
 function select(u) {
   store.setSelectedChat(u.id)
@@ -147,7 +148,7 @@ function select(u) {
 function onAdd() {
   const account = prompt(t('sidebar.addFriendPrompt'))
   if (!account) return
-  api.addFriend(account).then(ok => { if (ok) window.$toast.success(t('sidebar.frSent')) })
+  api.addFriend(account).then(ok => { if (ok) toast.success(t('sidebar.frSent')) })
 }
 
 function openSettings() {
@@ -174,24 +175,24 @@ async function loadFriendRequests() {
 async function handleAccept(userId) {
   const friend = await api.acceptFriend(userId)
   if (friend) {
-    window.$toast.success(t('sidebar.frAccepted'))
+    toast.success(t('sidebar.frAccepted'))
     // 移除已处理的申请
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
     // 增量添加新好友（不重新请求整个列表）
     store.addUser(friend)
   } else {
-    window.$toast.error(t('sidebar.frAcceptFailed'))
+    toast.error(t('sidebar.frAcceptFailed'))
   }
 }
 
 async function handleReject(userId) {
   const ok = await api.rejectFriend(userId)
   if (ok) {
-    window.$toast.info(t('sidebar.frRejected'))
+    toast.info(t('sidebar.frRejected'))
     // 移除已处理的申请
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
   } else {
-    window.$toast.error(t('sidebar.frRejectFailed'))
+    toast.error(t('sidebar.frRejectFailed'))
   }
 }
 

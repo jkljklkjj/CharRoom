@@ -65,7 +65,7 @@
                 <div class="file-size">{{ extractFileSize(m.text) }}</div>
               </div>
             </div>
-            <!-- 普通文本消息 -->
+            <!-- 普通文本消息 — 安全：text 已在 store 中通过 DOMPurify.sanitize 预清洗 -->
             <div v-else class="text-content" v-html="formatText(m.text)"></div>
           </div>
         </div>

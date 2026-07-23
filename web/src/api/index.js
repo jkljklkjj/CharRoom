@@ -363,6 +363,13 @@ export async function purchaseTokens(amountFen) {
   return res.ok ? (res.body?.data || res.body) : null
 }
 
+export async function confirmPurchase(purchaseId) {
+  const res = await safeFetch(`${API_BASE}/agent/quota/purchase/confirm?purchaseId=${purchaseId}`, {
+    method: 'POST'
+  })
+  return res.ok
+}
+
 export async function getOnlineStatus(userIds) {
   const { ok, body } = await safeFetch(`${API_BASE}/users/online-status`, {
     method: 'POST',

@@ -12,6 +12,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { registerToast } from '../utils/toast'
 
 const toasts = ref([])
 const visible = ref(false)
@@ -26,19 +27,15 @@ defineExpose({
   warning
 })
 
-// 将 Toast 方法挂载到全局 window 对象
+// 注册到 toast 服务
 onMounted(() => {
-  window.$toast = {
+  registerToast({
     show: (message, type = 'info', duration = 3000) => show(message, type, duration),
     success: (message, duration = 3000) => success(message, duration),
     error: (message, duration = 3000) => error(message, duration),
     info: (message, duration = 3000) => info(message, duration),
     warning: (message, duration = 3000) => warning(message, duration)
-  }
-})
-
-onUnmounted(() => {
-  delete window.$toast
+  })
 })
 
 function getToastIcon(type) {

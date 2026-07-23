@@ -24,6 +24,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { useStore } from '../store'
+import { toast } from '../utils/toast'
 
 const { t } = useI18n()
 const account = ref('')
@@ -49,19 +50,19 @@ async function doAction() {
 }
 
 async function doLogin() {
-  if (!account.value || !password.value) { window.$toast.warning(t('login.pleaseFillAccountPassword')); return }
+  if (!account.value || !password.value) { toast.warning(t('login.pleaseFillAccountPassword')); return }
   const tokens = await api.login(account.value, password.value)
   if (tokens && tokens.accessToken) {
     store.setToken(tokens.accessToken)
     store.setRefreshToken(tokens.refreshToken || '')
     emit('logged', tokens)
   } else {
-    window.$toast.error(t('login.checkAccountPassword'))
+    toast.error(t('login.checkAccountPassword'))
   }
 }
 
 async function doRegister() {
-  if (!account.value || !password.value) { window.$toast.warning(t('login.pleaseFillEmailPassword')); return }
+  if (!account.value || !password.value) { toast.warning(t('login.pleaseFillEmailPassword')); return }
   // 发送验证码到邮箱，跳转到验证码输入页
   const sent = await api.sendVerifyCode(account.value)
   if (sent) {
@@ -70,7 +71,7 @@ async function doRegister() {
     store.setPendingRegister({ email: account.value, password: password.value })
     router.push({ name: 'Verify' })
   } else {
-    window.$toast.error(t('login.verificationSentFailed'))
+    toast.error(t('login.verificationSentFailed'))
   }
 }
 </script>

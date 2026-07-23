@@ -365,7 +365,7 @@ function connectChat(token, accountId) {
 
 /** 清除本地登录状态 */
 function clearAuth() {
-  localStorage.removeItem('charroom_token')
+  sessionStorage.removeItem('charroom_token')
   localStorage.removeItem('charroom_refreshToken')
   localStorage.removeItem('charroom_accountId')
   store.setToken('')
@@ -389,10 +389,10 @@ async function logout() {
   router.push('/')
 }
 
-/** 保存登录凭证到本地 */
+/** 保存登录凭证到本地 — access token 用 sessionStorage（XSS 安全），refresh token 用 localStorage */
 function persistTokens(accessToken, refreshToken) {
   try {
-    localStorage.setItem('charroom_token', accessToken)
+    sessionStorage.setItem('charroom_token', accessToken)
     localStorage.setItem('charroom_refreshToken', refreshToken || '')
   } catch (_e) { /* ignore */ }
 }
@@ -509,7 +509,7 @@ onMounted(() => {
 })
 
 async function restoreSession() {
-  const savedToken = localStorage.getItem('charroom_token')
+  const savedToken = sessionStorage.getItem('charroom_token')
   const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
   const savedAccountId = localStorage.getItem('charroom_accountId')
 

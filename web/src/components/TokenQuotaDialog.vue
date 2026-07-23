@@ -133,9 +133,8 @@ async function doPurchase() {
 async function checkPayment() {
   if (!currentPurchaseId.value) return
   try {
-    const url = `/api/agent/quota/purchase/confirm?purchaseId=${currentPurchaseId.value}`
-    const res = await fetch(url, { method: 'POST', credentials: 'include' })
-    if (res.ok) {
+    const result = await api.confirmPurchase(currentPurchaseId.value)
+    if (result) {
       qrCodeUrl.value = ''
       currentPurchaseId.value = null
       purchaseAmount.value = 0
