@@ -487,7 +487,7 @@ function closeSettings() {
 }
 
 // 页面加载时恢复登录状态
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('resize', handleResize)
 
   // 初始化主题
@@ -504,6 +504,11 @@ onMounted(async () => {
     mediaQuery.removeEventListener('change', handleSystemThemeChange)
   })
 
+  // 异步恢复登录状态（不阻塞 onMounted）
+  restoreSession()
+})
+
+async function restoreSession() {
   const savedToken = localStorage.getItem('charroom_token')
   const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
   const savedAccountId = localStorage.getItem('charroom_accountId')
@@ -540,7 +545,7 @@ onMounted(async () => {
   }
 
   loading.value = false
-})
+}
 
 // 页面关闭时发送登出消息
 const handleBeforeUnload = () => {

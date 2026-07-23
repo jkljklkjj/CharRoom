@@ -181,9 +181,8 @@ export function addUser(u) {
 }
 
 export function removeUser(id) {
-  const idx = state.users.findIndex(u => u.id === id)
-  if (idx === -1) return
-  state.users.splice(idx, 1)
+  if (!state.users.some(u => u.id === id)) return
+  state.users = state.users.filter(u => u.id !== id)
   delete state.conversationStates[id]
   state.messages = state.messages.filter(m => m.user !== id.toString())
   if (state.selectedChatId === id) {

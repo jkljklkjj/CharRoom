@@ -5,12 +5,31 @@ import { getPrivateConversationId, loadPrivateConversation, loadGroupConversatio
 import DOMPurify from 'dompurify'
 
 // 延迟导入 users.js 避免循环依赖
+let _updateConversationState = null
 let _invalidateConversationPreview = null
-function invalidatePreview(conversationId) {
-  if (!_invalidateConversationPreview) {
-    import('./users.js').then(m => { _invalidateConversationPreview = m.invalidateConversationPreview })
+let _pendingPatches = [] // 缓存首次调用的 patch，等导入完成后执行
+
+import('./users.js').then(m => {
+  _updateConversationState = m.updateConversationState
+  _invalidateConversationPreview = m.invalidateConversationPreview
+  // 执行缓存的 patches
+  for (const { conversationId, patch } of _pendingPatches) {
+    _updateConversationState(conversationId, patch)
+  }
+  _pendingPatches = []
+})
+
+function updateConversationState(conversationId, patch) {
+  if (!_updateConversationState) {
+    // 导入未完成，缓存 patch
+    _pendingPatches.push({ conversationId, patch })
     return
   }
+  _updateConversationState(conversationId, patch)
+}
+
+function invalidatePreview(conversationId) {
+  if (!_invalidateConversationPreview) return
   _invalidateConversationPreview(conversationId)
 }
 
@@ -268,15 +287,4 @@ export function deleteMessage(message, isGroup = false) {
   } else {
     state.messages = state.messages.filter(m => m !== message)
   }
-}
-
-// 从 users.js 延迟导入，避免循环依赖
-let _updateConversationState = null
-function updateConversationState(conversationId, patch) {
-  if (!_updateConversationState) {
-    // 动态导入避免循环依赖
-    import('./users.js').then(m => { _updateConversationState = m.updateConversationState })
-    return
-  }
-  _updateConversationState(conversationId, patch)
 }

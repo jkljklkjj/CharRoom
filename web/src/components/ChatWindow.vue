@@ -336,16 +336,15 @@ function formatRelativeTime(ts) {
   return `${month}/${day} ${hour}:${minute}`
 }
 
-function time(t){ if(!t) return '' ; const d = new Date(t); return d.toLocaleTimeString() }
 function getAvatar(userId){
   if(!userId) return null
   const id = String(userId)
   const u = store.state.users.find(x => String(x.id) === id)
   if (!u) return null
-  if (!u.avatarUrl) return null
-  const v = u.avatarKey
-  return v ? (u.avatarUrl + (u.avatarUrl.includes('?') ? '&v=' : '?v=') + encodeURIComponent(v)) : u.avatarUrl
+  return avatarSrc(u)
 }
+
+import { avatarSrc } from '../utils/format'
 
 import { initials } from '../utils/format'
 

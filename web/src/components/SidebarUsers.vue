@@ -125,18 +125,10 @@ const filteredUsers = computed(() => {
   })
 })
 
-function avatarSrc(u) {
-  if (!u || !u.avatarUrl) return null
-  const v = u.avatarKey
-  return v ? (u.avatarUrl + (u.avatarUrl.includes('?') ? '&v=' : '?v=') + encodeURIComponent(v)) : u.avatarUrl
-}
-
-import { initials } from '../utils/format'
+import { initials, avatarSrc } from '../utils/format'
 
 function select(u) {
-  console.log('SidebarUsers.select triggered, u.id=', u.id, 'type=', typeof u.id)
   store.setSelectedChat(u.id)
-  console.log('setSelectedChat after, store.state.selectedChatId=', store.state.selectedChatId)
   emit('user-selected', u)
 
   // 点击用户时，主动查询该用户的在线状态（排除AI助手和群组）

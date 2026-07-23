@@ -1,4 +1,5 @@
 import store from '../store'
+import { getDeviceId, getDeviceType } from '../utils/device'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://chatlite.xin/api'
 
@@ -105,18 +106,6 @@ async function safeFetch(url, options = {}) {
     return { ok: false, status: 0, body: null }
   }
 }
-
-function getDeviceId() {
-  const key = 'charroom_device_id'
-  let id = localStorage.getItem(key)
-  if (!id) {
-    id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-    localStorage.setItem(key, id)
-  }
-  return id
-}
-
-function getDeviceType() { return 'web' }
 
 export async function login(account, password) {
   if (!account || !password) return null

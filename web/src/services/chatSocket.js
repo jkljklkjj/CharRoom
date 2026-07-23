@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import i18n from '../i18n'
 import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
 import { saveToQueue, getAllPending, removeMessage, clearQueue } from './offlineQueue'
+import { getDeviceId, getDeviceType } from '../utils/device'
 
 // ── 内部变量 ────────────────────────────────────
 
@@ -172,24 +173,6 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
     console.error('❌ 连接失败:', e)
     throw e
   }
-}
-
-/**
- * 获取或生成本地设备 ID（持久化到 localStorage）
- */
-function getDeviceId() {
-  const key = 'charroom_device_id'
-  let id = localStorage.getItem(key)
-  if (!id) {
-    id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-    localStorage.setItem(key, id)
-  }
-  return id
-}
-
-/** 判断当前设备类型 */
-function getDeviceType() {
-  return 'web'
 }
 
 async function sendLogin(token) {
