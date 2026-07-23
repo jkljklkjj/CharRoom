@@ -40,7 +40,7 @@
 - [x] **三层 API 封装简化** — 删除 RemoteDataSource，Repository 直接调用 ApiClient，减少 300+ 行
 - [x] **Koin DI 迁移** — ViewModels 使用 koinInject()，移除 Global 单例
 - [x] **ChatScreen/GroupChatScreen 代码重复** — 已提取 MessageBubble, ChatInputBar, MessageLongPressMenu 等公共组件，消除 731 行重复
-- [ ] **LocalDataSourceImpl 非 KMP 兼容** — 用 java.io.File，需 expect/actual 模式
+- [x] **LocalDataSourceImpl KMP 兼容** — 使用 FileProvider 接口，各平台提供具体实现
 - [x] **`Util.kt` 用 Jackson — 已删除（死代码）**
 - [x] **`formatDate()` 硬编码中文 — 已用 i18n 替代**
 - [x] **`UserListScreen` 重复 formatTime — 已移除**
