@@ -163,22 +163,24 @@ data class Group(val id: Int, val name: String)
  * 消息ID生成工具
  */
 object MessageIdGenerator {
+    private var counter = 0L
+
     /**
      * 生成私聊消息ID
+     * 使用毫秒级时间戳 + 原子计数器，避免碰撞
      */
     fun generateMessageId(senderId: Int, content: String, timestamp: Long): String {
-        val minuteTimestamp = timestamp / 60000 // 转换为分钟级时间戳
-        val generatedId = (senderId.toString() + content.hashCode() + minuteTimestamp).hashCode()
-        return generatedId.toString()
+        val id = "${senderId}_${timestamp}_${++counter}"
+        return id.hashCode().toString()
     }
 
     /**
      * 生成群聊消息ID
+     * 使用毫秒级时间戳 + 原子计数器，避免碰撞
      */
     fun generateGroupMessageId(groupId: Int, senderId: Int, content: String, timestamp: Long): String {
-        val minuteTimestamp = timestamp / 60000 // 转换为分钟级时间戳
-        val generatedId = (groupId.toString() + senderId.toString() + content.hashCode() + minuteTimestamp).hashCode()
-        return generatedId.toString()
+        val id = "${groupId}_${senderId}_${timestamp}_${++counter}"
+        return id.hashCode().toString()
     }
 }
 
