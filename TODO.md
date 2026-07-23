@@ -56,11 +56,11 @@
 
 ### 中优
 
-- [ ] `/msg <userId> <text>` 直聊命令
-- [ ] 密码输入安全（Windows 下 `System.console()` 返回 null）
+- [x] **`/msg <userId> <text>` 直聊命令** — 已实现
+- [x] **密码输入安全** — 使用 `System.console()?.readPassword()`，不回显
 - [ ] 日志框架（slf4j-simple 或 Kermit 替代 println）
-- [ ] 离线消息拉取（登录后调用 syncMessages）
-- [ ] 自动重连（连接断开后指数退避重试）
+- [x] **离线消息拉取** — 登录后自动拉取
+- [x] **自动重连** — 连接断开后指数退避重试（最多10次）
 
 ### 低优
 
