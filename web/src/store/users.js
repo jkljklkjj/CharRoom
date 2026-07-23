@@ -151,6 +151,7 @@ export function cacheUsers(users) {
           online: u.online,
           status: u.status,
           avatarUrl: u.avatarUrl,
+          avatarKey: u.avatarKey,  // 存储 avatarKey 用于缓存失效
           signature: u.signature
         }))
       }))
@@ -202,31 +203,4 @@ export function updateUserOnlineStatus(userId, online) {
       status: online ? i18n.global.t('sidebar.online') : i18n.global.t('sidebar.offline')
     }
   }
-}
-
-// ── 头像缓存 ──────────────────────────────────
-
-const avatarCache = new Map()
-
-export function getCachedAvatar(url) {
-  if (!url) return null
-  if (avatarCache.has(url)) return avatarCache.get(url)
-  try {
-    const key = `charroom_avatar_${btoa(url).slice(0, 40)}`
-    const cached = localStorage.getItem(key)
-    if (cached) {
-      avatarCache.set(url, cached)
-      return cached
-    }
-  } catch (_) {}
-  return null
-}
-
-export function setCachedAvatar(url, dataUrl) {
-  if (!url || !dataUrl) return
-  avatarCache.set(url, dataUrl)
-  try {
-    const key = `charroom_avatar_${btoa(url).slice(0, 40)}`
-    localStorage.setItem(key, dataUrl)
-  } catch (_) {}
 }

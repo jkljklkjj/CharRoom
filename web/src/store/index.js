@@ -4,8 +4,7 @@ import { setToken, setRefreshToken, setAccountId, setPendingRegister,
          clearPendingRegister, setLoginValid, clearAll } from './auth'
 import { setUsers, setGroups, mergeUsers, cacheUsers, loadCachedUsers,
          addUser, removeUser, updateUserOnlineStatus,
-         rebuildConversationStates, updateConversationState, clearConversationUnread,
-         getCachedAvatar, setCachedAvatar } from './users'
+         rebuildConversationStates, updateConversationState, clearConversationUnread } from './users'
 import { addMessage, addGroupMessage, upsertAgentStreamMessage,
          updateMessageStatus, setSelectedChat, loadConversation,
          loadOlderMessages, trimMessages, trimGroupMessages,
@@ -39,8 +38,6 @@ export function useStore() {
     mergeUsers,
     cacheUsers,
     loadCachedUsers,
-    getCachedAvatar,
-    setCachedAvatar,
     trimMessages,
     trimGroupMessages,
     deleteMessage,
