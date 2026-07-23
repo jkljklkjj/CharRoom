@@ -69,13 +69,13 @@ async function submit() {
   if (submitting.value) return
   submitting.value = true
   try {
-    const id = await api.verifyRegister(email.value, code.value, password)
-    if (id && id !== -1) {
+    const result = await api.verifyRegister(email.value, code.value, password)
+    if (result.ok) {
       window.$toast.success(t('verify.success'))
       store.clearPendingRegister()
       router.push({ name: 'WebApp' })
     } else {
-      window.$toast.error(t('verify.failed'))
+      window.$toast.error(result.error || t('verify.failed'))
     }
   } finally {
     submitting.value = false
@@ -85,14 +85,14 @@ async function submit() {
 async function resend() {
   if (!email.value) return
   if (cooldown.value > 0) return
-  const ok = await api.sendVerifyCode(email.value)
-  if (ok) {
+  const result = await api.sendVerifyCode(email.value)
+  if (result.ok) {
     // 本地记录冷却到期时间（120s）并启动倒计时
     try { localStorage.setItem('verify:email:cooldown:' + email.value, String(Date.now() + 120000)); } catch (e) {}
     startCooldown(120)
     window.$toast.success(t('verify.codeResent'))
   } else {
-    window.$toast.error(t('verify.sendFailed'))
+    window.$toast.error(result.error || t('verify.sendFailed'))
   }
 }
 

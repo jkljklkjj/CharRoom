@@ -95,7 +95,17 @@ async function safeFetch(url, options = {}) {
       }
     }
 
-    if (!res.ok) return { ok: false, status: res.status, body: null }
+    if (!res.ok) {
+      // 读取错误响应体，获取后端返回的错误信息
+      const text = await res.text()
+      let body = null
+      try {
+        body = JSON.parse(text)
+      } catch (_) {
+        body = { message: text || '请求失败' }
+      }
+      return { ok: false, status: res.status, body }
+    }
     const text = await res.text()
     try {
       return { ok: true, status: res.status, body: JSON.parse(text) }
@@ -108,12 +118,15 @@ async function safeFetch(url, options = {}) {
 }
 
 export async function login(account, password) {
-  if (!account || !password) return null
+  if (!account || !password) return { ok: false, error: '请输入账号和密码' }
   const { ok, body } = await safeFetch(`${API_BASE}/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ account, password, deviceType: getDeviceType(), deviceId: getDeviceId() })
   })
-  if (!ok) return null
+  if (!ok) {
+    const errorMsg = body?.message || '登录失败'
+    return { ok: false, error: errorMsg }
+  }
 
   const data = body?.data
   // 兼容新后端：data = { accessToken, refreshToken }
@@ -121,14 +134,14 @@ export async function login(account, password) {
     const accessToken = String(data.accessToken || '')
     const refreshToken = String(data.refreshToken || '')
     if (accessToken) {
-      return { accessToken, refreshToken }
+      return { ok: true, accessToken, refreshToken }
     }
   }
   // 兼容旧后端：data 直接是 access token
   if (typeof data === 'string' && data) {
-    return { accessToken: data, refreshToken: '' }
+    return { ok: true, accessToken: data, refreshToken: '' }
   }
-  return null
+  return { ok: false, error: '登录失败：服务器返回数据异常' }
 }
 
 export async function refreshToken(refreshToken) {
@@ -159,21 +172,27 @@ export async function register(username, password) {
 }
 
 export async function sendVerifyCode(email) {
-  if (!email) return false
+  if (!email) return { ok: false, error: '请输入邮箱地址' }
   const { ok, body } = await safeFetch(`${API_BASE}/auth/verify-code`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
   })
-  if (!ok) return false
-  return body?.data === true
+  if (!ok) {
+    const errorMsg = body?.message || '验证码发送失败'
+    return { ok: false, error: errorMsg }
+  }
+  return { ok: true }
 }
 
 export async function verifyRegister(email, code, password) {
-  if (!email || !code || !password) return -1
+  if (!email || !code || !password) return { ok: false, error: '请填写完整信息' }
   const { ok, body } = await safeFetch(`${API_BASE}/auth/register/verify`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code, password })
   })
-  if (!ok) return -1
-  return body?.data ?? -1
+  if (!ok) {
+    const errorMsg = body?.message || '注册失败'
+    return { ok: false, error: errorMsg }
+  }
+  return { ok: true, data: body?.data }
 }
 
 export async function getOfflineMessages(pageSize) {

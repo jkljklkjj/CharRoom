@@ -51,27 +51,27 @@ async function doAction() {
 
 async function doLogin() {
   if (!account.value || !password.value) { toast.warning(t('login.pleaseFillAccountPassword')); return }
-  const tokens = await api.login(account.value, password.value)
-  if (tokens && tokens.accessToken) {
-    store.setToken(tokens.accessToken)
-    store.setRefreshToken(tokens.refreshToken || '')
-    emit('logged', tokens)
+  const result = await api.login(account.value, password.value)
+  if (result.ok) {
+    store.setToken(result.accessToken)
+    store.setRefreshToken(result.refreshToken || '')
+    emit('logged', { accessToken: result.accessToken, refreshToken: result.refreshToken })
   } else {
-    toast.error(t('login.checkAccountPassword'))
+    toast.error(result.error || t('login.checkAccountPassword'))
   }
 }
 
 async function doRegister() {
   if (!account.value || !password.value) { toast.warning(t('login.pleaseFillEmailPassword')); return }
   // 发送验证码到邮箱，跳转到验证码输入页
-  const sent = await api.sendVerifyCode(account.value)
-  if (sent) {
+  const result = await api.sendVerifyCode(account.value)
+  if (result.ok) {
     // 本地记录冷却到期时间（120s），用于前端倒计时显示
     try { localStorage.setItem('verify:email:cooldown:' + account.value, String(Date.now() + 120000)); } catch (e) {}
     store.setPendingRegister({ email: account.value, password: password.value })
     router.push({ name: 'Verify' })
   } else {
-    toast.error(t('login.verificationSentFailed'))
+    toast.error(result.error || t('login.verificationSentFailed'))
   }
 }
 </script>
