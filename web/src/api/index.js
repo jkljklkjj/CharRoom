@@ -1,5 +1,5 @@
 import store from '../store'
-import { getDeviceId, getDeviceType, getOrSetDeviceType } from '../utils/device'
+import { getDeviceId, DEVICE_TYPE } from '../utils/device'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://chatlite.xin/api'
 
@@ -188,11 +188,10 @@ export async function getOfflineMessages(pageSize) {
  * 使用 per-device cursor，确保每个设备独立追踪已读位置
  */
 export async function syncMessages(conversationId, lastSeqId, limit = 50) {
-  const deviceType = getOrSetDeviceType()
   const { ok, body } = await safeFetch(`${API_BASE}/sync/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversationId, lastSeqId, limit, deviceType })
+    body: JSON.stringify({ conversationId, lastSeqId, limit, deviceType: DEVICE_TYPE })
   })
   if (!ok || !body?.data) return { messages: [], nextSeqId: lastSeqId, hasMore: false }
   return body.data

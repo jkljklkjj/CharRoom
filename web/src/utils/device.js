@@ -16,23 +16,13 @@ export function getDeviceId() {
 }
 
 /**
- * 判断当前设备类型
- * Web 前端统一返回 'web'，用于 per-device sync cursor
+ * 设备类型，Web 前端固定为 'web'
  */
-export function getDeviceType() {
-  return 'web'
-}
+export const DEVICE_TYPE = 'web'
 
 /**
- * 获取或设置当前设备类型（持久化到 localStorage）
- * 用于 sync API 传递正确的 deviceType
+ * 获取设备类型
  */
-export function getOrSetDeviceType() {
-  const key = 'charroom_deviceType'
-  let deviceType = localStorage.getItem(key)
-  if (!deviceType) {
-    deviceType = getDeviceType()
-    localStorage.setItem(key, deviceType)
-  }
-  return deviceType
+export function getDeviceType() {
+  return DEVICE_TYPE
 }

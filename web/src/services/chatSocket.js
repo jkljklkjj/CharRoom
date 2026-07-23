@@ -177,17 +177,14 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 
 async function sendLogin(token) {
   try {
-    const deviceType = getDeviceType()
     const result = await sendWrapper({
       type: 'login',
       login: {
         token: token,
-        deviceType: deviceType,
+        deviceType: getDeviceType(),
         deviceId: getDeviceId()
       }
     })
-    // 存储 deviceType 到 localStorage，供 sync API 使用
-    localStorage.setItem('charroom_deviceType', deviceType)
     console.log('📤 登录消息已发送, 结果:', result)
   } catch (err) {
     console.error('❌ 发送登录消息失败:', err)
