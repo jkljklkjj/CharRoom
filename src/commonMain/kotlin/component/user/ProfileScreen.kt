@@ -25,9 +25,9 @@ import component.AppTopBar
 import component.dialog.AvatarCropDialog
 import component.io.FilePicker
 import com.chatlite.i18n.LocalStrings
-import presentation.viewmodel.GlobalProfileViewModel
 import presentation.viewmodel.ProfileUiState
 import presentation.viewmodel.ProfileViewModel
+import org.koin.compose.koinInject
 
 /**
  * 个人信息页面
@@ -37,7 +37,7 @@ import presentation.viewmodel.ProfileViewModel
 fun ProfileScreen(
     onBack: () -> Unit,
     onProfileUpdated: () -> Unit = {},
-    viewModel: ProfileViewModel = GlobalProfileViewModel
+    viewModel: ProfileViewModel = koinInject()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 

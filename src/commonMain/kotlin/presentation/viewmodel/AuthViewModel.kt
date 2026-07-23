@@ -4,7 +4,6 @@ import core.Throttle
 import core.ThrottleOp
 import core.state.AuthState
 import data.repository.AuthRepository
-import data.repository.GlobalAuthRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,7 +16,7 @@ import kotlinx.coroutines.launch
  * 处理登录注册相关的UI逻辑和状态
  */
 class AuthViewModel(
-    private val authRepository: AuthRepository = GlobalAuthRepository,
+    private val authRepository: AuthRepository,
     private var coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 ) {
     private val throttle = Throttle()
@@ -100,6 +99,3 @@ class AuthViewModel(
      */
     fun getCurrentAccount(): String? = authRepository.getCurrentAccount()
 }
-
-// 全局单例，兼容旧代码
-val GlobalAuthViewModel = AuthViewModel()

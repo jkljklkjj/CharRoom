@@ -46,8 +46,8 @@ private const val AGENT_ASSISTANT_ID = 900000001
 private val logger = KotlinLogging.logger {}
 
 open class ChatViewModel(
-    protected val chatRepository: ChatRepository = GlobalChatRepository,
-    protected val chatState: ChatState = GlobalChatState
+    protected val chatRepository: ChatRepository,
+    protected val chatState: ChatState
 ) {
     // 唯一的作用域嵌套：应用级（永不取消）→ 会话级（clear 时重建）
     private val appJob = SupervisorJob()
@@ -1066,6 +1066,3 @@ open class ChatViewModel(
         }
     }
 }
-
-// 全局单例，兼容旧代码
-val GlobalChatViewModel = ChatViewModel()

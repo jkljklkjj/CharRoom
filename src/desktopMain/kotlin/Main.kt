@@ -12,7 +12,7 @@ import component.settings.Platform
 import core.MessageReceiveListener
 import core.Chat
 import java.awt.SystemTray
-import presentation.viewmodel.GlobalChatViewModel
+import presentation.viewmodel.ChatViewModel
 import java.awt.Toolkit
 import java.awt.TrayIcon
 import java.util.prefs.Preferences
@@ -186,14 +186,16 @@ class DesktopNotificationManager : MessageReceiveListener {
 
     override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
                                           seqId: Long, conversationId: String) {
-        val sender = GlobalChatViewModel.usersFlow.value.find { it.id == senderId }
+        val chatViewModel: ChatViewModel = org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
+        val sender = chatViewModel.usersFlow.value.find { it.id == senderId }
         val senderName = sender?.username ?: currentStrings["tray.stranger"]
         showNotification(currentStrings["tray.new.message"], "$senderName: $message")
     }
 
     override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long,
                                         seqId: Long, conversationId: String) {
-        val group = GlobalChatViewModel.usersFlow.value.find { it.id == -groupId }
+        val chatViewModel: ChatViewModel = org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
+        val group = chatViewModel.usersFlow.value.find { it.id == -groupId }
         val groupName = group?.username ?: currentStrings["tray.group"]
         showNotification(currentStrings["tray.group.message"].format(groupName), "$senderName: $message")
     }

@@ -49,6 +49,7 @@ import presentation.viewmodel.ChatViewModel
 import com.chatlite.i18n.LocalStrings
 import component.settings.SettingsScreen
 import component.TokenQuotaScreen
+import org.koin.compose.koinInject
 
 /**
  * 聊天主界面
@@ -65,8 +66,8 @@ fun ChatApp(
     val scaffoldState = rememberScaffoldState(snackbarHostState = SnackbarHostState())
     val scope = rememberCoroutineScope()
     val s = LocalStrings.current
-    // 方案B：每个屏幕使用独立ViewModel实例，但共享全局ChatState数据源
-    val chatViewModel = remember { ChatViewModel(chatState = GlobalChatState) }
+    // 使用 Koin 注入 ChatViewModel
+    val chatViewModel: ChatViewModel = koinInject()
 
     // 观察状态
     val selectedChatTarget by chatViewModel.selectedChatTargetFlow.collectAsState()

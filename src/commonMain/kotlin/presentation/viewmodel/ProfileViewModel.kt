@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import core.FileUploader
 import core.loadImageBitmapWithCache
 import data.repository.ChatRepository
-import data.repository.GlobalChatRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +20,8 @@ import com.chatlite.i18n.currentStrings
  * Profile ViewModel - handles profile page business logic
  */
 class ProfileViewModel(
-    private val chatRepository: ChatRepository = GlobalChatRepository,
-    private val chatViewModel: ChatViewModel = GlobalChatViewModel,
+    private val chatRepository: ChatRepository,
+    private val chatViewModel: ChatViewModel,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate)
 ) {
     // UI状态
@@ -305,6 +304,3 @@ sealed class ProfileUiState {
     data class Success(val user: User) : ProfileUiState()
     data class Error(val message: String) : ProfileUiState()
 }
-
-// 全局单例，兼容旧代码
-val GlobalProfileViewModel = ProfileViewModel()

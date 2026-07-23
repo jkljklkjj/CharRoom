@@ -2,7 +2,6 @@ package component
 
 import component.chat.ChatApp
 import presentation.viewmodel.AuthViewModel
-import presentation.viewmodel.GlobalAuthViewModel
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.chatlite.i18n.LocalStrings
+import org.koin.compose.koinInject
 
 /**
  * 登录或注册界面
@@ -39,7 +39,7 @@ fun LoginRegisterApp(
     isDarkMode: Boolean,
     onToggleDarkMode: () -> Unit,
     onBackPressed: ((() -> Boolean) -> Unit)? = null,
-    authViewModel: AuthViewModel = GlobalAuthViewModel
+    authViewModel: AuthViewModel = koinInject()
 ) {
     var isLogin by remember { mutableStateOf(true) }
     var username by remember { mutableStateOf("") } // 注册模式下用户名
