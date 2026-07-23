@@ -26,17 +26,17 @@
 - [x] **`getDeviceId()` / `getDeviceType()` 重复定义** — 提取到 `utils/device.js`
 - [x] **`avatarSrc()` 逻辑重复** — 提取到 `utils/format.js`
 - [x] **debug `console.log` 未清理** — 已移除
-- [ ] **`window.$toast` 全局模式脆弱** — 改用 provide/inject 或独立 service
+- [x] **`window.$toast` 全局模式** — 改用 utils/toast.js 独立 service
 - [x] **`callAgentStream` 未用 `safeFetch`** — 已添加 auth header
-- [ ] **`TokenQuotaDialog` 相对 URL + `credentials:include`** — CSRF 风险
+- [x] **`TokenQuotaDialog` CSRF 风险** — 改用 safeFetch
 - [x] **双 `onMounted` + async onMounted** — 提取 `restoreSession` 函数
 - [x] **`time()` 函数死代码** — 已移除
 - [x] **`removeUser` 用 splice** — 改用 filter
 
 ## 🔵 P3 — 安全
 
-- [ ] **Token 存 localStorage** — XSS 可窃取 → httpOnly cookie 或 sessionStorage
-- [ ] **`v-html` 依赖 DOMPurify 配置不变** — 添加安全注释
+- [x] **Token 存 localStorage** — 改用 sessionStorage（XSS 安全）
+- [x] **`v-html` 安全** — 添加安全注释
 
 ## ⚪ P4 — 功能缺失（vs KMP）
 

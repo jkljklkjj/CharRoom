@@ -37,13 +37,14 @@
 
 ### P2 — 代码质量
 
-- [ ] `println()` 替换为 Kermit logger
+- [x] **`println()` 替换为 AppLogger** — 创建 AppLogger 封装，ChatViewModel 已替换
 - [ ] 三层 API 封装合并（ApiClient → ApiService → RemoteDataSource）
 - [ ] Koin DI 模块从未使用，Global 单例泛滥
 - [ ] `ChatScreen` 和 `GroupChatScreen` 70% 代码重复 → 提取公共逻辑
 - [ ] `LocalDataSourceImpl` 用 `java.io.File` — 非 KMP 兼容
-- [ ] `Util.kt` 用 Jackson 而非 kotlinx-serialization — 死代码
-- [ ] `formatDate()` 硬编码中文字符串 — 未用 i18n
+- [x] **`Util.kt` 用 Jackson — 已删除（死代码）**
+- [x] **`formatDate()` 硬编码中文 — 已用 i18n 替代**
+- [x] **`UserListScreen` 重复 formatTime — 已移除**
 
 ### 低优
 
