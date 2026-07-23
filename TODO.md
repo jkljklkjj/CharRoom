@@ -9,10 +9,10 @@
 - [x] flushQueue 门控（仅登录成功后触发）
 - [x] XSS 漏洞修复（DOMPurify）
 - [x] seqId 全链路贯通（接收消息提取 seqId）
+- [x] v-for key 改用 messageId
+- [x] DOMPurify 预清洗
 
 - [ ] localStorage O(n) 消息持久化 → IndexedDB
-- [ ] v-for index key → messageId key
-- [ ] DOMPurify 预清洗
 
 - [ ] WebTransport Datagram（长期）
 - [ ] WASM 编解码（长期）
@@ -24,9 +24,9 @@
 ### P0 — Bug
 
 - [x] **seqId 全链路贯通** — MessageReceiveListener 增加 seqId/conversationId 参数
-- [ ] **`forwardMessage` 忽略 targetUser** — 转发到原群组而非目标用户（GroupChatScreen.kt:291）
-- [ ] **`ConversationSyncService` 和 `MessageSender` 是死代码** — 从未实例化，与 ChatViewModel 重复
-- [ ] **`MessageIdGenerator` 分钟级时间戳碰撞** — 同用户同内容同分钟产生相同 ID
+- [x] **`forwardMessage` 忽略 targetUser** — 改为调用 sendPrivateMessage
+- [x] **`ConversationSyncService` 和 `MessageSender` 是死代码** — 已删除
+- [x] **`MessageIdGenerator` 分钟级时间戳碰撞** — 改用毫秒级时间戳 + 原子计数器
 
 ### P1 — 性能
 

@@ -21,17 +21,17 @@
 
 ## 🟢 P2 — 代码质量
 
-- [ ] **`mergeUsers` 删除缓存中存在但 API 返回中不存在的用户** — 应只删 API 明确返回的
-- [ ] **循环依赖 `messages.js` ↔ `users.js`** — 首次调用 `updateConversationState` 静默丢失 → 拆分到第三个模块
-- [ ] **`getDeviceId()` / `getDeviceType()` 重复定义** — 提取到 `utils/device.js`
-- [ ] **`avatarSrc()` 逻辑重复** — 提取到 `utils/format.js`
-- [ ] **debug `console.log` 未清理** — `api/index.js`, `SidebarUsers.vue`
+- [x] **`mergeUsers` 删除缓存中存在但 API 返回中不存在的用户** — 已修复，merge 只做合并
+- [x] **循环依赖 `messages.js` ↔ `users.js`** — 预加载 + pending queue 修复
+- [x] **`getDeviceId()` / `getDeviceType()` 重复定义** — 提取到 `utils/device.js`
+- [x] **`avatarSrc()` 逻辑重复** — 提取到 `utils/format.js`
+- [x] **debug `console.log` 未清理** — 已移除
 - [ ] **`window.$toast` 全局模式脆弱** — 改用 provide/inject 或独立 service
-- [ ] **`callAgentStream` 未用 `safeFetch`** — 无 auth token
+- [x] **`callAgentStream` 未用 `safeFetch`** — 已添加 auth header
 - [ ] **`TokenQuotaDialog` 相对 URL + `credentials:include`** — CSRF 风险
-- [ ] **双 `onMounted` + async onMounted** — 合并为单个 onMounted
-- [ ] **`time()` 函数死代码** — ChatWindow.vue
-- [ ] **`removeUser` 用 splice** — 改用 filter 保持一致性
+- [x] **双 `onMounted` + async onMounted** — 提取 `restoreSession` 函数
+- [x] **`time()` 函数死代码** — 已移除
+- [x] **`removeUser` 用 splice** — 改用 filter
 
 ## 🔵 P3 — 安全
 
