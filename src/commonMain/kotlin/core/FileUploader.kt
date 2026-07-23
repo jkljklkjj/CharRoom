@@ -1,4 +1,5 @@
 package core
+import core.AppLogger
 
 import core.state.GlobalAppState
 import io.ktor.client.call.*
@@ -7,8 +8,6 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.utils.io.core.writeFully
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * 文件上传服务
@@ -23,8 +22,8 @@ object FileUploader {
      * @param fileName 文件名
      * @return 上传成功返回文件URL，失败返回null
      */
-    suspend fun uploadFile(bytes: ByteArray, fileName: String): String? = withContext(Dispatchers.IO) {
-        try {
+    suspend fun uploadFile(bytes: ByteArray, fileName: String): String? {
+        return try {
             val response = client.submitFormWithBinaryData(
                 url = ApiEndpoints.url(ApiEndpoints.FILE_UPLOAD),
                 formData = formData {
@@ -43,12 +42,12 @@ object FileUploader {
                 val result = response.body<ApiResponse<String>>()
                 result.data
             } else {
-                println("File upload failed: ${response.status}")
+                AppLogger.w("File upload failed: ${response.status}")
                 null
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("File upload error: ${e.message}")
+            AppLogger.e("File upload error: ${e.message}")
             null
         }
     }
@@ -69,8 +68,8 @@ object FileUploader {
      * @param fileName 文件名
      * @return 上传成功返回头像URL，失败返回null
      */
-    suspend fun uploadAvatar(bytes: ByteArray, fileName: String): String? = withContext(Dispatchers.IO) {
-        try {
+    suspend fun uploadAvatar(bytes: ByteArray, fileName: String): String? {
+        return try {
             val response = client.submitFormWithBinaryData(
                 url = ApiEndpoints.url(ApiEndpoints.USER_AVATAR_UPLOAD),
                 formData = formData {
@@ -89,12 +88,12 @@ object FileUploader {
                 val result = response.body<ApiResponse<String>>()
                 result.data
             } else {
-                println("Avatar upload failed: ${response.status}")
+                AppLogger.w("Avatar upload failed: ${response.status}")
                 null
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            println("Avatar upload error: ${e.message}")
+            AppLogger.e("Avatar upload error: ${e.message}")
             null
         }
     }

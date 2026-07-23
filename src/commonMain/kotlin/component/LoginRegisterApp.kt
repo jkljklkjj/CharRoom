@@ -1,4 +1,5 @@
 package component
+import core.AppLogger
 
 import component.chat.ChatApp
 import presentation.viewmodel.AuthViewModel
