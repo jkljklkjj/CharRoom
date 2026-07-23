@@ -30,10 +30,10 @@
 
 ### P1 — 性能
 
-- [ ] `syncAllConversations` 每页重建 existingIds Set → 循环外构建，增量更新
-- [ ] `ChatScreen` 收集全局 allMessages 但只用 per-conversation slice → 移除不必要的 collectAsState
-- [ ] `UserListScreen` 收集全量消息计算 subtitle → 缓存 preview
-- [ ] `ChatState` emit 每次创建新 List → 结构相等性检查
+- [x] **`syncAllConversations` 每页重建 existingIds Set** — 循环外构建，增量更新
+- [x] **`ChatScreen` 收集全局 allMessages 但只用 per-conversation slice** — 移除不必要的 collectAsState
+- [x] **`UserListScreen` 收集全量消息计算 subtitle** — userPreviews 缓存 subtitle 和 lastMessageTime
+- [x] **`ChatState` emit 每次创建新 List** — 结构相等性检查
 
 ### P2 — 代码质量
 
