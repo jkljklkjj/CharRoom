@@ -18,6 +18,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
     id("org.jetbrains.compose") version "1.10.3"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
 group = "com.chatlite"
@@ -275,6 +276,14 @@ tasks.register("customApkDebug") {
     group = "distribution"
     description = "Build the Android debug APK for the androidApp module"
     dependsOn(":androidApp:assembleDebug")
+}
+
+// detekt 静态分析配置
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(file("$rootDir/config/detekt/detekt.yml"))
+    source.setFrom("src/commonMain/kotlin", "src/desktopMain/kotlin", "src/cliMain/kotlin")
 }
 
 tasks.register("customApk") {

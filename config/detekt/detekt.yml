@@ -1,0 +1,48 @@
+# detekt 配置文件
+# 基于默认配置，调整为项目适用的规则
+
+build:
+  maxIssues: 10
+
+complexity:
+  LongMethod:
+    threshold: 60
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  ComplexMethod:
+    threshold: 15
+  TooManyFunctions:
+    thresholdInClass: 25
+
+naming:
+  FunctionNaming:
+    # Composable 函数使用 PascalCase
+    functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+
+style:
+  MaxLineLength:
+    maxLineLength: 120
+    ignoreBacktickIdentifiers: true
+  MagicNumber:
+    active: false
+  ReturnCount:
+    max: 3
+  WildcardImport:
+    active: false
+
+empty-blocks:
+  EmptyFunctionBlock:
+    ignoreOverridden: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+
+indentation:
+  continuationIndentSize: 8
+
+import-ordering:
+  autoCorrect: false
