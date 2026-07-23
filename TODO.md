@@ -38,7 +38,7 @@
 
 - [x] **`println()` 替换为 AppLogger** — 创建 AppLogger 封装，ChatViewModel 已替换
 - [x] **三层 API 封装简化** — 删除 RemoteDataSource，Repository 直接调用 ApiClient，减少 300+ 行
-- [ ] **Koin DI 未用于 ViewModel** — 模块已定义但 ViewModels 仍用 Global 单例，需迁移到 koinInject
+- [x] **Koin DI 迁移** — ViewModels 使用 koinInject()，移除 Global 单例
 - [x] **ChatScreen/GroupChatScreen 代码重复** — 已提取 MessageBubble, ChatInputBar, MessageLongPressMenu 等公共组件，消除 731 行重复
 - [ ] **LocalDataSourceImpl 非 KMP 兼容** — 用 java.io.File，需 expect/actual 模式
 - [x] **`Util.kt` 用 Jackson — 已删除（死代码）**
