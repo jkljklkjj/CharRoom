@@ -210,8 +210,6 @@ private fun ChatScreenContent(
     val s = LocalStrings.current
     var messageText by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    // 从ViewModel收集消息状态
-    val allMessages by chatViewModel.messagesFlow.collectAsState()
     // 从ViewModel收集用户列表状态
     val allUsers by chatViewModel.usersFlow.collectAsState()
 

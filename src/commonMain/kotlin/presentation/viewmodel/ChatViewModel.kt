@@ -521,6 +521,9 @@ open class ChatViewModel(
             var lastSeqId = chatState.getConversationSeqId(conversationId)
             var hasMore = true
             var pageCount = 0
+            // 循环外构建 existingIds，循环内增量更新
+            val existingIds = mutableSetOf<String>()
+            chatState.messages.value.forEach { existingIds.add(it.messageId) }
 
             while (hasMore) {
                 try {
@@ -529,7 +532,6 @@ open class ChatViewModel(
 
                     pageCount++
                     // 去重：过滤掉已存在的消息
-                    val existingIds = chatState.messages.value.map { it.messageId }.toSet()
                     val newMessages = result.messages.filter { it.messageId !in existingIds }
 
                     AppLogger.d(" 会话 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条, lastSeqId=$lastSeqId, nextSeqId=${result.nextSeqId}, hasMore=${result.hasMore}")
@@ -537,6 +539,7 @@ open class ChatViewModel(
                     // 按时间戳顺序逐条插入
                     for (msg in newMessages) {
                         chatState.addMessage(msg)
+                        existingIds.add(msg.messageId)  // 增量更新
                     }
 
                     // 更新该会话的 seqId 游标
@@ -563,6 +566,9 @@ open class ChatViewModel(
                 var lastSeqId = chatState.getConversationSeqId(conversationId)
                 var hasMore = true
                 var pageCount = 0
+                // 循环外构建 existingIds，循环内增量更新
+                val existingIds = mutableSetOf<String>()
+                chatState.groupMessages.value.forEach { existingIds.add(it.messageId) }
 
                 while (hasMore) {
                     try {
@@ -570,7 +576,6 @@ open class ChatViewModel(
                         if (result.messages.isEmpty()) break
 
                         pageCount++
-                        val existingIds = chatState.groupMessages.value.map { it.messageId }.toSet()
                         val newMessages = result.messages.filter { it.messageId !in existingIds }
 
                         AppLogger.d(" 群聊 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条")
@@ -587,6 +592,7 @@ open class ChatViewModel(
                                 conversationId = conversationId
                             )
                             chatState.addGroupMessage(groupMsg)
+                            existingIds.add(msg.messageId)  // 增量更新
                         }
 
                         if (result.nextSeqId > lastSeqId) {

@@ -137,9 +137,13 @@ class MessageLruCache<T : Any>(
 
     // ── 内部 ───────────────────────────────────────
 
-    /** 发射当前列表到 StateFlow（仅一次）。 */
+    /** 发射当前列表到 StateFlow（结构相等性检查，避免不必要的重组）。 */
     private fun emit() {
-        _state.value = _items.toList()
+        val newList = _items.toList()
+        // 仅在内容变化时发射新列表，避免 Compose 不必要的重组
+        if (_state.value != newList) {
+            _state.value = newList
+        }
     }
 
     /**

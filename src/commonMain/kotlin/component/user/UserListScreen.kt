@@ -79,6 +79,12 @@ import model.User
 import presentation.viewmodel.ChatViewModel
 import androidx.compose.runtime.collectAsState
 
+// 用户预览信息（subtitle + lastMessageTime），用于缓存避免重复计算
+private data class UserPreview(
+    val subtitle: String,
+    val lastMessageTime: String
+)
+
 /**
  * Left sidebar showing user and group list
  */
@@ -106,8 +112,21 @@ fun UserList(
     val s = LocalStrings.current
     val userListState by chatViewModel.usersFlow.collectAsState()
     val conversationStates by chatViewModel.conversationStatesFlow.collectAsState()
+    // 收集消息用于构建 subtitle 和 lastMessageTime（仅在 UI 需要时计算）
     val allMessages by chatViewModel.messagesFlow.collectAsState()
     val allGroupMessages by chatViewModel.groupMessagesFlow.collectAsState()
+
+    // 预计算每个用户的 subtitle 和 lastMessageTime，避免每次 recomposition 重复计算
+    val userPreviews by remember(userListState, allMessages, allGroupMessages) {
+        derivedStateOf {
+            userListState.associateWith { user ->
+                val subtitle = buildSubtitle(user, allMessages, allGroupMessages)
+                val lastTime = buildLastMessageTime(user, allMessages, allGroupMessages)
+                UserPreview(subtitle, lastTime)
+            }
+        }
+    }
+
     val sortedUsers by remember(searchQuery, userListState, conversationStates) {
         derivedStateOf {
             val indexById = userListState.withIndex().associate { it.value.id to it.index }
@@ -322,7 +341,8 @@ fun UserList(
                     )
                 ) {
                 val displayName = buildDisplayName(user)
-                val subtitle = buildSubtitle(user, allMessages, allGroupMessages)
+                val preview = userPreviews[user]
+                val subtitle = preview?.subtitle ?: ""
                 val unreadCount = conversationStates[user.id]?.unreadCount ?: 0
                 val selected = selectedUserId == user.id
                 val cardColor by animateColorAsState(
@@ -337,7 +357,6 @@ fun UserList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            println("[UserList DEBUG] Clicked user: ${user.id} - ${user.username}")
                             try {
                                 ActionLogger.log(
                                     Action(
@@ -352,7 +371,6 @@ fun UserList(
                             if (Chat.isServerConnected && user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                                 val checkPayload = buildCheckPayload(user.id.toString())
                                 Chat.send(checkPayload, MsgType.CHECK, user.id.toString(), 1) { success, _ ->
-                                    if (success) println("[UserList] Online status check sent: user=${user.id}")
                                 }
                             }
                             onUserClick(user)
@@ -433,7 +451,7 @@ fun UserList(
                             )
                         }
 
-                        val timeText = buildLastMessageTime(user, allMessages, allGroupMessages)
+                        val timeText = userPreviews[user]?.lastMessageTime ?: ""
                         if (timeText.isNotBlank() || unreadCount > 0) {
                             Column(horizontalAlignment = Alignment.End) {
                                 if (timeText.isNotBlank()) {
