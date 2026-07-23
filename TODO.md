@@ -73,9 +73,23 @@
 
 ## 前后端协同
 
-| # | 问题 | 建议 |
-|---|------|------|
-| 1 | 消息 ID 双标准 | 统一由后端生成 |
-| 2 | 群组 ID 符号约定 | 统一为正值 |
-| 3 | 设备管理协议 | 实现 DeviceMessage |
-| 4 | Protobuf 版本演进 | buf breaking CI 检测 |
+| # | 问题 | 状态 | 说明 |
+|---|------|------|------|
+| 1 | 消息 ID 双标准 | ✅ 已正确 | 客户端生成 ID 用于 ACK 关联，后端使用同一 ID 做去重。`CommonUtil.generateMessageId()` 仅在客户端未提供 ID 时作为 fallback |
+| 2 | 群组 ID 符号约定 | ✅ 已正确 | 前端用负数区分群组/用户（UI 约定），后端用正数，protobuf 用 string 类型。转换在 `toUiUser()` 中处理 |
+| 3 | 设备管理协议 | ⏳ 待实现 | 需要 `DeviceMessage` protobuf + 多设备管理端点。当前已有 `device_type` 和 `device_id` 字段 |
+| 4 | Protobuf 版本演进 | ✅ 已完成 | buf breaking CI 检测已配置（`.github/workflows/ci.yml`） |
+
+### 设备管理协议详细设计
+
+**需要实现的功能：**
+1. `DeviceMessage` protobuf 定义
+2. 设备注册/注销端点
+3. 多设备在线状态查询
+4. 设备间消息同步
+5. 设备管理 UI（查看/删除设备）
+
+**现有基础：**
+- `LoginMessage` 已有 `device_type` 和 `device_id` 字段
+- `SessionManager` 已支持多设备连接
+- 前端已有设备 ID 生成逻辑
