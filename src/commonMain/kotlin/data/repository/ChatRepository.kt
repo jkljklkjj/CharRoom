@@ -97,7 +97,7 @@ class ChatRepository(
      */
     suspend fun addFriend(account: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return core.addFriend(token, account)
+        return addFriend(token, account)
     }
 
     /**
@@ -105,7 +105,7 @@ class ChatRepository(
      */
     suspend fun addGroup(groupId: String): Boolean {
         val token = authRepository.getCurrentToken() ?: return false
-        return core.addGroup(token, groupId).isSuccess
+        return addGroup(token, groupId).isSuccess
     }
 
     /**

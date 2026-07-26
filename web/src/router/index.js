@@ -7,6 +7,7 @@ const routes = [
   ,{ path: '/faq', name: 'FAQ', component: () => import('../views/FAQ.vue') }
   ,{ path: '/features', name: 'Features', component: () => import('../views/Features.vue') }
   ,{ path: '/compare', name: 'Compare', component: () => import('../views/Compare.vue') }
+  ,{ path: '/devices', name: 'Devices', component: () => import('../views/DeviceManagement.vue') }
 ]
 
 const router = createRouter({

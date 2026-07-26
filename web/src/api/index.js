@@ -216,6 +216,49 @@ export async function syncMessages(conversationId, lastSeqId, limit = 50) {
   return body.data
 }
 
+/**
+ * 全局增量同步 — 一次请求获取所有会话的新事件
+ */
+export async function syncGlobal(lastGlobalSeqId, limit = 100) {
+  const { ok, body } = await safeFetch(`${API_BASE}/sync/global`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lastGlobalSeqId, limit, deviceType: DEVICE_TYPE })
+  })
+  if (!ok || !body?.data) return { events: [], nextGlobalSeqId: lastGlobalSeqId, hasMore: false }
+  return body.data
+}
+
+/**
+ * 上报已读状态
+ */
+export async function markAsRead(conversationId, lastReadSeqId) {
+  const { ok } = await safeFetch(`${API_BASE}/sync/read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId, lastReadSeqId })
+  })
+  return ok
+}
+
+/**
+ * 查询已读状态
+ */
+export async function getReadStatus() {
+  const { ok, body } = await safeFetch(`${API_BASE}/sync/read/status`, { method: 'GET' })
+  if (!ok || !body?.data) return {}
+  return body.data
+}
+
+/**
+ * 获取设备列表
+ */
+export async function getDevices() {
+  const { ok, body } = await safeFetch(`${API_BASE}/sync/devices`, { method: 'GET' })
+  if (!ok || !body?.data) return []
+  return body.data
+}
+
 export async function getMyGroups() {
   const { ok, body } = await safeFetch(`${API_BASE}/groups`, { method: 'GET' })
   if (!ok) return []
@@ -419,6 +462,10 @@ export default {
   verifyRegister,
   refreshToken,
   syncMessages,
+  syncGlobal,
+  markAsRead,
+  getReadStatus,
+  getDevices,
   getTokenQuota,
   getTokenPrices,
   purchaseTokens

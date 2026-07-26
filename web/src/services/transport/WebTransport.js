@@ -3,17 +3,15 @@
  *
  * **多流设计**：
  * - Control Stream: 登录/登出/心跳/ACK（高优先级，需可靠低延迟）
- * - Chat Streams: per-conversation 双向流（聊天消息，与服务端 QuicChatStreamHandler 对应）
- * - Incoming Streams: 服务端主动推送（如新消息通知）
- *
- * WebTransport URL 格式: https://host:port/.well-known/webtransport
+ * - Chat Streams: per-conversation 双向流（聊天消息）
+ * - Incoming Streams: 服务端主动推送
+ * - Datagram: typing/在线状态/临时反应（不可靠但最低延迟）
  */
 import { ChatTransport } from './ChatTransport'
 
-// 流类型常量
 const STREAM_TYPE = {
-  CONTROL: 'control',   // 控制流
-  CHAT: 'chat',         // 私有/群聊会话流
+  CONTROL: 'control',
+  CHAT: 'chat',
 }
 
 export class WebTransport extends ChatTransport {
@@ -21,37 +19,24 @@ export class WebTransport extends ChatTransport {
     super()
     this._transport = null
     this._url = ''
-
-    // 控制流（登录/心跳/ACK）
     this._controlStream = null
     this._controlWriter = null
-
-    // 会话流池：conversationId → { writer, reader }
     this._chatStreams = new Map()
-
-    // 入站流读取器
     this._incomingReader = null
-
+    this._datagramWriter = null
     this._readerActive = false
-    this._closedCalled = false  // 防止 _onclose 重复调用
+    this._closedCalled = false
   }
 
-  /**
-   * 安全调用 _onclose，防止重复触发。
-   */
   _safeOnClose() {
     if (this._closedCalled) return
     this._closedCalled = true
     if (this._onclose) this._onclose()
   }
 
-  /**
-   * 建立 WebTransport 连接。
-   * 连接成功后创建控制流 + 启动入站流监听。
-   */
   async connect(url, token) {
     this._url = url
-    this._closedCalled = false  // 重置关闭标记
+    this._closedCalled = false
 
     if (typeof globalThis.WebTransport === 'undefined') {
       throw new Error('浏览器不支持 WebTransport API')
@@ -60,7 +45,6 @@ export class WebTransport extends ChatTransport {
     try {
       this._transport = new globalThis.WebTransport(url)
 
-      // 监听 transport.closed —— 服务端断开或网络异常时触发
       this._transport.closed.then((info) => {
         console.debug('WebTransport.closed 触发:', info)
         this._readerActive = false
@@ -71,7 +55,6 @@ export class WebTransport extends ChatTransport {
         this._safeOnClose()
       })
 
-      // QUIC 握手 + HTTP/3，15s 超时
       const TIMEOUT_MS = 15000
       await Promise.race([
         this._transport.ready,
@@ -79,33 +62,21 @@ export class WebTransport extends ChatTransport {
           setTimeout(() => reject(new Error('WebTransport 连接超时')), TIMEOUT_MS)
         ),
       ])
-      console.debug('✅ WebTransport 连接成功:', url)
+      console.debug('WebTransport 连接成功:', url)
 
-      // 创建控制流
       await this._createControlStream()
-
       this._connected = true
 
-      // 启动入站流监听（服务端推送）
       this._startListeningIncomingStreams()
+      this._initDatagram()  // Datagram 初始化
 
       if (this._onopen) this._onopen()
     } catch (e) {
-      console.error('❌ WebTransport 连接失败:', e)
+      console.error('WebTransport 连接失败:', e)
       throw e
     }
   }
 
-  /**
-   * 发送消息，自动按类型路由到对应流：
-   * - ack / heartbeat → 控制流
-   * - chat / groupChat / agent_chat → 会话流（按 conversationId）
-   *
-   * @param {ArrayBuffer|Uint8Array} data - protobuf 编码后的消息
-   * @param {object} [opts] - 可选参数
-   * @param {string} [opts.conversationId] - 会话 ID，用于会话流路由
-   * @param {string} [opts.streamType] - 流类型：'control' | 'chat'
-   */
   send(data, opts = {}) {
     const streamType = opts.streamType || STREAM_TYPE.CONTROL
     const conversationId = opts.conversationId || ''
@@ -116,19 +87,20 @@ export class WebTransport extends ChatTransport {
     return this._sendToControlStream(data)
   }
 
-  /**
-   * 关闭连接：关闭所有流和传输层。
-   */
   close() {
     this._readerActive = false
     this._controlWriter = null
     this._controlStream = null
 
-    // 关闭所有会话流
     for (const [convId, stream] of this._chatStreams) {
       try { stream.writer.close() } catch (_) {}
     }
     this._chatStreams.clear()
+
+    if (this._datagramWriter) {
+      try { this._datagramWriter.close() } catch (_) {}
+      this._datagramWriter = null
+    }
 
     if (this._transport) {
       this._transport.close()
@@ -143,13 +115,80 @@ export class WebTransport extends ChatTransport {
     return this._connected && this._transport !== null
   }
 
+  // ── Datagram 通道 ──────────────────────────────
+
+  async _initDatagram() {
+    if (!this._transport || !this._transport.datagrams) {
+      console.debug('WebTransport Datagram 不可用')
+      return
+    }
+    try {
+      this._datagramWriter = this._transport.datagrams.writable.getWriter()
+      this._startDatagramReading()
+      console.debug('Datagram 通道就绪')
+    } catch (e) {
+      console.debug('Datagram 初始化失败:', e.message)
+    }
+  }
+
+  /**
+   * 发送 Datagram（不可靠、无序）。
+   * 适用于 typing、在线状态、临时反应等低优先级场景。
+   * Datagram 比 Stream 延迟更低，但不保证到达。
+   *
+   * @param {Uint8Array} data - 数据
+   * @param {string} [type] - 类型：'typing' | 'presence' | 'reaction'
+   */
+  sendDatagram(data, type = '') {
+    if (!this._datagramWriter) return false
+
+    const typeMap = { typing: 0x01, presence: 0x02, reaction: 0x03 }
+    const typeByte = typeMap[type] || 0x00
+    const payload = new Uint8Array(data.byteLength + 1)
+    payload[0] = typeByte
+    payload.set(new Uint8Array(data), 1)
+
+    try {
+      this._datagramWriter.write(payload)
+      return true
+    } catch (e) {
+      console.debug('Datagram 发送失败:', e.message)
+      return false
+    }
+  }
+
+  async _startDatagramReading() {
+    try {
+      const reader = this._transport.datagrams.readable.getReader()
+      while (this._readerActive) {
+        const { value, done } = await reader.read()
+        if (done) break
+        if (value && value.length > 0) {
+          const typeByte = value[0]
+          const payload = value.slice(1)
+          const typeNames = { 0x01: 'typing', 0x02: 'presence', 0x03: 'reaction' }
+          const typeName = typeNames[typeByte] || ''
+          if (this._ondatagram) {
+            this._ondatagram(this._toArrayBuffer(payload), typeName)
+          }
+        }
+      }
+    } catch (e) {
+      if (this._readerActive) {
+        console.debug('Datagram 读取结束:', e.message)
+      }
+    }
+  }
+
+  hasDatagram() {
+    return this._datagramWriter !== null && this._datagramWriter !== undefined
+  }
+
   // ── 控制流 ─────────────────────────────────────
 
   async _createControlStream() {
     this._controlStream = await this._transport.createBidirectionalStream()
     this._controlWriter = this._controlStream.writable.getWriter()
-
-    // 启动控制流读取循环
     this._readerActive = true
     this._startControlStreamReading()
   }
@@ -186,25 +225,17 @@ export class WebTransport extends ChatTransport {
 
   // ── 会话流 ──────────────────────────────────────
 
-  /**
-   * 向指定会话发送消息。如果会话流不存在则创建新流。
-   *
-   * WebTransport 协议：服务端 `QuicWebTransportHandler` 直接处理
-   * protobuf MessageWrapper，无需额外 init 帧。
-   */
   _sendToChatStream(conversationId, data) {
     const entry = this._chatStreams.get(conversationId)
     if (entry && entry.writer) {
       entry.writer.write(data).catch(e => {
-        console.error(`会话流(${conversationId})发送异常:`, e)
+        console.error('会话流发送异常:', e)
         if (this._onerror) this._onerror(e)
       })
       return true
     }
-
-    // 创建新会话流并立即发送
     this._createChatStream(conversationId, data).catch(e =>
-      console.error(`创建会话流(${conversationId})失败:`, e)
+      console.error('创建会话流失败:', e)
     )
     return true
   }
@@ -212,8 +243,6 @@ export class WebTransport extends ChatTransport {
   async _createChatStream(conversationId, firstData) {
     const stream = await this._transport.createBidirectionalStream()
     const writer = stream.writable.getWriter()
-
-    // 直接发 protobuf 消息（WebTransport 无需 init 帧，后端通吃）
     if (firstData) await writer.write(firstData)
 
     const entry = { stream, writer }
@@ -232,7 +261,7 @@ export class WebTransport extends ChatTransport {
         }
       }
     } catch (e) {
-      console.debug(`会话流(${conversationId})读取结束:`, e.message)
+      console.debug('会话流读取结束:', e.message)
     } finally {
       this._chatStreams.delete(conversationId)
     }
@@ -246,11 +275,10 @@ export class WebTransport extends ChatTransport {
       while (true) {
         const { value: stream, done } = await this._incomingReader.read()
         if (done) break
-        // 服务端推流 — 可能是新聊天消息或批量通知
         this._handleIncomingStream(stream)
       }
     } catch (e) {
-      console.debug('WebTransport 入站流监听结束:', e.message)
+      console.debug('入站流监听结束:', e.message)
     }
   }
 
@@ -265,13 +293,12 @@ export class WebTransport extends ChatTransport {
         }
       }
     } catch (e) {
-      console.debug('WebTransport 入站流处理结束:', e.message)
+      console.debug('入站流处理结束:', e.message)
     }
   }
 
   // ── 工具方法 ────────────────────────────────────
 
-  /** 将 Uint8Array 转为 ArrayBuffer */
   _toArrayBuffer(uint8Array) {
     return uint8Array.buffer.slice(
       uint8Array.byteOffset,

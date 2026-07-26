@@ -73,6 +73,8 @@ dependencies {
     implementation("com.google.protobuf:protobuf-java:4.34.1")
     implementation("com.google.protobuf:protobuf-kotlin:4.34.1")
     implementation(project(":proto"))
+    // SQLite 本地数据库
+    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
     // QR 码生成
     implementation("io.github.alexzhirkevich:qrose:1.1.2")
 

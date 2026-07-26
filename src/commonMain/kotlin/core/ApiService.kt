@@ -7,6 +7,7 @@ import model.Group
 import model.Message
 import model.User
 import model.toUiUser
+import core.*
 
 /**
  * Api服务
@@ -22,84 +23,84 @@ class ApiService(private val authToken: String? = null) {
      * 获取当前用户信息
      */
     suspend fun getCurrentUserProfile(): User? {
-        return core.getUserInfo(authToken ?: GlobalAppState.currentToken.orEmpty())
+        return getUserInfo(authToken ?: GlobalAppState.currentToken.orEmpty())
     }
 
     /**
      * 获取好友列表（对 UI 友好）
      */
     suspend fun fetchFriends(): List<User> {
-        return core.getFriendList(authToken ?: GlobalAppState.currentToken.orEmpty())
+        return getFriendList(authToken ?: GlobalAppState.currentToken.orEmpty())
     }
 
     /**
      * 获取群组列表（对 UI 友好）
      */
     suspend fun fetchGroups(): List<User> {
-        return core.getGroupList(authToken ?: GlobalAppState.currentToken.orEmpty()).map { it.toUiUser() }
+        return getGroupList(authToken ?: GlobalAppState.currentToken.orEmpty()).map { it.toUiUser() }
     }
 
     /**
      * 获取好友列表
      */
     suspend fun getFriendList(): List<User> {
-        return core.getFriendList(authToken ?: GlobalAppState.currentToken.orEmpty())
+        return getFriendList(authToken ?: GlobalAppState.currentToken.orEmpty())
     }
 
     /**
      * 获取群组列表
      */
     suspend fun getGroupList(): List<Group> {
-        return core.getGroupList(authToken ?: GlobalAppState.currentToken.orEmpty())
+        return getGroupList(authToken ?: GlobalAppState.currentToken.orEmpty())
     }
 
     /**
      * 添加好友
      */
     suspend fun addFriend(account: String): Boolean {
-        return core.addFriend(authToken ?: GlobalAppState.currentToken.orEmpty(), account)
+        return addFriend(authToken ?: GlobalAppState.currentToken.orEmpty(), account)
     }
 
     /**
      * 加入群组（仅返回是否成功）
      */
     suspend fun addGroup(groupId: String): Boolean {
-        return core.addGroup(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId).isSuccess
+        return addGroup(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId).isSuccess
     }
 
     /**
      * 加入群组（返回完整响应，包含 code/message，可用于区分"需要审核"状态）
      */
     suspend fun addGroupWithResponse(groupId: String): ApiResponse<Unit> {
-        return core.addGroup(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId)
+        return addGroup(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId)
     }
 
     /**
      * 查询用户详情
      */
     suspend fun getUserDetail(userId: String): User? {
-        return core.getUserDetail(authToken ?: GlobalAppState.currentToken.orEmpty(), userId)
+        return getUserDetail(authToken ?: GlobalAppState.currentToken.orEmpty(), userId)
     }
 
     /**
      * 查询群组详情
      */
     suspend fun getGroupDetail(groupId: String): User? {
-        return core.getGroupDetail(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId)?.toUiUser()
+        return getGroupDetail(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId)?.toUiUser()
     }
 
     /**
      * 获取离线消息
      */
     suspend fun getOfflineMessages(): List<Message> {
-        return core.getOfflineMessages(authToken ?: GlobalAppState.currentToken.orEmpty())
+        return getOfflineMessages(authToken ?: GlobalAppState.currentToken.orEmpty())
     }
 
     /**
      * 发送邮箱更新验证码
      */
     suspend fun sendEmailUpdateVerifyCode(email: String): Boolean {
-        return core.sendEmailUpdateVerifyCode(authToken ?: GlobalAppState.currentToken.orEmpty(), email)
+        return sendEmailUpdateVerifyCode(authToken ?: GlobalAppState.currentToken.orEmpty(), email)
     }
 
     /**
@@ -111,21 +112,21 @@ class ApiService(private val authToken: String? = null) {
         signature: String,
         password: String? = null
     ): Boolean {
-        return core.updateUserProfile(authToken ?: GlobalAppState.currentToken.orEmpty(), username, phone, signature, password)
+        return updateUserProfile(authToken ?: GlobalAppState.currentToken.orEmpty(), username, phone, signature, password)
     }
 
     /**
      * 更新邮箱
      */
     suspend fun updateEmail(newEmail: String, verifyCode: String): Boolean {
-        return core.updateEmail(authToken ?: GlobalAppState.currentToken.orEmpty(), newEmail, verifyCode)
+        return updateEmail(authToken ?: GlobalAppState.currentToken.orEmpty(), newEmail, verifyCode)
     }
 
     /**
      * 获取好友申请列表（UI 用 User 类型）
      */
     suspend fun fetchFriendRequests(): List<User> {
-        return core.getFriendRequests(authToken ?: GlobalAppState.currentToken.orEmpty())
+        return getFriendRequests(authToken ?: GlobalAppState.currentToken.orEmpty())
             .map { request ->
                 User(
                     id = request.id,
@@ -139,7 +140,7 @@ class ApiService(private val authToken: String? = null) {
      * 获取群聊申请列表（UI 用 User 类型）
      */
     suspend fun fetchGroupRequests(): List<User> {
-        return core.getGroupRequests(authToken ?: GlobalAppState.currentToken.orEmpty())
+        return getGroupRequests(authToken ?: GlobalAppState.currentToken.orEmpty())
             .map { request ->
                 User(
                     id = request.id,
@@ -153,28 +154,28 @@ class ApiService(private val authToken: String? = null) {
      * 同意好友申请
      */
     suspend fun acceptFriend(requestId: String): Boolean {
-        return core.acceptFriend(authToken ?: GlobalAppState.currentToken.orEmpty(), requestId)
+        return acceptFriend(authToken ?: GlobalAppState.currentToken.orEmpty(), requestId)
     }
 
     /**
      * 拒绝好友申请
      */
     suspend fun rejectFriend(requestId: String): Boolean {
-        return core.rejectFriend(authToken ?: GlobalAppState.currentToken.orEmpty(), requestId)
+        return rejectFriend(authToken ?: GlobalAppState.currentToken.orEmpty(), requestId)
     }
 
     /**
      * 同意群聊申请
      */
     suspend fun acceptGroupApplication(groupId: String, userId: String): Boolean {
-        return core.acceptGroupApplication(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId, userId)
+        return acceptGroupApplication(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId, userId)
     }
 
     /**
      * 拒绝群聊申请
      */
     suspend fun rejectGroupApplication(groupId: String, userId: String): Boolean {
-        return core.rejectGroupApplication(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId, userId)
+        return rejectGroupApplication(authToken ?: GlobalAppState.currentToken.orEmpty(), groupId, userId)
     }
 
     /**
@@ -189,7 +190,7 @@ class ApiService(private val authToken: String? = null) {
         fileSize: Long? = null,
         replyToMessageId: String? = null
     ): Boolean {
-        return core.sendPrivateMessage(
+        return sendPrivateMessage(
             token = authToken ?: GlobalAppState.currentToken.orEmpty(),
             receiverId = receiverId,
             content = content,
@@ -213,7 +214,7 @@ class ApiService(private val authToken: String? = null) {
         fileSize: Long? = null,
         replyToMessageId: String? = null
     ): Boolean {
-        return core.sendGroupMessage(
+        return sendGroupMessage(
             token = authToken ?: GlobalAppState.currentToken.orEmpty(),
             groupId = groupId,
             content = content,
@@ -234,7 +235,7 @@ class ApiService(private val authToken: String? = null) {
         platform: String,
         channel: String = "official"
     ): VersionCheckResult? {
-        return core.checkAppVersion(
+        return checkAppVersion(
             appVersion = AppConfig.VERSION_CODE,
             platform = platform,
             channel = channel
@@ -247,11 +248,11 @@ class ApiService(private val authToken: String? = null) {
          * 登录，返回 token
          */
         suspend fun login(account: String, password: String): String {
-            return core.login(account, password).orEmpty()
+            return login(account, password).orEmpty()
         }
 
         suspend fun loginTokens(account: String, password: String): LoginTokens? {
-            val bundle = core.loginTokens(account, password) ?: return null
+            val bundle = loginTokens(account, password) ?: return null
             if (bundle.accessToken.isBlank()) return null
             return LoginTokens(bundle.accessToken, bundle.refreshToken)
         }
@@ -260,42 +261,42 @@ class ApiService(private val authToken: String? = null) {
          * 注册，返回账号 ID
          */
         suspend fun register(username: String, password: String): Int {
-            return core.register(username, password) ?: -1
+            return register(username, password) ?: -1
         }
 
         /**
          * 验证注册（与网页端逻辑一致），返回账号 ID
          */
         suspend fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = ""): Int {
-            return core.verifyRegister(username, password, email, verifyCode) ?: -1
+            return verifyRegister(username, password, email, verifyCode) ?: -1
         }
 
         /**
          * 发送注册验证码
          */
         suspend fun sendRegisterVerifyCode(email: String): Boolean {
-            return core.sendRegisterVerifyCode(email)
+            return sendRegisterVerifyCode(email)
         }
 
         /**
          * 获取用户信息
          */
         suspend fun getUserInfo(token: String): User? {
-            return core.getUserInfo(token)
+            return getUserInfo(token)
         }
 
         suspend fun validateToken(token: String): LoginTokens? {
-            val bundle = core.validateToken(token) ?: return null
+            val bundle = validateToken(token) ?: return null
             if (bundle.accessToken.isBlank()) return null
             return LoginTokens(bundle.accessToken, bundle.refreshToken)
         }
 
         suspend fun refreshAccessToken(refreshToken: String): String {
-            return core.refreshAccessToken(refreshToken).orEmpty()
+            return refreshAccessToken(refreshToken).orEmpty()
         }
 
         suspend fun refreshTokenBundle(refreshToken: String): LoginTokens? {
-            val bundle = core.refreshTokenBundle(refreshToken) ?: return null
+            val bundle = refreshTokenBundle(refreshToken) ?: return null
             if (bundle.accessToken.isBlank()) return null
             return LoginTokens(bundle.accessToken, bundle.refreshToken)
         }

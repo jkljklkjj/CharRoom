@@ -57,6 +57,10 @@ class ChatState {
     private val _conversationSeqIds = MutableStateFlow<Map<String, Long>>(emptyMap())
     val conversationSeqIds: StateFlow<Map<String, Long>> = _conversationSeqIds.asStateFlow()
 
+    // 全局同步序列号（用于全局增量同步）
+    private val _globalSeqId = MutableStateFlow(0L)
+    val globalSeqId: StateFlow<Long> = _globalSeqId.asStateFlow()
+
     // 加载更多历史消息状态
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
@@ -192,6 +196,24 @@ class ChatState {
      */
     suspend fun clearConversationSeqIds() = seqIdMutex.withLock {
         _conversationSeqIds.value = emptyMap()
+    }
+
+    // ── 全局同步序列号 ─────────────────────────────────
+
+    /**
+     * 更新全局同步序列号，仅在新 seqId 大于旧 seqId 时更新。
+     */
+    suspend fun updateGlobalSeqId(seqId: Long) = seqIdMutex.withLock {
+        if (seqId > _globalSeqId.value) {
+            _globalSeqId.value = seqId
+        }
+    }
+
+    /**
+     * 获取当前全局同步序列号。
+     */
+    suspend fun getGlobalSeqId(): Long = seqIdMutex.withLock {
+        _globalSeqId.value
     }
 
     /**

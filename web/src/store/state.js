@@ -10,6 +10,7 @@ export const state = reactive({
   groupMessages: [],
   conversationStates: {},
   conversationSeqIds: {},
+  globalSeqId: 0,
   token: '',
   refreshToken: '',
   accountId: '',

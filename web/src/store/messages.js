@@ -2,7 +2,15 @@ import { state, PAGE_SIZE } from './state'
 import { getPrivateConversationId, normalizeTimeValue,
          getConversationKey } from './storage'
 import DOMPurify from 'dompurify'
-import { getMessages as dbGetMessages, appendMessage as dbAppendMessage } from '../utils/messageDB'
+import {
+  getMessages as dbGetMessages,
+  appendMessage as dbAppendMessage,
+  getAllSeqIds as dbGetAllSeqIds,
+  setSeqId as dbSetSeqId,
+  getOfflineQueue as dbGetOfflineQueue,
+  saveToOfflineQueue as dbSaveToOfflineQueue,
+  removeFromOfflineQueue as dbRemoveFromOfflineQueue
+} from '../utils/messageDB'
 
 // 延迟导入 users.js 避免循环依赖
 
@@ -44,25 +52,24 @@ function sanitizeText(text) {
   return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })
 }
 
-// ── seqId 持久化 ──────────────────────────────
+// ── seqId 持久化（IndexedDB）─────────────────────────────
 
-function persistConversationSeqIds() {
+async function persistConversationSeqIds() {
   try {
     if (state.accountId) {
-      localStorage.setItem(`charroom_seqids_${state.accountId}`, JSON.stringify(state.conversationSeqIds))
+      for (const [convId, seqId] of Object.entries(state.conversationSeqIds)) {
+        await dbSetSeqId(state.accountId, convId, seqId)
+      }
     }
   } catch (_) {}
 }
 
-function restoreConversationSeqIds() {
+async function restoreConversationSeqIds() {
   try {
     if (state.accountId) {
-      const raw = localStorage.getItem(`charroom_seqids_${state.accountId}`)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (typeof parsed === 'object' && parsed !== null) {
-          state.conversationSeqIds = parsed
-        }
+      const seqIds = await dbGetAllSeqIds(state.accountId)
+      if (seqIds && typeof seqIds === 'object') {
+        state.conversationSeqIds = seqIds
       }
     }
   } catch (_) {}
@@ -71,6 +78,38 @@ function restoreConversationSeqIds() {
 export function getConversationSeqId(conversationId) {
   const key = String(conversationId)
   return state.conversationSeqIds[key] || 0
+}
+
+// ── globalSeqId（保持 localStorage，因为是单值）─────────────
+
+function persistGlobalSeqId() {
+  try {
+    if (state.accountId) {
+      localStorage.setItem(`charroom_globalseqid_${state.accountId}`, String(state.globalSeqId))
+    }
+  } catch (_) {}
+}
+
+function restoreGlobalSeqId() {
+  try {
+    if (state.accountId) {
+      const raw = localStorage.getItem(`charroom_globalseqid_${state.accountId}`)
+      if (raw) {
+        state.globalSeqId = parseInt(raw, 10) || 0
+      }
+    }
+  } catch (_) {}
+}
+
+export function getGlobalSeqId() {
+  return state.globalSeqId || 0
+}
+
+export function setGlobalSeqId(seqId) {
+  if (seqId > (state.globalSeqId || 0)) {
+    state.globalSeqId = seqId
+    persistGlobalSeqId()
+  }
 }
 
 export function setConversationSeqId(conversationId, seqId) {

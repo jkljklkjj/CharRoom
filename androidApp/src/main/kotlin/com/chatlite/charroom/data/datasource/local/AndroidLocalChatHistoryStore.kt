@@ -1,68 +1,183 @@
 package com.chatlite.charroom.data.datasource.local
 
+import android.content.ContentValues
 import android.content.Context
-import androidx.compose.runtime.mutableStateOf
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
 import core.LocalChatHistoryStoreProvider
 import core.RestoredChatHistory
 import model.GroupMessage
 import model.Message
 import model.MessageType
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
 
 /**
- * Android端本地聊天历史存储实现
+ * Android端本地聊天历史存储实现（SQLite 版本）
+ *
+ * 使用 Android 原生 SQLite API，支持：
+ * - 增量写入（INSERT OR REPLACE）
+ * - 按会话查询
+ * - 消息上限管理（每会话 1000 条）
+ * - Per-account 隔离
+ * - 离线队列（带重试和状态）
  */
 object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
-    private const val HISTORY_DIR_NAME = "chat_history"
-    private const val MAX_PRIVATE_HISTORY = 5000
-    private const val MAX_GROUP_HISTORY = 5000
+    private const val DB_NAME = "chatroom.db"
+    private const val DB_VERSION = 1
+    private const val MAX_MESSAGES_PER_CONVERSATION = 1000
 
     private lateinit var context: Context
+    private var dbHelper: DatabaseHelper? = null
 
-    /**
-     * 初始化，需要在Application中调用
-     */
     fun init(context: Context) {
         this.context = context.applicationContext
+        dbHelper = DatabaseHelper(this.context)
+    }
+
+    private fun getDb(): SQLiteDatabase {
+        return dbHelper?.writableDatabase ?: throw IllegalStateException("AndroidLocalChatHistoryStore not initialized")
+    }
+
+    private class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
+        override fun onCreate(db: SQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE messages (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL,
+                    sender_id INTEGER,
+                    receiver_id INTEGER,
+                    content TEXT,
+                    timestamp INTEGER,
+                    is_sent INTEGER DEFAULT 0,
+                    message_type TEXT DEFAULT 'TEXT',
+                    file_url TEXT,
+                    file_name TEXT,
+                    file_size INTEGER,
+                    reply_to_message_id TEXT,
+                    reply_to_content TEXT,
+                    reply_to_sender TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+                )
+            """)
+            db.execSQL("CREATE INDEX idx_messages_conv ON messages(account_id, conversation_id)")
+            db.execSQL("CREATE INDEX idx_messages_ts ON messages(account_id, conversation_id, timestamp)")
+
+            db.execSQL("""
+                CREATE TABLE seq_ids (
+                    account_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL,
+                    seq_id INTEGER DEFAULT 0,
+                    PRIMARY KEY (account_id, conversation_id)
+                )
+            """)
+
+            db.execSQL("""
+                CREATE TABLE pending_messages (
+                    message_id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL,
+                    message_type TEXT NOT NULL,
+                    payload TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s','now') * 1000),
+                    retry_count INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'pending'
+                )
+            """)
+            db.execSQL("CREATE INDEX idx_pending_status ON pending_messages(status)")
+        }
+
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            // 版本迁移逻辑
+        }
     }
 
     override fun save(accountId: String, privateMessages: List<Message>, groupMessages: List<GroupMessage>) {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return
+        if (accountId.isBlank() || !::context.isInitialized) return
+
+        val db = getDb()
+        db.beginTransaction()
+        try {
+            // 保存私聊消息
+            privateMessages.forEach { msg ->
+                val convId = "user:${minOf(msg.senderId, msg.receiverId)}:${maxOf(msg.senderId, msg.receiverId)}"
+                insertMessage(db, accountId, convId, msg)
+            }
+
+            // 保存群聊消息
+            groupMessages.forEach { groupMsg ->
+                val convId = "group:${groupMsg.groupId}"
+                val msg = Message(
+                    senderId = groupMsg.senderId,
+                    receiverId = -groupMsg.groupId,
+                    message = groupMsg.text,
+                    sender = false,
+                    timestamp = groupMsg.timestamp,
+                    isSent = groupMsg.isSent,
+                    messageId = groupMsg.messageId,
+                    replyToMessageId = groupMsg.replyToMessageId,
+                    replyToContent = groupMsg.replyToContent,
+                    replyToSender = groupMsg.replyToSender,
+                    messageType = groupMsg.messageType,
+                    fileUrl = groupMsg.fileUrl,
+                    fileName = groupMsg.fileName,
+                    fileSize = groupMsg.fileSize
+                )
+                insertMessage(db, accountId, convId, msg)
+            }
+
+            // 清理超出上限的旧消息
+            cleanupOldMessages(db, accountId)
+
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
         }
+    }
 
-        // 保存私聊消息
-        privateMessages
-            .groupBy { if (it.sender) it.receiverId else it.senderId }
-            .forEach { (peerId, messages) ->
-                saveMessages(accountId, peerId.toString(), false, messages)
-            }
+    private fun insertMessage(db: SQLiteDatabase, accountId: String, convId: String, msg: Message) {
+        val values = ContentValues().apply {
+            put("id", msg.messageId)
+            put("account_id", accountId)
+            put("conversation_id", convId)
+            put("sender_id", msg.senderId)
+            put("receiver_id", msg.receiverId)
+            put("content", msg.message)
+            put("timestamp", msg.timestamp)
+            put("is_sent", if (msg.isSent) 1 else 0)
+            put("message_type", msg.messageType.name)
+            put("file_url", msg.fileUrl)
+            put("file_name", msg.fileName)
+            put("file_size", msg.fileSize ?: 0)
+            put("reply_to_message_id", msg.replyToMessageId)
+            put("reply_to_content", msg.replyToContent)
+            put("reply_to_sender", msg.replyToSender)
+        }
+        db.insertWithOnConflict("messages", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
 
-        // 保存群聊消息
-        groupMessages
-            .groupBy { it.groupId }
-            .forEach { (groupId, messages) ->
-                saveMessages(accountId, groupId.toString(), true, messages.map { groupMsg ->
-                    Message(
-                        senderId = groupMsg.senderId,
-                        message = groupMsg.text,
-                        sender = false,
-                        receiverId = -groupId, // 使用负的groupId表示群聊
-                        timestamp = groupMsg.timestamp,
-                        isSent = groupMsg.isSent,
-                        messageId = groupMsg.messageId,
-                        replyToMessageId = groupMsg.replyToMessageId,
-                        replyToContent = groupMsg.replyToContent,
-                        replyToSender = groupMsg.replyToSender,
-                        messageType = groupMsg.messageType,
-                        fileUrl = groupMsg.fileUrl,
-                        fileName = groupMsg.fileName,
-                        fileSize = groupMsg.fileSize
+    private fun cleanupOldMessages(db: SQLiteDatabase, accountId: String) {
+        val cursor = db.rawQuery(
+            "SELECT DISTINCT conversation_id FROM messages WHERE account_id = ?",
+            arrayOf(accountId)
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                val convId = it.getString(0)
+                db.execSQL(
+                    """
+                    DELETE FROM messages WHERE account_id = ? AND conversation_id = ?
+                    AND id NOT IN (
+                        SELECT id FROM messages
+                        WHERE account_id = ? AND conversation_id = ?
+                        ORDER BY timestamp DESC
+                        LIMIT $MAX_MESSAGES_PER_CONVERSATION
                     )
-                })
+                    """.trimIndent(),
+                    arrayOf(accountId, convId, accountId, convId)
+                )
             }
+        }
     }
 
     override fun restore(accountId: String): RestoredChatHistory {
@@ -70,287 +185,363 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun restorePage(accountId: String, page: Int, pageSize: Int): RestoredChatHistory {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return RestoredChatHistory()
-        }
+        if (accountId.isBlank() || !::context.isInitialized) return RestoredChatHistory()
 
-        val accountDir = getAccountDir(accountId)
-        if (!accountDir.exists()) {
-            return RestoredChatHistory()
-        }
-
-        // 加载所有私聊消息
-        val privateFiles = accountDir.listFiles { file -> file.name.startsWith("private_") } ?: emptyArray()
-        val allPrivateMessages = privateFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("private_"), false) }
-            .filterIsInstance<Message>()
-            .sortedByDescending { it.timestamp }
-
-        // 加载所有群聊消息
-        val groupFiles = accountDir.listFiles { file -> file.name.startsWith("group_") } ?: emptyArray()
-        val allGroupMessages = groupFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("group_"), true) }
-            .filterIsInstance<GroupMessage>()
-            .sortedByDescending { it.timestamp }
-
-        // 分页处理
-        val privateStart = page * pageSize
-        val privateEnd = minOf(privateStart + pageSize, allPrivateMessages.size)
-        val privatePage = if (privateStart < allPrivateMessages.size) {
-            allPrivateMessages.subList(privateStart, privateEnd).reversed()
-        } else {
-            emptyList()
-        }
-
-        val groupStart = page * pageSize
-        val groupEnd = minOf(groupStart + pageSize, allGroupMessages.size)
-        val groupPage = if (groupStart < allGroupMessages.size) {
-            allGroupMessages.subList(groupStart, groupEnd).reversed()
-        } else {
-            emptyList()
-        }
+        val db = getDb()
+        val privateMessages = loadPrivateMessages(db, accountId, page, pageSize)
+        val groupMessages = loadGroupMessages(db, accountId, page, pageSize)
 
         return RestoredChatHistory(
-            privateMessages = privatePage,
-            groupMessages = groupPage
+            privateMessages = privateMessages,
+            groupMessages = groupMessages
+        )
+    }
+
+    private fun loadPrivateMessages(db: SQLiteDatabase, accountId: String, page: Int, pageSize: Int): List<Message> {
+        val cursor = db.rawQuery(
+            """
+            SELECT * FROM messages
+            WHERE account_id = ? AND conversation_id LIKE 'user:%'
+            ORDER BY timestamp DESC
+            LIMIT ? OFFSET ?
+            """.trimIndent(),
+            arrayOf(accountId, pageSize.toString(), (page * pageSize).toString())
+        )
+        return cursor.use {
+            val messages = mutableListOf<Message>()
+            while (it.moveToNext()) {
+                messages.add(cursorToMessage(it))
+            }
+            messages.reversed()
+        }
+    }
+
+    private fun loadGroupMessages(db: SQLiteDatabase, accountId: String, page: Int, pageSize: Int): List<GroupMessage> {
+        val cursor = db.rawQuery(
+            """
+            SELECT * FROM messages
+            WHERE account_id = ? AND conversation_id LIKE 'group:%'
+            ORDER BY timestamp DESC
+            LIMIT ? OFFSET ?
+            """.trimIndent(),
+            arrayOf(accountId, pageSize.toString(), (page * pageSize).toString())
+        )
+        return cursor.use {
+            val messages = mutableListOf<GroupMessage>()
+            while (it.moveToNext()) {
+                messages.add(cursorToGroupMessage(it))
+            }
+            messages.reversed()
+        }
+    }
+
+    private fun cursorToMessage(cursor: Cursor): Message {
+        return Message(
+            senderId = cursor.getInt(cursor.getColumnIndexOrThrow("sender_id")),
+            receiverId = cursor.getInt(cursor.getColumnIndexOrThrow("receiver_id")),
+            message = cursor.getString(cursor.getColumnIndexOrThrow("content")) ?: "",
+            sender = cursor.getInt(cursor.getColumnIndexOrThrow("is_sent")) == 0,
+            timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")),
+            isSent = cursor.getInt(cursor.getColumnIndexOrThrow("is_sent")) == 1,
+            messageId = cursor.getString(cursor.getColumnIndexOrThrow("id")) ?: "",
+            replyToMessageId = cursor.getString(cursor.getColumnIndexOrThrow("reply_to_message_id")),
+            replyToContent = cursor.getString(cursor.getColumnIndexOrThrow("reply_to_content")),
+            replyToSender = cursor.getString(cursor.getColumnIndexOrThrow("reply_to_sender")),
+            messageType = try {
+                MessageType.valueOf(cursor.getString(cursor.getColumnIndexOrThrow("message_type")) ?: "TEXT")
+            } catch (_: Exception) { MessageType.TEXT },
+            fileUrl = cursor.getString(cursor.getColumnIndexOrThrow("file_url")),
+            fileName = cursor.getString(cursor.getColumnIndexOrThrow("file_name")),
+            fileSize = cursor.getLong(cursor.getColumnIndexOrThrow("file_size")).takeIf { it > 0 }
+        )
+    }
+
+    private fun cursorToGroupMessage(cursor: Cursor): GroupMessage {
+        val convId = cursor.getString(cursor.getColumnIndexOrThrow("conversation_id")) ?: ""
+        val groupId = convId.removePrefix("group:").toIntOrNull() ?: 0
+        return GroupMessage(
+            groupId = groupId,
+            senderName = "",
+            text = cursor.getString(cursor.getColumnIndexOrThrow("content")) ?: "",
+            senderId = cursor.getInt(cursor.getColumnIndexOrThrow("sender_id")),
+            timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")),
+            isSent = cursor.getInt(cursor.getColumnIndexOrThrow("is_sent")) == 1,
+            messageId = cursor.getString(cursor.getColumnIndexOrThrow("id")) ?: "",
+            replyToMessageId = cursor.getString(cursor.getColumnIndexOrThrow("reply_to_message_id")),
+            replyToContent = cursor.getString(cursor.getColumnIndexOrThrow("reply_to_content")),
+            replyToSender = cursor.getString(cursor.getColumnIndexOrThrow("reply_to_sender")),
+            messageType = try {
+                MessageType.valueOf(cursor.getString(cursor.getColumnIndexOrThrow("message_type")) ?: "TEXT")
+            } catch (_: Exception) { MessageType.TEXT },
+            fileUrl = cursor.getString(cursor.getColumnIndexOrThrow("file_url")),
+            fileName = cursor.getString(cursor.getColumnIndexOrThrow("file_name")),
+            fileSize = cursor.getLong(cursor.getColumnIndexOrThrow("file_size")).takeIf { it > 0 }
         )
     }
 
     override fun getPrivateMessagesByTimeRange(accountId: String, userId: Int, startTime: Long, endTime: Long): List<Message> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return emptyList()
-        }
+        if (accountId.isBlank() || !::context.isInitialized) return emptyList()
 
-        return loadMessages(accountId, userId.toString(), false)
-            .filterIsInstance<Message>()
-            .filter { it.timestamp in startTime..endTime }
-            .sortedBy { it.timestamp }
+        val db = getDb()
+        val convId = "user:${minOf(0, userId)}:${maxOf(0, userId)}"
+        val cursor = db.rawQuery(
+            """
+            SELECT * FROM messages
+            WHERE account_id = ? AND conversation_id = ? AND timestamp BETWEEN ? AND ?
+            ORDER BY timestamp ASC
+            """.trimIndent(),
+            arrayOf(accountId, convId, startTime.toString(), endTime.toString())
+        )
+        return cursor.use {
+            val messages = mutableListOf<Message>()
+            while (it.moveToNext()) {
+                messages.add(cursorToMessage(it))
+            }
+            messages
+        }
     }
 
     override fun getGroupMessagesByTimeRange(accountId: String, groupId: Int, startTime: Long, endTime: Long): List<GroupMessage> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return emptyList()
-        }
+        if (accountId.isBlank() || !::context.isInitialized) return emptyList()
 
-        return loadMessages(accountId, groupId.toString(), true)
-            .filterIsInstance<GroupMessage>()
-            .filter { it.timestamp in startTime..endTime }
-            .sortedBy { it.timestamp }
+        val db = getDb()
+        val convId = "group:$groupId"
+        val cursor = db.rawQuery(
+            """
+            SELECT * FROM messages
+            WHERE account_id = ? AND conversation_id = ? AND timestamp BETWEEN ? AND ?
+            ORDER BY timestamp ASC
+            """.trimIndent(),
+            arrayOf(accountId, convId, startTime.toString(), endTime.toString())
+        )
+        return cursor.use {
+            val messages = mutableListOf<GroupMessage>()
+            while (it.moveToNext()) {
+                messages.add(cursorToGroupMessage(it))
+            }
+            messages
+        }
     }
 
     override fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int, pageSize: Int): List<Message> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return emptyList()
-        }
+        if (accountId.isBlank() || !::context.isInitialized) return emptyList()
 
-        val allMessages = loadMessages(accountId, userId.toString(), false)
-            .filterIsInstance<Message>()
-            .sortedByDescending { it.timestamp }
-
-        val startIndex = page * pageSize
-        val endIndex = minOf(startIndex + pageSize, allMessages.size)
-
-        return if (startIndex < allMessages.size) {
-            allMessages.subList(startIndex, endIndex).reversed()
-        } else {
-            emptyList()
+        val db = getDb()
+        val convId = "user:${minOf(0, userId)}:${maxOf(0, userId)}"
+        val cursor = db.rawQuery(
+            """
+            SELECT * FROM messages
+            WHERE account_id = ? AND conversation_id = ?
+            ORDER BY timestamp DESC
+            LIMIT ? OFFSET ?
+            """.trimIndent(),
+            arrayOf(accountId, convId, pageSize.toString(), (page * pageSize).toString())
+        )
+        return cursor.use {
+            val messages = mutableListOf<Message>()
+            while (it.moveToNext()) {
+                messages.add(cursorToMessage(it))
+            }
+            messages.reversed()
         }
     }
 
     override fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int, pageSize: Int): List<GroupMessage> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return emptyList()
-        }
+        if (accountId.isBlank() || !::context.isInitialized) return emptyList()
 
-        val allMessages = loadMessages(accountId, groupId.toString(), true)
-            .filterIsInstance<GroupMessage>()
-            .sortedByDescending { it.timestamp }
-
-        val startIndex = page * pageSize
-        val endIndex = minOf(startIndex + pageSize, allMessages.size)
-
-        return if (startIndex < allMessages.size) {
-            allMessages.subList(startIndex, endIndex).reversed()
-        } else {
-            emptyList()
+        val db = getDb()
+        val convId = "group:$groupId"
+        val cursor = db.rawQuery(
+            """
+            SELECT * FROM messages
+            WHERE account_id = ? AND conversation_id = ?
+            ORDER BY timestamp DESC
+            LIMIT ? OFFSET ?
+            """.trimIndent(),
+            arrayOf(accountId, convId, pageSize.toString(), (page * pageSize).toString())
+        )
+        return cursor.use {
+            val messages = mutableListOf<GroupMessage>()
+            while (it.moveToNext()) {
+                messages.add(cursorToGroupMessage(it))
+            }
+            messages.reversed()
         }
     }
 
     override fun clear(accountId: String): Boolean {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return false
-        }
+        if (accountId.isBlank() || !::context.isInitialized) return false
 
         return runCatching {
-            val accountDir = getAccountDir(accountId)
-            if (accountDir.exists()) {
-                accountDir.deleteRecursively()
-            }
+            val db = getDb()
+            db.delete("messages", "account_id = ?", arrayOf(accountId))
+            db.delete("seq_ids", "account_id = ?", arrayOf(accountId))
+            db.delete("pending_messages", "account_id = ?", arrayOf(accountId))
             true
         }.getOrDefault(false)
     }
 
     override fun clearConversation(accountId: String, targetId: String, isGroup: Boolean): Boolean {
-        if (accountId.isBlank() || !this::context.isInitialized) return false
+        if (accountId.isBlank() || !::context.isInitialized) return false
+
         return runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            if (file.exists()) file.delete()
+            val db = getDb()
+            val prefix = if (isGroup) "group" else "user"
+            val convId = "$prefix:$targetId"
+            db.delete("messages", "account_id = ? AND conversation_id = ?", arrayOf(accountId, convId))
             true
         }.getOrDefault(false)
     }
 
     override fun clearAll(): Boolean {
-        if (!this::context.isInitialized) return false
+        if (!::context.isInitialized) return false
+
         return runCatching {
-            val folder = java.io.File(context.filesDir, HISTORY_DIR_NAME)
-            if (folder.exists()) {
-                folder.deleteRecursively()
-            }
+            val db = getDb()
+            db.delete("messages", null, null)
+            db.delete("seq_ids", null, null)
+            db.delete("pending_messages", null, null)
             true
         }.getOrDefault(false)
     }
 
     override fun saveConversationSeqIds(ids: Map<String, Long>) {
-        if (!this::context.isInitialized) return
+        if (!::context.isInitialized) return
+
         runCatching {
-            val prefs = context.getSharedPreferences("conversation_seq_ids", Context.MODE_PRIVATE)
-            val json = JSONObject()
-            ids.forEach { (key, value) -> json.put(key, value) }
-            prefs.edit().putString("seq_ids", json.toString()).apply()
+            val db = getDb()
+            db.beginTransaction()
+            try {
+                ids.forEach { (convId, seqId) ->
+                    val values = ContentValues().apply {
+                        put("account_id", "default")
+                        put("conversation_id", convId)
+                        put("seq_id", seqId)
+                    }
+                    db.insertWithOnConflict("seq_ids", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
         }.onFailure {
-            timber.log.Timber.w(it, "操作失败")
+            timber.log.Timber.w(it, "saveConversationSeqIds failed")
         }
     }
 
     override fun restoreConversationSeqIds(): Map<String, Long> {
-        if (!this::context.isInitialized) return emptyMap()
+        if (!::context.isInitialized) return emptyMap()
+
         return runCatching {
-            val prefs = context.getSharedPreferences("conversation_seq_ids", Context.MODE_PRIVATE)
-            val jsonStr = prefs.getString("seq_ids", null) ?: return@runCatching emptyMap()
-            val json = JSONObject(jsonStr)
-            val result = mutableMapOf<String, Long>()
-            json.keys().forEach { key ->
-                result[key] = json.optLong(key, 0L)
+            val db = getDb()
+            val cursor = db.rawQuery(
+                "SELECT conversation_id, seq_id FROM seq_ids WHERE account_id = 'default'",
+                null
+            )
+            cursor.use {
+                val result = mutableMapOf<String, Long>()
+                while (it.moveToNext()) {
+                    result[it.getString(0)] = it.getLong(1)
+                }
+                result
             }
-            result
         }.getOrDefault(emptyMap())
     }
 
-    // 内部方法
+    override fun savePendingMessages(privatePending: List<Message>, groupPending: List<GroupMessage>) {
+        if (!::context.isInitialized) return
 
-    private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
         runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            val array = JSONArray()
-            messages.takeLast(500).forEach { // 只保留最近500条
-                array.put(messageToJson(it))
+            val db = getDb()
+            db.beginTransaction()
+            try {
+                // 先清除旧的待发送消息
+                db.delete("pending_messages", "status = 'pending'", null)
+
+                privatePending.forEach { msg ->
+                    val values = ContentValues().apply {
+                        put("message_id", msg.messageId)
+                        put("account_id", "default")
+                        put("conversation_id", "user:${minOf(msg.senderId, msg.receiverId)}:${maxOf(msg.senderId, msg.receiverId)}")
+                        put("message_type", "private")
+                        put("payload", msg.message)
+                    }
+                    db.insertWithOnConflict("pending_messages", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                }
+
+                groupPending.forEach { msg ->
+                    val values = ContentValues().apply {
+                        put("message_id", msg.messageId)
+                        put("account_id", "default")
+                        put("conversation_id", "group:${msg.groupId}")
+                        put("message_type", "group")
+                        put("payload", msg.text)
+                    }
+                    db.insertWithOnConflict("pending_messages", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                }
+
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
             }
-            file.writeText(array.toString())
         }.onFailure {
-            timber.log.Timber.w(it, "操作失败")
+            timber.log.Timber.w(it, "savePendingMessages failed")
         }
     }
 
-    private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean): List<Any> {
+    override fun restorePendingMessages(): Pair<List<Message>, List<GroupMessage>> {
+        if (!::context.isInitialized) return Pair(emptyList(), emptyList())
+
         return runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            if (!file.exists()) return emptyList()
-            val text = file.readText()
-            if (text.isBlank()) return emptyList()
-            val array = JSONArray(text)
-            val records = mutableListOf<Any>()
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                records.add(jsonToMessage(item, isGroup))
+            val db = getDb()
+            val cursor = db.rawQuery(
+                "SELECT * FROM pending_messages WHERE status = 'pending'",
+                null
+            )
+            cursor.use {
+                val privateList = mutableListOf<Message>()
+                val groupList = mutableListOf<GroupMessage>()
+
+                while (it.moveToNext()) {
+                    val type = it.getString(it.getColumnIndexOrThrow("message_type"))
+                    val payload = it.getString(it.getColumnIndexOrThrow("payload")) ?: ""
+                    val convId = it.getString(it.getColumnIndexOrThrow("conversation_id")) ?: ""
+
+                    if (type == "private") {
+                        val parts = convId.removePrefix("user:").split(":")
+                        val receiverId = parts.getOrElse(1) { "0" }.toIntOrNull() ?: 0
+                        privateList.add(Message(
+                            senderId = 0,
+                            receiverId = receiverId,
+                            message = payload,
+                            timestamp = System.currentTimeMillis(),
+                            isSent = true,
+                            messageId = it.getString(it.getColumnIndexOrThrow("message_id")) ?: ""
+                        ))
+                    } else if (type == "group") {
+                        val groupId = convId.removePrefix("group:").toIntOrNull() ?: 0
+                        groupList.add(GroupMessage(
+                            groupId = groupId,
+                            senderName = "",
+                            text = payload,
+                            senderId = 0,
+                            timestamp = System.currentTimeMillis(),
+                            isSent = true,
+                            messageId = it.getString(it.getColumnIndexOrThrow("message_id")) ?: ""
+                        ))
+                    }
+                }
+                Pair(privateList, groupList)
             }
-            records
-        }.getOrElse {
-            timber.log.Timber.w(it, "操作失败")
-            emptyList()
-        }
+        }.getOrDefault(Pair(emptyList(), emptyList()))
     }
 
-    private fun getHistoryFile(accountId: String, targetId: String, isGroup: Boolean): File {
-        val folder = File(context.filesDir, HISTORY_DIR_NAME)
-        if (!folder.exists()) {
-            folder.mkdirs()
-        }
-        val safeAccountId = accountId.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        val accountFolder = File(folder, safeAccountId)
-        if (!accountFolder.exists()) {
-            accountFolder.mkdirs()
-        }
-        val prefix = if (isGroup) "group" else "private"
-        return File(accountFolder, "${prefix}_${targetId}.json")
-    }
+    override fun clearPendingMessages() {
+        if (!::context.isInitialized) return
 
-    private fun getAccountDir(accountId: String): File {
-        val folder = File(context.filesDir, HISTORY_DIR_NAME)
-        if (!folder.exists()) {
-            folder.mkdirs()
-        }
-        val safeAccountId = accountId.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        return File(folder, safeAccountId)
-    }
-
-    private fun messageToJson(message: Message): JSONObject {
-        return JSONObject().apply {
-            put("senderId", message.senderId)
-            put("receiverId", message.receiverId)
-            put("content", message.message)
-            put("sender", message.sender)
-            put("timestamp", message.timestamp)
-            put("isSent", message.isSent)
-            put("messageId", message.messageId)
-            put("replyToMessageId", message.replyToMessageId)
-            put("replyToContent", message.replyToContent)
-            put("replyToSender", message.replyToSender)
-            put("messageType", message.messageType.name)
-            put("fileUrl", message.fileUrl)
-            put("fileName", message.fileName)
-            put("fileSize", message.fileSize)
-        }
-    }
-
-    private fun jsonToMessage(json: JSONObject, isGroup: Boolean): Any {
-        val messageType = try {
-            MessageType.valueOf(json.optString("messageType", "TEXT"))
-        } catch (_: Exception) {
-            MessageType.TEXT
-        }
-
-        return if (isGroup) {
-            GroupMessage(
-                groupId = json.optInt("receiverId", 0).let { if (it < 0) -it else it },
-                senderName = json.optString("senderName", "未知用户"),
-                text = json.optString("content", ""),
-                senderId = json.optInt("senderId", 0),
-                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
-                isSent = json.optBoolean("isSent", true),
-                messageId = json.optString("messageId", ""),
-                replyToMessageId = json.optString("replyToMessageId").takeIf { it.isNotEmpty() },
-                replyToContent = json.optString("replyToContent").takeIf { it.isNotEmpty() },
-                replyToSender = json.optString("replyToSender").takeIf { it.isNotEmpty() },
-                messageType = messageType,
-                fileUrl = json.optString("fileUrl").takeIf { it.isNotEmpty() },
-                fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
-                fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
-            )
-        } else {
-            Message(
-                senderId = json.optInt("senderId", 0),
-                receiverId = json.optInt("receiverId", 0),
-                message = json.optString("content", ""),
-                sender = json.optBoolean("sender", false),
-                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
-                isSent = json.optBoolean("isSent", true),
-                messageId = json.optString("messageId", ""),
-                replyToMessageId = json.optString("replyToMessageId").takeIf { it.isNotEmpty() },
-                replyToContent = json.optString("replyToContent").takeIf { it.isNotEmpty() },
-                replyToSender = json.optString("replyToSender").takeIf { it.isNotEmpty() },
-                messageType = messageType,
-                fileUrl = json.optString("fileUrl").takeIf { it.isNotEmpty() },
-                fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
-                fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
-            )
+        runCatching {
+            val db = getDb()
+            db.delete("pending_messages", null, null)
         }
     }
 }

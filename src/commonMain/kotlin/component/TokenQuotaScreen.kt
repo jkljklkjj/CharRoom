@@ -20,6 +20,7 @@ import core.state.GlobalAppState
 import core.getTokenQuota
 import core.getTokenPrices
 import core.purchaseTokens
+import core.confirmPurchase
 import model.QuotaInfo
 import model.TokenPrices
 // QR code library removed for Android compatibility
@@ -273,7 +274,7 @@ private suspend fun confirmPay(purchaseId: Long, token: String, scope: kotlinx.c
     if (purchaseId <= 0) return
     try {
         withContext(Dispatchers.IO) {
-            core.confirmPurchase(token, purchaseId)
+            confirmPurchase(token, purchaseId)
         }
         // 刷新页面
         scope.launch {

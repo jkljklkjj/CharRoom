@@ -43,6 +43,10 @@ object ApiEndpoints {
     // Messages
     const val OFFLINE = "/messages/offline"
     const val SYNC_MESSAGES = "/sync/messages"
+    const val SYNC_GLOBAL = "/sync/global"
+    const val SYNC_READ = "/sync/read"
+    const val SYNC_READ_STATUS = "/sync/read/status"
+    const val SYNC_DEVICES = "/sync/devices"
 
     // Agent
     const val AGENT_NL = "/agent/nl"
