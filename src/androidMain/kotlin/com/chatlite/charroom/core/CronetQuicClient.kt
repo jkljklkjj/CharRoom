@@ -360,26 +360,31 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         }
                         MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
                             val stream = wrapper.agentStream
-                            val dedupKey = if (stream.done) stream.messageId
-                                else "${stream.messageId}:${stream.chunk.hashCode()}"
+                            val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
+                            val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
+                            val text = if (stream.hasText()) stream.text else ""
+                            // 去重：done 按 requestId；chunk 按 requestId + seq（seq 为服务端流内递增序号）。
+                            // 不能用文本内容哈希去重 —— 合法的重复 token（如“！！”）会被误删。
+                            val dedupKey = if (isDone) stream.requestId
+                                else "${stream.requestId}:${stream.seq}"
                             if (isDuplicateMessage(dedupKey)) return@forEach
-                            if (stream.done) {
-                                sendAck(stream.messageId, "agent")
+                            if (isDone) {
+                                sendAck(stream.requestId, "agent")
                             }
                             val handler = agentStreamHandler
                             if (handler != null) {
                                 handler.onAgentStreamChunk(
-                                    messageId = stream.messageId,
-                                    fullContent = stream.chunk,
-                                    done = stream.done,
-                                    error = stream.error
+                                    messageId = stream.requestId,
+                                    fullContent = text,
+                                    done = isDone,
+                                    error = isError
                                 )
                             } else {
                                 listener.onAgentStreamChunk(
-                                    messageId = stream.messageId,
-                                    fullContent = stream.chunk,
-                                    done = stream.done,
-                                    error = stream.error
+                                    messageId = stream.requestId,
+                                    fullContent = text,
+                                    done = isDone,
+                                    error = isError
                                 )
                             }
                         }

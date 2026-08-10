@@ -57,6 +57,8 @@ message AgentStreamChunk {
     AgentStreamType type = 1;
     string request_id = 2;      // 关联的请求 ID
     string trace_id = 3;        // 链路追踪 ID
+    int32 seq = 4;              // 流内递增序号（客户端按 request_id + seq 去重，
+                                // 不能按内容哈希去重——合法的重复 token 如“！！”会被误删）
 
     oneof payload {
         string text = 10;                   // type=TEXT

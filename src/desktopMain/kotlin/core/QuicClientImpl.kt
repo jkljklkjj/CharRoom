@@ -256,9 +256,10 @@ class QuicClientImpl : ChatTransport {
                                 val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
                                 val text = if (stream.hasText()) stream.text else ""
 
-                                // 去重：done 按 requestId，chunk 按 requestId+contentHash
+                                // 去重：done 按 requestId；chunk 按 requestId + seq（seq 为服务端流内递增序号）。
+                                // 不能用文本内容哈希去重 —— 合法的重复 token（如“！！”）会被误删。
                                 val dedupKey = if (isDone) stream.requestId
-                                else "${stream.requestId}:${text.hashCode()}"
+                                else "${stream.requestId}:${stream.seq}"
                                 if (isDuplicateMessage(dedupKey)) {
                                     log.debug("重复 Agent 流跳过: requestId={}, done={}", stream.requestId, isDone)
                                     return@forEach
@@ -400,7 +401,6 @@ class QuicClientImpl : ChatTransport {
                         MsgType.CHAT -> "private"
                         MsgType.GROUP_CHAT -> "group"
                         MsgType.AGENT_CHAT -> "agent"
-                        else -> "private"
                     }
                     val checkMsg = com.chatlite.proto.MessageProtos.CheckMessage.newBuilder()
                         .setTargetClientId("$convType:$targetId")
