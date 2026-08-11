@@ -258,19 +258,19 @@ class QuicClientImpl : ChatTransport {
 
                                 // 去重：done 按 requestId；chunk 按 requestId + seq（seq 为服务端流内递增序号）。
                                 // 不能用文本内容哈希去重 —— 合法的重复 token（如“！！”）会被误删。
-                                val dedupKey = if (isDone) stream.requestId
+                                val dedupKey = if (isDone) stream.requestId.toString()
                                 else "${stream.requestId}:${stream.seq}"
                                 if (isDuplicateMessage(dedupKey)) {
                                     log.debug("重复 Agent 流跳过: requestId={}, done={}", stream.requestId, isDone)
                                     return@forEach
                                 }
                                 if (isDone) {
-                                    sendAckToServer(streamId, stream.requestId, "agent")
+                                    sendAckToServer(streamId, stream.requestId.toString(), "agent")
                                 }
                                 // 优先使用独立 handler（绕过 listener 遍历）
                                 val handler = agentStreamHandler
                                 handler?.onAgentStreamChunk(
-                                    messageId = stream.requestId,
+                                    messageId = stream.requestId.toString(),
                                     fullContent = text,
                                     done = isDone,
                                     error = isError

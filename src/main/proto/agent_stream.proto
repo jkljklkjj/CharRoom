@@ -55,8 +55,8 @@ message StreamError {
 // ============================================================
 message AgentStreamChunk {
     AgentStreamType type = 1;
-    string request_id = 2;      // 关联的请求 ID
-    string trace_id = 3;        // 链路追踪 ID
+    int64 request_id = 2;       // 关联的请求 ID（毫秒时间戳，varint 编码 6B；原 string 13B+）
+    string trace_id = 3;        // 链路追踪 ID（仅 DONE/ERROR/USAGE 等控制类消息携带，TEXT 块不传以瘦身）
     int32 seq = 4;              // 流内递增序号（客户端按 request_id + seq 去重，
                                 // 不能按内容哈希去重——合法的重复 token 如“！！”会被误删）
 

@@ -365,23 +365,23 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                             val text = if (stream.hasText()) stream.text else ""
                             // 去重：done 按 requestId；chunk 按 requestId + seq（seq 为服务端流内递增序号）。
                             // 不能用文本内容哈希去重 —— 合法的重复 token（如“！！”）会被误删。
-                            val dedupKey = if (isDone) stream.requestId
+                            val dedupKey = if (isDone) stream.requestId.toString()
                                 else "${stream.requestId}:${stream.seq}"
                             if (isDuplicateMessage(dedupKey)) return@forEach
                             if (isDone) {
-                                sendAck(stream.requestId, "agent")
+                                sendAck(stream.requestId.toString(), "agent")
                             }
                             val handler = agentStreamHandler
                             if (handler != null) {
                                 handler.onAgentStreamChunk(
-                                    messageId = stream.requestId,
+                                    messageId = stream.requestId.toString(),
                                     fullContent = text,
                                     done = isDone,
                                     error = isError
                                 )
                             } else {
                                 listener.onAgentStreamChunk(
-                                    messageId = stream.requestId,
+                                    messageId = stream.requestId.toString(),
                                     fullContent = text,
                                     done = isDone,
                                     error = isError
