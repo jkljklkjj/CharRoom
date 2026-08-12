@@ -6,6 +6,9 @@ import { saveToQueue, getAllPending, removeMessage, incrementRetry, MAX_RETRIES 
 import { getDeviceId, getDeviceType } from '../utils/device'
 
 // ── 消息类型（与 message.proto MessageWrapperType 枚举值一致）────
+// 设备类型数字映射（与 message.proto DeviceType 枚举值一致）
+export const DEVICE_TYPE_NUM = { mobile: 1, desktop: 2, web: 3, cli: 4 }
+
 export const MSG_TYPE = {
   LOGIN: 1, LOGOUT: 2, CHAT: 3, GROUP_CHAT: 4, AGENT_CHAT: 5,
   AGENT_CHAT_STREAM: 6, CHECK: 7, HEARTBEAT: 8, ACK: 9,
@@ -174,7 +177,7 @@ async function sendLogin(token) {
       type: MSG_TYPE.LOGIN,
       login: {
         token: token,
-        deviceType: getDeviceType(),
+        deviceType: DEVICE_TYPE_NUM[getDeviceType()] ?? 0,
         deviceId: getDeviceId()
       }
     })

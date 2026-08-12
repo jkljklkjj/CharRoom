@@ -8,7 +8,7 @@ import com.chatlite.proto.MessageProtos
 fun buildLoginPayload(token: String?, deviceType: String = ServerConfig.DEVICE_TYPE, deviceId: String = generateDeviceId()): ByteArray {
     val login = MessageProtos.LoginMessage.newBuilder()
         .setToken(token ?: "")
-        .setDeviceType(deviceType)
+        .setDeviceType(deviceType.toProtoEnum())
         .setDeviceId(deviceId)
         .build()
     return MessageProtos.MessageWrapper.newBuilder()
@@ -210,4 +210,14 @@ fun buildAckPayload(messageId: String): ByteArray {
         .setAck(ack)
         .build()
         .toByteArray()
+}
+
+
+/** 设备类型字符串 → proto wire 枚举（未知类型返回 UNSPECIFIED，服务端按未指定处理） */
+fun String.toProtoEnum(): MessageProtos.DeviceType = when (lowercase()) {
+    "mobile" -> MessageProtos.DeviceType.MOBILE
+    "desktop" -> MessageProtos.DeviceType.DESKTOP
+    "web" -> MessageProtos.DeviceType.WEB
+    "cli" -> MessageProtos.DeviceType.CLI
+    else -> MessageProtos.DeviceType.DEVICE_TYPE_UNSPECIFIED
 }

@@ -15,10 +15,19 @@ enum MessageType {
     FILE = 2;  // 文件消息
 }
 
+// 设备类型枚举（wire 层枚举化，替代字符串 device_type）
+enum DeviceType {
+    DEVICE_TYPE_UNSPECIFIED = 0;
+    MOBILE = 1;
+    DESKTOP = 2;
+    WEB = 3;
+    CLI = 4;
+}
+
 // 登录消息
 message LoginMessage {
     string token = 1;           // 登录凭证token，后端解析获取用户信息
-    string device_type = 2;     // 设备类型：mobile / desktop / web / cli
+    DeviceType device_type = 2; // 设备类型：mobile / desktop / web / cli
     string device_id = 3;       // 设备唯一标识
 }
 
