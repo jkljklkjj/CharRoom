@@ -192,7 +192,8 @@ fun buildGroupChatPayload(
  */
 fun buildCheckPayload(targetClientId: String): ByteArray {
     val check = MessageProtos.CheckMessage.newBuilder()
-        .setTargetClientId(targetClientId)
+        .setConversationType(MessageProtos.ConversationType.PRIVATE)
+        .setTargetClientId(targetClientId.toLong())
         .build()
     return MessageProtos.MessageWrapper.newBuilder()
         .setType(MessageProtos.MessageWrapperType.CHECK)

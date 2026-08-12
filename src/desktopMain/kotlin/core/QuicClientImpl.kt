@@ -403,8 +403,14 @@ class QuicClientImpl : ChatTransport {
                         MsgType.GROUP_CHAT -> "group"
                         MsgType.AGENT_CHAT -> "agent"
                     }
+                    val convTypeProto = when (convType) {
+                        "group" -> com.chatlite.proto.MessageProtos.ConversationType.GROUP
+                        "agent" -> com.chatlite.proto.MessageProtos.ConversationType.AGENT
+                        else -> com.chatlite.proto.MessageProtos.ConversationType.PRIVATE
+                    }
                     val checkMsg = com.chatlite.proto.MessageProtos.CheckMessage.newBuilder()
-                        .setTargetClientId("$convType:$targetId")
+                        .setConversationType(convTypeProto)
+                        .setTargetClientId(targetId.toLong())
                         .build()
                     val initWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
                         .setType(MessageProtos.MessageWrapperType.CHECK)

@@ -98,9 +98,18 @@ message AgentChatMessage {
     repeated ClientAction clientActions = 5; // 可选的行为序列
 }
 
+// 会话类型枚举
+enum ConversationType {
+    CONVERSATION_TYPE_UNSPECIFIED = 0;
+    PRIVATE = 1;  // 单聊
+    GROUP = 2;    // 群聊
+    AGENT = 3;    // Agent 助手
+}
+
 // 检查在线状态消息
 message CheckMessage {
-    string targetClientId = 1;  // 要检查的客户端ID
+    ConversationType conversation_type = 1;  // 会话类型
+    int64 target_client_id = 2;              // 目标 ID（用户/群组/Agent）
 }
 
 // 心跳消息

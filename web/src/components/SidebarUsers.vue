@@ -137,7 +137,8 @@ function select(u) {
     chatSocket.sendWrapper({
       type: MSG_TYPE.CHECK,
       check: {
-        targetClientId: u.id.toString()
+        conversationType: 1, // PRIVATE
+        targetClientId: u.id
       }
     }).catch(err => {
       console.warn('Failed to query online status:', err)
