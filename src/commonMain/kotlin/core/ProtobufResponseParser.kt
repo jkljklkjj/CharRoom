@@ -15,8 +15,8 @@ fun parseProtoResponse(bytes: ByteArray): ApiUnwrap {
     try {
         val wrapper = MessageProtos.MessageWrapper.parseFrom(bytes)
         val node = mapper.createObjectNode()
-        node.put("type", wrapper.type)
-        AppLog.i { "Parsed MessageWrapper with type: ${wrapper.type}" }
+        node.put("type", wrapper.type.name)
+        AppLog.i { "Parsed MessageWrapper with type: ${wrapper.type.name}" }
 
         when (wrapper.payloadCase) {
             MessageProtos.MessageWrapper.PayloadCase.LOGIN -> {

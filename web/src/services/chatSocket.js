@@ -2,13 +2,19 @@ import { encodeMessage, decodeMessage } from '../proto'
 import DOMPurify from 'dompurify'
 import i18n from '../i18n'
 import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
-import { saveToQueue, getAllPending, removeMessage, clearQueue } from './offlineQueue'
+import { saveToQueue, getAllPending, removeMessage, incrementRetry, MAX_RETRIES } from './offlineQueue'
 import { getDeviceId, getDeviceType } from '../utils/device'
+
+// ── 消息类型（与 message.proto MessageWrapperType 枚举值一致）────
+export const MSG_TYPE = {
+  LOGIN: 1, LOGOUT: 2, CHAT: 3, GROUP_CHAT: 4, AGENT_CHAT: 5,
+  AGENT_CHAT_STREAM: 6, CHECK: 7, HEARTBEAT: 8, ACK: 9,
+  RESPONSE: 10, STREAM_INIT_ACK: 11, SYNC_HINT: 12, FRIEND_ACCEPTED: 13
+}
 
 // ── 内部变量 ────────────────────────────────────
 
 let transport = null          // ChatTransport 实例
-let pendingQueue = []
 let handlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerror: () => {} }
 let reconnectTimer = null
 let heartbeatTimer = null
@@ -20,11 +26,8 @@ let heartbeatTimeout = 10000  // 心跳超时10秒
 let currentReconnectDelay = 1000
 let lastHeartbeatResponseTime = 0
 let maxReconnectDelay = 30000
-let isReconnecting = false
 let stopReconnect = false
 let currentUserId = null
-let loggedIn = false
-const MAX_QUEUE_SIZE = 1000
 const MAX_MESSAGE_CACHE = 1000
 // 消息去重：Map<messageId, timestamp>，带 TTL 自动过期
 const messageCache = new Map()
@@ -32,14 +35,7 @@ const MESSAGE_TTL = 5 * 60 * 1000 // 5 分钟 TTL
 
 // 乐观 UI：待确认消息跟踪 Map<messageId, { sendTime, warned, failed }>
 const pendingAcks = new Map()
-const ACK_CONFIRM_MS = 8000   // 0-8s: 已发送（乐观）
 const ACK_TIMEOUT_MS = 16000  // 8-16s: 发送中 → 16s+: 失败
-
-// 优先级队列：多个队列按优先级处理
-const PRIORITY_HIGH = 0   // ACK
-const PRIORITY_NORMAL = 1 // 聊天消息
-const PRIORITY_LOW = 2    // 心跳
-const priorityQueues = { [PRIORITY_HIGH]: [], [PRIORITY_NORMAL]: [], [PRIORITY_LOW]: [] }
 
 // ── Store 引用（依赖注入，替代 window.__chatStore） ──
 
@@ -126,7 +122,6 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
   // 设置事件回调
   transport.onopen = () => {
     console.debug('✅ 连接成功')
-    isReconnecting = false
     currentReconnectDelay = 1000
 
     // 启动定时器（连接生命周期内）
@@ -149,8 +144,6 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
   transport.onclose = (event) => {
     console.debug('❌ 连接关闭')
     stopHeartbeat()
-    // 重置重连标记，防止永久锁死（onclose 可能在 connect().catch() 之前触发）
-    isReconnecting = false
 
     if (!stopReconnect) {
       scheduleReconnect(hostname, port, token, currentUserId)
@@ -178,7 +171,7 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
 async function sendLogin(token) {
   try {
     const result = await sendWrapper({
-      type: 'login',
+      type: MSG_TYPE.LOGIN,
       login: {
         token: token,
         deviceType: getDeviceType(),
@@ -196,16 +189,12 @@ async function sendLogin(token) {
  */
 export async function sendWrapper(wrapperObj) {
   if (!transport || !transport.isConnected()) {
-    // 未连接时：存入内存队列 + IndexedDB 持久化
-    if (pendingQueue.length < MAX_QUEUE_SIZE) {
+    // 未连接时：持久化到 IndexedDB 离线队列，重连后由 flushOfflineQueue 重发
+    if (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT) {
       const buffer = await encodeMessage(wrapperObj)
-      pendingQueue.push({ buffer, wrapperObj })
-      // 持久化到 IndexedDB（PWA 离线场景）
-      if (wrapperObj.type === 'chat' || wrapperObj.type === 'group_chat') {
-        saveToQueue(wrapperObj, buffer, {}).catch(e =>
-          console.warn('[OfflineQueue] 保存到 IndexedDB 失败:', e)
-        )
-      }
+      saveToQueue(wrapperObj, buffer, {}).catch(e =>
+        console.warn('[OfflineQueue] 保存到 IndexedDB 失败:', e)
+      )
     }
     return false
   }
@@ -231,7 +220,7 @@ export async function sendWrapper(wrapperObj) {
   const sent = transport.send(buffer, { streamType, conversationId })
 
   // 乐观 UI：跟踪待确认消息（私聊 + 群聊）
-  if (sent && msgId && (wrapperObj.type === 'chat' || wrapperObj.type === 'group_chat')) {
+  if (sent && msgId && (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT)) {
     pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
     // 发送成功，从 IndexedDB 离线队列中移除
     removeMessage(msgId).catch(e => console.warn('[OfflineQueue] 移除消息失败:', e))
@@ -245,10 +234,10 @@ export async function sendWrapper(wrapperObj) {
  */
 function getStreamType(wrapperObj) {
   const type = wrapperObj.type
-  if (type === 'ack' || type === 'heartbeat' || type === 'login' || type === 'logout') {
+  if (type === MSG_TYPE.ACK || type === MSG_TYPE.HEARTBEAT || type === MSG_TYPE.LOGIN || type === MSG_TYPE.LOGOUT) {
     return 'control'
   }
-  if (type === 'chat' || type === 'group_chat' || type === 'agent_chat') {
+  if (type === MSG_TYPE.CHAT || type === MSG_TYPE.GROUP_CHAT || type === MSG_TYPE.AGENT_CHAT) {
     return 'chat'
   }
   return 'control'
@@ -269,27 +258,6 @@ function resolveConversationId(wrapperObj) {
   return ''
 }
 
-function flushQueue() {
-  const total = Object.values(priorityQueues).reduce((sum, q) => sum + q.length, 0)
-  if (total === 0) return
-
-  console.debug('发送队列中的消息，共', total, '条')
-  for (const priority of [PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW]) {
-    const queue = priorityQueues[priority]
-    while (queue.length > 0) {
-      const entry = queue.shift()
-      if (transport && transport.isConnected()) {
-        transport.send(entry.buffer, entry.streamOptions)
-      } else {
-        if (priority <= PRIORITY_NORMAL) {
-          queue.unshift(entry)
-        }
-        break
-      }
-    }
-  }
-}
-
 /**
  * 刷新 IndexedDB 离线队列：网络恢复后自动重发离线消息。
  */
@@ -300,8 +268,16 @@ async function flushOfflineQueue() {
 
     console.debug(`[OfflineQueue] 发送离线队列中的 ${pending.length} 条消息`)
     for (const entry of pending) {
+      // 超过最大重试次数直接丢弃，避免无限重发
+      if (entry.retryCount >= MAX_RETRIES) {
+        console.warn(`[OfflineQueue] 丢弃超出重试上限的消息: ${entry.messageId} (retryCount=${entry.retryCount})`)
+        await removeMessage(entry.messageId)
+        continue
+      }
       try {
-        const buffer = new Uint8Array(entry.buffer).buffer
+        // 兼容旧版普通数组条目（迁移前 Array.from 存储）与新 Uint8Array 条目
+        const u8 = entry.buffer instanceof Uint8Array ? entry.buffer : new Uint8Array(entry.buffer)
+        const buffer = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)
         const streamType = entry.opts?.streamType || getStreamType(entry.wrapperObj)
         const conversationId = entry.opts?.conversationId || resolveConversationId(entry.wrapperObj)
 
@@ -313,6 +289,7 @@ async function flushOfflineQueue() {
         }
       } catch (e) {
         console.warn('[OfflineQueue] 发送失败:', entry.messageId, e)
+        await incrementRetry(entry.messageId)
       }
     }
   } catch (e) {
@@ -326,7 +303,7 @@ async function flushOfflineQueue() {
 export async function sendAck(messageId) {
   if (!currentUserId || !messageId) return false
   return sendWrapper({
-    type: 'ack',
+    type: MSG_TYPE.ACK,
     ack: { messageId: messageId }
   })
 }
@@ -348,12 +325,8 @@ export function close() {
     transport = null
   }
 
-  pendingQueue = []
-  Object.values(priorityQueues).forEach(q => q.length = 0)
-  messageCache.clear()
   pendingAcks.clear()
   currentUserId = null
-  loggedIn = false
 }
 
 export function readyState() {
@@ -381,7 +354,7 @@ function startHeartbeat() {
     const now = Date.now()
     recordHeartbeatSent(now)
     sendWrapper({
-      type: 'heartbeat',
+      type: MSG_TYPE.HEARTBEAT,
       heartbeat: { timestamp: now }
     }).catch(e => {
       console.warn('心跳发送失败:', e)
@@ -408,16 +381,12 @@ function stopHeartbeat() {
 function scheduleReconnect(hostname, port, token, userId) {
   if (reconnectTimer) clearTimeout(reconnectTimer)
 
-  isReconnecting = true
   console.debug(`将在 ${currentReconnectDelay}ms 后尝试重连...`)
 
   reconnectTimer = setTimeout(() => {
     if (!stopReconnect) {
       connect(hostname, port, token, userId, handlers).catch(e => {
         console.warn('重连失败:', e)
-      }).finally(() => {
-        // 无论成功失败，都重置 isReconnecting（成功时 onopen 也会重置）
-        isReconnecting = false
       })
       // 指数退避 + jitter 随机化，避免重连风暴
       currentReconnectDelay = Math.min(
@@ -457,13 +426,7 @@ async function handleMessage(rawData) {
     const isSuccess = processedData.success
       || (processedData.response && processedData.response.success)
     if (isSuccess !== undefined) {
-      if (isSuccess) {
-        // 仅在首次登录成功时刷新队列，避免心跳/ACK 等响应触发 flush
-        if (!loggedIn) {
-          loggedIn = true
-          flushQueue()
-        }
-      } else {
+      if (!isSuccess) {
         const msg = (processedData.response ? processedData.response.message : processedData.message || '').toLowerCase()
         if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
           console.debug('🔑 认证失败，停止重连')
@@ -475,13 +438,13 @@ async function handleMessage(rawData) {
     }
 
     // 心跳/ACK 响应
-    if (processedData.type === 'heartbeat'
+    if (processedData.type === MSG_TYPE.HEARTBEAT
         || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
       lastHeartbeatResponseTime = Date.now()
       return
     }
     // ACK 确认：更新消息状态 + seqId 游标 + RTT 测量
-    if (processedData.type === 'ack') {
+    if (processedData.type === MSG_TYPE.ACK) {
       lastHeartbeatResponseTime = Date.now()
       const ack = processedData.ack || processedData
 
@@ -504,7 +467,7 @@ async function handleMessage(rawData) {
 
     // sync_hint：服务端推送的增量同步提示，触发客户端拉取新消息
     // 格式：{ type: "sync_hint", ack: { clientId: conversationId, message: seqId } }
-    if (processedData.type === 'sync_hint') {
+    if (processedData.type === MSG_TYPE.SYNC_HINT) {
       const hint = processedData.ack || processedData
       const conversationId = hint.clientId
       const seqId = parseInt(hint.message, 10)
@@ -520,7 +483,7 @@ async function handleMessage(rawData) {
     }
 
     // 好友请求被接受通知
-    if (processedData.type === 'friend_accepted' && processedData.ack) {
+    if (processedData.type === MSG_TYPE.FRIEND_ACCEPTED && processedData.ack) {
       const accepterId = processedData.ack.clientId
       if (accepterId && handlers.onFriendAccepted) {
         handlers.onFriendAccepted(parseInt(accepterId))
@@ -528,14 +491,14 @@ async function handleMessage(rawData) {
     }
 
     // 新消息通知
-    if (processedData.type === 'chat' && processedData.chat) {
+    if (processedData.type === MSG_TYPE.CHAT && processedData.chat) {
       showNotification(processedData.chat)
-    } else if (processedData.type === 'group_chat' && processedData.groupChat) {
+    } else if (processedData.type === MSG_TYPE.GROUP_CHAT && processedData.groupChat) {
       showNotification(processedData.groupChat)
     }
 
     // 同步响应
-    if (processedData.type === 'response' && processedData.response) {
+    if (processedData.type === MSG_TYPE.RESPONSE && processedData.response) {
       // 传给上层
     }
   }

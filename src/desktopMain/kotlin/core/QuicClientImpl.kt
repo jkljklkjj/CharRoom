@@ -1,4 +1,5 @@
 package core
+import com.chatlite.proto.MessageProtos
 
 import kotlinx.coroutines.*
 import core.state.GlobalAppState
@@ -183,7 +184,7 @@ class QuicClientImpl : ChatTransport {
                     val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
                     log.debug("解析消息类型: type={}", wrapper.type)
                     when (wrapper.type) {
-                        MsgType.ACK.wire -> {
+                        MessageProtos.MessageWrapperType.ACK -> {
                             if (wrapper.hasAck()) {
                                 val ack = wrapper.ack
                                 val ackSeqId = ack.seqId
@@ -197,7 +198,7 @@ class QuicClientImpl : ChatTransport {
                             }
                             return@forEach
                         }
-                        MsgType.RESPONSE.wire -> {
+                        MessageProtos.MessageWrapperType.RESPONSE -> {
                             // 登录响应：提取 clientId 作为当前用户 ID
                             if (wrapper.hasResponse()) {
                                 val resp = wrapper.response
@@ -212,7 +213,7 @@ class QuicClientImpl : ChatTransport {
                             }
                             return@forEach
                         }
-                        MsgType.CHAT.wire -> {
+                        MessageProtos.MessageWrapperType.CHAT -> {
                             if (wrapper.hasChat()) {
                                 val chat = wrapper.chat
                                 if (isDuplicateMessage(chat.messageId)) {
@@ -230,7 +231,7 @@ class QuicClientImpl : ChatTransport {
                                 listener.onPrivateMessageReceived(senderId, text, ts, seqId, convId)
                             }
                         }
-                        MsgType.GROUP_CHAT.wire -> {
+                        MessageProtos.MessageWrapperType.GROUP_CHAT -> {
                             if (wrapper.hasGroupChat()) {
                                 val gc = wrapper.groupChat
                                 if (isDuplicateMessage(gc.messageId)) {
@@ -249,7 +250,7 @@ class QuicClientImpl : ChatTransport {
                                 listener.onGroupMessageReceived(groupId, senderId, senderName, text, ts, seqId, convId)
                             }
                         }
-                        MsgType.AGENT_CHAT_STREAM.wire -> {
+                        MessageProtos.MessageWrapperType.AGENT_CHAT_STREAM -> {
                             if (wrapper.hasAgentStream()) {
                                 val stream = wrapper.agentStream
                                 val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
@@ -277,7 +278,7 @@ class QuicClientImpl : ChatTransport {
                                 )
                             }
                         }
-                        MsgType.SYNC_HINT.wire -> {
+                        MessageProtos.MessageWrapperType.SYNC_HINT -> {
                             // sync_hint: 服务端通知有新消息，解析 conversationId + seqId
                             if (wrapper.hasAck()) {
                                 val ack = wrapper.ack
@@ -324,7 +325,7 @@ class QuicClientImpl : ChatTransport {
                 .setConversationId(conversationId)
                 .build()
             val ackWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
-                .setType(MsgType.ACK.wire)
+                .setType(MessageProtos.MessageWrapperType.ACK)
                 .setAck(ackMsg)
                 .build()
             val frame = QuicStreamProtocol.encodeFrame(ackWrapper.toByteArray())
@@ -406,7 +407,7 @@ class QuicClientImpl : ChatTransport {
                         .setTargetClientId("$convType:$targetId")
                         .build()
                     val initWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
-                        .setType(MsgType.CHECK.wire)
+                        .setType(MessageProtos.MessageWrapperType.CHECK)
                         .setCheck(checkMsg)
                         .build()
                     val initFrame = QuicStreamProtocol.encodeFrame(initWrapper.toByteArray())

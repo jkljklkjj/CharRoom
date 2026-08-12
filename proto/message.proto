@@ -118,8 +118,26 @@ message AckMessage {
 }
 
 // 通用消息包装器
+// 信封路由类型枚举：替代 string type（类型安全 + 契约收敛，前后端 proto 自动生成）
+enum MessageWrapperType {
+    MESSAGE_WRAPPER_TYPE_UNSPECIFIED = 0;
+    LOGIN = 1;
+    LOGOUT = 2;
+    CHAT = 3;
+    GROUP_CHAT = 4;
+    AGENT_CHAT = 5;
+    AGENT_CHAT_STREAM = 6;
+    CHECK = 7;
+    HEARTBEAT = 8;
+    ACK = 9;
+    RESPONSE = 10;
+    STREAM_INIT_ACK = 11;
+    SYNC_HINT = 12;
+    FRIEND_ACCEPTED = 13;
+}
+
 message MessageWrapper {
-    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout, agentChatStream, ack, response
+    MessageWrapperType type = 1;  // 信封路由类型
 
     oneof payload {
         LoginMessage login = 2;

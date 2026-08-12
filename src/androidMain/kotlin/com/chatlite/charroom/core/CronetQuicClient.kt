@@ -1,4 +1,5 @@
 package com.chatlite.charroom.core
+import com.chatlite.proto.MessageProtos
 
 import android.content.Context
 import core.*
@@ -306,7 +307,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
             synchronized(messageListeners) {
                 messageListeners.forEach { listener ->
                     when (wrapper.type) {
-                        MsgType.RESPONSE.wire -> {
+                        MessageProtos.MessageWrapperType.RESPONSE -> {
                             if (wrapper.hasResponse()) {
                                 val resp = wrapper.response
                                 if (resp.success && resp.clientId.isNotBlank()) {
@@ -316,7 +317,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 }
                             }
                         }
-                        MsgType.CHAT.wire -> if (wrapper.hasChat()) {
+                        MessageProtos.MessageWrapperType.CHAT -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
                             if (isDuplicateMessage(chat.messageId)) return@forEach
                             sendAck(chat.messageId, "chat")
@@ -328,7 +329,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 conversationId = chat.conversationId
                             )
                         }
-                        MsgType.GROUP_CHAT.wire -> if (wrapper.hasGroupChat()) {
+                        MessageProtos.MessageWrapperType.GROUP_CHAT -> if (wrapper.hasGroupChat()) {
                             val gc = wrapper.groupChat
                             if (isDuplicateMessage(gc.messageId)) return@forEach
                             sendAck(gc.messageId, "group:${gc.targetClientId}")
@@ -342,7 +343,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 conversationId = gc.conversationId
                             )
                         }
-                        MsgType.AGENT_CHAT.wire -> if (wrapper.hasChat()) {
+                        MessageProtos.MessageWrapperType.AGENT_CHAT -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
                             listener.onPrivateMessageReceived(
                                 senderId = chat.userId.toIntOrNull() ?: 0,
@@ -350,7 +351,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 timestamp = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis()
                             )
                         }
-                        MsgType.ACK.wire -> if (wrapper.hasAck()) {
+                        MessageProtos.MessageWrapperType.ACK -> if (wrapper.hasAck()) {
                             val ack = wrapper.ack
                             if (ack.conversationId.isNotBlank() && ack.seqId > 0) {
                                 scope.launch {
@@ -358,7 +359,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 }
                             }
                         }
-                        MsgType.AGENT_CHAT_STREAM.wire -> if (wrapper.hasAgentStream()) {
+                        MessageProtos.MessageWrapperType.AGENT_CHAT_STREAM -> if (wrapper.hasAgentStream()) {
                             val stream = wrapper.agentStream
                             val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
                             val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
@@ -405,7 +406,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                 .setConversationId(conversationId)
                 .build()
             val ackWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
-                .setType(MsgType.ACK.wire)
+                .setType(MessageProtos.MessageWrapperType.ACK)
                 .setAck(ackMsg)
                 .build()
             sendInternal(ackWrapper.toByteArray())

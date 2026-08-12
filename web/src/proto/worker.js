@@ -32,7 +32,7 @@ async function loadProto() {
 loadProto()
 
 self.onmessage = async function(e) {
-  const { type, id, payload, transfer } = e.data
+  const { type, id, payload } = e.data
 
   try {
     if (type === 'encode') {
