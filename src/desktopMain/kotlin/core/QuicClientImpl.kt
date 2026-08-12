@@ -220,9 +220,9 @@ class QuicClientImpl : ChatTransport {
                                     log.debug("重复消息跳过: messageId={}", chat.messageId)
                                     return@forEach
                                 }
-                                val senderId = chat.userId.toIntOrNull() ?: return@forEach
+                                val senderId = chat.userId.toInt()
                                 val text = chat.content
-                                val ts = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                                val ts = chat.timestamp
                                 val seqId = chat.seqId
                                 val convId = chat.conversationId
                                 val myId = GlobalAppState.currentUserId ?: 0
@@ -238,8 +238,8 @@ class QuicClientImpl : ChatTransport {
                                     log.debug("重复群聊消息跳过: messageId={}", gc.messageId)
                                     return@forEach
                                 }
-                                val groupId = gc.targetClientId.toIntOrNull() ?: return@forEach
-                                val senderId = gc.userId.toIntOrNull() ?: return@forEach
+                                val groupId = gc.targetClientId.toInt()
+                                val senderId = gc.userId.toInt()
                                 val senderName = senderId.toString()
                                 val text = gc.content
                                 val ts = System.currentTimeMillis()

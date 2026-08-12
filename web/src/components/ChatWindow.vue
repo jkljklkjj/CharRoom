@@ -77,7 +77,31 @@
       <div class="menu-item" @click="copyMessage">{{ $t('chat.context.copy') }}</div>
       <div class="menu-item" @click="shareMessage" v-if="canShare">{{ $t('chat.context.share') }}</div>
       <div class="menu-item" @click="replyMessage">{{ $t('chat.context.reply') }}</div>
+      <div class="menu-item" @click="forwardMessage">{{ $t('chat.context.forward') }}</div>
       <div class="menu-item danger" v-if="selectedMessage?.user === 'you'" @click="deleteMessage">{{ $t('chat.context.delete') }}</div>
+    </div>
+
+    <!-- 转发选择弹窗 -->
+    <div v-if="forwardDialogOpen" class="modal-overlay" @click.self="forwardDialogOpen = false">
+      <div class="modal-content forward-dialog">
+        <div class="forward-header">
+          <h3>{{ $t('chat.forward.title') }}</h3>
+          <button class="forward-close" @click="forwardDialogOpen = false">×</button>
+        </div>
+        <div class="forward-list">
+          <div
+            v-for="u in forwardTargets"
+            :key="u.id"
+            class="forward-item"
+            @click="doForward(u)"
+          >
+            <div class="forward-avatar" v-if="u.avatarUrl"><img :src="avatarSrc(u)" alt="" /></div>
+            <div class="forward-avatar placeholder" v-else>{{ initials(u.name || u.username || u.id) }}</div>
+            <div class="forward-name">{{ u.name || u.username || u.id }}</div>
+          </div>
+          <div v-if="forwardTargets.length === 0" class="forward-empty">{{ $t('chat.forward.empty') }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 未选中好友时的占位 -->
@@ -100,6 +124,15 @@
         <div class="drag-tip">{{ $t('chat.dragTip') }}</div>
       </div>
 
+      <!-- 回复预览栏 -->
+      <div v-if="replyTo" class="reply-preview">
+        <div class="reply-preview-text">
+          <span class="reply-sender">{{ $t('chat.replyTo', { sender: replyTo.sender }) }}</span>
+          <span class="reply-content">{{ replyTo.content }}</span>
+        </div>
+        <button class="reply-cancel" @click="cancelReply" title="取消回复">×</button>
+      </div>
+
       <form class="composer" @submit.prevent="send">
         <textarea
           v-model="text"
@@ -120,11 +153,15 @@
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
-import chatSocket from '../services/chatSocket'
+import chatSocket, { MSG_TYPE } from '../services/chatSocket'
 
 const store = useStore()
 // 注入 store 引用给 chatSocket（替代 window.__chatStore hack）
 chatSocket.setStore(store)
+
+// 相对时间实时刷新：每 30s 更新一次 now，触发模板重渲染（formatRelativeTime 读取 now.value）
+const now = ref(Date.now())
+let relTimeTimer = null
 
 // 前后台自适应：切后台时释放部分消息内存
 const handleVisibilityChange = () => {
@@ -161,6 +198,7 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('keydown', handleKeydown)
+  relTimeTimer = setInterval(() => { now.value = Date.now() }, 30000)
   scrollToBottom()
 })
 onUnmounted(() => {
@@ -168,6 +206,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleClickOutside)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (relTimeTimer) clearInterval(relTimeTimer)
   clearTimeout(resizeTimer)
 })
 
@@ -316,12 +355,10 @@ watch(() => isGroupChat.value ? store.state.groupMessages.length : store.state.m
   }
 })
 
-// 相对时间格式化
+// 相对时间格式化（读取 now.value 使模板随 30s 定时器实时刷新）
 function formatRelativeTime(ts) {
   if (!ts) return ''
-  const now = new Date()
-  const time = new Date(ts)
-  const diff = now - time
+  const diff = now.value - new Date(ts)
   const seconds = Math.floor(diff / 1000)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
@@ -335,6 +372,7 @@ function formatRelativeTime(ts) {
   if (days < 7) return t('time.daysAgo', { n: days })
 
   // 超过 7 天显示绝对时间
+  const time = new Date(ts)
   const month = time.getMonth() + 1
   const day = time.getDate()
   const hour = time.getHours().toString().padStart(2, '0')
@@ -342,12 +380,19 @@ function formatRelativeTime(ts) {
   return `${month}/${day} ${hour}:${minute}`
 }
 
-function getAvatar(userId){
-  if(!userId) return null
-  const id = String(userId)
-  const u = store.state.users.find(x => String(x.id) === id)
-  if (!u) return null
-  return avatarSrc(u)
+// userId → avatarUrl 的 memoized 映射，避免每条消息 O(好友数) find
+// （仅在 store.state.users 变化时重建）
+const avatarMap = computed(() => {
+  const map = new Map()
+  for (const u of store.state.users) {
+    if (u && u.id != null) map.set(String(u.id), avatarSrc(u))
+  }
+  return map
+})
+
+function getAvatar(userId) {
+  if (!userId) return null
+  return avatarMap.value.get(String(userId)) || null
 }
 
 import { avatarSrc } from '../utils/format'
@@ -452,14 +497,18 @@ function send(){
   m.isSent = 'sending' // 立即显示发送中状态
 
   const to = currentChatId.value
+  const reply = replyTo.value
+  const replyFields = reply && reply.messageId
+    ? { replyToMessageId: reply.messageId, replyToContent: reply.content, replyToSender: reply.sender }
+    : {}
   const wrapper = isGroupChat.value
     ? {
-        type: 'group_chat',
-        groupChat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: localMessageId }
+        type: MSG_TYPE.GROUP_CHAT,
+        groupChat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId, ...replyFields }
       }
     : {
-        type: 'chat',
-        chat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: localMessageId }
+        type: MSG_TYPE.CHAT,
+        chat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId, ...replyFields }
       }
 
   if (isGroupChat.value) {
@@ -470,6 +519,7 @@ function send(){
 
   chatSocket.sendWrapper(wrapper).catch(e => console.warn("send failed:", e.message))
   text.value = ''
+  cancelReply()
   // 滚动到底部
   scrollToBottom()
 }
@@ -486,12 +536,12 @@ async function retryMessage(m) {
   const newMessageId = 'local_' + Date.now()
   const wrapper = isGroupChat.value
     ? {
-        type: 'group_chat',
-        groupChat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: newMessageId }
+        type: MSG_TYPE.GROUP_CHAT,
+        groupChat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: newMessageId }
       }
     : {
-        type: 'chat',
-        chat: { targetClientId: String(to), content: m.text, timestamp: m.time, messageId: newMessageId }
+        type: MSG_TYPE.CHAT,
+        chat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: newMessageId }
       }
 
   // 更新状态为发送中
@@ -534,13 +584,13 @@ function handlePaste(e) {
 }
 
 // 处理拖拽进入
-function handleDragOver(e) {
+function handleDragOver() {
   if (currentChatId.value == null) return
   isDragOver.value = true
 }
 
 // 处理拖拽离开
-function handleDragLeave(e) {
+function handleDragLeave() {
   isDragOver.value = false
 }
 
@@ -631,12 +681,12 @@ async function handleFileUpload(file) {
 
   const wrapper = isGroupChat.value
     ? {
-        type: 'group_chat',
-        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time, messageId: localMessageId }
+        type: MSG_TYPE.GROUP_CHAT,
+        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId }
       }
     : {
-        type: 'chat',
-        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: m.time, messageId: localMessageId }
+        type: MSG_TYPE.CHAT,
+        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId }
       }
 
   if (isGroupChat.value) {
@@ -689,18 +739,61 @@ async function shareMessage() {
   closeContextMenu()
 }
 
-// 回复消息
+// 回复预览：选中消息后输入框上方显示引用条，发送时携带 replyTo 字段
+const replyTo = ref(null) // { messageId, content, sender }
+
+// 回复消息（进入预览模式，不再把引用文本塞进输入框）
 function replyMessage() {
   if (!selectedMessage.value) return
-  // 在输入框中引用要回复的内容
-  const sender = selectedMessage.value.user === 'you' ? t('chat.myself') : (currentChatUser.value?.name || currentChatUser.value?.username || t('chat.myself'))
-  text.value = t('chat.replyPrefix', { sender }) + `: \n${selectedMessage.value.text}\n---\n`
-  messageInput.value?.focus()
-  // 移动光标到末尾
-  if (messageInput.value) {
-    messageInput.value.selectionStart = messageInput.value.selectionEnd = messageInput.value.value.length
+  const m = selectedMessage.value
+  const sender = m.user === 'you'
+    ? t('chat.myself')
+    : (currentChatUser.value?.name || currentChatUser.value?.username || String(m.user))
+  replyTo.value = {
+    messageId: m.messageId,
+    content: String(m.text || '').slice(0, 80),
+    sender
   }
+  messageInput.value?.focus()
   closeContextMenu()
+}
+
+function cancelReply() {
+  replyTo.value = null
+}
+
+// ── 消息转发 ─────────────────────────────────────────────
+
+const forwardDialogOpen = ref(false)
+// 转发目标：好友（排除群组与 AI 助手）
+const forwardTargets = computed(() =>
+  store.state.users.filter(u => u.id > 0 && u.id !== 900000001)
+)
+
+function forwardMessage() {
+  if (!selectedMessage.value) return
+  forwardDialogOpen.value = true
+  closeContextMenu()
+}
+
+async function doForward(target) {
+  const content = selectedMessage.value?.text
+  forwardDialogOpen.value = false
+  if (!content) return
+  const localMessageId = 'local_' + Date.now()
+  try {
+    await chatSocket.sendWrapper({
+      type: MSG_TYPE.CHAT,
+      chat: {
+        targetClientId: String(target.id),
+        content,
+        timestamp: Date.now(),
+        messageId: localMessageId
+      }
+    })
+  } catch (e) {
+    console.warn('转发失败:', e)
+  }
 }
 
 // 删除消息（仅自己的消息）
@@ -866,6 +959,96 @@ function handleKeydown(e) {
 }
 
 /* Composer 输入框 */
+
+.reply-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 6px 10px;
+  background: rgba(255, 122, 51, 0.08);
+  border-left: 3px solid var(--accent-2, #ff7a33);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--muted, #666);
+}
+.reply-preview-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.reply-sender { font-weight: 600; margin-right: 6px; }
+.reply-content { color: var(--text-primary, #333); }
+.reply-cancel {
+  border: none;
+  background: transparent;
+  color: #999;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.reply-cancel:hover { color: #333; }
+.forward-dialog {
+  width: 300px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+.forward-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--surface-border, #eee);
+}
+.forward-header h3 { margin: 0; font-size: 15px; }
+.forward-close {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  color: #999;
+}
+.forward-list {
+  overflow: auto;
+  padding: 8px 0;
+}
+.forward-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.forward-item:hover { background: rgba(0,0,0,0.04); }
+.forward-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
+  color: #fff;
+}
+.forward-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.forward-name { font-size: 14px; }
+.forward-empty {
+  text-align: center;
+  padding: 30px 0;
+  color: #999;
+  font-size: 13px;
+}
+
+
 .composer{display:flex;padding:12px;border-top:1px solid var(--surface-border);gap:8px}
 .composer textarea{
   flex:1;

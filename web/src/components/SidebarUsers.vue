@@ -70,7 +70,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import api from '../api'
-import chatSocket from '../services/chatSocket'
+import chatSocket, { MSG_TYPE } from '../services/chatSocket'
 
 const emit = defineEmits(['user-selected', 'open-settings'])
 
@@ -135,7 +135,7 @@ function select(u) {
   // 点击用户时，主动查询该用户的在线状态（排除AI助手和群组）
   if (u.id > 0 && u.id !== 900000001) {
     chatSocket.sendWrapper({
-      type: 'check',
+      type: MSG_TYPE.CHECK,
       check: {
         targetClientId: u.id.toString()
       }

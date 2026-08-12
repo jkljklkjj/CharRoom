@@ -46,7 +46,7 @@ fun buildHeartbeatPayload(): ByteArray {
  */
 fun buildLogoutPayload(userId: String): ByteArray {
     val logout = MessageProtos.LogoutMessage.newBuilder()
-        .setUserId(userId)
+        .setUserId(userId.toLong())
         .build()
     return MessageProtos.MessageWrapper.newBuilder()
         .setType(MessageProtos.MessageWrapperType.LOGOUT)
@@ -59,7 +59,7 @@ fun buildLogoutPayload(userId: String): ByteArray {
  * 构建普通聊天消息
  */
 fun buildChatPayload(
-    targetClientId: String,
+    targetClientId: String, // 数字 ID 字符串
     content: String,
     userId: Int = 0,
     timestamp: Long,
@@ -72,10 +72,10 @@ fun buildChatPayload(
     fileSize: Long? = null
 ): ByteArray {
     val chatBuilder = MessageProtos.ChatMessage.newBuilder()
-        .setTargetClientId(targetClientId)
+        .setTargetClientId(targetClientId.toLong())
         .setContent(content)
-        .setUserId(userId.toString())
-        .setTimestamp(timestamp.toString())
+        .setUserId(userId.toLong())
+        .setTimestamp(timestamp)
         .setMessageType(MessageProtos.MessageType.forNumber(messageType))
 
     // 设置引用回复字段
@@ -113,10 +113,10 @@ fun buildAgentChatPayload(
     fileSize: Long? = null
 ): ByteArray {
     val actionBuilder = MessageProtos.ChatMessage.newBuilder()
-        .setTargetClientId(targetClientId)
+        .setTargetClientId(targetClientId.toLong())
         .setContent(content)
-        .setUserId(userId.toString())
-        .setTimestamp(timestamp.toString())
+        .setUserId(userId.toLong())
+        .setTimestamp(timestamp)
         .setMessageType(MessageProtos.MessageType.forNumber(messageType))
 
     // 设置引用回复字段
@@ -164,9 +164,9 @@ fun buildGroupChatPayload(
     fileSize: Long? = null
 ): ByteArray {
     val gmBuilder = MessageProtos.GroupChatMessage.newBuilder()
-        .setTargetClientId(targetClientId)
+        .setTargetClientId(targetClientId.toLong())
         .setContent(content)
-        .setUserId(userId.toString())
+        .setUserId(userId.toLong())
         .setMessageType(MessageProtos.MessageType.forNumber(messageType))
 
     // 设置引用回复字段

@@ -322,9 +322,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                             if (isDuplicateMessage(chat.messageId)) return@forEach
                             sendAck(chat.messageId, "chat")
                             listener.onPrivateMessageReceived(
-                                senderId = chat.userId.toIntOrNull() ?: 0,
+                                senderId = chat.userId.toInt(),
                                 message = chat.content,
-                                timestamp = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis(),
+                                timestamp = chat.timestamp,
                                 seqId = chat.seqId,
                                 conversationId = chat.conversationId
                             )
@@ -334,8 +334,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                             if (isDuplicateMessage(gc.messageId)) return@forEach
                             sendAck(gc.messageId, "group:${gc.targetClientId}")
                             listener.onGroupMessageReceived(
-                                groupId = gc.targetClientId.toIntOrNull() ?: 0,
-                                senderId = gc.userId.toIntOrNull() ?: 0,
+                                groupId = gc.targetClientId.toInt(),
+                                senderId = gc.userId.toInt(),
                                 senderName = "用户${gc.userId}",
                                 message = gc.content,
                                 timestamp = gc.timestamp.toLongOrNull() ?: System.currentTimeMillis(),
@@ -346,9 +346,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                         MessageProtos.MessageWrapperType.AGENT_CHAT -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
                             listener.onPrivateMessageReceived(
-                                senderId = chat.userId.toIntOrNull() ?: 0,
+                                senderId = chat.userId.toInt(),
                                 message = chat.content,
-                                timestamp = chat.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                                timestamp = chat.timestamp
                             )
                         }
                         MessageProtos.MessageWrapperType.ACK -> if (wrapper.hasAck()) {
