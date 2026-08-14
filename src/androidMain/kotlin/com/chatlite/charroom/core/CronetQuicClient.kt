@@ -343,15 +343,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 conversationId = gc.conversationId
                             )
                         }
-                        MessageProtos.MessageWrapperType.LOGIN,
-                        MessageProtos.MessageWrapperType.LOGOUT,
-                        MessageProtos.MessageWrapperType.CHECK,
-                        MessageProtos.MessageWrapperType.HEARTBEAT,
-                        MessageProtos.MessageWrapperType.STREAM_INIT_ACK,
-                        MessageProtos.MessageWrapperType.SYNC_HINT,
-                        MessageProtos.MessageWrapperType.FRIEND_ACCEPTED,
-                        MessageProtos.MessageWrapperType.MESSAGE_WRAPPER_TYPE_UNSPECIFIED -> {
-                            // 这些类型由其他逻辑处理，此处忽略
+                        else -> {
+                            // 未处理的消息类型（LOGIN/LOGOUT/CHECK/HEARTBEAT/STREAM_INIT_ACK/SYNC_HINT/FRIEND_ACCEPTED/UNRECOGNIZED）
                         }
                         MessageProtos.MessageWrapperType.AGENT_CHAT -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
