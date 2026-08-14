@@ -2,6 +2,8 @@ package com.chatlite.charroom.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import data.repository.AuthRepository
+import data.repository.GlobalAuthRepository
 import presentation.viewmodel.AuthViewModel
 
 /**
@@ -10,6 +12,7 @@ import presentation.viewmodel.AuthViewModel
  */
 class AndroidAuthViewModel : ViewModel() {
     val viewModel = AuthViewModel(
+        authRepository = GlobalAuthRepository,
         coroutineScope = viewModelScope
     )
 }

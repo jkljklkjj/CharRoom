@@ -234,6 +234,58 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(emptyMap())
     }
 
+    override fun savePendingMessages(privatePending: List<Message>, groupPending: List<GroupMessage>) {
+        if (!this::context.isInitialized) return
+        runCatching {
+            val prefs = context.getSharedPreferences("pending_messages", Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            val privateArray = JSONArray()
+            privatePending.forEach { privateArray.put(messageToJson(it)) }
+            editor.putString("private_pending", privateArray.toString())
+            val groupArray = JSONArray()
+            groupPending.forEach { groupArray.put(messageToJson(it)) }
+            editor.putString("group_pending", groupArray.toString())
+            editor.apply()
+        }.onFailure {
+            timber.log.Timber.w(it, "保存待发消息失败")
+        }
+    }
+
+    override fun restorePendingMessages(): Pair<List<Message>, List<GroupMessage>> {
+        if (!this::context.isInitialized) return Pair(emptyList(), emptyList())
+        return runCatching {
+            val prefs = context.getSharedPreferences("pending_messages", Context.MODE_PRIVATE)
+            val privateJson = prefs.getString("private_pending", null)
+            val groupJson = prefs.getString("group_pending", null)
+            val privateMessages = if (privateJson != null) {
+                val array = JSONArray(privateJson)
+                (0 until array.length()).mapNotNull { i ->
+                    array.optJSONObject(i)?.let { jsonToMessage(it, false) as? Message }
+                }
+            } else emptyList()
+            val groupMessages = if (groupJson != null) {
+                val array = JSONArray(groupJson)
+                (0 until array.length()).mapNotNull { i ->
+                    array.optJSONObject(i)?.let { jsonToMessage(it, true) as? GroupMessage }
+                }
+            } else emptyList()
+            Pair(privateMessages, groupMessages)
+        }.getOrElse {
+            timber.log.Timber.w(it, "恢复待发消息失败")
+            Pair(emptyList(), emptyList())
+        }
+    }
+
+    override fun clearPendingMessages() {
+        if (!this::context.isInitialized) return
+        runCatching {
+            val prefs = context.getSharedPreferences("pending_messages", Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+        }.onFailure {
+            timber.log.Timber.w(it, "清除待发消息失败")
+        }
+    }
+
     // 内部方法
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {

@@ -338,10 +338,20 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 senderId = gc.userId.toInt(),
                                 senderName = "用户${gc.userId}",
                                 message = gc.content,
-                                timestamp = gc.timestamp.toLongOrNull() ?: System.currentTimeMillis(),
+                                timestamp = gc.timestamp,
                                 seqId = gc.seqId,
                                 conversationId = gc.conversationId
                             )
+                        }
+                        MessageProtos.MessageWrapperType.LOGIN,
+                        MessageProtos.MessageWrapperType.LOGOUT,
+                        MessageProtos.MessageWrapperType.CHECK,
+                        MessageProtos.MessageWrapperType.HEARTBEAT,
+                        MessageProtos.MessageWrapperType.STREAM_INIT_ACK,
+                        MessageProtos.MessageWrapperType.SYNC_HINT,
+                        MessageProtos.MessageWrapperType.FRIEND_ACCEPTED,
+                        MessageProtos.MessageWrapperType.MESSAGE_WRAPPER_TYPE_UNSPECIFIED -> {
+                            // 这些类型由其他逻辑处理，此处忽略
                         }
                         MessageProtos.MessageWrapperType.AGENT_CHAT -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat

@@ -4,7 +4,6 @@ import com.chatlite.charroom.data.repository.NetworkRepository
 import com.chatlite.charroom.data.repository.NetworkRepository.TokenBundle
 import core.ApiService
 import core.ApiService.LoginTokens
-import data.datasource.remote.RemoteDataSource
 import model.Group
 import model.Message
 import model.User
@@ -16,7 +15,7 @@ import model.toUiUser
  */
 class AndroidRemoteDataSource(
     private val networkRepository: NetworkRepository = NetworkRepository.getInstance()
-) : RemoteDataSource {
+) {
 
     override suspend fun login(account: String, password: String): ApiService.LoginTokens? {
         return networkRepository.login(account, password)?.let {
