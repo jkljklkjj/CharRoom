@@ -396,6 +396,7 @@ function getAvatar(userId) {
 }
 
 import { avatarSrc } from '../utils/format'
+import { AGENT_USER_ID } from '../constants'
 
 import { initials } from '../utils/format'
 
@@ -767,7 +768,7 @@ function cancelReply() {
 const forwardDialogOpen = ref(false)
 // 转发目标：好友（排除群组与 AI 助手）
 const forwardTargets = computed(() =>
-  store.state.users.filter(u => u.id > 0 && u.id !== 0)
+  store.state.users.filter(u => u.id > 0 && u.id !== AGENT_USER_ID)
 )
 
 function forwardMessage() {

@@ -126,6 +126,7 @@ import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
 import siteConfig from '../siteConfig'
 import api from '../api'
+import { AGENT_USER_ID } from '../constants'
 
 function normalizeTimestamp(raw) {
   if (raw == null || raw === '') return new Date().toISOString()
@@ -538,7 +539,7 @@ async function initUserSession(accessToken, refreshToken) {
 
   // 批量拉取好友在线状态
   if (friends && friends.length > 0) {
-    const friendIds = friends.map(f => f.id).filter(id => id && id !== 0)
+    const friendIds = friends.map(f => f.id).filter(id => id && id !== AGENT_USER_ID)
     if (friendIds.length > 0) {
       const statusMap = await api.getOnlineStatus(friendIds)
       for (const [userId, online] of Object.entries(statusMap)) {

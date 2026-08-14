@@ -126,6 +126,7 @@ const filteredUsers = computed(() => {
 })
 
 import { initials, avatarSrc } from '../utils/format'
+import { AGENT_USER_ID } from '../constants'
 import { toast } from '../utils/toast'
 
 function select(u) {
@@ -133,7 +134,7 @@ function select(u) {
   emit('user-selected', u)
 
   // 点击用户时，主动查询该用户的在线状态（排除AI助手和群组）
-  if (u.id > 0 && u.id !== 0) {
+  if (u.id > 0 && u.id !== AGENT_USER_ID) {
     chatSocket.sendWrapper({
       type: MSG_TYPE.CHECK,
       check: {

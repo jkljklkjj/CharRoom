@@ -1,4 +1,5 @@
 import { state, PAGE_SIZE } from './state'
+import { AGENT_USER_ID } from '../constants'
 import { getPrivateConversationId, normalizeTimeValue } from './storage'
 import DOMPurify from 'dompurify'
 import { getMessagesPage as dbGetMessagesPage, appendMessage as dbAppendMessage,
@@ -213,7 +214,7 @@ export function upsertAgentStreamMessage(messageId, fullContent, done = false) {
     }
   } else {
     const agentMessage = {
-      user: '0',
+      user: String(AGENT_USER_ID),
       text: fullContent,
       time: new Date().toISOString(),
       targetId: String(state.accountId),
