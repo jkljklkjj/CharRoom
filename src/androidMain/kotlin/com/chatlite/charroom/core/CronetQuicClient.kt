@@ -343,9 +343,6 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                 conversationId = gc.conversationId
                             )
                         }
-                        else -> {
-                            // 未处理的消息类型（LOGIN/LOGOUT/CHECK/HEARTBEAT/STREAM_INIT_ACK/SYNC_HINT/FRIEND_ACCEPTED/UNRECOGNIZED）
-                        }
                         MessageProtos.MessageWrapperType.AGENT_CHAT -> if (wrapper.hasChat()) {
                             val chat = wrapper.chat
                             listener.onPrivateMessageReceived(
@@ -391,6 +388,9 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                                     error = isError
                                 )
                             }
+                        }
+                        else -> {
+                            // 未处理的消息类型（LOGIN/LOGOUT/CHECK/HEARTBEAT/STREAM_INIT_ACK/SYNC_HINT/FRIEND_ACCEPTED/UNRECOGNIZED）
                         }
                     }
                 }
