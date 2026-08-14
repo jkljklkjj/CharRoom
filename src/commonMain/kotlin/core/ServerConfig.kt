@@ -1,8 +1,8 @@
 package core
 
 object ServerConfig {
-    const val AGENT_ASSISTANT_ID = 900000001
-    const val AGENT_ASSISTANT_NAME = "AI助手"
+    const val AGENT_ASSISTANT_ID = 0
+    const val AGENT_ASSISTANT_NAME = "智聊助手"
 
     var SERVER_IP: String = "chatlite.xin"
 

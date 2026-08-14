@@ -6,7 +6,7 @@ import core.LocalChatHistoryStore
 import core.AppLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import core.MsgType
-import core.ServerConfig.AGENT_ASSISTANT_ID
+
 import core.batchOnlineStatus
 import core.buildChatPayload
 import core.buildGroupChatPayload
@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import model.Group
@@ -37,13 +38,20 @@ import core.state.ConversationPreviewState
 import core.Throttle
 import core.ThrottleOp
 
-private const val AGENT_ASSISTANT_ID = 900000001
+private val AGENT_ASSISTANT_ID = core.ServerConfig.AGENT_ASSISTANT_ID
 
 /**
  * 聊天ViewModel
  * 处理聊天相关的UI逻辑和状态
  */
 private val logger = KotlinLogging.logger {}
+
+// ── 本地历史写盘 debounce ────────────────────────────────
+// 合并高频写（AI 流式 chunk / 批量消息/状态更新），静默 1s 后一次性全量保存，
+// 避免每条消息都触发 DesktopLocalChatHistoryStore 全量重写历史文件
+private const val SAVE_HISTORY_DEBOUNCE_MS = 1000L
+private var historyDirty = false
+private var historySaveJob: Job? = null
 
 open class ChatViewModel(
     protected val chatRepository: ChatRepository,
@@ -199,7 +207,7 @@ open class ChatViewModel(
         sessionScope.launch {
             val user = chatState.users.value.find { it.id == message.senderId }
             if (user == null) {
-                logger.warn("retryMessage: 找不到用户 {}", message.senderId)
+                logger.warn { "retryMessage: 找不到用户 ${message.senderId}" }
                 return@launch
             }
 
@@ -500,7 +508,7 @@ open class ChatViewModel(
         try {
             val token = GlobalAppState.currentToken
             if (token != null && friends.isNotEmpty()) {
-                val friendIds = friends.map { it.id }.filter { it > 0 && it != 900000001 }
+                val friendIds = friends.map { it.id }.filter { it > 0 && it != AGENT_ASSISTANT_ID }
                 val statusMap = batchOnlineStatus(token, friendIds)
                 for ((userIdStr, online) in statusMap) {
                     val userId = userIdStr.toIntOrNull() ?: continue
@@ -1026,9 +1034,27 @@ open class ChatViewModel(
     }
 
     /**
-     * 保存聊天历史到本地存储
+     * 保存聊天历史到本地（debounce 合并：高频调用只触发一次落盘）。
+     * 所有状态访问收敛到 sessionScope(Main) 上，避免 IO 线程并发访问。
      */
-    private suspend fun saveChatHistoryToLocal() {
+    private fun saveChatHistoryToLocal() {
+        sessionScope.launch {
+            historyDirty = true
+            if (historySaveJob?.isActive == true) return@launch
+            historySaveJob = launch {
+                delay(SAVE_HISTORY_DEBOUNCE_MS)
+                if (historyDirty) {
+                    historyDirty = false
+                    withContext(Dispatchers.IO) {
+                        persistChatHistoryNow()
+                    }
+                }
+            }
+        }
+    }
+
+    /** 立即全量保存聊天历史（debounce 的底层实现） */
+    private suspend fun persistChatHistoryNow() {
         val userId = GlobalAppState.currentUserId ?: return
         val accountId = userId.toString()
         try {

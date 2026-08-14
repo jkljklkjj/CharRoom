@@ -193,9 +193,8 @@ fun Group.toUiUser(): User = User(id = -this.id, username = this.name)
  * 添加AI助手到用户列表
  */
 fun List<User>.withAgentAssistant(): List<User> {
-    val agentId = 900000001 // 从ServerConfig移动到这里，避免依赖
-    if (this.any { it.id == agentId }) {
+    if (this.any { it.id == core.ServerConfig.AGENT_ASSISTANT_ID }) {
         return this
     }
-    return listOf(User(id = agentId, username = "AI助手")) + this
+    return listOf(User(id = core.ServerConfig.AGENT_ASSISTANT_ID, username = core.ServerConfig.AGENT_ASSISTANT_NAME)) + this
 }
