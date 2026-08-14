@@ -11,7 +11,10 @@
           <div v-if="isRegister && passwordError" class="error-hint">{{ passwordError }}</div>
 
           <div class="actions">
-            <button class="primary" type="submit">{{ isRegister ? $t('login.createAccount') : $t('login.login') }}</button>
+            <button class="primary" type="submit" :disabled="submitting">
+              <span v-if="submitting" class="spinner"></span>
+              {{ submitting ? $t('login.loading') : (isRegister ? $t('login.createAccount') : $t('login.login')) }}
+            </button>
             <button type="button" class="toggle-mode" @click="toggleMode">{{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}</button>
           </div>
         </form>
@@ -52,15 +55,15 @@ function onPasswordInput() {
   }
 }
 
-let _submitting = false
+const submitting = ref(false)
 async function doAction() {
-  if (_submitting) return
-  _submitting = true
+  if (submitting.value) return
+  submitting.value = true
   try {
     if (isRegister.value) return await doRegister()
     return await doLogin()
   } finally {
-    _submitting = false
+    submitting.value = false
   }
 }
 
@@ -107,6 +110,9 @@ async function doRegister() {
 .panel input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #eee;margin-top:10px;box-sizing:border-box}
 .error-hint{color:#ff4757;font-size:12px;margin-top:4px}
 .actions{margin-top:18px;display:flex;flex-direction:column;gap:8px}
-.primary{background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff;border:0;padding:12px;border-radius:10px;font-weight:700}
+.primary{background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff;border:0;padding:12px;border-radius:10px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}
+.primary:disabled{opacity:.6;cursor:not-allowed}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .toggle-mode{background:transparent;border:0;color:var(--accent-2);text-align:center;padding:6px 0;font-weight:600;cursor:pointer}
 </style>
