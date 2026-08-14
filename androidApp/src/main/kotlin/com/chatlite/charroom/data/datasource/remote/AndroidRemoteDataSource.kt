@@ -17,7 +17,7 @@ class AndroidRemoteDataSource(
     private val networkRepository: NetworkRepository = NetworkRepository.getInstance()
 ) {
 
-    override suspend fun login(account: String, password: String): ApiService.LoginTokens? {
+    suspend fun login(account: String, password: String): ApiService.LoginTokens? {
         return networkRepository.login(account, password)?.let {
             ApiService.LoginTokens(
                 accessToken = it.accessToken,
@@ -26,21 +26,21 @@ class AndroidRemoteDataSource(
         }
     }
 
-    override suspend fun register(username: String, password: String): Int {
+    suspend fun register(username: String, password: String): Int {
         return networkRepository.register(username, password)
     }
 
-    override suspend fun verifyRegister(username: String, password: String, email: String, verifyCode: String): Int {
+    suspend fun verifyRegister(username: String, password: String, email: String, verifyCode: String): Int {
         // 使用core的ApiService实现，与网页端逻辑一致
         return core.ApiService.verifyRegister(username, password, email, verifyCode)
     }
 
-    override suspend fun sendRegisterVerifyCode(email: String): Boolean {
+    suspend fun sendRegisterVerifyCode(email: String): Boolean {
         // 使用core的ApiService实现，与网页端逻辑一致
         return core.ApiService.sendRegisterVerifyCode(email)
     }
 
-    override suspend fun validateToken(token: String): ApiService.LoginTokens? {
+    suspend fun validateToken(token: String): ApiService.LoginTokens? {
         return networkRepository.validateToken(token)?.let {
             ApiService.LoginTokens(
                 accessToken = it.accessToken,
@@ -49,7 +49,7 @@ class AndroidRemoteDataSource(
         }
     }
 
-    override suspend fun refreshToken(refreshToken: String): ApiService.LoginTokens? {
+    suspend fun refreshToken(refreshToken: String): ApiService.LoginTokens? {
         return networkRepository.refreshAccessToken(refreshToken)?.let {
             ApiService.LoginTokens(
                 accessToken = it.accessToken,
@@ -58,13 +58,13 @@ class AndroidRemoteDataSource(
         }
     }
 
-    override suspend fun getUserInfo(token: String): User? {
+    suspend fun getUserInfo(token: String): User? {
         // 获取当前用户信息需要自己的ID，这里暂时返回null，后续可以完善
         // 或者通过其他方式获取当前用户ID
         return null
     }
 
-    override suspend fun getFriendList(token: String): List<User> {
+    suspend fun getFriendList(token: String): List<User> {
         return networkRepository.fetchFriendAndGroupList(token)
             .filter { it.id > 0 } // 好友ID为正值
             .map { localUser ->
@@ -80,7 +80,7 @@ class AndroidRemoteDataSource(
             }
     }
 
-    override suspend fun getGroupList(token: String): List<Group> {
+    suspend fun getGroupList(token: String): List<Group> {
         return networkRepository.fetchFriendAndGroupList(token)
             .filter { it.id < 0 } // 群组ID为负值
             .map { localUser ->
@@ -91,15 +91,15 @@ class AndroidRemoteDataSource(
             }
     }
 
-    override suspend fun addFriend(token: String, account: String): Boolean {
+    suspend fun addFriend(token: String, account: String): Boolean {
         return networkRepository.addFriend(account, token)
     }
 
-    override suspend fun addGroup(token: String, groupId: String): Boolean {
+    suspend fun addGroup(token: String, groupId: String): Boolean {
         return networkRepository.addGroup(groupId, token)
     }
 
-    override suspend fun getUserDetail(token: String, userId: String): User? {
+    suspend fun getUserDetail(token: String, userId: String): User? {
         return networkRepository.getUserDetail(userId, token)?.let { localUser ->
             User(
                 id = localUser.id,
@@ -113,7 +113,7 @@ class AndroidRemoteDataSource(
         }
     }
 
-    override suspend fun getGroupDetail(token: String, groupId: String): Group? {
+    suspend fun getGroupDetail(token: String, groupId: String): Group? {
         return networkRepository.getGroupDetail(groupId, token)?.let { localUser ->
             Group(
                 id = -localUser.id,
@@ -122,21 +122,21 @@ class AndroidRemoteDataSource(
         }
     }
 
-    override suspend fun getOfflineMessages(token: String): List<Message> {
+    suspend fun getOfflineMessages(token: String): List<Message> {
         // 现有实现返回空列表，后续可以完善
         return emptyList()
     }
 
-    override suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int): core.SyncMessagesResult {
+    suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int): core.SyncMessagesResult {
         return core.SyncMessagesResult()
     }
 
-    override suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean {
+    suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
         return false
     }
 
-    override suspend fun updateUserProfile(
+    suspend fun updateUserProfile(
         token: String,
         username: String,
         phone: String,
@@ -147,42 +147,42 @@ class AndroidRemoteDataSource(
         return networkRepository.updateUserProfile(userId, token, username, phone, signature)
     }
 
-    override suspend fun updateEmail(token: String, newEmail: String, verifyCode: String): Boolean {
+    suspend fun updateEmail(token: String, newEmail: String, verifyCode: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
         return false
     }
 
-    override suspend fun getFriendRequests(token: String): List<User> {
+    suspend fun getFriendRequests(token: String): List<User> {
         // 这个接口Android端还没有实现，暂时返回空列表
         return emptyList()
     }
 
-    override suspend fun getGroupRequests(token: String): List<User> {
+    suspend fun getGroupRequests(token: String): List<User> {
         // 这个接口Android端还没有实现，暂时返回空列表
         return emptyList()
     }
 
-    override suspend fun acceptFriend(token: String, requestId: String): Boolean {
+    suspend fun acceptFriend(token: String, requestId: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
         return false
     }
 
-    override suspend fun rejectFriend(token: String, requestId: String): Boolean {
+    suspend fun rejectFriend(token: String, requestId: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
         return false
     }
 
-    override suspend fun acceptGroupApplication(token: String, groupId: String, userId: String): Boolean {
+    suspend fun acceptGroupApplication(token: String, groupId: String, userId: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
         return false
     }
 
-    override suspend fun rejectGroupApplication(token: String, groupId: String, userId: String): Boolean {
+    suspend fun rejectGroupApplication(token: String, groupId: String, userId: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
         return false
     }
 
-    override suspend fun deleteFriend(token: String, friendId: Int): Boolean {
+    suspend fun deleteFriend(token: String, friendId: Int): Boolean {
         // Android 暂无删除好友的 API 实现
         return false
     }

@@ -243,7 +243,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             privatePending.forEach { privateArray.put(messageToJson(it)) }
             editor.putString("private_pending", privateArray.toString())
             val groupArray = JSONArray()
-            groupPending.forEach { groupArray.put(messageToJson(it)) }
+            groupPending.forEach { groupArray.put(groupMessageToJson(it)) }
             editor.putString("group_pending", groupArray.toString())
             editor.apply()
         }.onFailure {
@@ -349,6 +349,25 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("receiverId", message.receiverId)
             put("content", message.message)
             put("sender", message.sender)
+            put("timestamp", message.timestamp)
+            put("isSent", message.isSent)
+            put("messageId", message.messageId)
+            put("replyToMessageId", message.replyToMessageId)
+            put("replyToContent", message.replyToContent)
+            put("replyToSender", message.replyToSender)
+            put("messageType", message.messageType.name)
+            put("fileUrl", message.fileUrl)
+            put("fileName", message.fileName)
+            put("fileSize", message.fileSize)
+        }
+    }
+
+    private fun groupMessageToJson(message: GroupMessage): JSONObject {
+        return JSONObject().apply {
+            put("senderId", message.senderId)
+            put("receiverId", message.groupId)
+            put("senderName", message.senderName)
+            put("content", message.text)
             put("timestamp", message.timestamp)
             put("isSent", message.isSent)
             put("messageId", message.messageId)
