@@ -767,7 +767,7 @@ function cancelReply() {
 const forwardDialogOpen = ref(false)
 // 转发目标：好友（排除群组与 AI 助手）
 const forwardTargets = computed(() =>
-  store.state.users.filter(u => u.id > 0 && u.id !== 900000001)
+  store.state.users.filter(u => u.id > 0 && u.id !== 0)
 )
 
 function forwardMessage() {

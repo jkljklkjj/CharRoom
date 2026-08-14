@@ -67,7 +67,45 @@
             </div>
           </div>
           <button class="quota-btn" @click="showQuota = true">{{ $t('app.settings.tokenQuota') }}</button>
-          <button class="logout-btn" @click="logout">{{ $t('app.settings.logout') }}</button>
+          <button class="quota-btn" @click="openProfileEdit">{{ $t('app.settings.editProfile') }}</button>
+          <button class="logout-btn" @click="showLogoutConfirm = true">{{ $t('app.settings.logout') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 退出确认弹窗 -->
+    <div v-if="showLogoutConfirm" class="settings-overlay" @click.self="showLogoutConfirm = false">
+      <div class="settings-dialog confirm-dialog">
+        <div class="confirm-text">{{ $t('app.settings.logoutConfirm') }}</div>
+        <div class="confirm-actions">
+          <button class="btn cancel" @click="showLogoutConfirm = false">{{ $t('app.cancel') }}</button>
+          <button class="logout-btn" @click="doLogout">{{ $t('app.settings.logout') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 编辑资料弹窗 -->
+    <div v-if="showProfileEdit" class="settings-overlay" @click.self="showProfileEdit = false">
+      <div class="settings-dialog profile-dialog">
+        <div class="settings-header">
+          <h3>{{ $t('app.settings.editProfile') }}</h3>
+          <button class="close-settings" @click="showProfileEdit = false">×</button>
+        </div>
+        <div class="settings-body">
+          <div class="settings-item">
+            <label>{{ $t('app.settings.profileUsername') }}</label>
+            <input v-model="profileForm.username" class="profile-input" :placeholder="profileForm.username" />
+          </div>
+          <div class="settings-item">
+            <label>{{ $t('app.settings.profileSignature') }}</label>
+            <textarea v-model="profileForm.signature" class="profile-input" rows="2" :placeholder="$t('app.settings.profileSignaturePlaceholder')"></textarea>
+          </div>
+          <div class="settings-item" v-if="profileError">
+            <div class="profile-error">{{ profileError }}</div>
+          </div>
+          <button class="quota-btn" :disabled="profileSaving" @click="saveProfile">
+            {{ profileSaving ? $t('app.settings.profileSaving') : $t('app.settings.profileSave') }}
+          </button>
         </div>
       </div>
     </div>
@@ -76,13 +114,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
 import TokenQuotaDialog from '../components/TokenQuotaDialog.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import { toast } from '../utils/toast'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
 import siteConfig from '../siteConfig'
@@ -112,7 +151,49 @@ const currentView = ref('list') // 'list' | 'chat'
 const currentChatName = ref('')
 const showSettings = ref(false)
 const showQuota = ref(false)
+const showLogoutConfirm = ref(false)
 const loading = ref(true) // 登录状态验证中
+
+// 编辑资料
+const showProfileEdit = ref(false)
+const profileSaving = ref(false)
+const profileError = ref('')
+const profileForm = reactive({ username: '', signature: '' })
+
+function openProfileEdit() {
+  const me = store.state.users.find(u => String(u.id) === String(store.state.accountId))
+  profileForm.username = me?.username || me?.name || ''
+  profileForm.signature = me?.signature || ''
+  profileError.value = ''
+  showProfileEdit.value = true
+}
+
+async function saveProfile() {
+  const username = profileForm.username.trim()
+  const signature = profileForm.signature.trim()
+  if (!username) {
+    profileError.value = t('app.settings.profileUsernameRequired')
+    return
+  }
+  profileSaving.value = true
+  profileError.value = ''
+  try {
+    const ok = await api.updateUserProfile({ username, signature })
+    if (ok) {
+      // 本地更新用户信息
+      const me = store.state.users.find(u => String(u.id) === String(store.state.accountId))
+      if (me) {
+        store.mergeUsers([{ ...me, username, signature }])
+      }
+      toast.success(t('app.settings.profileSaved'))
+      showProfileEdit.value = false
+    } else {
+      profileError.value = t('app.settings.profileSaveFailed')
+    }
+  } finally {
+    profileSaving.value = false
+  }
+}
 
 // 主题设置
 const theme = ref(localStorage.getItem('theme') || 'auto') // auto, light, dark
@@ -157,6 +238,7 @@ function handleIncomingMessage(msg) {
         text: msg.chat.content,
         time: normalizeTimestamp(msg.chat.timestamp),
         targetId: msg.chat.targetClientId,
+        messageId: msg.chat.messageId || undefined,
         seqId: msg.chat.seqId || undefined
       })
       // 从消息 payload 中更新 seqId 游标（后端全链路携带 seqId）
@@ -169,6 +251,7 @@ function handleIncomingMessage(msg) {
         text: msg.groupChat.content,
         time: normalizeTimestamp(msg.groupChat.timestamp),
         groupId: msg.groupChat.targetClientId,
+        messageId: msg.groupChat.messageId || undefined,
         seqId: msg.groupChat.seqId || undefined
       })
       // 从消息 payload 中更新 seqId 游标
@@ -245,12 +328,15 @@ async function syncConversation(conversationId, serverSeqId) {
     const accountId = store.state.accountId
     for (const msg of result.messages) {
       const isMe = String(msg.senderId) === String(accountId)
+      // 后端 Message.id 即客户端 messageId（fromProto: id = chat.getMessageId()）
+      const messageId = msg.id || msg.messageId || undefined
       if (conversationId.startsWith('group:')) {
         store.addGroupMessage({
           user: String(msg.senderId),
           text: msg.message,
           time: msg.timestamp,
           groupId: conversationId.replace('group:', ''),
+          messageId,
           seqId: msg.seqId
         })
       } else {
@@ -259,6 +345,7 @@ async function syncConversation(conversationId, serverSeqId) {
           text: msg.message,
           time: msg.timestamp,
           targetId: isMe ? String(msg.receiverId) : String(msg.senderId),
+          messageId,
           seqId: msg.seqId
         })
       }
@@ -310,6 +397,7 @@ async function syncAllConversations() {
           text: msg.message,
           time: msg.timestamp,
           targetId: isMe ? String(msg.receiverId) : String(msg.senderId),
+          messageId: msg.id || msg.messageId || undefined,
           seqId: msg.seqId
         })
       }
@@ -327,6 +415,7 @@ async function syncAllConversations() {
           text: msg.message,
           time: msg.timestamp,
           groupId: gid,
+          messageId: msg.id || msg.messageId || undefined,
           seqId: msg.seqId
         })
       }
@@ -354,7 +443,7 @@ function connectChat(token, accountId) {
         const friend = await api.getUserDetail(accepterId)
         if (friend?.data) {
           store.addUser(friend.data)
-          window.$toast?.success?.(t('chat.friendAccepted') || '好友已添加')
+          toast.success(t('chat.friendAccepted') || '好友已添加')
         }
       } catch (e) {
         console.warn('获取新好友信息失败:', e)
@@ -386,7 +475,13 @@ async function logout() {
   clearAuth()
   store.setSelectedChat(null)
   showSettings.value = false
+  showLogoutConfirm.value = false
   router.push('/')
+}
+
+/** 退出确认后的实际登出 */
+function doLogout() {
+  logout()
 }
 
 /** 保存登录凭证到本地 — access token 用 sessionStorage（XSS 安全），refresh token 用 localStorage */
@@ -443,7 +538,7 @@ async function initUserSession(accessToken, refreshToken) {
 
   // 批量拉取好友在线状态
   if (friends && friends.length > 0) {
-    const friendIds = friends.map(f => f.id).filter(id => id && id !== 900000001)
+    const friendIds = friends.map(f => f.id).filter(id => id && id !== 0)
     if (friendIds.length > 0) {
       const statusMap = await api.getOnlineStatus(friendIds)
       for (const [userId, online] of Object.entries(statusMap)) {
@@ -717,6 +812,28 @@ onUnmounted(() => {
   color: white;
   font-weight: 600;
   cursor: pointer;
+}
+
+
+.profile-dialog { width: min(360px, calc(100% - 40px)); }
+.profile-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--surface-border, #e8e8e8);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--panel, #fff);
+  color: var(--text-primary, #333);
+  resize: none;
+}
+.profile-input:focus {
+  outline: none;
+  border-color: #ff7a33;
+}
+.profile-error {
+  color: #ff4757;
+  font-size: 13px;
 }
 
 .logout-btn:hover {

@@ -1,8 +1,8 @@
 import { state, PAGE_SIZE } from './state'
-import { getPrivateConversationId, normalizeTimeValue,
-         getConversationKey } from './storage'
+import { getPrivateConversationId, normalizeTimeValue } from './storage'
 import DOMPurify from 'dompurify'
-import { getMessages as dbGetMessages, appendMessage as dbAppendMessage } from '../utils/messageDB'
+import { getMessagesPage as dbGetMessagesPage, appendMessage as dbAppendMessage,
+         deleteMessage as dbDeleteMessage } from '../utils/messageDB'
 
 // 延迟导入 users.js 避免循环依赖
 
@@ -54,20 +54,6 @@ function persistConversationSeqIds() {
   } catch (_) {}
 }
 
-function restoreConversationSeqIds() {
-  try {
-    if (state.accountId) {
-      const raw = localStorage.getItem(`charroom_seqids_${state.accountId}`)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (typeof parsed === 'object' && parsed !== null) {
-          state.conversationSeqIds = parsed
-        }
-      }
-    }
-  } catch (_) {}
-}
-
 export function getConversationSeqId(conversationId) {
   const key = String(conversationId)
   return state.conversationSeqIds[key] || 0
@@ -110,6 +96,10 @@ async function saveGroupMessage(message) {
 
 // ── 会话加载 + 分页 ───────────────────────────
 
+// 分页游标：conversationId → 已加载的最旧消息 index（null=从头）；
+// 配合 IndexedDB 游标分页，避免每次翻页全量读会话消息
+const pageCursors = new Map()
+
 export async function loadConversation(id, isGroup = false) {
   if (!id) {
     state.selectedChatId = null
@@ -124,14 +114,17 @@ export async function loadConversation(id, isGroup = false) {
     if (isGroup) {
       state.messages = []
       const conversationId = `group:${Math.abs(Number(id))}`
-      const all = await dbGetMessages(state.accountId, conversationId)
-      state.groupMessages = all.slice(-PAGE_SIZE)
-      state.hasMoreGroupMessages = all.length > PAGE_SIZE
+      const page = await dbGetMessagesPage(state.accountId, conversationId, null, PAGE_SIZE)
+      state.groupMessages = page.messages
+      state.hasMoreGroupMessages = page.hasMore
+      pageCursors.set(conversationId, page.beforeIndex)
     } else {
       state.groupMessages = []
-      const all = await dbGetMessages(state.accountId, String(id))
-      state.messages = all.slice(-PAGE_SIZE)
-      state.hasMoreMessages = all.length > PAGE_SIZE
+      const conversationId = String(id)
+      const page = await dbGetMessagesPage(state.accountId, conversationId, null, PAGE_SIZE)
+      state.messages = page.messages
+      state.hasMoreMessages = page.hasMore
+      pageCursors.set(conversationId, page.beforeIndex)
     }
   } else {
     state.messages = []
@@ -148,27 +141,36 @@ export async function loadOlderMessages() {
   if (isGroup) {
     if (!state.hasMoreGroupMessages) return false
     const conversationId = `group:${Math.abs(Number(state.selectedChatId))}`
-    const all = await dbGetMessages(state.accountId, conversationId)
-    const currentCount = state.groupMessages.length
-    const older = all.slice(Math.max(0, all.length - currentCount - PAGE_SIZE), all.length - currentCount)
-    if (older.length === 0) {
+    const beforeIndex = pageCursors.get(conversationId)
+    if (beforeIndex == null) {
       state.hasMoreGroupMessages = false
       return false
     }
-    state.groupMessages = [...older, ...state.groupMessages]
-    state.hasMoreGroupMessages = all.length - currentCount - older.length > 0
+    const page = await dbGetMessagesPage(state.accountId, conversationId, beforeIndex, PAGE_SIZE)
+    if (page.messages.length === 0) {
+      state.hasMoreGroupMessages = false
+      return false
+    }
+    state.groupMessages = [...page.messages, ...state.groupMessages]
+    state.hasMoreGroupMessages = page.hasMore
+    pageCursors.set(conversationId, page.beforeIndex)
     return true
   } else {
     if (!state.hasMoreMessages) return false
-    const all = await dbGetMessages(state.accountId, String(state.selectedChatId))
-    const currentCount = state.messages.length
-    const older = all.slice(Math.max(0, all.length - currentCount - PAGE_SIZE), all.length - currentCount)
-    if (older.length === 0) {
+    const conversationId = String(state.selectedChatId)
+    const beforeIndex = pageCursors.get(conversationId)
+    if (beforeIndex == null) {
       state.hasMoreMessages = false
       return false
     }
-    state.messages = [...older, ...state.messages]
-    state.hasMoreMessages = all.length - currentCount - older.length > 0
+    const page = await dbGetMessagesPage(state.accountId, conversationId, beforeIndex, PAGE_SIZE)
+    if (page.messages.length === 0) {
+      state.hasMoreMessages = false
+      return false
+    }
+    state.messages = [...page.messages, ...state.messages]
+    state.hasMoreMessages = page.hasMore
+    pageCursors.set(conversationId, page.beforeIndex)
     return true
   }
 }
@@ -211,7 +213,7 @@ export function upsertAgentStreamMessage(messageId, fullContent, done = false) {
     }
   } else {
     const agentMessage = {
-      user: '900000001',
+      user: '0',
       text: fullContent,
       time: new Date().toISOString(),
       targetId: String(state.accountId),
@@ -277,9 +279,23 @@ export function trimGroupMessages(max) {
 }
 
 export function deleteMessage(message, isGroup = false) {
+  const byId = message && message.messageId
+    ? m => m.messageId !== message.messageId
+    : m => m !== message
   if (isGroup) {
-    state.groupMessages = state.groupMessages.filter(m => m !== message)
+    state.groupMessages = state.groupMessages.filter(byId)
   } else {
-    state.messages = state.messages.filter(m => m !== message)
+    state.messages = state.messages.filter(byId)
+  }
+  // 同步删除 IndexedDB 中的持久化消息，避免刷新后复活
+  if (state.accountId && message && message.messageId) {
+    const chatId = isGroup
+      ? `group:${message.groupId}`
+      : getPrivateConversationId(message)
+    if (chatId) {
+      dbDeleteMessage(state.accountId, chatId, message.messageId).catch(e =>
+        console.warn('[MessageDB] 删除消息失败:', e)
+      )
+    }
   }
 }
