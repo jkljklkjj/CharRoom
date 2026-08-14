@@ -1,5 +1,5 @@
 import store from '../store'
-import { getDeviceId, DEVICE_TYPE } from '../utils/device'
+import { getDeviceId, getDeviceType, DEVICE_TYPE } from '../utils/device'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://chatlite.xin/api'
 
@@ -31,7 +31,8 @@ function onRefreshFailure() {
   localStorage.removeItem('charroom_token')
   localStorage.removeItem('charroom_refreshToken')
   localStorage.removeItem('charroom_accountId')
-  window.location.href = '/login'
+  // 注意：router 无 /login 路由，跳 /app（未登录态展示 LoginRegister）
+  window.location.href = '/app'
 }
 
 async function safeFetch(url, options = {}) {
@@ -294,6 +295,24 @@ export async function getCurrentUser() {
   return body?.data || body || null
 }
 
+/**
+ * 更新当前用户资料（昵称/签名/密码）。
+ * @returns {Promise<boolean>}
+ */
+export async function updateUserProfile({ username, phone, signature, password } = {}) {
+  const body = {}
+  if (username) body.username = username
+  if (phone) body.phone = phone
+  if (signature) body.signature = signature
+  if (password) body.password = password
+  const { ok } = await safeFetch(`${API_BASE}/users/me/profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  return ok
+}
+
 export async function validateToken() {
   try {
     const { ok, body } = await safeFetch(`${API_BASE}/auth/validate`, { method: 'GET' })
@@ -336,7 +355,7 @@ export async function getGroupDetail(id) {
 }
 
 // 示例：调用 agent stream（后续可以改为 SSE 或 WebTransport 分块）
-export async function callAgentStream(text, onTokenChunk = (chunk) => {}) {
+export async function callAgentStream(text, onTokenChunk = (_chunk) => {}) {
   try {
     const headers = { 'Content-Type': 'text/plain' }
     if (store.state.token) {
@@ -362,32 +381,8 @@ export async function callAgentStream(text, onTokenChunk = (chunk) => {}) {
   }
 }
 
-/**
- * Token 配额 & 购买
- */
-export async function getTokenQuota() {
-  const res = await safeFetch(`${API_BASE}/agent/quota`, { method: 'GET' })
-  return res.ok ? (res.body?.data || null) : null
-}
-export async function getTokenPrices() {
-  const res = await safeFetch(`${API_BASE}/agent/quota/prices`, { method: 'GET' })
-  return res.ok ? (res.body?.data || null) : null
-}
-export async function purchaseTokens(amountFen) {
-  const res = await safeFetch(`${API_BASE}/agent/quota/purchase`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount: amountFen })
-  })
-  return res.ok ? (res.body?.data || res.body) : null
-}
-
-export async function confirmPurchase(purchaseId) {
-  const res = await safeFetch(`${API_BASE}/agent/quota/purchase/confirm?purchaseId=${purchaseId}`, {
-    method: 'POST'
-  })
-  return res.ok
-}
+// Token 配额 & 购买 → 已提取到 api/quota.js
+export { getTokenQuota, getTokenPrices, purchaseTokens, confirmPurchase } from './quota.js'
 
 export async function getOnlineStatus(userIds) {
   const { ok, body } = await safeFetch(`${API_BASE}/users/online-status`, {
@@ -421,5 +416,6 @@ export default {
   syncMessages,
   getTokenQuota,
   getTokenPrices,
-  purchaseTokens
+  purchaseTokens,
+  updateUserProfile
 }
