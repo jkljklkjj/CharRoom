@@ -201,392 +201,79 @@ suspend fun uploadFile(
 /**
  * 登录接口
  */
-suspend fun loginTokens(account: String, password: String): LoginTokenBundle? {
-    val requestBody = buildJsonObject {
-        put("account", account)
-        put("password", password)
-        put("deviceType", ServerConfig.DEVICE_TYPE)
-        put("deviceId", generateDeviceId())
-    }
-
-    val response = sendRequest<LoginTokenBundle>(
-        path = ApiEndpoints.LOGIN,
-        method = "POST",
-        body = requestBody
-    )
-
-    if (response.isSuccess && response.data != null && response.data.accessToken.isNotBlank()) {
-        return response.data
-    }
-//    throw Exception("登录失败")
-
-    return null
-}
-
-suspend fun login(account: String, password: String): String? {
-    return loginTokens(account, password)?.accessToken
-}
-
 /**
  * 使用 refresh token 刷新 access token（并轮换 refresh token）
  */
-suspend fun refreshTokenBundle(refreshToken: String): LoginTokenBundle? {
-    if (refreshToken.isBlank()) return null
-
-    val requestBody = buildJsonObject {
-        put("refreshToken", refreshToken)
-    }
-
-    val response = sendRequest<LoginTokenBundle>(
-        path = ApiEndpoints.REFRESH_TOKEN,
-        method = "POST",
-        body = requestBody
-    )
-
-    return response.data?.takeIf { it.accessToken.isNotBlank() }
-}
-
-suspend fun refreshAccessToken(refreshToken: String): String? {
-    return refreshTokenBundle(refreshToken)?.accessToken
-}
-
 /**
  * 验证token有效性接口，验证成功返回新的token对，验证失败/过期/错误统一返回null
  */
-suspend fun validateToken(token: String): LoginTokenBundle? {
-    if (token.isBlank()) return null
-
-    val response = sendRequest<LoginTokenBundle>(
-        path = ApiEndpoints.VALIDATE_TOKEN,
-        method = "GET",
-        token = token
-    )
-
-    // 只有code为0才认为成功，其他所有情况都返回null
-    return response.data?.takeIf { response.isSuccess && it.accessToken.isNotBlank() }
-}
-
 /**
  * 注册接口
  */
-suspend fun register(username: String, password: String, email: String = ""): Int? {
-    val requestBody = buildJsonObject {
-        put("username", username)
-        put("password", password)
-        put("email", email)
-    }
-
-    val response = sendRequest<Int>(
-        path = ApiEndpoints.REGISTER,
-        method = "POST",
-        body = requestBody
-    )
-
-    return response.data
-}
-
 /**
  * 验证注册接口（与网页端逻辑一致）
  */
-suspend fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = ""): Int? {
-    val requestBody = buildJsonObject {
-        put("username", username)
-        put("password", password)
-        put("email", email)
-        put("verifyCode", verifyCode)
-    }
-
-    val response = sendRequest<Int>(
-        path = ApiEndpoints.VERIFY_REGISTER,
-        method = "POST",
-        body = requestBody
-    )
-
-    return response.data
-}
-
 /**
  * 发送注册验证码
  */
-suspend fun sendRegisterVerifyCode(email: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("email", email)
-    }
-
-    val response = sendRequest<Boolean>(
-        path = ApiEndpoints.SEND_REGISTER_VERIFY_CODE,
-        method = "POST",
-        body = requestBody
-    )
-
-    return response.data == true
-}
-
 /**
  * 获取用户信息
  */
-suspend fun getUserInfo(token: String): User? {
-    val response = sendRequest<User>(
-        path = ApiEndpoints.USER_PROFILE,
-        method = "GET",
-        token = token
-    )
-
-    return response.data
-}
-
 /**
  * 获取好友列表
  */
-suspend fun getFriendList(token: String): List<User> {
-    val response = sendRequest<List<User>>(
-        path = ApiEndpoints.FRIEND_GET,
-        method = "GET",
-        token = token
-    )
-
-    return response.data ?: emptyList()
-}
-
 /**
  * 获取群组列表
  */
-suspend fun getGroupList(token: String): List<Group> {
-    val response = sendRequest<List<Group>>(
-        path = ApiEndpoints.GROUP_GET,
-        method = "GET",
-        token = token
-    )
-
-    return response.data ?: emptyList()
-}
-
 /**
  * 获取历史消息
  */
-suspend fun getHistoryMessages(token: String, userId: Int, page: Int = 1, limit: Int = 50): List<Message> {
-    val path = "${ApiEndpoints.OFFLINE}?userId=$userId&page=$page&limit=$limit"
-
-    val response = sendRequest<List<MessageSerializer>>(
-        path = path,
-        method = "GET",
-        token = token
-    )
-
-    return response.data?.let { convertMessages(it) } ?: emptyList()
-}
-
 /**
  * 获取群历史消息
  */
-suspend fun getGroupHistoryMessages(token: String, groupId: Int, page: Int = 1, limit: Int = 50): List<Message> {
-    val path = "${ApiEndpoints.OFFLINE}?groupId=$groupId&page=$page&limit=$limit"
-
-    val response = sendRequest<List<GroupMessageSerializer>>(
-        path = path,
-        method = "GET",
-        token = token
-    )
-
-    return response.data?.let { convertMessages(it, groupId) } ?: emptyList()
-}
-
 /**
  * 发送好友申请
  */
-suspend fun sendFriendRequest(token: String, targetUserId: Int, message: String = ""): Boolean {
-    val requestBody = buildJsonObject {
-        put("targetUserId", targetUserId)
-        put("message", message)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.FRIEND_ADD,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 获取 Token 配额信息
  */
-suspend fun getTokenQuota(token: String): model.QuotaInfo? {
-    val response = sendRequest<model.QuotaInfo>(
-        path = ApiEndpoints.AGENT_QUOTA,
-        token = token
-    )
-    return if (response.isSuccess) response.data else null
-}
-
 /**
  * 获取 Token 定价
  */
-suspend fun getTokenPrices(token: String): model.TokenPrices? {
-    val response = sendRequest<model.TokenPrices>(
-        path = ApiEndpoints.AGENT_QUOTA_PRICES,
-        token = token
-    )
-    return if (response.isSuccess) response.data else null
-}
-
 /**
  * 购买 Token — 返回下订单结果（含支付二维码/prepayId）
  */
-suspend fun purchaseTokens(token: String, amountFen: Int): model.PayResult? {
-    val requestBody = buildJsonObject {
-        put("amount", amountFen)
-    }
-    val response = sendRequest<model.PayResult>(
-        path = ApiEndpoints.AGENT_QUOTA_PURCHASE,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-    return if (response.isSuccess) response.data else null
-}
-
 /**
  * 确认支付（测试用 Mock）
  */
-suspend fun confirmPurchase(token: String, purchaseId: Long): Boolean {
-    val response = sendRequest<Unit>(
-        path = "${ApiEndpoints.AGENT_QUOTA_PURCHASE_CONFIRM}?purchaseId=$purchaseId",
-        method = "POST",
-        token = token
-    )
-    return response.isSuccess
-}
-
 /**
  * 删除好友 — DELETE /friends/{friendId}
  */
-suspend fun deleteFriend(token: String, friendId: Int): Boolean {
-    val response = sendRequest<Unit>(
-        path = "${ApiEndpoints.FRIEND_DEL}/$friendId",
-        method = "DELETE",
-        token = token
-    )
-    return response.isSuccess
-}
-
 /**
  * 处理好友申请
  */
-suspend fun handleFriendRequest(token: String, requestId: Int, accept: Boolean): Boolean {
-    val endpoint = if (accept) ApiEndpoints.FRIEND_ACCEPT else ApiEndpoints.FRIEND_REJECT
-    val requestBody = buildJsonObject {
-        put("requestId", requestId)
-    }
-
-    val response = sendRequest<Unit>(
-        path = endpoint,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 获取好友申请列表
  */
-suspend fun getFriendRequests(token: String): List<FriendRequest> {
-    val response = sendRequest<List<FriendRequest>>(
-        path = ApiEndpoints.FRIEND_REQUESTS,
-        method = "GET",
-        token = token
-    )
-
-    return response.data ?: emptyList()
-}
-
 /**
  * 获取群聊申请列表
  */
-suspend fun getGroupRequests(token: String): List<FriendRequest> {
-    val response = sendRequest<List<FriendRequest>>(
-        path = ApiEndpoints.GROUP_REQUESTS,
-        method = "GET",
-        token = token
-    )
-
-    return response.data ?: emptyList()
-}
-
 /**
  * 添加好友
  */
-suspend fun addFriend(token: String, account: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("account", account)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.FRIEND_ADD,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 加入群组
  * @return 完整响应，包含 code/message/data。code=1005 表示需要审核（群组需管理员批准）
  */
-suspend fun addGroup(token: String, groupId: String): ApiResponse<Unit> {
-    return sendRequest<Unit>(
-        path = "${ApiEndpoints.GROUP_ADD}/${groupId}/join",
-        method = "POST",
-        token = token
-    )
-}
-
 /**
  * 查询用户详情
  */
-suspend fun getUserDetail(token: String, userId: String): User? {
-    val response = sendRequest<User>(
-        path = "${ApiEndpoints.USER_DETAIL}?userId=$userId",
-        method = "GET",
-        token = token
-    )
-
-    return response.data
-}
-
 /**
  * 查询群组详情
  */
-suspend fun getGroupDetail(token: String, groupId: String): Group? {
-    val path = "${ApiEndpoints.GROUP_DETAIL}/$groupId"
-    val response = sendRequest<Group>(
-        path = path,
-        method = "GET",
-        token = token
-    )
-
-    return response.data
-}
-
 /**
  * 获取离线消息
  */
-suspend fun getOfflineMessages(token: String): List<Message> {
-    val response = sendRequest<List<MessageSerializer>>(
-        path = ApiEndpoints.OFFLINE,
-        method = "GET",
-        token = token
-    )
-
-    return response.data?.let { convertMessages(it) } ?: emptyList()
-}
-
 /**
  * 增量同步消息（基于 seqId 游标）。
  * @return SyncMessagesResult 包含消息列表和下一个游标
@@ -599,289 +286,51 @@ data class SyncMessagesResult(
     val hasMore: Boolean = false
 )
 
-suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int = 50): SyncMessagesResult {
-    val requestBody = buildJsonObject {
-        put("conversationId", conversationId)
-        put("lastSeqId", lastSeqId)
-        put("limit", limit)
-    }
-    val response = sendRequest<SyncMessagesResult>(
-        path = ApiEndpoints.SYNC_MESSAGES,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-    return response.data ?: SyncMessagesResult()
-}
-
 /**
  * 发送邮箱更新验证码
  */
-suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("email", email)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.SEND_EMAIL_UPDATE_VERIFY_CODE,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 更新用户个人资料
  */
-suspend fun updateUserProfile(token: String, username: String, phone: String, signature: String, password: String? = null): Boolean {
-    val requestBody = buildJsonObject {
-        put("username", username)
-        put("phone", phone)
-        put("signature", signature)
-        password?.let { put("password", it) }
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.USER_PROFILE_UPDATE,
-        method = "PUT",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 更新邮箱
  */
-suspend fun updateEmail(token: String, newEmail: String, verifyCode: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("email", newEmail)
-        put("verifyCode", verifyCode)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.USER_PROFILE_UPDATE_EMAIL,
-        method = "PUT",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 同意好友申请
  */
-suspend fun acceptFriend(token: String, requestId: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("requestId", requestId)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.FRIEND_ACCEPT,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 拒绝好友申请
  */
-suspend fun rejectFriend(token: String, requestId: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("requestId", requestId)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.FRIEND_REJECT,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 同意群聊申请
  */
-suspend fun acceptGroupApplication(token: String, groupId: String, userId: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("groupId", groupId)
-        put("userId", userId)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.GROUP_ACCEPT,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 拒绝群聊申请
  */
-suspend fun rejectGroupApplication(token: String, groupId: String, userId: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("groupId", groupId)
-        put("userId", userId)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.GROUP_REJECT,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 创建群组
  */
-suspend fun createGroup(token: String, name: String, memberIds: List<Int>): Group? {
-    val requestBody = buildJsonObject {
-        put("name", name)
-        putJsonArray("memberIds") {
-            memberIds.forEach { add(it) }
-        }
-    }
-
-    val response = sendRequest<Group>(
-        path = ApiEndpoints.GROUP_ADD,
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.data
-}
-
 /**
  * 邀请加入群组
  */
-suspend fun inviteToGroup(token: String, groupId: Int, userId: Int): Boolean {
-    val requestBody = buildJsonObject {
-        put("userId", userId)
-    }
-
-    val response = sendRequest<Unit>(
-        path = "${ApiEndpoints.GROUP_ADD}/$groupId/members",
-        method = "POST",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 退出群组
  */
-suspend fun leaveGroup(token: String, groupId: Int): Boolean {
-    val response = sendRequest<Unit>(
-        path = "${ApiEndpoints.GROUP_GET}/$groupId/leave",
-        method = "POST",
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 修改用户信息
  */
-suspend fun updateUserInfo(
-    token: String,
-    nickname: String? = null,
-    avatar: String? = null,
-    signature: String? = null
-): Boolean {
-    val requestBody = buildJsonObject {
-        nickname?.let { put("username", it) }
-        signature?.let { put("signature", it) }
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.USER_PROFILE_UPDATE,
-        method = "PUT",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 修改密码
  */
-suspend fun changePassword(token: String, oldPassword: String, newPassword: String): Boolean {
-    val requestBody = buildJsonObject {
-        put("password", newPassword)
-    }
-
-    val response = sendRequest<Unit>(
-        path = ApiEndpoints.USER_PROFILE_UPDATE,
-        method = "PUT",
-        body = requestBody,
-        token = token
-    )
-
-    return response.isSuccess
-}
-
 /**
  * 搜索用户
  */
-suspend fun searchUser(token: String, keyword: String): List<User> {
-    val path = "${ApiEndpoints.USER_DETAIL}?keyword=$keyword"
-    val response = sendRequest<List<User>>(
-        path = path,
-        method = "GET",
-        token = token
-    )
-
-    return response.data ?: emptyList()
-}
-
 /**
  * 检查应用版本更新
  * @param appVersion 当前应用版本号
  * @param platform 平台：android/desktop/web
  * @param channel 渠道：official/debug等
  */
-suspend fun checkAppVersion(
-    appVersion: Int,
-    platform: String,
-    channel: String = "official"
-): VersionCheckResult? {
-    val requestBody = buildJsonObject {
-        put("versionCode", appVersion)
-        put("platform", platform)
-        put("channel", channel)
-    }
-
-    // 版本检查不需要token，公开接口
-    val response = sendRequest<VersionCheckResult>(
-        path = ApiEndpoints.APP_VERSION_CHECK,
-        method = "POST",
-        body = requestBody,
-        token = null // 明确不传token
-    )
-
-    return response.data
-}
-
 /**
  * 文件上传
  */
@@ -892,34 +341,9 @@ suspend fun uploadFile(token: String, fileBytes: ByteArray, fileName: String): S
 /**
  * 上传头像
  */
-suspend fun uploadAvatar(token: String, fileBytes: ByteArray, fileName: String): String? {
-    return uploadFile(ApiEndpoints.USER_AVATAR_UPLOAD, fileBytes, fileName, token)
-}
-
 /**
  * AI聊天接口
  */
-suspend fun agentChat(token: String, message: String, stream: Boolean = false): String {
-    val requestBody = buildJsonObject {
-        put("message", message)
-        put("stream", stream)
-    }
-
-    return try {
-        val response = httpClient.request(ApiEndpoints.url(ApiEndpoints.AGENT_NL)) {
-            method = HttpMethod.Post
-            header(HttpHeaders.Authorization, "Bearer $token")
-            setBody(requestBody)
-            timeout {
-                requestTimeoutMillis = 30000
-            }
-        }
-        response.bodyAsText()
-    } catch (e: Exception) {
-        ""
-    }
-}
-
 // ==================================
 // 数据类定义
 // ==================================
@@ -962,8 +386,8 @@ data class FriendRequest(
 @Serializable
 data class MessageSerializer(
     val id: Int? = null,
-    val senderId: Int,
-    val receiverId: Int,
+    val senderId: String,
+    val receiverId: String,
     val content: String,
     val timestamp: Long,
     val messageType: String = "TEXT",
@@ -983,7 +407,7 @@ data class MessageSerializer(
 data class GroupMessageSerializer(
     val id: Int? = null,
     val groupId: Int,
-    val senderId: Int,
+    val senderId: String,
     val senderName: String,
     val content: String,
     val timestamp: Long,
@@ -1002,11 +426,13 @@ data class GroupMessageSerializer(
  */
 fun convertMessages(messages: List<MessageSerializer>): List<Message> {
     return messages.map { msg ->
+        val senderIdInt = msg.senderId.toIntOrNull() ?: 0
+        val receiverIdInt = msg.receiverId.toIntOrNull() ?: 0
         Message(
-            senderId = msg.senderId,
-            receiverId = msg.receiverId,
+            senderId = senderIdInt,
+            receiverId = receiverIdInt,
             message = msg.content,
-            sender = msg.senderId == GlobalAppState.currentAccount?.toInt(),
+            sender = msg.senderId == GlobalAppState.currentAccount,
             timestamp = msg.timestamp,
             isSent = true,
             messageType = MessageType.valueOf(msg.messageType),
@@ -1026,11 +452,12 @@ fun convertMessages(messages: List<MessageSerializer>): List<Message> {
  */
 fun convertMessages(messages: List<GroupMessageSerializer>, groupId: Int): List<Message> {
     return messages.map { msg ->
+        val senderIdInt = msg.senderId.toIntOrNull() ?: 0
         Message(
-            senderId = msg.senderId,
+            senderId = senderIdInt,
             receiverId = -groupId, // 群消息receiverId用负的groupId表示
             message = msg.content,
-            sender = msg.senderId == GlobalAppState.currentAccount?.toInt(),
+            sender = msg.senderId == GlobalAppState.currentAccount,
             timestamp = msg.timestamp,
             isSent = true,
             messageType = MessageType.valueOf(msg.messageType),
@@ -1048,97 +475,10 @@ fun convertMessages(messages: List<GroupMessageSerializer>, groupId: Int): List<
 /**
  * 发送私聊消息
  */
-suspend fun sendPrivateMessage(
-    token: String,
-    receiverId: String,
-    content: String,
-    messageType: String,
-    fileUrl: String? = null,
-    fileName: String? = null,
-    fileSize: Long? = null,
-    replyToMessageId: String? = null
-): Boolean {
-    return try {
-        println("[ApiClient] 发送私聊消息请求: receiverId=$receiverId, messageType=$messageType")
-        val response = httpClient.post(ApiEndpoints.url("/message/send/private")) {
-            header("Authorization", "Bearer $token")
-            contentType(ContentType.Application.Json)
-            val body = buildJsonObject {
-                put("receiverId", receiverId)
-                put("content", content)
-                put("messageType", messageType)
-                fileUrl?.let { put("fileUrl", it) }
-                fileName?.let { put("fileName", it) }
-                fileSize?.let { put("fileSize", it) }
-                replyToMessageId?.let { put("replyToMessageId", it) }
-            }
-            println("[ApiClient] 请求体: $body")
-            setBody(body)
-        }
-        println("[ApiClient] 响应状态: ${response.status}")
-        val apiResponse = response.body<ApiResponse<Unit>>()
-        println("[ApiClient] 解析结果: isSuccess=${apiResponse.isSuccess}, code=${apiResponse.code}")
-        apiResponse.isSuccess
-    } catch (e: Exception) {
-        println("[ApiClient] 发送消息异常: ${e.message}, 堆栈: ${e.stackTraceToString()}")
-        false
-    }
-}
-
 /**
  * 发送群聊消息
  */
-suspend fun sendGroupMessage(
-    token: String,
-    groupId: String,
-    content: String,
-    messageType: String,
-    fileUrl: String? = null,
-    fileName: String? = null,
-    fileSize: Long? = null,
-    replyToMessageId: String? = null
-): Boolean {
-    return try {
-        val response = httpClient.post(ApiEndpoints.url("/message/send/group")) {
-            header("Authorization", "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(
-                buildJsonObject {
-                    put("groupId", groupId)
-                    put("content", content)
-                    put("messageType", messageType)
-                    fileUrl?.let { put("fileUrl", it) }
-                    fileName?.let { put("fileName", it) }
-                    fileSize?.let { put("fileSize", it) }
-                    replyToMessageId?.let { put("replyToMessageId", it) }
-                }
-            )
-        }
-        val apiResponse = response.body<ApiResponse<Unit>>()
-        apiResponse.isSuccess
-    } catch (e: Exception) {
-        false
-    }
-}
-
 /**
  * 批量查询用户在线状态。
  * @return userId → online 映射
  */
-suspend fun batchOnlineStatus(token: String, userIds: List<Int>): Map<String, Boolean> {
-    if (userIds.isEmpty()) return emptyMap()
-    return try {
-        val response = httpClient.post(ApiEndpoints.url("/users/online-status")) {
-            header("Authorization", "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(buildJsonObject {
-                put("userIds", userIds.joinToString(","))
-            })
-        }
-        val apiResponse = response.body<ApiResponse<Map<String, Boolean>>>()
-        apiResponse.data ?: emptyMap()
-    } catch (e: Exception) {
-        println("[ApiClient] 批量在线状态查询失败: ${e.message}")
-        emptyMap()
-    }
-}

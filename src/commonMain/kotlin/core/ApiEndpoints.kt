@@ -50,7 +50,9 @@ object ApiEndpoints {
     const val AGENT_QUOTA = "/agent/quota"
     const val AGENT_QUOTA_PRICES = "/agent/quota/prices"
     const val AGENT_QUOTA_PURCHASE = "/agent/quota/purchase"
-    const val AGENT_QUOTA_PURCHASE_CONFIRM = "/agent/quota/purchase/confirm"
+
+    // 只读订单状态（GET {base}/{purchaseId}）；入账由服务端查单/回调触发，客户端不能直接确认
+    const val AGENT_QUOTA_PURCHASE_STATUS = "/agent/quota/purchase"
 
     // Files
     const val FILE_UPLOAD = "/files"
