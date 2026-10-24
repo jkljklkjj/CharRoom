@@ -189,7 +189,7 @@ fun ChatApp(
         ) {
             // 调试日志：观察选中用户变化
             LaunchedEffect(selectedChatTarget) {
-                println("[ChatApp DEBUG] selectedChatTarget changed: ${selectedChatTarget?.id} - ${selectedChatTarget?.username}")
+                AppLogger.d("selectedChatTarget changed: ${selectedChatTarget?.id} - ${selectedChatTarget?.username}")
             }
 
             // 注册系统返回键处理逻辑

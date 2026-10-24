@@ -305,7 +305,7 @@ class ChatState {
      * 添加新的私聊消息（自动按时间戳排序插入）
      */
     suspend fun addMessage(message: Message) = messagesMutex.withLock {
-        println("[ChatState] 添加私聊消息到状态: messageId=${message.messageId}, senderId=${message.senderId}, receiverId=${message.receiverId}, content=${message.message.take(50)}, isSent=${message.isSent}, timestamp=${message.timestamp}")
+        AppLogger.d("[ChatState] 添加私聊消息: messageId=${message.messageId}, senderId=${message.senderId}, receiverId=${message.receiverId}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
         _messageCache.add(message)                           // 全量镜像
         val convUserId = privateConversationId(message)
@@ -319,7 +319,7 @@ class ChatState {
                 unreadDelta = if (shouldIncreaseUnread) 1 else 0
             )
         }
-        println("[ChatState] 添加完成")
+        AppLogger.d("[ChatState] 添加完成")
     }
 
     /**
@@ -348,7 +348,7 @@ class ChatState {
      */
     suspend fun updateMessageSentStatus(messageId: String, isSent: Boolean) {
         messagesMutex.withLock {
-            println("[ChatState] 更新私聊消息发送状态: messageId=$messageId, isSent=$isSent")
+            AppLogger.d("[ChatState] 更新私聊消息发送状态: messageId=$messageId, isSent=$isSent")
             val msg = _messageCache.snapshot.find { it.messageId == messageId } ?: return@withLock
             val updated = msg.copy(isSent = isSent)
             _messageCache.add(updated)
@@ -368,7 +368,7 @@ class ChatState {
      * 添加新的群聊消息（自动按时间戳排序插入）
      */
     suspend fun addGroupMessage(message: GroupMessage) = groupMessagesMutex.withLock {
-        println("[ChatState] 添加群聊消息到状态: messageId=${message.messageId}, groupId=${message.groupId}, senderId=${message.senderId}, senderName=${message.senderName}, content=${message.text.take(50)}, isSent=${message.isSent}, timestamp=${message.timestamp}")
+        AppLogger.d("[ChatState] 添加群聊消息: messageId=${message.messageId}, groupId=${message.groupId}, senderId=${message.senderId}, senderName=${message.senderName}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
         val gid = groupConversationId(message)
         _groupMessageCache.add(message)                       // 全量镜像
@@ -382,7 +382,7 @@ class ChatState {
                 unreadDelta = if (shouldIncreaseUnread) 1 else 0
             )
         }
-        println("[ChatState] 添加群聊消息完成, 当前群消息总数: ${_groupMessageCache.size}")
+        AppLogger.d("[ChatState] 添加群聊消息完成, 当前群消息总数: ${_groupMessageCache.size}")
     }
 
     /**
@@ -411,7 +411,7 @@ class ChatState {
      */
     suspend fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) {
         groupMessagesMutex.withLock {
-            println("[ChatState] 更新群聊消息发送状态: messageId=$messageId, isSent=$isSent")
+            AppLogger.d("[ChatState] 更新群聊消息发送状态: messageId=$messageId, isSent=$isSent")
             val msg = _groupMessageCache.snapshot.find { it.messageId == messageId } ?: return@withLock
             val updated = msg.copy(isSent = isSent)
             _groupMessageCache.add(updated)

@@ -69,7 +69,7 @@ object DesktopImageLoader : ImageLoaderProvider {
             return@withContext bufferedImage?.toComposeImageBitmap()
         }
     } catch (e: Exception) {
-        println("Image load error: $url, ${e.message}")
+        AppLogger.w("Image load error: $url, ${e.message}")
         null
     }
 }

@@ -3,6 +3,7 @@ package component
 import java.awt.Desktop
 import java.net.URI
 import java.net.URLEncoder
+import core.AppLogger
 
 /**
  * Desktop: 用 java.awt.Desktop 打开默认邮件客户端，将消息内容填入邮件正文
@@ -14,6 +15,6 @@ fun shareText(text: String) {
             Desktop.getDesktop().mail(URI.create("mailto:?body=$body"))
         }
     } catch (_: Exception) {
-        println("[ShareUtil] Failed to share via mail: $text")
+        AppLogger.w("[ShareUtil] Failed to share via mail: $text")
     }
 }

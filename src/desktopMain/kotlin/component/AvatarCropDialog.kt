@@ -52,6 +52,7 @@ import java.awt.event.MouseWheelEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseWheelListener
 import io.github.oshai.kotlinlogging.KotlinLogging
+import core.AppLogger
 private val logger = KotlinLogging.logger {}
 
 /**
@@ -100,7 +101,7 @@ object DesktopAvatarCropDialog : AvatarCropDialogProvider {
                     imageBitmap = argbImage.toComposeImageBitmap()
                 }
             } catch (e: Exception) {
-                println("[AvatarCropDialog] 图片加载失败: ${e.message}")
+                AppLogger.w("[AvatarCropDialog] 图片加载失败: ${e.message}")
             }
         }
     }

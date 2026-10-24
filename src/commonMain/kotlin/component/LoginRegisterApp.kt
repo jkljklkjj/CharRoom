@@ -98,7 +98,7 @@ fun LoginRegisterApp(
 
                 // 调试日志：输出屏幕尺寸
                 LaunchedEffect(Unit) {
-                    println("[LoginRegisterApp DEBUG] Screen size: ${windowSize.width} x ${windowSize.height}, isSmallScreen: ${windowSize.width < 600.dp}")
+                    AppLogger.d("Screen size: ${windowSize.width} x ${windowSize.height}, isSmallScreen: ${windowSize.width < 600.dp}")
                 }
 
                 ChatApp(

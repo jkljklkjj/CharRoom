@@ -2,6 +2,7 @@ package component
 
 import java.awt.Desktop
 import java.net.URI
+import core.AppLogger
 
 /**
  * Desktop: 打开系统默认浏览器访问支付链接
@@ -12,6 +13,6 @@ fun openPaymentUrl(url: String) {
             Desktop.getDesktop().browse(URI(url))
         }
     } catch (_: Exception) {
-        println("[TokenQuota] Failed to open URL: $url")
+        AppLogger.w("[TokenQuota] Failed to open URL: $url")
     }
 }
