@@ -598,7 +598,12 @@ function showNotification(msg: ChatMessage | GroupChatMessage) {
   if (document.visibilityState === 'visible') return
   if (!('Notification' in window) || Notification.permission !== 'granted') return
 
-  const title = String(msg.userId || '') || '新消息'
+  // 优先显示发送者昵称（好友列表查找），找不到时回退账号 ID
+  const senderId = String(msg.userId || '')
+  const sender = senderId && storeRef
+    ? storeRef.state.users.find(u => String(u.id) === senderId)
+    : undefined
+  const title = sender?.name || sender?.username || senderId || '新消息'
   const body = msg.content || '[图片或其他内容]'
   try {
     new Notification(DOMPurify.sanitize(title), {
