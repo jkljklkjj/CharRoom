@@ -517,11 +517,15 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper) {
       }
     }
 
-    // 新消息通知
+    // 新消息通知 + 立即回 ACK
+    // 后端 PendingMessageManager 未收到 ACK 时会 30s 间隔重发、最多 3 次，
+    // 不回 ACK 接收方会看到 3 份重复消息
     if (processedData.type === MSG_TYPE.CHAT && processedData.chat) {
       showNotification(processedData.chat)
+      if (processedData.chat.messageId) void sendAck(processedData.chat.messageId)
     } else if (processedData.type === MSG_TYPE.GROUP_CHAT && processedData.groupChat) {
       showNotification(processedData.groupChat)
+      if (processedData.groupChat.messageId) void sendAck(processedData.groupChat.messageId)
     }
 
     // 同步响应

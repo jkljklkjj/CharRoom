@@ -177,7 +177,22 @@ export async function loadOlderMessages() {
 
 // ── 消息操作 ──────────────────────────────────
 
+// 最近处理过的 messageId（防重复入列：后端未收到 ACK 会 30s×3 重发，
+// 重连补拉/增量同步也可能与实时推送重复）
+const seenMessageIds = new Set<string>()
+function alreadySeen(messageId?: string | null): boolean {
+  if (!messageId) return false
+  if (seenMessageIds.has(messageId)) return true
+  seenMessageIds.add(messageId)
+  if (seenMessageIds.size > 500) {
+    const oldest = seenMessageIds.values().next().value
+    if (oldest !== undefined) seenMessageIds.delete(oldest)
+  }
+  return false
+}
+
 export function addMessage(m: ChatMessage) {
+  if (alreadySeen(m.messageId)) return
   const chatId = getPrivateConversationId(m)
   if (!chatId) return
   // 预清洗文本，避免每次渲染调用 DOMPurify
@@ -226,6 +241,7 @@ export function upsertAgentStreamMessage(messageId: string, fullContent: string,
 }
 
 export function addGroupMessage(m: ChatMessage) {
+  if (alreadySeen(m.messageId)) return
   const conversationId = `-${m.groupId}`
   // 预清洗文本，避免每次渲染调用 DOMPurify
   const sanitized = m.text != null ? { ...m, text: sanitizeText(m.text) } : m
