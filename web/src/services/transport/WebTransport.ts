@@ -53,11 +53,13 @@ export class WebTransport extends ChatTransport {
 
       // 监听 transport.closed —— 服务端断开或网络异常时触发
       this._transport.closed.then((info) => {
-        console.debug('WebTransport.closed 触发:', info)
+        console.warn('[WT] transport.closed 触发:', JSON.stringify(info))
+        console.warn('[WT] transport.closed 堆栈:', new Error().stack)
         this._readerActive = false
         this._safeOnClose()
       }).catch((e) => {
-        console.debug('WebTransport.closed 异常:', e)
+        console.warn('[WT] transport.closed 异常:', e)
+        console.warn('[WT] transport.closed 异常堆栈:', new Error().stack)
         this._readerActive = false
         this._safeOnClose()
       })
@@ -97,7 +99,7 @@ export class WebTransport extends ChatTransport {
    * @param {string} [opts.conversationId] - 会话 ID，用于会话流路由
    * @param {string} [opts.streamType] - 流类型：'control' | 'chat'
    */
-  send(data: BinaryData, opts: SendOptions = {}) {
+  async send(data: BinaryData, opts: SendOptions = {}): Promise<boolean> {
     const streamType = opts.streamType || STREAM_TYPE.CONTROL
     const conversationId = opts.conversationId || ''
 
@@ -116,13 +118,13 @@ export class WebTransport extends ChatTransport {
     this._controlStream = null
 
     // 关闭所有会话流
-    for (const [convId, stream] of this._chatStreams) {
+    for (const stream of this._chatStreams.values()) {
       try { stream.writer.close() } catch (_) {}
     }
     this._chatStreams.clear()
 
     if (this._transport) {
-      this._transport.close()
+      try { this._transport.close() } catch (_) {}
       this._transport = null
     }
     this._connected = false
@@ -145,13 +147,19 @@ export class WebTransport extends ChatTransport {
     this._startControlStreamReading()
   }
 
-  _sendToControlStream(data: BinaryData) {
-    if (!this._controlWriter) return false
-    this._controlWriter.write(data instanceof Uint8Array ? data : new Uint8Array(data)).catch(e => {
-      console.error('控制流发送异常:', e)
+  async _sendToControlStream(data: BinaryData): Promise<boolean> {
+    if (!this._controlWriter) {
+      console.warn('[WT] 控制流 writer 为 null，无法发送')
+      return false
+    }
+    try {
+      await this._controlWriter.write(data instanceof Uint8Array ? data : new Uint8Array(data))
+      return true
+    } catch (e) {
+      console.error('[WT] 控制流发送异常:', e)
       if (this._onerror) this._onerror(e)
-    })
-    return true
+      return false
+    }
   }
 
   async _startControlStreamReading() {
@@ -170,8 +178,10 @@ export class WebTransport extends ChatTransport {
         if (this._onerror) this._onerror(e)
       }
     } finally {
+      // 控制流 reader 结束不意味着整个 session 关闭——
+      // 可能只是服务端关闭了这条流，但 WebTransport session 仍存活。
+      // 不再调用 _safeOnClose()，由 transport.closed promise 统一处理。
       this._readerActive = false
-      this._safeOnClose()
     }
   }
 
@@ -183,21 +193,31 @@ export class WebTransport extends ChatTransport {
    * WebTransport 协议：服务端 `QuicWebTransportHandler` 直接处理
    * protobuf MessageWrapper，无需额外 init 帧。
    */
-  _sendToChatStream(conversationId: string, data: BinaryData) {
+  async _sendToChatStream(conversationId: string, data: BinaryData): Promise<boolean> {
     const entry = this._chatStreams.get(conversationId)
-    if (entry && entry.writer) {
-      entry.writer.write(data instanceof Uint8Array ? data : new Uint8Array(data)).catch(e => {
-        console.error(`会话流(${conversationId})发送异常:`, e)
+    if (!entry || !entry.writer) {
+      // 创建新会话流并立即发送；write 失败会抛异常，由 catch 处理
+      try {
+        await this._createChatStream(conversationId, data)
+        return true
+      } catch (e) {
+        console.error(`创建会话流(${conversationId})失败:`, e)
         if (this._onerror) this._onerror(e)
-      })
-      return true
+        return false
+      }
     }
-
-    // 创建新会话流并立即发送
-    this._createChatStream(conversationId, data).catch(e =>
-      console.error(`创建会话流(${conversationId})失败:`, e)
-    )
-    return true
+    try {
+      await entry.writer.write(data instanceof Uint8Array ? data : new Uint8Array(data))
+      return true
+    } catch (e) {
+      console.error(`会话流(${conversationId})发送异常:`, e)
+      // 流已损坏，清除缓存以便下次重建
+      if (this._chatStreams.get(conversationId) === entry) {
+        this._chatStreams.delete(conversationId)
+      }
+      if (this._onerror) this._onerror(e)
+      return false
+    }
   }
 
   async _createChatStream(conversationId: string, firstData: BinaryData) {
@@ -225,7 +245,12 @@ export class WebTransport extends ChatTransport {
     } catch (e) {
       console.debug(`会话流(${conversationId})读取结束:`, e instanceof Error ? e.message : String(e))
     } finally {
-      this._chatStreams.delete(conversationId)
+      // 只有当当前流仍是 map 中注册的那个时才删除，
+      // 避免旧流 reader 退出时误删新流（同 conversationId 替换场景）。
+      const entry = this._chatStreams.get(conversationId)
+      if (entry && entry.stream === stream) {
+        this._chatStreams.delete(conversationId)
+      }
     }
   }
 

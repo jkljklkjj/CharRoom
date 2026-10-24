@@ -12,7 +12,8 @@ export abstract class ChatTransport {
   set onerror(fn: ((error: unknown) => void) | null) { this._onerror = fn }
   get connected() { return this._connected }
   abstract connect(url: string, token: string): Promise<void>
-  abstract send(data: BinaryData, opts?: SendOptions): boolean
+  /** 发送二进制消息。返回 Promise<boolean>，resolve 表示 write 真实完成状态。 */
+  abstract send(data: BinaryData, opts?: SendOptions): boolean | Promise<boolean>
   abstract close(): void
   isConnected() { return this._connected }
 }
