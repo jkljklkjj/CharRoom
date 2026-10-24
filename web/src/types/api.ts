@@ -27,3 +27,11 @@ export interface TokenQuota {
 }
 export interface TokenPrice { model: string; inputPrice?: number; outputPrice?: number }
 export interface Purchase { purchaseId: string; codeUrl?: string }
+/** 充值订单状态（只读）。paid=true 表示支付方已确认且已入账。 */
+export interface PurchaseStatus {
+  purchaseId: string
+  status: string
+  amountFen?: number
+  remainingFen?: number
+  paid: boolean
+}

@@ -1,4 +1,4 @@
-import type { TokenQuota, TokenPrice, Purchase } from '../types/api'
+import type { TokenQuota, TokenPrice, Purchase, PurchaseStatus } from '../types/api'
 /**
  * Token 配额 & 购买 API
  * 从 api/index.ts 提取，单一职责
@@ -27,10 +27,10 @@ export async function purchaseTokens(amountFen: number) {
   return res.ok ? (res.body?.data || null) : null
 }
 
-/** 确认购买完成 */
-export async function confirmPurchase(purchaseId: string) {
-  const res = await safeFetch(`${API_BASE}/agent/quota/purchase/confirm?purchaseId=${purchaseId}`, {
-    method: 'POST'
+/** 查询订单状态（只读）。服务端在 pending 时主动查单并入账，客户端不直接改余额。 */
+export async function getPurchaseStatus(purchaseId: string) {
+  const res = await safeFetch<PurchaseStatus>(`${API_BASE}/agent/quota/purchase/${purchaseId}`, {
+    method: 'GET'
   })
-  return res.ok
+  return res.ok ? (res.body?.data || null) : null
 }

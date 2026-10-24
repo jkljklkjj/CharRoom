@@ -48,13 +48,19 @@ test('failed token refresh settles every waiting request without recursive refre
   assert.equal(refreshCalls, 1)
   assert.ok(results.every(result => !result.ok && result.status === 401))
 })
-test('API default export supplies quota, payment confirmation and friend notification methods', async () => {
+test('API default export supplies quota, payment status and friend notification methods', async () => {
   const store = fixtureStore()
   const { exports: module } = await loadTs(path.resolve(__dirname, '../src/api/index.ts'), {
     fetch: async () => response(200, { data: { balanceFen: 250 } }), Headers,
     sessionStorage: storage(), localStorage: storage(), window: { location: {} }
   }, { '../store': { default: store } })
-  for (const name of ['getTokenQuota', 'getTokenPrices', 'purchaseTokens', 'confirmPurchase', 'getFriendNotifications', 'markFriendNotificationsRead', 'getOnlineStatus']) {
+  // 支付改只读查单：客户端不再提供 confirmPurchase（入账由服务端确认）
+  for (const name of ['getTokenQuota', 'getTokenPrices', 'purchaseTokens', 'getPurchaseStatus', 'getFriendNotifications', 'markFriendNotificationsRead', 'getOnlineStatus']) {
+    assert.equal(typeof module.default[name], 'function', name)
+  }
+  assert.equal(module.default.confirmPurchase, undefined)
+  // 客服 AI 副驾 API re-export
+  for (const name of ['getCopilotMe', 'listCopilotConversations', 'sendCopilotMessage', 'listCopilotChannels']) {
     assert.equal(typeof module.default[name], 'function', name)
   }
   assert.equal((await module.default.getTokenQuota()).balanceFen, 250)

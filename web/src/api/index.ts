@@ -1,7 +1,8 @@
 import store from '../store'
 import { getDeviceId, getDeviceType, DEVICE_TYPE } from '../utils/device'
 import { safeFetch, API_BASE, refreshToken } from './http'
-import { getTokenQuota, getTokenPrices, purchaseTokens, confirmPurchase } from './quota'
+import { getTokenQuota, getTokenPrices, purchaseTokens, getPurchaseStatus } from './quota'
+import * as copilotApi from './copilot'
 import type { Id, User, Group } from '../types/chat'
 import type { Tokens, LoginResult, OfflineMessage, SyncResult, FriendRequest, FriendNotification, UserProfile } from '../types/api'
 export { safeFetch, API_BASE, refreshToken }
@@ -95,11 +96,14 @@ export async function getMyGroups() {
   return body?.data || []
 }
 
-export async function addFriend(account: string) {
-  const { ok } = await safeFetch(`${API_BASE}/friends`, {
+export async function addFriend(account: string): Promise<{ ok: boolean; message: string }> {
+  const { ok, body } = await safeFetch(`${API_BASE}/friends`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account })
   })
-  return ok
+  if (!ok) {
+    return { ok: false, message: body?.message || '请求失败' }
+  }
+  return { ok: true, message: '' }
 }
 
 export async function getFriendRequests() {
@@ -254,7 +258,9 @@ export async function callAgentStream(text: string, onTokenChunk: (chunk: string
 }
 
 // Token 配额 & 购买 → 已提取到 api/quota.ts
-export { getTokenQuota, getTokenPrices, purchaseTokens, confirmPurchase }
+export { getTokenQuota, getTokenPrices, purchaseTokens, getPurchaseStatus }
+// 客服 AI 副驾 → 已提取到 api/copilot.ts
+export * from './copilot'
 
 export async function getOnlineStatus(userIds: Id[]) {
   const { ok, body } = await safeFetch<Record<string, boolean>>(`${API_BASE}/users/online-status`, {
@@ -267,6 +273,7 @@ export async function getOnlineStatus(userIds: Id[]) {
 }
 
 export default {
+  ...copilotApi,
   login,
   register,
   getCurrentUser,
@@ -289,7 +296,7 @@ export default {
   getTokenQuota,
   getTokenPrices,
   purchaseTokens,
-  confirmPurchase,
+  getPurchaseStatus,
   getFriendNotifications,
   markFriendNotificationsRead,
   getOnlineStatus,
