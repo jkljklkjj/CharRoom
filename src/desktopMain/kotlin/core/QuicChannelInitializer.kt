@@ -21,22 +21,19 @@ class QuicStreamInitializer(
 
     override fun initChannel(ch: QuicStreamChannel) {
         ch.pipeline().addLast(object : SimpleChannelInboundHandler<ByteBuf>() {
+            private val decoder = QuicStreamProtocol.Decoder()
+
             override fun channelRead0(ctx: ChannelHandlerContext, msg: ByteBuf) {
                 val readable = msg.readableBytes()
-                if (readable < 4) return
                 val bytes = ByteArray(readable)
                 msg.readBytes(bytes)
-                // 循环解码：QUIC 流可能在一次 channelRead0 中包含多帧数据
-                var offset = 0
-                while (offset < bytes.size) {
-                    val result = QuicStreamProtocol.decodeFrame(bytes, offset) ?: break
-                    val (payload, consumed) = result
+                for (payload in decoder.decode(bytes)) {
                     onStreamFrame(ch.streamId(), payload)
-                    offset += consumed
                 }
             }
 
             override fun channelInactive(ctx: ChannelHandlerContext) {
+                decoder.reset()
                 log.info("QUIC stream 已关闭: streamId={}", ch.streamId())
                 onStreamInactive?.invoke(ch.streamId())
                 super.channelInactive(ctx)
@@ -44,6 +41,7 @@ class QuicStreamInitializer(
 
             override fun exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
                 log.warn("QUIC stream handler exception, streamId={}", ch.streamId(), cause)
+                ctx.close()
             }
         })
 

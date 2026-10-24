@@ -4,7 +4,6 @@ import com.chatlite.proto.MessageProtos
 import android.content.Context
 import core.*
 import core.state.GlobalAppState
-import core.state.GlobalChatState
 import kotlinx.coroutines.*
 import com.google.android.gms.net.CronetProviderInstaller
 import org.chromium.net.CronetEngine
@@ -36,16 +35,27 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     private val sessionStreams = ConcurrentHashMap<String, BidirectionalStream>()
     private val executor: Executor = Executors.newSingleThreadExecutor()
 
-    // 消息去重：服务端未收到 ACK 时会重发，客户端需去重
-    private val recentMessageIds = object : LinkedHashMap<String, Boolean>(256, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?): Boolean {
-            return size > 256
-        }
-    }
-
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
     override var agentStreamHandler: AgentStreamHandler? = null
+
+    private val pendingAcks = PendingMessageAcks(schedule = { timeout, action ->
+        val task = scope.launch { delay(timeout); action() }
+        val cancel: () -> Unit = { task.cancel() }
+        cancel
+    }, onCallbackFailure = { log.warn("发送确认回调失败", it) })
+
+    private val dispatcher = ProtobufMessageDispatcher(
+        listeners = { synchronized(messageListeners) { messageListeners.toList() } },
+        agentHandler = { agentStreamHandler },
+        onResponse = { response ->
+            if (response.success) response.clientId.toIntOrNull()?.takeIf { it > 0 }?.let {
+                GlobalAppState.setCurrentUserId(it)
+            }
+        },
+        onAcknowledgement = { ack, bytes -> pendingAcks.acknowledge(ack, bytes) },
+        onFailure = { log.warn("消息分发失败", it) }
+    )
 
     // ── 生命周期 ──
 
@@ -74,6 +84,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     override fun stop() {
         connected.set(false)
+        pendingAcks.failAll()
+        dispatcher.clear()
         controlStream?.cancel()
         sessionStreams.values.forEach { it.cancel() }
         sessionStreams.clear()
@@ -91,7 +103,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     override fun logoutAndDisconnect() {
         val token = GlobalAppState.currentToken
         if (!token.isNullOrBlank()) {
-            val payload = buildLogoutPayload(token)
+            val payload = buildLogoutPayload((GlobalAppState.currentUserId ?: 0).toString())
             sendInternal(payload)
         }
         stop()
@@ -99,8 +111,21 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     override fun send(payload: ByteArray, type: MsgType, targetClientId: String,
                       expectedResponses: Int, callback: (Boolean, List<ByteArray>) -> Unit) {
+        var messageId: String? = null
+        try {
+            val wrapper = MessageProtos.MessageWrapper.parseFrom(payload)
+            require(wrapper.type == type) { "Message type and encoded payload disagree" }
+            messageId = wrapper.deliveryMessageId()
+            if (messageId != null) pendingAcks.await(messageId, callback)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            callback(false, emptyList())
+            return
+        }
+        val ackId = messageId
         scope.launch {
             try {
+                check(connected.get()) { "Not connected" }
                 val stream = getOrCreateStream(type, targetClientId)
                 val framed = QuicStreamProtocol.encodeFrame(payload)
                 val buf = ByteBuffer.allocateDirect(framed.size)
@@ -108,10 +133,11 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
                 buf.flip()
                 stream.write(buf, false)
                 stream.flush()
-                callback(true, emptyList())
+                if (ackId == null) callback(true, emptyList())
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 log.error("发送失败 type={}", type, e)
-                callback(false, emptyList())
+                if (ackId != null) pendingAcks.fail(ackId) else callback(false, emptyList())
             }
         }
     }
@@ -119,11 +145,11 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     override fun sendText(content: String, callback: (Boolean) -> Unit) = callback(false)
 
     override fun addMessageReceiveListener(listener: MessageReceiveListener) {
-        messageListeners.add(listener)
+        synchronized(messageListeners) { if (!messageListeners.contains(listener)) messageListeners.add(listener) }
     }
 
     override fun removeMessageReceiveListener(listener: MessageReceiveListener) {
-        messageListeners.remove(listener)
+        synchronized(messageListeners) { messageListeners.remove(listener) }
     }
 
     override fun addAuthStateListener(listener: AuthStateListener) {
@@ -156,6 +182,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     }
 
     private inner class ControlStreamCallback : BidirectionalStream.Callback() {
+        private val decoder = QuicStreamProtocol.Decoder()
+
         override fun onStreamReady(stream: BidirectionalStream) {
             log.info("控制流就绪")
         }
@@ -166,10 +194,13 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
         override fun onReadCompleted(stream: BidirectionalStream, info: UrlResponseInfo,
                                      buffer: ByteBuffer, endOfStream: Boolean) {
-            if (buffer.hasRemaining()) {
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                handleStreamData(bytes)
+            try {
+                decoder.decodeReadBuffer(buffer).forEach { handleStreamData(it) }
+            } catch (error: IllegalArgumentException) {
+                log.warn("无效的消息帧", error)
+                decoder.reset()
+                stream.cancel()
+                return
             }
             if (!endOfStream) {
                 buffer.clear()
@@ -228,7 +259,7 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     private fun getOrCreateStream(type: MsgType, targetId: String): BidirectionalStream {
         return when (type) {
-            MsgType.LOGIN, MsgType.LOGOUT, MsgType.HEARTBEAT -> {
+            MsgType.LOGIN, MsgType.LOGOUT, MsgType.HEARTBEAT, MsgType.CHECK, MsgType.ACK -> {
                 controlStream ?: throw IllegalStateException("控制流未就绪")
             }
             MsgType.CHAT, MsgType.GROUP_CHAT, MsgType.AGENT_CHAT -> {
@@ -252,6 +283,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
     }
 
     private inner class SessionStreamCallback(private val targetId: String) : BidirectionalStream.Callback() {
+        private val decoder = QuicStreamProtocol.Decoder()
+
         override fun onStreamReady(stream: BidirectionalStream) {
             log.debug("会话流就绪: {}", targetId)
         }
@@ -260,10 +293,13 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
         override fun onReadCompleted(stream: BidirectionalStream, info: UrlResponseInfo,
                                      buffer: ByteBuffer, endOfStream: Boolean) {
-            if (buffer.hasRemaining()) {
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                handleStreamData(bytes)
+            try {
+                decoder.decodeReadBuffer(buffer).forEach { handleStreamData(it) }
+            } catch (error: IllegalArgumentException) {
+                log.warn("无效的消息帧", error)
+                decoder.reset()
+                stream.cancel()
+                return
             }
             if (!endOfStream) {
                 buffer.clear()
@@ -290,112 +326,8 @@ class CronetQuicClient(private val context: Context) : ChatTransport {
 
     // ── 消息处理 ──
 
-    /**
-     * 消息去重：返回 true 表示是重复消息，应跳过。
-     */
-    private fun isDuplicateMessage(messageId: String): Boolean {
-        synchronized(recentMessageIds) {
-            if (recentMessageIds.containsKey(messageId)) return true
-            recentMessageIds[messageId] = true
-            return false
-        }
-    }
-
     private fun handleStreamData(data: ByteArray) {
-        try {
-            val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
-            synchronized(messageListeners) {
-                messageListeners.forEach { listener ->
-                    when (wrapper.type) {
-                        MessageProtos.MessageWrapperType.RESPONSE -> {
-                            if (wrapper.hasResponse()) {
-                                val resp = wrapper.response
-                                if (resp.success && resp.clientId.isNotBlank()) {
-                                    resp.clientId.toIntOrNull()?.let {
-                                        if (it > 0) GlobalAppState.setCurrentUserId(it)
-                                    }
-                                }
-                            }
-                        }
-                        MessageProtos.MessageWrapperType.CHAT -> if (wrapper.hasChat()) {
-                            val chat = wrapper.chat
-                            if (isDuplicateMessage(chat.messageId)) return@forEach
-                            sendAck(chat.messageId, "chat")
-                            listener.onPrivateMessageReceived(
-                                senderId = chat.userId.toInt(),
-                                message = chat.content,
-                                timestamp = chat.timestamp,
-                                seqId = chat.seqId,
-                                conversationId = chat.conversationId
-                            )
-                        }
-                        MessageProtos.MessageWrapperType.GROUP_CHAT -> if (wrapper.hasGroupChat()) {
-                            val gc = wrapper.groupChat
-                            if (isDuplicateMessage(gc.messageId)) return@forEach
-                            sendAck(gc.messageId, "group:${gc.targetClientId}")
-                            listener.onGroupMessageReceived(
-                                groupId = gc.targetClientId.toInt(),
-                                senderId = gc.userId.toInt(),
-                                senderName = "用户${gc.userId}",
-                                message = gc.content,
-                                timestamp = gc.timestamp,
-                                seqId = gc.seqId,
-                                conversationId = gc.conversationId
-                            )
-                        }
-                        MessageProtos.MessageWrapperType.AGENT_CHAT -> if (wrapper.hasChat()) {
-                            val chat = wrapper.chat
-                            listener.onPrivateMessageReceived(
-                                senderId = chat.userId.toInt(),
-                                message = chat.content,
-                                timestamp = chat.timestamp
-                            )
-                        }
-                        MessageProtos.MessageWrapperType.ACK -> if (wrapper.hasAck()) {
-                            val ack = wrapper.ack
-                            if (ack.conversationId.isNotBlank() && ack.seqId > 0) {
-                                scope.launch {
-                                    GlobalChatState.updateConversationSeqId(ack.conversationId, ack.seqId)
-                                }
-                            }
-                        }
-                        MessageProtos.MessageWrapperType.AGENT_CHAT_STREAM -> if (wrapper.hasAgentStream()) {
-                            val stream = wrapper.agentStream
-                            val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
-                            val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
-                            val text = if (stream.hasText()) stream.text else ""
-                            // 去重：done 按 requestId；chunk 按 requestId + seq（seq 为服务端流内递增序号）。
-                            // 不能用文本内容哈希去重 —— 合法的重复 token（如“！！”）会被误删。
-                            val dedupKey = if (isDone) stream.requestId.toString()
-                                else "${stream.requestId}:${stream.seq}"
-                            if (isDuplicateMessage(dedupKey)) return@forEach
-                            if (isDone) {
-                                sendAck(stream.requestId.toString(), "agent")
-                            }
-                            val handler = agentStreamHandler
-                            if (handler != null) {
-                                handler.onAgentStreamChunk(
-                                    messageId = stream.requestId.toString(),
-                                    fullContent = text,
-                                    done = isDone,
-                                    error = isError
-                                )
-                            } else {
-                                listener.onAgentStreamChunk(
-                                    messageId = stream.requestId.toString(),
-                                    fullContent = text,
-                                    done = isDone,
-                                    error = isError
-                                )
-                            }
-                        }
-                        else -> {
-                            // 未处理的消息类型（LOGIN/LOGOUT/CHECK/HEARTBEAT/STREAM_INIT_ACK/SYNC_HINT/FRIEND_ACCEPTED/UNRECOGNIZED）
-                        }
-                    }
-                }
-            }
-        } catch (_: Exception) {}
+        dispatcher.dispatch(data) { messageId, conversationId -> sendAck(messageId, conversationId) }
     }
 
     /**

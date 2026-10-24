@@ -4,16 +4,7 @@ import i18n from '../i18n'
 import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
 import { saveToQueue, getAllPending, removeMessage, incrementRetry, MAX_RETRIES } from './offlineQueue'
 import { getDeviceId, getDeviceType } from '../utils/device'
-
-// ── 消息类型（与 message.proto MessageWrapperType 枚举值一致）────
-// 设备类型数字映射（与 message.proto DeviceType 枚举值一致）
-export const DEVICE_TYPE_NUM = { mobile: 1, desktop: 2, web: 3, cli: 4 }
-
-export const MSG_TYPE = {
-  LOGIN: 1, LOGOUT: 2, CHAT: 3, GROUP_CHAT: 4, AGENT_CHAT: 5,
-  AGENT_CHAT_STREAM: 6, CHECK: 7, HEARTBEAT: 8, ACK: 9,
-  RESPONSE: 10, STREAM_INIT_ACK: 11, SYNC_HINT: 12, FRIEND_ACCEPTED: 13
-}
+import { MSG_TYPE, DEVICE_TYPE_NUM, PROTO_DEVICE_TYPE } from '../proto/constants'
 
 // ── 内部变量 ────────────────────────────────────
 
@@ -177,7 +168,7 @@ async function sendLogin(token) {
       type: MSG_TYPE.LOGIN,
       login: {
         token: token,
-        deviceType: DEVICE_TYPE_NUM[getDeviceType()] ?? 0,
+        deviceType: DEVICE_TYPE_NUM[getDeviceType()] ?? PROTO_DEVICE_TYPE.DEVICE_TYPE_UNSPECIFIED,
         deviceId: getDeviceId()
       }
     })
@@ -459,7 +450,7 @@ async function handleMessage(rawData) {
       const ackedMsgId = ack.messageId
       if (ackedMsgId && pendingAcks.has(ackedMsgId)) {
         pendingAcks.delete(ackedMsgId)
-        if (storeRef) storeRef.updateMessageStatus(ackedMsgId, 'sent')
+        if (storeRef) storeRef.updateMessageStatus(ackedMsgId, ack.success === false ? 'failed' : 'sent')
       }
       // 更新 seqId 游标（用于增量同步断点续拉）
       if (ack.seqId != null && ack.conversationId && storeRef) {

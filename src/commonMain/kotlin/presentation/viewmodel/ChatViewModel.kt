@@ -205,9 +205,10 @@ open class ChatViewModel(
      */
     fun retryMessage(message: Message) {
         sessionScope.launch {
-            val user = chatState.users.value.find { it.id == message.senderId }
+            val targetId = if (message.sender) message.receiverId else message.senderId
+            val user = chatState.users.value.find { it.id == targetId }
             if (user == null) {
-                logger.warn { "retryMessage: 找不到用户 ${message.senderId}" }
+                logger.warn { "retryMessage: 找不到用户 $targetId" }
                 return@launch
             }
 
@@ -224,7 +225,8 @@ open class ChatViewModel(
                 messageType = message.messageType.ordinal,
                 fileUrl = message.fileUrl,
                 fileName = message.fileName,
-                fileSize = message.fileSize
+                fileSize = message.fileSize,
+                messageId = messageId
             )
 
             Chat.send(
@@ -810,7 +812,8 @@ open class ChatViewModel(
                 messageType = messageType.ordinal,
                 fileUrl = fileUrl,
                 fileName = fileName,
-                fileSize = fileSize
+                fileSize = fileSize,
+                messageId = messageId
             )
 
             // 通过QUIC发送消息
@@ -919,7 +922,9 @@ open class ChatViewModel(
                 messageType = messageType.ordinal,
                 fileUrl = fileUrl,
                 fileName = fileName,
-                fileSize = fileSize
+                fileSize = fileSize,
+                messageId = messageId,
+                timestamp = timestamp
             )
 
             // 通过QUIC发送群聊消息

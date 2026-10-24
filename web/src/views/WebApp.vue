@@ -124,6 +124,7 @@ import ChatWindow from '../components/ChatWindow.vue'
 import { toast } from '../utils/toast'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
+import { MSG_TYPE, AGENT_STREAM_TYPE } from '../proto/constants'
 import siteConfig from '../siteConfig'
 import api from '../api'
 import { AGENT_USER_ID } from '../constants'
@@ -233,7 +234,7 @@ function handleResize() {
 /** 处理 QUIC/WebTransport 收到的消息 */
 function handleIncomingMessage(msg) {
   try {
-    if (msg.type === 'chat' && msg.chat) {
+    if (msg.type === MSG_TYPE.CHAT && msg.chat) {
       store.addMessage({
         user: String(msg.chat.userId || 'unknown'),
         text: msg.chat.content,
@@ -246,7 +247,7 @@ function handleIncomingMessage(msg) {
       if (msg.chat.seqId && msg.chat.conversationId) {
         store.setConversationSeqId(msg.chat.conversationId, msg.chat.seqId)
       }
-    } else if (msg.type === 'group_chat' && msg.groupChat) {
+    } else if (msg.type === MSG_TYPE.GROUP_CHAT && msg.groupChat) {
       store.addGroupMessage({
         user: String(msg.groupChat.userId),
         text: msg.groupChat.content,
@@ -259,7 +260,7 @@ function handleIncomingMessage(msg) {
       if (msg.groupChat.seqId && msg.groupChat.conversationId) {
         store.setConversationSeqId(msg.groupChat.conversationId, msg.groupChat.seqId)
       }
-    } else if (msg.type === 'agentChatStream' && msg.agentStream) {
+    } else if (msg.type === MSG_TYPE.AGENT_CHAT_STREAM && msg.agentStream) {
       // Agent 流式消息（AgentStreamChunk 协议）
       const stream = msg.agentStream
       const requestId = stream.requestId || ''
@@ -267,34 +268,34 @@ function handleIncomingMessage(msg) {
 
       const streamType = stream.type
       // 0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
-      if (streamType === 0 && stream.text !== undefined) {
+      if (streamType === AGENT_STREAM_TYPE.STREAM_TEXT && stream.text !== undefined) {
         // 文本片段：增量拼接
         store.upsertAgentStreamMessage(requestId, stream.text, false)
-      } else if (streamType === 1 && stream.toolCall) {
+      } else if (streamType === AGENT_STREAM_TYPE.STREAM_TOOL_CALL && stream.toolCall) {
         // 工具调用：显示工具名称和参数
         const tc = stream.toolCall
         const toolInfo = `\n\n🔧 调用工具: ${tc.name}`
         store.upsertAgentStreamMessage(requestId, toolInfo, false)
-      } else if (streamType === 2 && stream.toolResult) {
+      } else if (streamType === AGENT_STREAM_TYPE.STREAM_TOOL_RESULT && stream.toolResult) {
         // 工具结果：显示执行结果
         const tr = stream.toolResult
         const status = tr.success ? '✅' : '❌'
         const resultText = `\n${status} 结果: ${tr.result || '(空)'}`
         store.upsertAgentStreamMessage(requestId, resultText, false)
-      } else if (streamType === 3 && stream.usage) {
+      } else if (streamType === AGENT_STREAM_TYPE.STREAM_USAGE && stream.usage) {
         // Token 用量：显示统计
         const u = stream.usage
         const usageText = `\n\n📊 Token: ${u.inputTokens} 输入 / ${u.outputTokens} 输出`
         store.upsertAgentStreamMessage(requestId, usageText, false)
-      } else if (streamType === 4) {
+      } else if (streamType === AGENT_STREAM_TYPE.STREAM_DONE) {
         // 流结束
         store.upsertAgentStreamMessage(requestId, '', true)
-      } else if (streamType === 5 && stream.error) {
+      } else if (streamType === AGENT_STREAM_TYPE.STREAM_ERROR && stream.error) {
         // 错误
         const errorMsg = stream.error.message || 'Agent 处理失败'
         store.upsertAgentStreamMessage(requestId, `\n\n❌ ${errorMsg}`, true)
       }
-    } else if (msg.type === 'sync_hint') {
+    } else if (msg.type === MSG_TYPE.SYNC_HINT) {
       // sync_hint：服务端推送的增量同步提示
       const hint = msg.ack || msg
       const conversationId = hint.clientId
@@ -467,7 +468,7 @@ function clearAuth() {
 async function logout() {
   try {
     await chatSocket.sendWrapper({
-      type: 'logout',
+      type: MSG_TYPE.LOGOUT,
       logout: { userId: String(store.state.accountId) }
     })
   } catch (_) {}
@@ -647,7 +648,7 @@ async function restoreSession() {
 const handleBeforeUnload = () => {
   if (store.state.token) {
     chatSocket.sendWrapper({
-      type: 'logout',
+      type: MSG_TYPE.LOGOUT,
       logout: { userId: String(store.state.accountId) }
     }).catch(e => console.debug('登出消息发送失败:', e))
   }

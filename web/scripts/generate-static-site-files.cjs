@@ -3,9 +3,8 @@ const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '..');
 const publicDir = path.join(projectRoot, 'public');
-const protoSource = path.join(projectRoot, 'src', 'proto', 'message.proto');
 const protoTargetDir = path.join(publicDir, 'proto');
-const protoTarget = path.join(protoTargetDir, 'message.proto');
+const protoFiles = ['message.proto', 'agent_stream.proto'];
 const routesConfigPath = path.join(projectRoot, 'site.routes.json');
 
 function ensureDir(dirPath) {
@@ -42,8 +41,8 @@ function main() {
   ensureDir(publicDir);
   ensureDir(protoTargetDir);
 
-  if (fs.existsSync(protoSource)) {
-    fs.copyFileSync(protoSource, protoTarget);
+  for (const name of protoFiles) {
+    fs.copyFileSync(path.join(projectRoot, 'src', 'proto', name), path.join(protoTargetDir, name));
   }
 
   const sitemapEntries = routes

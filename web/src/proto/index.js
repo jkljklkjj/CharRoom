@@ -75,9 +75,10 @@ async function loadProto() {
 async function mainThreadEncode(wrapperObj) {
   const root = await loadProto()
   const Wrapper = root.lookupType('com.chatlite.proto.MessageWrapper')
-  const err = Wrapper.verify(wrapperObj)
+  // UI identifiers are decimal strings so int64 values remain lossless.
+  const message = Wrapper.fromObject(wrapperObj)
+  const err = Wrapper.verify(message)
   if (err) throw Error(err)
-  const message = Wrapper.create(wrapperObj)
   const buffer = Wrapper.encode(message).finish()
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.length)
 }
@@ -87,7 +88,7 @@ async function mainThreadDecode(arrayBuffer) {
   const Wrapper = root.lookupType('com.chatlite.proto.MessageWrapper')
   const uint8 = new Uint8Array(arrayBuffer)
   const msg = Wrapper.decode(uint8)
-  return Wrapper.toObject(msg, { longs: String, enums: String, defaults: true })
+  return Wrapper.toObject(msg, { longs: String, enums: Number, defaults: true })
 }
 
 // ── 公共 API ──────────────────────────────────────────

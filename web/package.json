@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "test:messages": "node scripts/generate-protocol-constants.cjs --check && node --experimental-vm-modules --test tests/message-contract.test.cjs",
+    "generate:protocol": "node scripts/generate-protocol-constants.cjs",
     "generate:site": "node scripts/generate-static-site-files.cjs",
     "generate:icons": "node scripts/generate-favicons.cjs",
-    "build": "node scripts/generate-favicons.cjs && node scripts/generate-static-site-files.cjs && vite build",
+    "build": "node scripts/generate-favicons.cjs && node scripts/generate-static-site-files.cjs && node scripts/generate-protocol-constants.cjs && vite build",
     "prerender": "node scripts/prerender.cjs",
     "preview": "vite preview"
   },

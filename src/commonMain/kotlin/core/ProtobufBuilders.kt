@@ -69,13 +69,15 @@ fun buildChatPayload(
     messageType: Int = 0,
     fileUrl: String? = null,
     fileName: String? = null,
-    fileSize: Long? = null
+    fileSize: Long? = null,
+    messageId: String = java.util.UUID.randomUUID().toString()
 ): ByteArray {
     val chatBuilder = MessageProtos.ChatMessage.newBuilder()
         .setTargetClientId(targetClientId.toLong())
         .setContent(content)
         .setUserId(userId.toLong())
         .setTimestamp(timestamp)
+        .setMessageId(messageId)
         .setMessageType(MessageProtos.MessageType.forNumber(messageType))
 
     // 设置引用回复字段
@@ -161,12 +163,16 @@ fun buildGroupChatPayload(
     messageType: Int = 0,
     fileUrl: String? = null,
     fileName: String? = null,
-    fileSize: Long? = null
+    fileSize: Long? = null,
+    messageId: String = java.util.UUID.randomUUID().toString(),
+    timestamp: Long = System.currentTimeMillis()
 ): ByteArray {
     val gmBuilder = MessageProtos.GroupChatMessage.newBuilder()
         .setTargetClientId(targetClientId.toLong())
         .setContent(content)
         .setUserId(userId.toLong())
+        .setMessageId(messageId)
+        .setTimestamp(timestamp)
         .setMessageType(MessageProtos.MessageType.forNumber(messageType))
 
     // 设置引用回复字段

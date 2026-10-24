@@ -15,19 +15,28 @@ enum MessageType {
     FILE = 2;  // 文件消息
 }
 
+// 设备类型枚举（wire 层枚举化，替代字符串 device_type）
+enum DeviceType {
+    DEVICE_TYPE_UNSPECIFIED = 0;
+    MOBILE = 1;
+    DESKTOP = 2;
+    WEB = 3;
+    CLI = 4;
+}
+
 // 登录消息
 message LoginMessage {
     string token = 1;           // 登录凭证token，后端解析获取用户信息
-    string device_type = 2;     // 设备类型：mobile / desktop / web / cli
+    DeviceType device_type = 2; // 设备类型：mobile / desktop / web / cli
     string device_id = 3;       // 设备唯一标识
 }
 
 // 聊天消息
 message ChatMessage {
-    string targetClientId = 1;  // 目标客户端ID
+    int64 targetClientId = 1;  // 目标客户端ID（接收者用户ID）
     string content = 2;       // 消息内容
-    string userId = 3;        // 发送者用户ID
-    string timestamp = 4;      // 时间戳
+    int64 userId = 3;        // 发送者用户ID
+    int64 timestamp = 4;      // 毫秒时间戳
     optional string messageId = 5;      // 消息唯一ID（用于ACK确认而非数据库）
     repeated ClientAction clientActions = 6; // 可选的行为序列
 
@@ -49,10 +58,10 @@ message ChatMessage {
 
 // 群聊消息
 message GroupChatMessage {
-    string targetClientId = 1;  // 群组ID
+    int64 targetClientId = 1;  // 群组ID
     string content = 2;       // 消息内容
-    string userId = 3;        // 发送者用户ID
-    string timestamp = 4;      // 时间戳
+    int64 userId = 3;        // 发送者用户ID
+    int64 timestamp = 4;      // 毫秒时间戳
     optional string messageId = 5;      // 消息唯一ID（用于ACK确认）
 
     // 引用回复相关字段
@@ -84,14 +93,23 @@ message ClientAction {
 message AgentChatMessage {
     string targetClientId = 1;  // 目标客户端ID
     string content = 2;       // 消息内容
-    string userId = 3;        // 发送者用户ID
-    string timestamp = 4;      // 时间戳
+    int64 userId = 3;        // 发送者用户ID
+    int64 timestamp = 4;      // 毫秒时间戳
     repeated ClientAction clientActions = 5; // 可选的行为序列
+}
+
+// 会话类型枚举
+enum ConversationType {
+    CONVERSATION_TYPE_UNSPECIFIED = 0;
+    PRIVATE = 1;  // 单聊
+    GROUP = 2;    // 群聊
+    AGENT = 3;    // Agent 助手
 }
 
 // 检查在线状态消息
 message CheckMessage {
-    string targetClientId = 1;  // 要检查的客户端ID
+    ConversationType conversation_type = 1;  // 会话类型
+    int64 target_client_id = 2;              // 目标 ID（用户/群组/Agent）
 }
 
 // 心跳消息
@@ -102,7 +120,7 @@ message HeartbeatMessage {
 
 // 登出消息
 message LogoutMessage {
-    string userId = 1;  // 用户ID
+    int64 userId = 1;  // 用户ID
 }
 
 // ACK确认消息
@@ -118,8 +136,26 @@ message AckMessage {
 }
 
 // 通用消息包装器
+// 信封路由类型枚举：替代 string type（类型安全 + 契约收敛，前后端 proto 自动生成）
+enum MessageWrapperType {
+    MESSAGE_WRAPPER_TYPE_UNSPECIFIED = 0;
+    LOGIN = 1;
+    LOGOUT = 2;
+    CHAT = 3;
+    GROUP_CHAT = 4;
+    AGENT_CHAT = 5;
+    AGENT_CHAT_STREAM = 6;
+    CHECK = 7;
+    HEARTBEAT = 8;
+    ACK = 9;
+    RESPONSE = 10;
+    STREAM_INIT_ACK = 11;
+    SYNC_HINT = 12;
+    FRIEND_ACCEPTED = 13;
+}
+
 message MessageWrapper {
-    string type = 1;  // 消息类型: login, chat, agentChat, groupChat, check, heartbeat, logout, agentChatStream, ack, response
+    MessageWrapperType type = 1;  // 信封路由类型
 
     oneof payload {
         LoginMessage login = 2;

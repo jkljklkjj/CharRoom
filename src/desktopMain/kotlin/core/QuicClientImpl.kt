@@ -3,7 +3,6 @@ import com.chatlite.proto.MessageProtos
 
 import kotlinx.coroutines.*
 import core.state.GlobalAppState
-import core.state.GlobalChatState
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -35,17 +34,28 @@ class QuicClientImpl : ChatTransport {
     // 待发送消息缓冲（断线时缓存）
     private val messageQueue = ConcurrentLinkedQueue<PendingMessage>()
 
-    // 消息去重：服务端未收到 ACK 时会重发，客户端需去重
-    private val recentMessageIds = object : LinkedHashMap<String, Boolean>(256, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?): Boolean {
-            return size > 256
-        }
-    }
-
     // 消息监听器
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
     override var agentStreamHandler: AgentStreamHandler? = null
+
+    private val pendingAcks = PendingMessageAcks(schedule = { timeout, action ->
+        val task = scope.launch { delay(timeout); action() }
+        val cancel: () -> Unit = { task.cancel() }
+        cancel
+    }, onCallbackFailure = { log.warn("发送确认回调失败", it) })
+
+    private val dispatcher = ProtobufMessageDispatcher(
+        listeners = { synchronized(messageListeners) { messageListeners.toList() } },
+        agentHandler = { agentStreamHandler },
+        onResponse = { response ->
+            if (response.success) response.clientId.toIntOrNull()?.takeIf { it > 0 }?.let {
+                GlobalAppState.setCurrentUserId(it)
+            }
+        },
+        onAcknowledgement = { ack, bytes -> pendingAcks.acknowledge(ack, bytes) },
+        onFailure = { log.warn("消息分发失败", it) }
+    )
 
     // 连接配置
     private var host: String = ServerConfig.QUIC_HOST
@@ -81,6 +91,7 @@ class QuicClientImpl : ChatTransport {
 
             override fun onDisconnected(cause: Throwable?) {
                 connected.set(false)
+                pendingAcks.failAll()
                 log.warn("QUIC 连接断开: ${cause?.message}")
                 sessions.clear()
             }
@@ -174,142 +185,9 @@ class QuicClientImpl : ChatTransport {
      * 处理收到的 Stream 数据帧，向上层回调分发。
      */
     private fun handleStreamData(streamId: Long, data: ByteArray) {
-        // 任何服务端响应都可作为 RTT 样本（心跳确认 + 消息推送）
         recordRtt()
-        // 数据已由 QuicStreamInitializer 按帧边界返回，直接透传
-        synchronized(messageListeners) {
-            messageListeners.forEach { listener ->
-                try {
-                    // 尝试解析为 protobuf MessageWrapper 并分发
-                    val wrapper = com.chatlite.proto.MessageProtos.MessageWrapper.parseFrom(data)
-                    log.debug("解析消息类型: type={}", wrapper.type)
-                    when (wrapper.type) {
-                        MessageProtos.MessageWrapperType.ACK -> {
-                            if (wrapper.hasAck()) {
-                                val ack = wrapper.ack
-                                val ackSeqId = ack.seqId
-                                val ackConvId = ack.conversationId
-                                // 更新会话 seqId 游标（增量同步用）
-                                if (ackConvId.isNotBlank() && ackSeqId > 0) {
-                                    scope.launch {
-                                        GlobalChatState.updateConversationSeqId(ackConvId, ackSeqId)
-                                    }
-                                }
-                            }
-                            return@forEach
-                        }
-                        MessageProtos.MessageWrapperType.RESPONSE -> {
-                            // 登录响应：提取 clientId 作为当前用户 ID
-                            if (wrapper.hasResponse()) {
-                                val resp = wrapper.response
-                                val clientId = resp.clientId
-                                if (resp.success && clientId.isNotBlank()) {
-                                    val userId = clientId.toIntOrNull()
-                                    if (userId != null && userId > 0) {
-                                        GlobalAppState.setCurrentUserId(userId)
-                                        log.info("QUIC 登录成功: userId={}", userId)
-                                    }
-                                }
-                            }
-                            return@forEach
-                        }
-                        MessageProtos.MessageWrapperType.CHAT -> {
-                            if (wrapper.hasChat()) {
-                                val chat = wrapper.chat
-                                if (isDuplicateMessage(chat.messageId)) {
-                                    log.debug("重复消息跳过: messageId={}", chat.messageId)
-                                    return@forEach
-                                }
-                                val senderId = chat.userId.toInt()
-                                val text = chat.content
-                                val ts = chat.timestamp
-                                val seqId = chat.seqId
-                                val convId = chat.conversationId
-                                val myId = GlobalAppState.currentUserId ?: 0
-                                sendAckToServer(streamId, chat.messageId, "${minOf(myId, senderId)}:${maxOf(myId, senderId)}")
-                                log.info("分发私聊消息: senderId={}, text={}, seqId={}", senderId, text, seqId)
-                                listener.onPrivateMessageReceived(senderId, text, ts, seqId, convId)
-                            }
-                        }
-                        MessageProtos.MessageWrapperType.GROUP_CHAT -> {
-                            if (wrapper.hasGroupChat()) {
-                                val gc = wrapper.groupChat
-                                if (isDuplicateMessage(gc.messageId)) {
-                                    log.debug("重复群聊消息跳过: messageId={}", gc.messageId)
-                                    return@forEach
-                                }
-                                val groupId = gc.targetClientId.toInt()
-                                val senderId = gc.userId.toInt()
-                                val senderName = senderId.toString()
-                                val text = gc.content
-                                val ts = System.currentTimeMillis()
-                                val seqId = gc.seqId
-                                val convId = gc.conversationId
-                                sendAckToServer(streamId, gc.messageId, "group:$groupId")
-                                log.info("分发群聊消息: groupId={}, senderId={}, seqId={}", groupId, senderId, seqId)
-                                listener.onGroupMessageReceived(groupId, senderId, senderName, text, ts, seqId, convId)
-                            }
-                        }
-                        MessageProtos.MessageWrapperType.AGENT_CHAT_STREAM -> {
-                            if (wrapper.hasAgentStream()) {
-                                val stream = wrapper.agentStream
-                                val isDone = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_DONE
-                                val isError = stream.type == com.chatlite.proto.AgentStreamProtos.AgentStreamType.STREAM_ERROR
-                                val text = if (stream.hasText()) stream.text else ""
-
-                                // 去重：done 按 requestId；chunk 按 requestId + seq（seq 为服务端流内递增序号）。
-                                // 不能用文本内容哈希去重 —— 合法的重复 token（如“！！”）会被误删。
-                                val dedupKey = if (isDone) stream.requestId.toString()
-                                else "${stream.requestId}:${stream.seq}"
-                                if (isDuplicateMessage(dedupKey)) {
-                                    log.debug("重复 Agent 流跳过: requestId={}, done={}", stream.requestId, isDone)
-                                    return@forEach
-                                }
-                                if (isDone) {
-                                    sendAckToServer(streamId, stream.requestId.toString(), "agent")
-                                }
-                                // 优先使用独立 handler（绕过 listener 遍历）
-                                val handler = agentStreamHandler
-                                handler?.onAgentStreamChunk(
-                                    messageId = stream.requestId.toString(),
-                                    fullContent = text,
-                                    done = isDone,
-                                    error = isError
-                                )
-                            }
-                        }
-                        MessageProtos.MessageWrapperType.SYNC_HINT -> {
-                            // sync_hint: 服务端通知有新消息，解析 conversationId + seqId
-                            if (wrapper.hasAck()) {
-                                val ack = wrapper.ack
-                                val conversationId = ack.clientId
-                                val seqId = ack.message?.toLongOrNull() ?: 0L
-                                if (conversationId.isNotBlank() && seqId > 0) {
-                                    log.info("收到 sync_hint: conversationId={}, seqId={}", conversationId, seqId)
-                                    listener.onSyncHint(conversationId, seqId)
-                                }
-                            }
-                        }
-                        else -> {
-                            log.warn("未知消息类型: type={}", wrapper.type)
-                        }
-                    }
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    log.error("解析 Stream 数据失败: streamId={}, dataLen={}, error={}", streamId, data.size, e.message)
-                }
-            }
-        }
-    }
-
-    /**
-     * 消息去重：返回 true 表示是重复消息，应跳过。
-     */
-    private fun isDuplicateMessage(messageId: String): Boolean {
-        synchronized(recentMessageIds) {
-            if (recentMessageIds.containsKey(messageId)) return true
-            recentMessageIds[messageId] = true
-            return false
+        dispatcher.dispatch(data) { messageId, conversationId ->
+            sendAckToServer(streamId, messageId, conversationId)
         }
     }
 
@@ -375,53 +253,30 @@ class QuicClientImpl : ChatTransport {
      * - 会话类消息（CHAT/GROUP_CHAT/AGENT_CHAT）-> 按 conversationId 复用或新建流
      */
     private fun getOrCreateStream(type: MsgType, targetId: String): Long {
-        return when (type) {
-            MsgType.LOGIN, MsgType.LOGOUT, MsgType.HEARTBEAT,
-            MsgType.CHECK, MsgType.ACK, MsgType.RESPONSE, MsgType.AGENT_CHAT_STREAM, MsgType.SYNC_HINT -> {
-                getOrCreateControlStream()
-            }
-            MsgType.CHAT, MsgType.GROUP_CHAT, MsgType.AGENT_CHAT -> {
-                val convId = targetId
-                val existing = sessions[convId]
-                if (existing != null && transport.isStreamActive(existing.streamId)) {
-                    existing.streamId
-                } else {
-                    val newStreamId = transport.openStream()
-                    sessions[convId] = StreamSession(
-                        streamId = newStreamId,
-                        conversationId = convId,
-                        conversationType = when (type) {
-                            MsgType.CHAT -> StreamSession.ConversationType.PRIVATE
-                            MsgType.GROUP_CHAT -> StreamSession.ConversationType.GROUP
-                            MsgType.AGENT_CHAT -> StreamSession.ConversationType.AGENT
-                        },
-                        targetId = targetId
-                    )
-                    // 发送 Stream 初始化首帧（protobuf CheckMessage，服务端期望此格式）
-                    val convType = when (type) {
-                        MsgType.CHAT -> "private"
-                        MsgType.GROUP_CHAT -> "group"
-                        MsgType.AGENT_CHAT -> "agent"
-                    }
-                    val convTypeProto = when (convType) {
-                        "group" -> com.chatlite.proto.MessageProtos.ConversationType.GROUP
-                        "agent" -> com.chatlite.proto.MessageProtos.ConversationType.AGENT
-                        else -> com.chatlite.proto.MessageProtos.ConversationType.PRIVATE
-                    }
-                    val checkMsg = com.chatlite.proto.MessageProtos.CheckMessage.newBuilder()
-                        .setConversationType(convTypeProto)
-                        .setTargetClientId(targetId.toLong())
-                        .build()
-                    val initWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
-                        .setType(MessageProtos.MessageWrapperType.CHECK)
-                        .setCheck(checkMsg)
-                        .build()
-                    val initFrame = QuicStreamProtocol.encodeFrame(initWrapper.toByteArray())
-                    transport.send(newStreamId, initFrame)
-                    newStreamId
-                }
-            }
+        val conversationType = when (type) {
+            MsgType.CHAT -> MessageProtos.ConversationType.PRIVATE
+            MsgType.GROUP_CHAT -> MessageProtos.ConversationType.GROUP
+            MsgType.AGENT_CHAT -> MessageProtos.ConversationType.AGENT
+            else -> return getOrCreateControlStream()
         }
+        val existing = sessions[targetId]
+        if (existing != null && transport.isStreamActive(existing.streamId)) return existing.streamId
+        val streamId = transport.openStream()
+        sessions[targetId] = StreamSession(
+            streamId = streamId,
+            conversationId = targetId,
+            conversationType = when (conversationType) {
+                MessageProtos.ConversationType.GROUP -> StreamSession.ConversationType.GROUP
+                MessageProtos.ConversationType.AGENT -> StreamSession.ConversationType.AGENT
+                else -> StreamSession.ConversationType.PRIVATE
+            },
+            targetId = targetId
+        )
+        val check = MessageProtos.CheckMessage.newBuilder().setConversationType(conversationType)
+            .setTargetClientId(targetId.toLong()).build()
+        val init = MessageProtos.MessageWrapper.newBuilder().setType(MsgType.CHECK).setCheck(check).build()
+        transport.send(streamId, QuicStreamProtocol.encodeFrame(init.toByteArray()))
+        return streamId
     }
 
     /**
@@ -444,14 +299,23 @@ class QuicClientImpl : ChatTransport {
         expectedResponses: Int,
         callback: (Boolean, List<ByteArray>) -> Unit
     ) {
-        sendMessage(payload, type, targetClientId)
-        // Phase 1 简化实现：直接回调成功
-        callback(true, emptyList())
+        var messageId: String? = null
+        try {
+            val wrapper = MessageProtos.MessageWrapper.parseFrom(payload)
+            require(wrapper.type == type) { "Message type and encoded payload disagree" }
+            messageId = wrapper.deliveryMessageId()
+            if (messageId != null) pendingAcks.await(messageId, callback)
+            sendMessage(payload, type, targetClientId)
+            if (messageId == null) callback(true, emptyList())
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            if (!messageId.isNullOrBlank()) pendingAcks.fail(messageId) else callback(false, emptyList())
+        }
     }
 
     override fun sendText(content: String, callback: (Boolean) -> Unit) {
         // 文本消息由上层构建 protobuf 后通过 send() 发送
-        callback(true)
+        callback(false)
     }
 
     override fun isConnected(): Boolean = connected.get()
@@ -464,7 +328,7 @@ class QuicClientImpl : ChatTransport {
     override fun logoutAndDisconnect() {
         val controlStreamId = sessions[CONTROL_SESSION_KEY]?.streamId
         if (controlStreamId != null) {
-            val logoutPayload = buildLogoutPayload(GlobalAppState.currentToken ?: "")
+            val logoutPayload = buildLogoutPayload((GlobalAppState.currentUserId ?: 0).toString())
             val frame = QuicStreamProtocol.encodeFrame(logoutPayload)
             transport.send(controlStreamId, frame)
         }
@@ -473,6 +337,8 @@ class QuicClientImpl : ChatTransport {
 
     override fun stop() {
         connected.set(false)
+        pendingAcks.failAll()
+        dispatcher.clear()
         transport.shutdown()
         sessions.clear()
         messageQueue.clear()

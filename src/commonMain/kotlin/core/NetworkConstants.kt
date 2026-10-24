@@ -7,7 +7,7 @@ object NetworkConstants {
     const val WS_PATH = "/ws"
 
     // QUIC 帧格式常量
-    const val FRAME_HEADER_SIZE = 4
+    const val FRAME_HEADER_SIZE = QuicStreamProtocol.FRAME_HEADER_SIZE
 
     fun wsUrl(): String = "$WS_PROTOCOL://${ServerConfig.SERVER_IP}$WS_PATH"
     fun wsOrigin(): String = "$HTTP_PROTOCOL://${ServerConfig.SERVER_IP}"

@@ -153,7 +153,8 @@
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
-import chatSocket, { MSG_TYPE } from '../services/chatSocket'
+import chatSocket from '../services/chatSocket'
+import { MSG_TYPE } from '../proto/constants'
 
 const store = useStore()
 // 注入 store 引用给 chatSocket（替代 window.__chatStore hack）

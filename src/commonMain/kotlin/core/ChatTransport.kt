@@ -1,8 +1,5 @@
 package core
 
-import model.GroupMessage
-import model.Message
-
 /**
  * 聊天传输层接口（QUIC 实现）。
  *
@@ -28,7 +25,7 @@ interface ChatTransport {
      * @param type 消息类型
      * @param targetClientId 目标客户端ID
      * @param expectedResponses 预期响应数量
-     * @param callback 发送结果回调
+     * @param callback 私聊/群聊由匹配的服务端 ACK 确认；拒绝、超时或关闭返回 false
      */
     fun send(
         payload: ByteArray,
@@ -138,6 +135,9 @@ interface MessageReceiveListener {
      */
     fun onAckReceived(messageId: String, seqId: Long, conversationId: String) {}
 
+    /** 服务端拒绝接收该消息，不可作为发送成功处理。 */
+    fun onAckRejected(messageId: String, reason: String) {}
+
     /**
      * 收到同步提示（默认空实现，按需覆盖）。
      * 服务端推送 sync_hint 通知客户端有新消息，客户端应调用 /sync/messages 拉取增量。
@@ -159,23 +159,6 @@ fun interface AgentStreamHandler {
  */
 fun interface AuthStateListener {
     fun onAuthInvalidated(reason: String)
-}
-
-/**
- * 消息类型枚举
- */
-enum class MsgType(val wire: String) {
-    LOGIN("login"),
-    LOGOUT("logout"),
-    CHAT("chat"),
-    AGENT_CHAT("agent_chat"),
-    AGENT_CHAT_STREAM("agent_chat_stream"),
-    GROUP_CHAT("group_chat"),
-    CHECK("check"),
-    HEARTBEAT("heartbeat"),
-    ACK("ack"),
-    RESPONSE("response"),
-    SYNC_HINT("sync_hint");
 }
 
 // 全局传输层实现，由各平台入口初始化

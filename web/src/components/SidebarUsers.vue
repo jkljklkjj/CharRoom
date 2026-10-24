@@ -70,7 +70,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import api from '../api'
-import chatSocket, { MSG_TYPE } from '../services/chatSocket'
+import chatSocket from '../services/chatSocket'
+import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
 const emit = defineEmits(['user-selected', 'open-settings'])
 
@@ -138,7 +139,7 @@ function select(u) {
     chatSocket.sendWrapper({
       type: MSG_TYPE.CHECK,
       check: {
-        conversationType: 1, // PRIVATE
+        conversationType: CONVERSATION_TYPE.PRIVATE,
         targetClientId: u.id
       }
     }).catch(err => {

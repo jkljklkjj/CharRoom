@@ -37,9 +37,9 @@ self.onmessage = async function(e) {
   try {
     if (type === 'encode') {
       if (!Wrapper) await loadProto()
-      const err = Wrapper.verify(payload)
+      const message = Wrapper.fromObject(payload)
+      const err = Wrapper.verify(message)
       if (err) throw new Error(err)
-      const message = Wrapper.create(payload)
       const buffer = Wrapper.encode(message).finish()
       const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.length)
       self.postMessage({ type: 'encode', id, result: ab }, [ab])
@@ -47,7 +47,7 @@ self.onmessage = async function(e) {
       if (!Wrapper) await loadProto()
       const uint8 = new Uint8Array(payload)
       const msg = Wrapper.decode(uint8)
-      const obj = Wrapper.toObject(msg, { longs: String, enums: String, defaults: true })
+      const obj = Wrapper.toObject(msg, { longs: String, enums: Number, defaults: true })
       self.postMessage({ type: 'decode', id, result: obj })
     } else if (type === 'init') {
       await loadProto()
