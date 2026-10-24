@@ -311,6 +311,15 @@ jobs:
       - name: Accept Android licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
+      - name: Set up raw QUIC native toolchain
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal --component rustfmt --target aarch64-linux-android --target x86_64-linux-android
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.3.13750724"
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libclang-dev
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
+        shell: bash
+
       - name: Make gradlew executable
         run: chmod +x gradlew
         shell: bash

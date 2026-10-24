@@ -8,7 +8,7 @@ import presentation.viewmodel.ChatViewModel
 /**
  * Android 端 ChatViewModel
  * 扩展基础 ChatViewModel，添加 Android 特有的逻辑。
- * 实时消息通过 Chat (CronetQuicClient) 全局变量处理。
+ * 实时消息通过 Chat (QuicheChatClient) 全局变量处理。
  */
 class AndroidChatViewModel(
     chatRepository: ChatRepository = GlobalChatRepository,

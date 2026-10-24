@@ -2,6 +2,8 @@
 // the Kotlin Gradle plugin (which may be loaded at the root) can see AGP
 // internals. Apply the Kotlin Android plugin without a version to avoid
 // re-resolving a different Kotlin plugin into a separate classloader.
+import org.gradle.api.GradleException
+
 plugins {
     // Let pluginManagement (settings.gradle.kts) supply the versions so both
     // AGP and the Kotlin Android plugin are resolved consistently into the
@@ -17,10 +19,42 @@ def composeVersion = project.findProperty("compose.lib.version") ?: '1.10.6'
 def androidComposeVersion = '1.7.6'
 def activityComposeVersion = '1.13.0'
 
+// Linux/macOS/Windows native builds share the same pinned Rust crate. A CI-built
+// JNI directory can be supplied for machines without a native toolchain.
+def quicAbis = ['arm64-v8a', 'x86_64']
+def prebuiltQuicDirectory = providers.gradleProperty('quicJniLibsDir').orNull
+def quicJniDirectory = prebuiltQuicDirectory ? file(prebuiltQuicDirectory) : layout.buildDirectory.dir('generated/quic/jniLibs').get().asFile
+def buildQuicNative = tasks.register('buildQuicNative') {
+    inputs.files(rootProject.fileTree('native/quiche-jni') { exclude 'target/**', 'jniLibs/**' })
+    inputs.file(rootProject.file('scripts/build-android-quic.py'))
+    inputs.property('prebuiltDirectory', prebuiltQuicDirectory ?: '')
+    outputs.dir(quicJniDirectory)
+    doLast {
+        if (!prebuiltQuicDirectory) {
+            def ndkDirectory = providers.gradleProperty('quicNdkDir').orNull ?: System.getenv('ANDROID_NDK_HOME')
+            if (!ndkDirectory) ndkDirectory = new File(android.sdkDirectory, "ndk/${android.ndkVersion}").absolutePath
+            exec {
+                commandLine providers.gradleProperty('quicPython').getOrElse('python'),
+                        rootProject.file('scripts/build-android-quic.py').absolutePath,
+                        '--ndk', ndkDirectory, '--output', quicJniDirectory.absolutePath,
+                        '--abis', quicAbis.join(',')
+            }
+        }
+        quicAbis.each { abi ->
+            ['libchatlite_quic.so', 'libc++_shared.so'].each { name ->
+                def library = new File(quicJniDirectory, "${abi}/${name}")
+                if (!library.isFile() || library.length() == 0) throw new GradleException("Missing QUIC JNI library: ${library}")
+            }
+        }
+    }
+}
+tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn(buildQuicNative) }
+
 // Keep the Android block as before
 android {
     namespace 'com.chatlite.charroom'
     compileSdk 36
+    ndkVersion '27.3.13750724'
 
     defaultConfig {
         applicationId 'com.chatlite'
@@ -28,6 +62,7 @@ android {
         targetSdk 36
         versionCode 1
         versionName '1.0'
+        ndk { abiFilters.addAll(quicAbis) }
     }
 
     compileOptions {
@@ -63,6 +98,7 @@ android {
             java.srcDirs += project.file('../src/commonMain/kotlin')
             java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
+            jniLibs.srcDirs += quicJniDirectory
         }
     }
 
@@ -132,6 +168,7 @@ android {
 
             // 只保留 arm64-v8a 架构，减小 APK 体积
             ndk {
+                abiFilters.clear()
                 abiFilters 'arm64-v8a'
             }
 
@@ -161,10 +198,6 @@ dependencies {
     implementation 'com.google.android.material:material:1.13.0'
     // Reuse protobuf-generated classes from the root :proto module
     implementation project(':proto')
-    // Cronet QUIC（Android 原生支持）
-    implementation('com.google.android.gms:play-services-cronet:18.1.1') {
-        exclude group: 'com.google.protobuf'
-    }
     implementation 'com.google.protobuf:protobuf-java:4.34.1'
     implementation 'com.google.protobuf:protobuf-kotlin:4.34.1'
 

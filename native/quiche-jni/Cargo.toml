@@ -1,0 +1,24 @@
+[package]
+name = "chatlite-quic"
+version = "0.1.0"
+edition = "2021"
+publish = false
+rust-version = "1.88"
+
+[lib]
+name = "chatlite_quic"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+quiche = "=0.30.0"
+jni = "=0.21.1"
+libc = "0.2"
+getrandom = "0.2"
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"
+
+[[bin]]
+name = "quic-probe"
+path = "src/bin/quic_probe.rs"

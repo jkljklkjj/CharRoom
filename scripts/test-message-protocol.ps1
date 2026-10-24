@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory = $true)][string]$ProtobufJar,
     [Parameter(Mandatory = $true)][string]$JUnitJar,
     [Parameter(Mandatory = $true)][string]$HamcrestJar,
-    [string]$KotlinHome
+    [string]$KotlinHome,
+    [string]$JniProbeOutputDirectory
 )
 
 # Isolated shared-protocol tests. This is not a desktop/Android application build.
@@ -41,10 +42,10 @@ $classpath = @($javaOutput, $ProtobufJar, $JUnitJar, $HamcrestJar,
     (Join-Path $KotlinHome 'lib/kotlin-test.jar'), (Join-Path $KotlinHome 'lib/kotlin-test-junit.jar')) -join ';'
 $sources = @($testSupport)
 foreach ($name in @('ProtobufBuilders', 'ServerConfig', 'MessageProtocol', 'ChatTransport',
-    'ProtobufMessageDispatcher', 'PendingMessageAcks', 'QuicStreamProtocol')) {
+    'ProtobufMessageDispatcher', 'PendingMessageAcks', 'QuicStreamProtocol', 'QuicDriver', 'NativeQuicChatTransport')) {
     $sources += Join-Path $projectRoot "src/commonMain/kotlin/core/$name.kt"
 }
-$testClasses = @('MessageProtocolTest', 'ProtobufMessageDispatcherTest', 'PendingMessageAcksTest', 'QuicStreamProtocolTest')
+$testClasses = @('MessageProtocolTest', 'ProtobufMessageDispatcherTest', 'PendingMessageAcksTest', 'QuicStreamProtocolTest', 'NativeQuicChatTransportTest')
 foreach ($name in $testClasses) { $sources += Join-Path $projectRoot "src/commonTest/kotlin/core/$name.kt" }
 & (Join-Path $KotlinHome 'bin/kotlinc.bat') @sources -classpath $classpath -jvm-target 21 -d $kotlinOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -52,4 +53,19 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $runtimeClasspath = @($kotlinOutput, $classpath, (Join-Path $KotlinHome 'lib/kotlin-stdlib.jar')) -join ';'
 Write-Output 'Running shared protocol logic only; ActionLogger is a test double; Netty/Cronet/UI are not loaded.'
 & java -cp $runtimeClasspath org.junit.runner.JUnitCore @($testClasses | ForEach-Object { 'core.' + $_ })
-exit $LASTEXITCODE
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if ($JniProbeOutputDirectory) {
+    $probeSources = @(
+        (Join-Path $projectRoot 'native/tests/QuicJniProbe.kt'),
+        (Join-Path $projectRoot 'src/androidMain/kotlin/com/chatlite/charroom/core/quic/QuicheNative.kt'),
+        (Join-Path $projectRoot 'src/androidMain/kotlin/com/chatlite/charroom/core/quic/QuicheDriver.kt')
+    )
+    $probeOutput = Join-Path $JniProbeOutputDirectory 'classes'
+    New-Item -ItemType Directory -Force -Path $probeOutput | Out-Null
+    & (Join-Path $KotlinHome 'bin/kotlinc.bat') @probeSources -classpath $runtimeClasspath -jvm-target 21 -d $probeOutput
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Copy-Item -Path "$javaOutput/*", "$kotlinOutput/*" -Destination $probeOutput -Recurse -Force
+    Copy-Item -LiteralPath $ProtobufJar, (Join-Path $KotlinHome 'lib/kotlin-stdlib.jar') -Destination $JniProbeOutputDirectory -Force
+    Write-Output "JNI probe classes built: $JniProbeOutputDirectory"
+}
+exit 0

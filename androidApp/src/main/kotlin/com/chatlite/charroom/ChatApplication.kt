@@ -4,7 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.chatlite.charroom.core.AppLifecycleObserver
 import com.chatlite.charroom.core.ChatNotificationManager
-import com.chatlite.charroom.core.CronetQuicClient
+import com.chatlite.charroom.core.QuicheChatClient
 import com.chatlite.charroom.data.datasource.local.AndroidLocalChatHistoryStore
 import com.chatlite.charroom.data.datasource.local.AndroidLocalDataSourceImpl
 import core.LocalChatHistoryStore
@@ -61,8 +61,8 @@ class ChatApplication : Application() {
         AndroidImageLoader.init(this)
         // 初始化头像裁剪对话框
         AvatarCropDialogImpl = AndroidAvatarCropDialog
-        // 初始化 Cronet QUIC 客户端
-        Chat = CronetQuicClient(this)
+        // 原生 QUIC：ALPN custom，与后端控制流/会话流协议一致。
+        Chat = QuicheChatClient(this)
         // 初始化日志
         if (BuildConfig.DEBUG) {
             Timber.plant(object : Timber.DebugTree() {

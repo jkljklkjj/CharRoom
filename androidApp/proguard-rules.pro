@@ -61,6 +61,9 @@
 # ============================================
 # 网络相关保留
 # ============================================
+# JNI symbols use the fully qualified class and method names.
+-keep class com.chatlite.charroom.core.quic.QuicheNative { *; }
+
 # Netty 核心保留（Android端需要更完整的规则）
 -keep class io.netty.** { *; }
 -keepclassmembers class io.netty.** { *; }
