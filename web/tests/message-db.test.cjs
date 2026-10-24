@@ -50,3 +50,23 @@ test('version 1 numeric account keys migrate without losing existing history', a
   const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), { indexedDB, IDBKeyRange, structuredClone })
   assert.deepEqual(Array.from(await db.getMessages('1', '41'), m => m.text), ['legacy history'])
 })
+test('conversation meta tracks last message time and clears with conversation', async () => {
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
+    indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
+  })
+  await db.appendMessage('A', '41', { user: '41', text: 'first', time: 1000 })
+  await db.appendMessage('A', '41', { user: 'you', text: 'second', time: 2000 })
+  await db.appendMessage('A', 'group:7', { user: '9', text: 'group hi', time: 3000 })
+  const all = await db.getAllConversationMeta('A')
+  assert.equal(all.length, 2)
+  const privateMeta = await db.getConversationMeta('A', '41')
+  assert.equal(privateMeta.lastIncomingMessageTime, 2000)
+  assert.equal((await db.getConversationMeta('A', 'group:7')).lastIncomingMessageTime, 3000)
+  // 批量保存取批内最大时间
+  await db.saveMessages('B', '41', [{ user: '41', text: 'x', time: 500 }, { user: '41', text: 'y', time: 900 }])
+  assert.equal((await db.getConversationMeta('B', '41')).lastIncomingMessageTime, 900)
+  // 清空会话时同步删除元数据
+  await db.clearConversation('A', '41')
+  assert.equal(await db.getConversationMeta('A', '41'), null)
+  assert.equal((await db.getAllConversationMeta('A')).length, 1)
+})
