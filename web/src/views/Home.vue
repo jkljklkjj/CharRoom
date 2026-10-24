@@ -10,10 +10,6 @@
         <router-link to="/app">{{ $t('nav.webApp') }}</router-link>
       </nav>
       <div class="header-actions">
-        <button class="btn" @click="showRequests = true" style="position:relative">
-          👥
-          <span v-if="friendRequests.length > 0" class="req-dot"></span>
-        </button>
         <button class="btn reward" @click="showReward = true">{{ $t('header.reward') }}</button>
       </div>
     </header>
@@ -160,14 +156,11 @@
 </template>
 
 <script setup lang="ts">
-import type { Id } from '../types/chat'
-import type { FriendRequest } from '../types/api'
 import { toast } from '../utils/toast'
 import logoSvg from '../assets/logo.svg'
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import siteConfig from '../siteConfig'
-import { getFriendRequests, acceptFriend } from '../api'
 
 const { t } = useI18n()
 
@@ -218,9 +211,6 @@ const selectedMethod = ref('alipay')
 const authorEmail = ref(siteConfig.AUTHOR_EMAIL)
 const copyStatus = ref<'copied' | 'failed' | null>(null) // null | 'copied' | 'failed'
 
-const showRequests = ref(false)
-const friendRequests = ref<FriendRequest[]>([]) // array of user objects
-
 function closeReward() { showReward.value = false }
 function selectMethod(method: string) { selectedMethod.value = method }
 
@@ -232,25 +222,6 @@ async function copyEmail() {
     copyStatus.value = 'failed'
   }
   setTimeout(() => { copyStatus.value = null }, 3000)
-}
-
-async function loadFriendRequests() {
-  try {
-    const list = await getFriendRequests()
-    friendRequests.value = Array.isArray(list) ? list : []
-  } catch (e) {
-    friendRequests.value = []
-  }
-}
-
-async function handleAccept(requesterId: Id, idx: number) {
-  const ok = await acceptFriend(requesterId)
-  if (ok) {
-    // remove from list
-    friendRequests.value.splice(idx, 1)
-  } else {
-    toast.error(t('sidebar.frAcceptFailed'))
-  }
 }
 
 function handleDownload(url: string) {
@@ -993,17 +964,6 @@ onMounted(() => {
   border: none;
   font-size: 18px;
   cursor: pointer;
-}
-
-.req-dot {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  width: 10px;
-  height: 10px;
-  background: #ff3b30;
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px rgba(255,59,48,0.12);
 }
 
 .author-email {

@@ -6,7 +6,7 @@ import { setUsers, setGroups, mergeUsers, cacheUsers, loadCachedUsers,
          addUser, removeUser, updateUserOnlineStatus,
          rebuildConversationStates, updateConversationState, clearConversationUnread } from './users'
 import { addMessage, addGroupMessage, upsertAgentStreamMessage,
-         updateMessageStatus, setSelectedChat, loadConversation,
+         updateMessageStatus, setSelectedChat,
          loadOlderMessages, trimMessages, trimGroupMessages,
          deleteMessage, getConversationSeqId, setConversationSeqId } from './messages'
 

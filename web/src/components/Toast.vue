@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import type { ToastKind } from '../utils/toast'
 import { registerToast } from '../utils/toast'
 
