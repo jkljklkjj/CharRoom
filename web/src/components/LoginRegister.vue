@@ -105,10 +105,10 @@ async function doRegister() {
 
 <style scoped>
 .login-wrap{display:flex;align-items:center;justify-content:center;height:100%}
-.panel{width:420px;background:#fff;padding:22px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.06)}
-.panel h3{margin:0 0 12px}
+.panel{width:420px;background:var(--panel, #fff);padding:22px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.06)}
+.panel h3{margin:0 0 12px;color:var(--text-primary, #222)}
 .panel label{display:block;font-size:12px;color:var(--muted);margin-top:8px}
-.panel input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #eee;margin-top:10px;box-sizing:border-box}
+.panel input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--input-border, #eee);margin-top:10px;box-sizing:border-box;background:var(--input-bg, #fff);color:var(--text-primary, #222)}
 .error-hint{color:#ff4757;font-size:12px;margin-top:4px}
 .actions{margin-top:18px;display:flex;flex-direction:column;gap:8px}
 .primary{background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff;border:0;padding:12px;border-radius:10px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}

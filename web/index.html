@@ -68,6 +68,17 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" href="/src/assets/logo.svg" />
+    <script>
+      // ── 主题预置（渲染前执行，避免闪烁/残留）──
+      // 与 src/utils/theme.ts 保持同一套逻辑：显式选择优先，否则跟随系统。
+      (function () {
+        try {
+          var t = localStorage.getItem('theme')
+          var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+        } catch (e) { /* localStorage 不可用时保持默认亮色 */ }
+      })()
+    </script>
     <script defer>
       // ── 前端静态 SEO i18n ──────────────────────────────────────────
       // 在 Vue 应用挂载前运行，读取 localStorage 或浏览器语言，
