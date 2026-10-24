@@ -56,7 +56,9 @@ QUIC 是字节流；Netty/Cronet 回调不是消息边界。每条流持有自�
 ## 尚待单独完成
 
 - Android 使用普通 Cronet `BidirectionalStream`，没有实现服务端要求的 WebTransport CONNECT 会话/子流协议。启动也未等待 stream ready/登录响应，尚未启动首次读取；共享协议修正不等于 Android 已能联通当前服务器。需要先确定 Android 传输实现，再做真机联调。
-- 原生界面的 `isSent` 仍是布尔值，初始采用乐观显示；完整产品状态还需区分“等待 ACK / 已接受 / 失败”。本轮修正的是传输回调的确认来源。
+- Web 已有 `sending / sent / failed` 三态；原生界面也已有失败提示和重发入口。原生缺少的是独立的“等待 ACK”状态：`isSent` 为布尔值，发送时先设为 true，因此等待期间与已确认成功的外观相同。本轮修正的是传输回调的确认来源，尚未迁移原生 UI 状态模型。
 - 连接就绪与认证就绪的分离、离线队列持久化和历史游标恢复仍需完整可靠性回归；本轮不宣称断网不丢消息或 exactly-once。
 
 本轮改动保存在客户端工作区源码中，没有重新部署网站或发布原生安装包。
+
+Android 传输适配方案与各端发送状态的准确区别见 [Android 传输与发送状态](ANDROID-TRANSPORT.md)。
