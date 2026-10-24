@@ -1,76 +1,79 @@
 import type { Id, User, Group, ConversationState, ConversationPatch } from '../types/chat'
 import { state } from './state'
-import { getConversationKey, isGroupConversationId, normalizeTimeValue,
-         loadGroupConversation, loadPrivateConversation, sanitizeId } from './storage'
+import { getConversationKey, sanitizeId } from './storage'
+import { getAllConversationMeta } from '../utils/messageDB'
 import i18n from '../i18n'
 
 // ── 会话状态 ──────────────────────────────────
 
-// 缓存会话预览，避免每次用户列表变化都读 localStorage
-const previewCache = new Map<string, ConversationState>() // key: "accountId:conversationId" → { lastIncomingMessageTime, loadedAt }
+// 会话预览缓存：accountId → Map<conversationId, lastIncomingMessageTime>
+// 数据源为 IndexedDB conversation_meta（localStorage 旧 key 在迁移后已无写入）
+const previewCache = new Map<string, Map<string, number>>()
 
-function loadConversationPreview(accountId: Id, conversationId: Id, forceRefresh = false) {
+/** 会话 key 统一约定：私聊 = 对方 id 字符串；群聊 = "group:<absId>" */
+function normalizeConversationId(conversationId: Id): string {
   const id = sanitizeId(conversationId)
-  if (!accountId || !id) {
-    return { lastIncomingMessageTime: 0, unreadCount: 0 }
-  }
+  if (!id) return ''
+  return Number(id) < 0 ? `group:${Math.abs(Number(id))}` : id
+}
 
-  const cacheKey = `${accountId}:${id}`
+async function loadConversationMetaMap(accountId: Id, forceRefresh = false): Promise<Map<string, number>> {
+  const cacheKey = String(accountId)
   if (!forceRefresh && previewCache.has(cacheKey)) {
     return previewCache.get(cacheKey)!
   }
-
-  const isGroup = isGroupConversationId(id)
-  const items = isGroup
-    ? loadGroupConversation(accountId, Math.abs(Number(id)))
-    : loadPrivateConversation(accountId, id)
-
-  let lastIncomingMessageTime = 0
-  items.forEach(item => {
-    const messageTime = normalizeTimeValue(item.time || item.timestamp)
-    const isIncoming = isGroup
-      ? String(item.user) !== String(accountId)
-      : String(item.user) !== 'you'
-    if (isIncoming) {
-      lastIncomingMessageTime = Math.max(lastIncomingMessageTime, messageTime)
-    }
-  })
-
-  const preview = { lastIncomingMessageTime, unreadCount: 0 }
-  previewCache.set(cacheKey, preview)
-  return preview
+  let map = new Map<string, number>()
+  try {
+    const metas = await getAllConversationMeta(accountId)
+    map = new Map(metas.map(m => [m.conversationId, m.lastIncomingMessageTime || 0]))
+  } catch (_) {
+    // IndexedDB 不可用时回退空 map（预览时间为 0，聊天本身不受影响）
+  }
+  previewCache.set(cacheKey, map)
+  return map
 }
 
-export function rebuildConversationStates(forceRefresh = false) {
+/**
+ * 重建会话预览（最后消息时间 + 未读数）。
+ * 数据源：IndexedDB 会话元数据；未读数始终保留内存中的实时值。
+ * 异步执行，调用方无需 await（结果会写入 state.conversationStates）。
+ */
+export async function rebuildConversationStates(forceRefresh = false) {
   if (!state.accountId || !Array.isArray(state.users)) {
     state.conversationStates = {}
     return
   }
+  let metaMap = new Map<string, number>()
+  try {
+    metaMap = await loadConversationMetaMap(state.accountId, forceRefresh)
+  } catch (_) { /* 保留空 map */ }
 
-  const existingStates = state.conversationStates || {}
-  const nextStates: Record<string, ConversationState> = {}
+  // 从当前 state 起步，保留重建期间的新 patch（unreadCount / 更新的时间）
+  const nextStates: Record<string, ConversationState> = { ...state.conversationStates }
   state.users.forEach(user => {
     if (!user || user.id == null) return
-    const preview = loadConversationPreview(state.accountId, user.id, forceRefresh)
-    const existing = existingStates[String(user.id)] || {}
-    nextStates[String(user.id)] = {
-      lastIncomingMessageTime: preview.lastIncomingMessageTime,
-      unreadCount: existing.unreadCount || 0
+    const key = String(user.id)
+    const convId = normalizeConversationId(key)
+    const dbTime = convId ? (metaMap.get(convId) || 0) : 0
+    const current = nextStates[key] || ({} as ConversationState)
+    nextStates[key] = {
+      lastIncomingMessageTime: Math.max(dbTime, current.lastIncomingMessageTime || 0),
+      unreadCount: current.unreadCount || 0
     }
   })
   state.conversationStates = nextStates
 }
 
 /**
- * 当消息变化时调用，清除特定会话的预览缓存。
- * 这样下次 rebuildConversationStates 时会重新读取 localStorage。
+ * 消息变化时清除对应会话的预览缓存，
+ * 下次 rebuildConversationStates 时重新读取 IndexedDB。
  */
 export function invalidateConversationPreview(conversationId: Id) {
   if (!state.accountId) return
-  const id = sanitizeId(conversationId)
-  if (id) {
-    previewCache.delete(`${state.accountId}:${id}`)
-  }
+  const map = previewCache.get(String(state.accountId))
+  if (!map) return
+  const convId = normalizeConversationId(conversationId)
+  if (convId) map.delete(convId)
 }
 
 export function updateConversationState(conversationId: Id, patch: ConversationPatch = {}) {
