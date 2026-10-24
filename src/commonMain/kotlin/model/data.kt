@@ -42,7 +42,8 @@ data class User(
     val avatarUrl: String? = null,
     val avatarKey: String? = null,
     val online: Boolean? = null,
-    val createdAt: Long? = null // 注册时间，时间戳
+    val createdAt: Long? = null, // 注册时间，时间戳
+    val friendRequestReason: String? = null
 )
 
 @Serializable

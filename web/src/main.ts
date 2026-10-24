@@ -3,6 +3,8 @@ import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
 import './styles.css'
+import './styles/app-controls.css'
+import './styles/social.css'
 import ToastGlobal from './components/Toast.vue'
 
 // 生产环境静默 debug 日志（大量 console.debug 调用点无需逐个改）

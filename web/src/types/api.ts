@@ -14,7 +14,7 @@ export interface OfflineMessage {
   seqId?: Id
 }
 export interface SyncResult { messages: OfflineMessage[]; nextSeqId: Id; hasMore: boolean }
-export interface FriendRequest extends User { requesterId?: Id }
+export interface FriendRequest extends User { requesterId?: Id; reason?: string }
 export interface FriendNotification { accepterId: Id }
 export interface UserProfile { username?: string; phone?: string; signature?: string; password?: string }
 export interface TokenQuota {

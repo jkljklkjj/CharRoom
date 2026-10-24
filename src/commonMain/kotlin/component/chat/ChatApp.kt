@@ -37,6 +37,7 @@ import component.dialog.ApplicationDialog
 import component.user.UserDetailScreen
 import component.user.UserList
 import component.user.ProfileScreen
+import component.social.SocialScreen
 import core.AgentStreamHandler
 import core.Chat
 import core.MessageReceiveListener
@@ -79,6 +80,7 @@ fun ChatApp(
     var showAddUserDialog by remember { mutableStateOf(false) }
     var showApplicationDialog by remember { mutableStateOf(false) }
     var showProfileScreen by remember { mutableStateOf(false) }
+    var showSocial by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
     var showQuotaScreen by remember { mutableStateOf(false) }
     var pendingRefreshTrigger by remember { mutableStateOf(0L) }
@@ -193,9 +195,10 @@ fun ChatApp(
             }
 
             // 注册系统返回键处理逻辑
-            LaunchedEffect(selectedChatTarget, isSmallScreen, onBackPressed, showSettingsScreen, showProfileScreen, showAddUserDialog, showApplicationDialog, showUserDetailScreen) {
+            LaunchedEffect(selectedChatTarget, isSmallScreen, onBackPressed, showSettingsScreen, showProfileScreen, showAddUserDialog, showApplicationDialog, showUserDetailScreen, showSocial) {
                 if (isSmallScreen && onBackPressed != null) {
                     when {
+                        showSocial -> onBackPressed { showSocial = false; true }
                         showUserDetailScreen -> {
                             // 在用户详情页时，返回键关闭详情页
                             onBackPressed {
@@ -260,6 +263,7 @@ fun ChatApp(
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
                                 onOpenProfile = { showProfileScreen = true },
+                                onOpenDiscovery = { showSocial = true },
                                 onUserClick = { user -> chatViewModel.selectedUser = user },
                                 onUserLongClick = { user ->
                                     selectedDetailUserId = user.id
@@ -294,6 +298,7 @@ fun ChatApp(
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
                                 onOpenProfile = { showProfileScreen = true },
+                                onOpenDiscovery = { showSocial = true },
                                 onUserClick = { user -> chatViewModel.selectedUser = user },
                                 onUserLongClick = { user ->
                                     selectedDetailUserId = user.id
@@ -337,6 +342,16 @@ fun ChatApp(
                         }
                     }
                 }
+            }
+
+            if (showSocial) {
+                SocialScreen(token, GlobalAppState.currentUserId?.toString().orEmpty(),
+                    onBack = { showSocial = false },
+                    onChat = { user ->
+                        chatViewModel.updateUsers((chatViewModel.usersFlow.value + user).distinctBy { it.id })
+                        chatViewModel.selectedUser = user
+                        showSocial = false
+                    })
             }
 
             // 添加好友/群组对话框
@@ -425,18 +440,18 @@ fun ChatApp(
                 exit = slideOutVertically(slideUpSpec) { it } + fadeOut(fadeSpec)
             ) {
                 if (selectedDetailUserId != null) {
-                    UserDetailScreen(
-                        chatViewModel = chatViewModel,
-                        userId = selectedDetailUserId!!,
+                    SocialScreen(
+                        token = token,
+                        userId = GlobalAppState.currentUserId?.toString().orEmpty(),
+                        initialProfileId = selectedDetailUserId!!.toString(),
                         onBack = {
                             showUserDetailScreen = false
                             selectedDetailUserId = null
                         },
-                        onAddFriend = {},
-                        onStartChat = {
+                        onChat = { user ->
                             showUserDetailScreen = false
-                            val targetUser = chatViewModel.usersFlow.value.find { it.id == selectedDetailUserId }
-                            targetUser?.let { chatViewModel.selectedUser = it }
+                            chatViewModel.updateUsers((chatViewModel.usersFlow.value + user).distinctBy { it.id })
+                            chatViewModel.selectedUser = user
                             selectedDetailUserId = null
                         }
                     )

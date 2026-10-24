@@ -341,5 +341,5 @@ val zhStrings = Strings(
         "call.video.btn" to "视频通话",
         "call.incoming" to "%s 邀请你视频通话",
         "common.unknown.error" to "未知错误"
-    )
+    ) + socialZh
 )

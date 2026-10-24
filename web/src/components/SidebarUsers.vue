@@ -3,6 +3,7 @@
     <div class="users-header">
       <div class="title">{{ $t('sidebar.title') }}</div>
       <div class="header-actions">
+        <button class="settings-btn" :aria-label="$t('social.discover')" @click="emit('open-discovery')">🌐</button>
         <button class="friend-requests-btn" @click="toggleFriendRequests" :class="{hasRequests: friendRequests.length > 0}">
           📩
           <span v-if="friendRequests.length > 0" class="badge">{{ friendRequests.length }}</span>
@@ -65,6 +66,7 @@
                 <div v-else class="avatar">{{ initials(req.username) }}</div>
                 <div class="request-meta">
                   <div class="name">{{ req.username }}</div>
+                  <div v-if="req.reason" class="desc">{{ req.reason }}</div>
                   <div class="desc">{{ $t('sidebar.frAccount') }}{{ req.id }} {{ $t('sidebar.frAddFriend') }}</div>
                 </div>
               </div>
@@ -104,7 +106,7 @@ import api from '../api'
 import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
-const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': [] }>()
+const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': []; 'open-discovery': [] }>()
 
 const store = useStore()
 const { t } = useI18n()

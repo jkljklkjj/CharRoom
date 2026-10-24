@@ -130,7 +130,9 @@ class ApiService(private val authToken: String? = null) {
                 User(
                     id = request.id,
                     username = request.senderName,
-                    avatarUrl = request.senderAvatar
+                    avatarUrl = request.senderAvatar,
+                    avatarKey = request.avatarKey,
+                    friendRequestReason = request.message
                 )
             }
     }

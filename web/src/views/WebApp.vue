@@ -17,6 +17,7 @@
           v-if="currentView === 'list'"
           @user-selected="onUserSelected"
           @open-settings="showSettings = true"
+          @open-discovery="showSocial = true"
         />
 
         <!-- 聊天视图 -->
@@ -32,7 +33,7 @@
 
       <!-- 桌面端视图 -->
       <template v-else>
-        <SidebarUsers class="sidebar" @open-settings="showSettings = true" />
+        <SidebarUsers class="sidebar" @open-settings="showSettings = true" @open-discovery="showSocial = true" />
         <ChatWindow class="chat" />
       </template>
     </div>
@@ -97,46 +98,24 @@
       </div>
     </div>
 
-    <!-- 编辑资料弹窗 -->
-    <div v-if="showProfileEdit" class="settings-overlay" @click.self="showProfileEdit = false">
-      <div class="settings-dialog profile-dialog">
-        <div class="settings-header">
-          <h3>{{ $t('app.settings.editProfile') }}</h3>
-          <button class="close-settings" @click="showProfileEdit = false">×</button>
-        </div>
-        <div class="settings-body">
-          <div class="settings-item">
-            <label>{{ $t('app.settings.profileUsername') }}</label>
-            <input v-model="profileForm.username" class="profile-input" :placeholder="profileForm.username" />
-          </div>
-          <div class="settings-item">
-            <label>{{ $t('app.settings.profileSignature') }}</label>
-            <textarea v-model="profileForm.signature" class="profile-input" rows="2" :placeholder="$t('app.settings.profileSignaturePlaceholder')"></textarea>
-          </div>
-          <div class="settings-item" v-if="profileError">
-            <div class="profile-error">{{ profileError }}</div>
-          </div>
-          <button class="save-btn" :disabled="profileSaving" @click="saveProfile">
-            {{ profileSaving ? $t('app.settings.profileSaving') : $t('app.settings.profileSave') }}
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
   <TokenQuotaDialog v-if="showQuota" @close="showQuota = false" />
+  <SocialHub v-if="showSocial && store.state.loginValid" :initial-tab="socialInitialTab" @close="showSocial = false; socialInitialTab = 'people'" @chat="onSocialChat" />
 </template>
 
 <script setup lang="ts">
 import type { MessageWrapper } from '../proto/messages'
 import type { Id, TimeValue, User } from '../types/chat'
 import type { OfflineMessage, Tokens } from '../types/api'
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
 import TokenQuotaDialog from '../components/TokenQuotaDialog.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import SocialHub from '../components/SocialHub.vue'
+import type { SocialProfile } from '../types/social'
 import { toast } from '../utils/toast'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
@@ -170,49 +149,22 @@ const isMobile = ref(window.innerWidth < 768)
 const currentView = ref('list') // 'list' | 'chat'
 const currentChatName = ref('')
 const showSettings = ref(false)
+const showSocial = ref(false)
+const socialInitialTab = ref<'people' | 'me'>('people')
+
+function onSocialChat(profile: SocialProfile) {
+  if (profile.relation !== 'FRIEND') return
+  const user = { id: profile.id, username: profile.username, name: profile.username, avatarUrl: profile.avatarUrl, signature: profile.signature }
+  store.mergeUsers([user]); store.setSelectedChat(profile.id); showSocial.value = false; socialInitialTab.value = 'people'; onUserSelected(user)
+}
 const showQuota = ref(false)
 const showLogoutConfirm = ref(false)
 const loading = ref(true) // 登录状态验证中
 
-// 编辑资料
-const showProfileEdit = ref(false)
-const profileSaving = ref(false)
-const profileError = ref('')
-const profileForm = reactive({ username: '', signature: '' })
-
 function openProfileEdit() {
-  const me = store.state.users.find(u => String(u.id) === String(store.state.accountId))
-  profileForm.username = me?.username || me?.name || ''
-  profileForm.signature = me?.signature || ''
-  profileError.value = ''
-  showProfileEdit.value = true
-}
-
-async function saveProfile() {
-  const username = profileForm.username.trim()
-  const signature = profileForm.signature.trim()
-  if (!username) {
-    profileError.value = t('app.settings.profileUsernameRequired')
-    return
-  }
-  profileSaving.value = true
-  profileError.value = ''
-  try {
-    const ok = await api.updateUserProfile({ username, signature })
-    if (ok) {
-      // 本地更新用户信息
-      const me = store.state.users.find(u => String(u.id) === String(store.state.accountId))
-      if (me) {
-        store.mergeUsers([{ ...me, username, signature }])
-      }
-      toast.success(t('app.settings.profileSaved'))
-      showProfileEdit.value = false
-    } else {
-      profileError.value = t('app.settings.profileSaveFailed')
-    }
-  } finally {
-    profileSaving.value = false
-  }
+  showSettings.value = false
+  socialInitialTab.value = 'me'
+  showSocial.value = true
 }
 
 // 主题设置（theme / setTheme / initTheme 来自 utils/theme.ts）
@@ -844,43 +796,15 @@ onUnmounted(() => {
   }
 }
 
-.settings-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
 
-.settings-dialog {
-  width: min(360px, calc(100% - 40px));
-  background: var(--bg);
-  border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-}
 
-.settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--surface-border-strong, rgba(0, 0, 0, 0.08));
-}
 
-.settings-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
 
-.close-settings {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  cursor: pointer;
-}
+
+
+
+
+
 
 .settings-body {
   padding: 20px;
@@ -946,50 +870,19 @@ onUnmounted(() => {
   background: rgba(255, 95, 95, 0.08);
 }
 
-.save-btn {
-  width: 100%;
-  padding: 12px 16px;
-  border: none;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent-1, #ff7a33), var(--accent-2, #ff5f5f));
-  color: white;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-}
 
-.save-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
 
-.save-btn:active:not(:disabled) {
-  transform: scale(0.98);
-}
 
-.save-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+
+
+
+
 
 
 
 .profile-dialog { width: min(360px, calc(100% - 40px)); }
-.profile-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border: 1px solid var(--surface-border, #e8e8e8);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--panel, #fff);
-  color: var(--text-primary, #333);
-  resize: none;
-}
-.profile-input:focus {
-  outline: none;
-  border-color: #ff7a33;
-}
+
+
 .profile-error {
   color: #ff4757;
   font-size: 13px;
@@ -1027,26 +920,8 @@ onUnmounted(() => {
   font-size: 14px;
   color: var(--muted);
 }
-.theme-options {
-  display: flex;
-  gap: 8px;
-}
-.theme-options button {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.theme-options button.active {
-  border-color: var(--accent-2);
-  background: var(--accent-2);
-  color: white;
-}
-.theme-options button:hover {
-  opacity: 0.9;
-}
+
+
+
+
 </style>

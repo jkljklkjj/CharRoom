@@ -55,6 +55,7 @@ import androidx.compose.material.TextField
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.ui.Alignment
@@ -98,6 +99,7 @@ fun UserList(
     onOpenSettings: () -> Unit = {},
     onOpenApplications: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    onOpenDiscovery: () -> Unit = {},
     onUserClick: (User) -> Unit,
     onUserLongClick: ((User) -> Unit)? = null,
     refreshTrigger: Long = 0L // external trigger to refresh, value changes refresh application list
@@ -250,6 +252,11 @@ fun UserList(
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ElasticHeaderAction(
+                            icon = Icons.Default.Explore,
+                            contentDescription = s["social.discover"],
+                            onClick = onOpenDiscovery
+                        )
                         ElasticHeaderAction(
                             icon = Icons.Default.Search,
                             contentDescription = s["contact.search.add"],

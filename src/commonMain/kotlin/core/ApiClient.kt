@@ -370,14 +370,17 @@ data class UserInfoResponse(
 )
 
 @Serializable
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 data class FriendRequest(
     val id: Int,
-    val senderId: Int,
-    val senderName: String,
+    val senderId: Int = 0,
+    @JsonNames("username") val senderName: String = "",
+    @JsonNames("avatarUrl")
     val senderAvatar: String? = null,
-    val message: String,
-    val status: Int, // 0:待处理 1:已同意 2:已拒绝
-    val createTime: Long
+    @JsonNames("reason") val message: String = "",
+    val status: Int = 0, // 0:待处理 1:已同意 2:已拒绝
+    val createTime: Long = 0L,
+    val avatarKey: String? = null
 )
 
 /**

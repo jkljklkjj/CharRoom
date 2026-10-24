@@ -236,6 +236,7 @@ fun ApplicationDialog(
                                             style = MaterialTheme.typography.caption,
                                             color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                         )
+                                        user.friendRequestReason?.takeIf { it.isNotBlank() }?.let { Text(it,style=MaterialTheme.typography.body2) }
                                     }
 
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

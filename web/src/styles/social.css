@@ -1,0 +1,52 @@
+/* Layout additions. Controls reuse app-controls.css and existing theme tokens. */
+.social-overlay { padding:16px; box-sizing:border-box; }
+.social-hub { width:min(980px,100%); max-height:92dvh; display:flex; flex-direction:column; color:var(--text-primary); }
+.social-hub * { box-sizing:border-box; }
+.social-hub h2 { font-size:18px; margin:0 0 10px; }
+.social-hub h3 { font-size:15px; margin:0 0 7px; }
+.social-hub p { overflow-wrap:anywhere; white-space:pre-wrap; }
+.social-hub button { font-family:inherit; }
+.social-hub button:focus-visible, .social-hub input:focus-visible, .social-hub textarea:focus-visible, .social-hub select:focus-visible { outline:2px solid var(--accent-2); outline-offset:2px; }
+.social-nav { padding:14px 20px; border-bottom:1px solid var(--surface-border); }
+.social-layout { overflow:auto; display:grid; grid-template-columns:minmax(0,1fr); min-height:0; }
+.social-layout.has-profile { grid-template-columns:minmax(0,1fr) minmax(270px,340px); }
+.social-main, .social-detail { padding:20px; min-width:0; }
+.social-detail { border-left:1px solid var(--surface-border); }
+.social-layout.profile-only { grid-template-columns:minmax(0,1fr); }
+.social-layout.profile-only .social-main { display:none; }
+.social-layout.profile-only .social-detail { width:min(640px,100%); margin:0 auto; border-left:0; }
+.social-form { display:grid; gap:12px; margin:16px 0; }
+.social-form label { display:grid; gap:6px; font-size:14px; }
+.social-form .social-check { display:flex; align-items:flex-start; gap:8px; }
+.social-check input { margin-top:4px; }
+.social-form textarea { resize:vertical; }
+.social-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:12px 0; }
+.social-actions .profile-input { flex:1; min-width:100px; width:0; }
+.social-hub .save-btn, .social-profile .save-btn { width:auto; }
+.social-hub .cancel-btn, .social-profile .cancel-btn { background:transparent; border:1px solid var(--surface-border); color:var(--text-secondary); padding:8px 12px; border-radius:6px; cursor:pointer; }
+.social-hub button:disabled { opacity:.5; cursor:not-allowed; }
+.social-muted { color:var(--text-secondary); font-size:13px; }
+.social-error { color:var(--accent-2); overflow-wrap:anywhere; }
+.social-person { padding:16px; border:1px solid var(--surface-border); border-radius:12px; background:var(--panel); margin:12px 0; }
+.social-person-head { display:flex; align-items:center; gap:12px; }
+.social-person-head p { margin:4px 0; }
+.social-avatar { width:46px; height:46px; border-radius:15px; object-fit:cover; flex:none; }
+.social-initial { display:grid; place-items:center; background:var(--bubble-bg); color:var(--accent-2); font-size:22px; }
+.social-tags { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+.social-tags span { padding:3px 8px; border-radius:6px; background:var(--bubble-bg); color:var(--text-secondary); font-size:12px; }
+.social-person .social-actions { justify-content:space-between; margin-bottom:0; }
+.social-cover { height:76px; border-radius:12px; background:linear-gradient(130deg,var(--accent-1),var(--accent-2)); }
+.social-profile[data-cover="ocean"] .social-cover { background:linear-gradient(130deg,var(--bubble-bg),var(--accent-1)); }
+.social-profile[data-cover="forest"] .social-cover { background:linear-gradient(20deg,var(--accent-2),var(--bubble-bg)); }
+.social-profile-content { padding:0 10px; }
+.social-profile-content > .social-avatar { width:64px; height:64px; margin-top:-28px; position:relative; border:4px solid var(--bg); }
+.social-profile-content > h2 { margin-top:12px; }
+.social-profile-content section { margin-top:18px; }
+.social-intent { background:var(--bubble-bg); padding:14px; border-radius:10px; margin:16px 0; overflow-wrap:anywhere; }
+.social-intent p { margin-bottom:0; }
+.social-answer { user-select:text; }
+.social-room-messages { display:flex; flex-direction:column; gap:10px; max-height:40dvh; overflow:auto; padding:10px 0; }
+.social-room-message { max-width:85%; align-self:flex-start; background:var(--bubble-bg); padding:10px 14px; border-radius:12px; user-select:text; }
+.social-room-message.mine { align-self:flex-end; background:linear-gradient(135deg,var(--accent-1),var(--accent-2)); color:var(--text-primary); }
+.social-room-message p { margin:5px 0 0; user-select:text; }
+@media(max-width:699px) { .social-overlay{padding:0;} .social-hub{max-height:100dvh;height:100dvh;border-radius:0;} .social-layout.has-profile{grid-template-columns:minmax(0,1fr);} .social-detail{border-left:0;} .social-nav{gap:5px;padding:10px;} .social-nav button{min-width:0;padding:9px 5px;} .social-hub .profile-input{font-size:16px;} .social-actions .profile-input{min-width:100%;width:100%;} }

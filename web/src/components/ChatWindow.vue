@@ -16,14 +16,7 @@
     <div v-if="showInfoModal" class="modal-overlay" @click="showInfoModal = false">
       <div class="modal-content" @click.stop>
         <button class="modal-close" @click="showInfoModal = false">✕</button>
-        <div class="friend-info" v-if="friendInfo">
-          <img :src="friendInfo.avatarUrl || '/icons/icon-192x192.png'" class="info-avatar" />
-          <div class="info-name">{{ friendInfo.name || friendInfo.username || friendInfo.id }}</div>
-          <div class="info-id">{{ $t('chat.friendId') }}: {{ friendInfo.id }}</div>
-          <div class="info-email" v-if="friendInfo.email">{{ $t('chat.email') }}: {{ friendInfo.email }}</div>
-          <div class="info-signature" v-if="friendInfo.signature">{{ $t('chat.signature') }}: {{ friendInfo.signature }}</div>
-        </div>
-        <div v-else class="friend-info-loading">{{ $t('chat.loading') }}</div>
+        <SocialProfileCard v-if="currentChatId !== null" :user-id="String(currentChatId)" @chat="showInfoModal = false" @blocked="showInfoModal = false" />
       </div>
     </div>
 
@@ -161,6 +154,7 @@
 </template>
 
 <script setup lang="ts">
+import SocialProfileCard from './SocialProfileCard.vue'
 import type { Id, TimeValue, ChatMessage, User } from '../types/chat'
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -243,23 +237,14 @@ const isGroupChat = computed(() => {
 const showFriendMenu = ref(false)
 const showInfoModal = ref(false)
 const showDeleteConfirm = ref(false)
-const friendInfo = ref<User | null>(null)
 
 function toggleFriendMenu() { showFriendMenu.value = !showFriendMenu.value }
 
 function handleClickOutside() { if (showFriendMenu.value) showFriendMenu.value = false }
 
-async function showFriendInfo() {
-  showFriendMenu.value = false; showInfoModal.value = true; friendInfo.value = null
-  if (!currentChatUser.value) return
-  try {
-    const { getUserDetail } = await import('../api')
-    const data = await getUserDetail(currentChatUser.value.id)
-    friendInfo.value = data || currentChatUser.value
-  } catch (e) {
-    console.warn('获取用户详情失败:', e)
-    friendInfo.value = currentChatUser.value
-  }
+function showFriendInfo() {
+  showFriendMenu.value = false
+  showInfoModal.value = true
 }
 
 function confirmDeleteFriend() { showFriendMenu.value = false; showDeleteConfirm.value = true }

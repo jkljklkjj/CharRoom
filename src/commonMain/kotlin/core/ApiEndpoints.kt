@@ -1,6 +1,7 @@
 package core
 
 object ApiEndpoints {
+    const val SOCIAL = "/social"
     private var _customBase: String? = null
     private val BASE get() = _customBase ?: "https://${ServerConfig.SERVER_IP}/api"
 
