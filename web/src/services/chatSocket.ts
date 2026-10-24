@@ -38,9 +38,15 @@ const MAX_MESSAGE_CACHE = 1000
 const messageCache = new Map<string, number>()
 const MESSAGE_TTL = 5 * 60 * 1000 // 5 分钟 TTL
 
-// 乐观 UI：待确认消息跟踪 Map<messageId, { sendTime, warned, failed }>
-const pendingAcks = new Map<string, { sendTime: number; warned: boolean; failed: boolean }>()
+// 乐观 UI：待确认消息跟踪 Map<messageId, PendingAckInfo>
+interface PendingAckInfo {
+  sendTime: number; warned: boolean; failed: boolean; retryCount: number
+  wrapperObj: MessageWrapper; buffer: ArrayBuffer
+  streamType: string; conversationId: string
+}
+const pendingAcks = new Map<string, PendingAckInfo>()
 const ACK_TIMEOUT_MS = 16000  // 8-16s: 发送中 → 16s+: 失败
+const MAX_ACK_RETRIES = 3     // ACK 超时后最多重发 3 次（服务端幂等去重，安全）
 
 // ── Store 引用（依赖注入，替代 window.__chatStore） ──
 
@@ -65,8 +71,19 @@ function startTimers() {
     const now = Date.now()
     for (const [msgId, info] of pendingAcks) {
       if (now - info.sendTime >= ACK_TIMEOUT_MS && !info.failed) {
-        info.failed = true
-        storeRef.updateMessageStatus(msgId, 'failed')
+        if (info.retryCount < MAX_ACK_RETRIES) {
+          // ACK 超时：重发同一 messageId（服务端幂等去重，安全），并重置计时
+          info.retryCount++
+          info.sendTime = now
+          if (transport && transport.isConnected()) {
+            void Promise.resolve(
+              transport.send(info.buffer, { streamType: info.streamType as 'control' | 'chat', conversationId: info.conversationId })
+            ).catch(() => {})
+          }
+        } else {
+          info.failed = true
+          storeRef.updateMessageStatus(msgId, 'failed')
+        }
       }
     }
   }, 1000)
@@ -147,7 +164,8 @@ export async function connect(hostname: string, port: number, token: string, use
   }
 
   transport.onclose = (event) => {
-    console.debug('❌ 连接关闭')
+    console.warn('[CS] ❌ 连接关闭, stopReconnect=' + stopReconnect)
+    console.warn('[CS] onclose 堆栈:', new Error().stack)
     stopHeartbeat()
 
     if (!stopReconnect) {
@@ -158,7 +176,8 @@ export async function connect(hostname: string, port: number, token: string, use
   }
 
   transport.onerror = (event) => {
-    console.error('💥 传输错误:', event)
+    console.warn('[CS] 💥 传输错误:', event)
+    console.warn('[CS] onerror 堆栈:', new Error().stack)
     if (handlers.onerror) handlers.onerror(event)
   }
 
@@ -222,13 +241,25 @@ export async function sendWrapper(wrapperObj: MessageWrapper) {
   const streamType = getStreamType(wrapperObj)
   const conversationId = resolveConversationId(wrapperObj)
 
-  const sent = transport.send(buffer, { streamType, conversationId })
+  // transport.send 返回真实 write 状态（Promise<boolean>），失败不会误判成功
+  const sent = await transport.send(buffer, { streamType, conversationId })
 
   // 乐观 UI：跟踪待确认消息（私聊 + 群聊）
-  if (sent && msgId && (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT)) {
-    pendingAcks.set(msgId, { sendTime: Date.now(), warned: false, failed: false })
-    // 发送成功，从 IndexedDB 离线队列中移除
-    removeMessage(msgId).catch(e => console.warn('[OfflineQueue] 移除消息失败:', e))
+  if (msgId && (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT)) {
+    if (sent) {
+      pendingAcks.set(msgId, {
+        sendTime: Date.now(), warned: false, failed: false, retryCount: 0,
+        wrapperObj, buffer, streamType, conversationId
+      })
+      // 发送成功，从 IndexedDB 离线队列中移除
+      removeMessage(msgId).catch(e => console.warn('[OfflineQueue] 移除消息失败:', e))
+    } else {
+      // 发送失败：重新入队，重连后由 flushOfflineQueue 重发，避免消息丢失
+      saveToQueue(wrapperObj, buffer as ArrayBuffer, { streamType, conversationId }).catch(e =>
+        console.warn('[OfflineQueue] 重新入队失败:', e)
+      )
+      if (storeRef) storeRef.updateMessageStatus(msgId, 'failed')
+    }
   }
 
   return sent
@@ -287,8 +318,14 @@ async function flushOfflineQueue() {
         const conversationId = entry.opts?.conversationId || resolveConversationId(entry.wrapperObj)
 
         if (transport && transport.isConnected()) {
-          transport.send(buffer, { streamType, conversationId })
-          await removeMessage(entry.messageId)
+          const ok = await transport.send(buffer, { streamType, conversationId })
+          if (ok) {
+            await removeMessage(entry.messageId)
+          } else {
+            // write 失败：保留队列条目并计一次重试，待下次 flush 重发
+            await incrementRetry(entry.messageId)
+            break
+          }
         } else {
           break // 连接断开，停止发送
         }
@@ -349,11 +386,9 @@ function startHeartbeat() {
     // 自适应心跳间隔
     const currentInterval = adaptiveHeartbeatInterval()
 
-    // 心跳超时检查
+    // 心跳超时检查：仅告警，不关闭连接（子流替代后 ACK 走子流，控制流收不到是正常的）
     if (lastHeartbeatResponseTime > 0 && Date.now() - lastHeartbeatResponseTime > currentInterval + heartbeatTimeout) {
-      console.warn('心跳超时，关闭连接')
-      if (transport) transport.close()
-      return
+      console.debug('[HB] 控制流无响应（ACK 走子流，正常）')
     }
 
     const now = Date.now()
@@ -362,8 +397,7 @@ function startHeartbeat() {
       type: MSG_TYPE.HEARTBEAT,
       heartbeat: { timestamp: now }
     }).catch(e => {
-      console.warn('心跳发送失败:', e)
-      if (transport) transport.close()
+      console.warn('[HB] 心跳发送失败:', e.message)
     })
   }
 
