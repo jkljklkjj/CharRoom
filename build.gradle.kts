@@ -91,6 +91,9 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:3.4.3")
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
+
+    // CLI 交互增强：命令历史 + Tab 补全（jline3）
+    implementation("org.jline:jline:3.27.1")
 }
 
 // 源集配置
