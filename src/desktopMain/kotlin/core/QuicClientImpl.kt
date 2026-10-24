@@ -34,6 +34,9 @@ class QuicClientImpl : ChatTransport {
     // 待发送消息缓冲（断线时缓存）
     private val messageQueue = ConcurrentLinkedQueue<PendingMessage>()
 
+    // 主动停止标志：true 时禁止 onDisconnected 自动重连（logout/stop 场景）
+    private val manualStop = AtomicBoolean(false)
+
     // 消息监听器
     internal val messageListeners = mutableListOf<MessageReceiveListener>()
     internal val authStateListeners = mutableListOf<AuthStateListener>()
@@ -73,6 +76,7 @@ class QuicClientImpl : ChatTransport {
     override fun start(host: String?, port: Int?) {
         this.host = host ?: ServerConfig.QUIC_HOST
         this.port = port ?: ServerConfig.QUIC_PORT
+        manualStop.set(false) // 首次连接/手动 reconnect 时允许自动重连
 
         transport.listener = object : QuicNettyClient.Listener {
             override fun onConnected() {
@@ -94,6 +98,31 @@ class QuicClientImpl : ChatTransport {
                 pendingAcks.failAll()
                 log.warn("QUIC 连接断开: ${cause?.message}")
                 sessions.clear()
+                // 主动停止（logout/stop）时不再自动重连，避免后台偷偷重连
+                if (manualStop.get()) return
+                // 自动重连：指数退避，最多等 30 秒
+                scope.launch {
+                    var delayMs = 1000L
+                    while (!connected.get() && !manualStop.get()) {
+                        log.info("{}ms 后尝试重连...", delayMs)
+                        delay(delayMs)
+                        if (manualStop.get()) break
+                        try {
+                            start()
+                        } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            log.warn("重连失败: {}", e.message)
+                        }
+                        // start() 内部会吞掉 connect 异常，不能据此判定成功；
+                        // 必须检查 connected 标志（onConnected 同步 set true）才能 break，
+                        // 否则 connect 失败时也会误判"重连成功"提前退出循环。
+                        if (connected.get()) {
+                            log.info("重连成功")
+                            break
+                        }
+                        delayMs = (delayMs * 2).coerceAtMost(30_000L)
+                    }
+                }
             }
 
             override fun onStreamFrame(streamId: Long, data: ByteArray) {
@@ -176,7 +205,8 @@ class QuicClientImpl : ChatTransport {
                 log.debug("心跳已发送 (interval={}ms)", interval)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                log.warn("心跳发送失败: ${e.message}")
+                log.warn("心跳发送失败，尝试重建控制流: ${e.message}")
+                sessions.remove(CONTROL_SESSION_KEY)
             }
         }
     }
@@ -333,15 +363,18 @@ class QuicClientImpl : ChatTransport {
             transport.send(controlStreamId, frame)
         }
         stop()
+        messageQueue.clear() // 用户主动退出，清空待发送消息
     }
 
     override fun stop() {
+        manualStop.set(true) // 禁止自动重连
         connected.set(false)
         pendingAcks.failAll()
         dispatcher.clear()
         transport.shutdown()
         sessions.clear()
-        messageQueue.clear()
+        // 注意：不清理 messageQueue——重连后 flushPendingMessages 会重发这些缓存消息。
+        // 用户主动退出（logoutAndDisconnect）时才应清空。
     }
 
     override fun addMessageReceiveListener(listener: MessageReceiveListener) {

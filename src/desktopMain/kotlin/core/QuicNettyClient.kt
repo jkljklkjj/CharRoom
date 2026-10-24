@@ -74,7 +74,7 @@ class QuicNettyClient {
             QuicClientCodecBuilder()
                 .sslContext(sslCtx)
                 // 与服务端对齐：QUIC 取双方 min，客户端必须和服务端一致或更大
-                .maxIdleTimeout(600_000, TimeUnit.MILLISECONDS)        // 10 min，与服务端对齐
+                .maxIdleTimeout(180_000, TimeUnit.MILLISECONDS)         // 3 min，与服务端对齐（原 10 min 导致异常断开后幽灵连接残留过久）
                 .initialCongestionWindowPackets(10)                    // 与服务端 QuicProperties 对齐
                 .congestionControlAlgorithm(QuicCongestionControlAlgorithm.BBR)
                 // 流量控制：必须显式设正值，默认 0 = 对端不能发数据
