@@ -70,3 +70,31 @@ test('conversation meta tracks last message time and clears with conversation', 
   assert.equal(await db.getConversationMeta('A', '41'), null)
   assert.equal((await db.getAllConversationMeta('A')).length, 1)
 })
+test('legacy branch v3 schema (accountId_conversationId_index) upgrades to the ordered index', async () => {
+  // 旧本地分支曾用 version 3 + 'accountId_conversationId_index' 索引名，
+  // 与当前代码同版本号但 schema 不同——upgrade 不会触发，必须靠版本提升修复
+  const indexedDB = new IDBFactory()
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.open('charroom_messages', 3)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      const store = db.createObjectStore('messages', { keyPath: 'id' })
+      store.createIndex('accountId', 'accountId')
+      store.createIndex('conversationId', 'conversationId')
+      store.createIndex('accountId_conversationId', ['accountId', 'conversationId'])
+      store.createIndex('accountId_conversationId_index', ['accountId', 'conversationId', 'index'])
+      db.createObjectStore('conversation_meta', { keyPath: 'id' }).createIndex('accountId', 'accountId')
+      store.put({ id: 'A:41:0', accountId: 'A', conversationId: '41', index: 0, message: { user: '41', text: 'legacy branch row' } })
+    }
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => { request.result.close(); resolve() }
+  })
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), { indexedDB, IDBKeyRange, structuredClone })
+  // 旧数据可读
+  assert.deepEqual(Array.from(await db.getMessages('A', '41'), m => m.text), ['legacy branch row'])
+  // 排序索引/追加/分页可用（此前抛 NotFoundError: The specified index was not found）
+  await db.appendMessage('A', '41', { user: 'you', text: 'appended', time: 1000 })
+  const page = await db.getMessagesPage('A', '41', null, 10)
+  assert.deepEqual(Array.from(page.messages, m => m.text), ['legacy branch row', 'appended'])
+  assert.equal((await db.getConversationMeta('A', '41')).lastIncomingMessageTime, 1000)
+})

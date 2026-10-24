@@ -1,6 +1,9 @@
 import type { ChatMessage, Id } from '../types/chat'
 
 const DB_NAME = 'charroom_messages'
+// v2: 复合排序索引；v3: 会话元数据；v4: 兼容历史分支同版本号不同 schema
+// （旧本地分支也用过 version 3 但索引名不同，同版本不会触发 upgrade，必须提升版本号）
+const DB_VERSION = 4
 const STORE_NAME = 'messages'
 const META_STORE_NAME = 'conversation_meta'
 const ORDER_INDEX = 'account_conversation_index'
@@ -16,7 +19,7 @@ export interface MessagePage { messages: ChatMessage[]; beforeIndex: number | nu
 let databasePromise: Promise<IDBDatabase> | null = null
 function openDB(): Promise<IDBDatabase> {
   databasePromise ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 3)
+    const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onerror = () => { databasePromise = null; reject(request.error) }
     request.onsuccess = () => {
       const db = request.result
