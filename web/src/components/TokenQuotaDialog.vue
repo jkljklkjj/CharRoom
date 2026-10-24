@@ -13,7 +13,7 @@
             <span class="unit">元</span>
           </div>
           <div class="balance-sub">
-            免费剩余 {{ ((quota?.freeRemainingFen || 0) / 100).toFixed(2) }} 元
+            免费剩余 {{ ((quota?.freeRemainingFen ?? 400) / 100).toFixed(2) }} 元
           </div>
         </div>
 
@@ -27,7 +27,7 @@
             <div class="free-bar" :style="{ width: freePct + '%' }"></div>
           </div>
           <div class="free-stats">
-            <span class="stat">{{ $t('quota.freeRemaining') }} {{ ((quota?.freeRemainingFen || 0) / 100).toFixed(2) }} 元</span>
+            <span class="stat">{{ $t('quota.freeRemaining') }} {{ ((quota?.freeRemainingFen ?? 400) / 100).toFixed(2) }} 元</span>
             <span class="stat">本周已用 {{ ((quota?.weeklyCostFen || 0) / 100).toFixed(2) }} 元</span>
           </div>
         </div>
@@ -79,10 +79,13 @@
 
 <script setup lang="ts">
 import type { TokenQuota } from '../types/api'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
+import { toast } from '../utils/toast'
 
 const emit = defineEmits<{ close: [] }>()
+const { t } = useI18n()
 
 const loading = ref(true)
 const err = ref('')
@@ -98,14 +101,14 @@ onMounted(async () => {
   try {
     quota.value = await api.getTokenQuota()
   } catch (e) {
-    err.value = '加载失败'
+    err.value = t('quota.loadFailed')
   }
   loading.value = false
 })
 
 const freePct = computed(() => {
-  if (!quota.value) return 0
-  return Math.min((quota.value.freeRemainingFen || 0) / 400 * 100, 100)
+  const remaining = quota.value?.freeRemainingFen ?? 400
+  return Math.min(remaining / 400 * 100, 100)
 })
 
 function close() {
@@ -122,11 +125,12 @@ async function doPurchase() {
     if (result && result.codeUrl) {
       currentPurchaseId.value = result.purchaseId
       qrCodeUrl.value = result.codeUrl
+      startPolling()
     } else {
       await checkPayment()
     }
   } catch (e) {
-    err.value = '支付创建失败'
+    err.value = t('quota.paymentCreateFailed')
   }
   purchasing.value = false
 }
@@ -134,18 +138,36 @@ async function doPurchase() {
 async function checkPayment() {
   if (!currentPurchaseId.value) return
   try {
-    const result = await api.confirmPurchase(currentPurchaseId.value)
-    if (result) {
+    // 只读查单：服务端确认支付方结果后才入账
+    const result = await api.getPurchaseStatus(currentPurchaseId.value)
+    if (result && result.paid) {
+      stopPolling()
       qrCodeUrl.value = ''
       currentPurchaseId.value = null
       purchaseAmount.value = 0
       quota.value = await api.getTokenQuota()
-      alert('充值成功！')
+      toast.success(t('quota.purchaseSuccess'))
+    } else {
+      err.value = t('quota.paymentPending')
     }
   } catch (e) {
-    err.value = '查询失败'
+    err.value = t('quota.paymentCheckFailed')
   }
 }
+
+// 展示二维码后轮询订单状态，支付完成自动入账刷新
+let pollTimer: ReturnType<typeof setInterval> | null = null
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(() => { checkPayment() }, 3000)
+}
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+onUnmounted(stopPolling)
 </script>
 
 <style scoped>
@@ -168,16 +190,16 @@ async function checkPayment() {
 .close-btn {
   position: absolute; top: 14px; right: 14px; z-index: 2;
   width: 32px; height: 32px; border-radius: 50%;
-  border: none; background: rgba(0,0,0,0.06);
-  font-size: 15px; cursor: pointer; color: #666;
+  border: none; background: var(--hover);
+  font-size: 15px; cursor: pointer; color: var(--text-secondary, #666);
   display: flex; align-items: center; justify-content: center;
   transition: all .15s;
 }
-.close-btn:hover { background: rgba(0,0,0,0.12); color: #222; }
+.close-btn:hover { background: var(--hover); color: var(--text-primary, #222); }
 .quota-body { padding: 28px 24px 24px; }
 .quota-loading { padding: 60px; text-align: center; }
 .loading-spinner {
-  width: 30px; height: 30px; border: 3px solid #e8e8e8;
+  width: 30px; height: 30px; border: 3px solid var(--input-border, #e8e8e8);
   border-top-color: #ff7a33; border-radius: 50%;
   animation: spin .6s linear infinite; margin: 0 auto;
 }
@@ -207,16 +229,16 @@ async function checkPayment() {
 /* 周免费 */
 .section-header {
   display: flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 600; color: #222;
+  font-size: 14px; font-weight: 600; color: var(--text-primary, #222);
   margin-bottom: 12px;
 }
 .section-icon { font-size: 16px; }
 .weekly-section {
-  background: #fff; border-radius: 14px; padding: 18px;
+  background: var(--panel, #fff); border-radius: 14px; padding: 18px;
   margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 .free-bar-wrap {
-  height: 8px; background: #f0f0f2; border-radius: 4px;
+  height: 8px; background: var(--surface-2, #f0f0f2); border-radius: 4px;
   overflow: hidden; margin-bottom: 10px;
 }
 .free-bar {
@@ -224,11 +246,11 @@ async function checkPayment() {
   background: linear-gradient(90deg, #ff7a33, #ffb347);
   border-radius: 4px; transition: width .4s ease;
 }
-.free-stats { display: flex; justify-content: space-between; font-size: 12px; color: #888; }
+.free-stats { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted, #888); }
 
 /* 购买 */
 .purchase-section {
-  background: #fff; border-radius: 14px; padding: 18px;
+  background: var(--panel, #fff); border-radius: 14px; padding: 18px;
   box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 .amount-grid {
@@ -238,28 +260,28 @@ async function checkPayment() {
 .amount-grid button {
   display: flex; flex-direction: column; align-items: center;
   padding: 10px 4px; border-radius: 10px;
-  border: 1.5px solid #eee; background: #fafafa;
+  border: 1.5px solid var(--input-border, #eee); background: var(--input-bg, #fafafa);
   cursor: pointer; transition: all .15s;
 }
-.amount-grid button:hover { border-color: #ffd5b3; background: #fff8f3; }
+.amount-grid button:hover { border-color: var(--accent-2, #ff7a33); background: var(--hover); }
 .amount-grid button.active {
-  border-color: #ff7a33; background: #fff8f3;
+  border-color: #ff7a33; background: rgba(255,122,51,.12);
   box-shadow: 0 0 0 3px rgba(255,122,51,.12);
 }
-.amount-num { font-size: 16px; font-weight: 700; color: #222; }
-.amount-unit { font-size: 11px; color: #999; margin-top: 1px; }
+.amount-num { font-size: 16px; font-weight: 700; color: var(--text-primary, #222); }
+.amount-unit { font-size: 11px; color: var(--muted, #999); margin-top: 1px; }
 .amount-grid button.active .amount-num { color: #e05d1a; }
 
 .custom-row {
   display: flex; align-items: center;
-  border: 1.5px solid #eee; border-radius: 10px; padding: 0 12px;
-  margin-bottom: 14px; transition: border-color .15s; background: #fafafa;
+  border: 1.5px solid var(--input-border, #eee); border-radius: 10px; padding: 0 12px;
+  margin-bottom: 14px; transition: border-color .15s; background: var(--input-bg, #fafafa);
 }
-.custom-row:focus-within { border-color: #ff7a33; background: #fff; }
-.custom-prefix { font-size: 15px; font-weight: 600; color: #999; margin-right: 4px; }
+.custom-row:focus-within { border-color: #ff7a33; background: var(--input-bg, #fafafa); }
+.custom-prefix { font-size: 15px; font-weight: 600; color: var(--muted, #999); margin-right: 4px; }
 .custom-row input {
   flex: 1; border: none; background: transparent;
-  padding: 9px 0; font-size: 14px; outline: none; color: #333;
+  padding: 9px 0; font-size: 14px; outline: none; color: var(--text-primary, #333);
 }
 .custom-row input::-webkit-inner-spin-button { display: none; }
 
@@ -281,23 +303,23 @@ async function checkPayment() {
 /* 二维码 */
 .qr-section { margin-top: 4px; }
 .qr-card {
-  background: #fff; border-radius: 14px; padding: 24px;
+  background: var(--panel, #fff); border-radius: 14px; padding: 24px;
   text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 .qr-icon { font-size: 32px; margin-bottom: 8px; }
-.qr-title { font-size: 15px; font-weight: 600; color: #222; margin: 0 0 16px; }
+.qr-title { font-size: 15px; font-weight: 600; color: var(--text-primary, #222); margin: 0 0 16px; }
 .qr-img-wrap {
-  display: inline-block; padding: 8px; background: #fff; border-radius: 12px;
+  display: inline-block; padding: 8px; background: var(--panel, #fff); border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,.08); margin-bottom: 12px;
 }
 .qr-img-wrap img { display: block; width: 200px; height: 200px; border-radius: 6px; }
-.qr-hint { font-size: 13px; color: #999; margin: 0 0 16px; }
+.qr-hint { font-size: 13px; color: var(--muted, #999); margin: 0 0 16px; }
 .check-btn {
-  padding: 10px 28px; border-radius: 10px; border: 1.5px solid #eee;
-  background: #fafafa; cursor: pointer; font-size: 14px;
-  font-weight: 500; color: #555; transition: all .15s;
+  padding: 10px 28px; border-radius: 10px; border: 1.5px solid var(--input-border, #eee);
+  background: var(--input-bg, #fafafa); cursor: pointer; font-size: 14px;
+  font-weight: 500; color: var(--text-secondary, #555); transition: all .15s;
 }
-.check-btn:hover { border-color: #ff7a33; color: #ff7a33; background: #fff8f3; }
+.check-btn:hover { border-color: #ff7a33; color: #ff7a33; background: rgba(255,122,51,.1); }
 
 .err-msg { color: #e74c3c; font-size: 13px; margin-top: 12px; text-align: center; }
 
