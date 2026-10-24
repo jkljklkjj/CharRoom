@@ -278,25 +278,28 @@ fun AvatarImage(
     avatarKey: String?,
     size: Dp = 32.dp,
     isViewportReady: Boolean = true,
+    username: String? = null,
     onClick: (() -> Unit)? = null
 ) {
+    val s = LocalStrings.current
     var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(avatarUrl, avatarKey, isViewportReady) {
         bitmap = if (isViewportReady && !avatarUrl.isNullOrBlank()) {
             loadImageBitmapWithCache(avatarUrl, avatarKey)
         } else null
     }
-    if (bitmap != null) {
+    val bmp = bitmap
+    if (bmp != null) {
         Image(
-            bitmap = bitmap!!,
-            contentDescription = "avatar",
+            bitmap = bmp,
+            contentDescription = s["user.avatar"],
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape)
                 .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
         )
     } else {
-        // 占位符
+        // 占位符：显示用户名首字符（无用户名时用 ?）
         Box(
             modifier = Modifier
                 .size(size)
@@ -309,7 +312,7 @@ fun AvatarImage(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "U",
+                text = username?.firstOrNull()?.toString() ?: "?",
                 color = Color.White,
                 style = MaterialTheme.typography.caption
             )

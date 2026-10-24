@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
@@ -448,6 +449,14 @@ fun GroupChatScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column {
+                            // 系统消息（加入群聊/退出群聊等）
+                            if (message.senderId == 0) {
+                                SystemMessageBubble(
+                                    text = message.text,
+                                    timestamp = message.timestamp,
+                                    isDarkMode = isDarkMode
+                                )
+                            } else {
                             MessageBubble(
                                 message = message,
                                 isMine = isMine,
@@ -464,6 +473,7 @@ fun GroupChatScreen(
                                             avatarUrl = senderUser?.avatarUrl,
                                             avatarKey = senderUser?.avatarKey,
                                             isViewportReady = isViewportReady,
+                                            username = senderUser?.username,
                                             onClick = { senderUser?.let { onAvatarClick?.invoke(it) } }
                                         )
                                     }
@@ -474,6 +484,7 @@ fun GroupChatScreen(
                                             avatarUrl = currentUser?.avatarUrl,
                                             avatarKey = currentUser?.avatarKey,
                                             isViewportReady = isViewportReady,
+                                            username = currentUser?.username,
                                             onClick = { onMyAvatarClick?.invoke() }
                                         )
                                     }
@@ -523,6 +534,7 @@ fun GroupChatScreen(
                                     onShare = { /* shareText unavailable on Android */ }
                                 )
                             }
+                            } // end else (non-system message)
                         }
                     }
 
@@ -626,6 +638,47 @@ fun GroupChatScreen(
             }
         )
     }
+}
+
+/**
+ * 系统消息气泡（加入群聊/退出群聊等）
+ */
+@Composable
+fun SystemMessageBubble(
+    text: String,
+    timestamp: Long,
+    isDarkMode: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = if (isDarkMode) Color(0x15FFFFFF) else Color(0x0A000000),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.caption,
+                color = if (isDarkMode) Color(0xFF888888) else Color(0xFF999999),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+        }
+        Text(
+            text = formatTimestampShort(timestamp),
+            style = MaterialTheme.typography.caption.copy(fontSize = 10.sp),
+            color = if (isDarkMode) Color(0xFF666666) else Color(0xFFBBBBBB),
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+private fun formatTimestampShort(timestamp: Long): String {
+    val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+    return sdf.format(java.util.Date(timestamp))
 }
 
 /**
