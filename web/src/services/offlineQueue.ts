@@ -1,6 +1,8 @@
 import type { MessageWrapper } from '../proto/messages'
 import type { SendOptions } from '../types/transport'
 export const MAX_RETRIES = 3
+/** 离线队列容量上限（条数），达到上限后新消息不再入队 */
+export const MAX_QUEUE_SIZE = 1000
 export interface QueueEntry {
   messageId: string; wrapperObj: MessageWrapper; buffer: number[] | Uint8Array<ArrayBuffer>
   opts: SendOptions; timestamp: number; retryCount: number
@@ -64,13 +66,22 @@ export async function saveToQueue(wrapperObj: MessageWrapper, buffer: ArrayBuffe
       retryCount: 0
     }
 
-    store.put(entry)
-
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      // 队列容量上限检查，避免 PWA 离线期间 IndexedDB 无限增长
+      const countRequest = store.count()
+      countRequest.onsuccess = () => {
+        if (countRequest.result >= MAX_QUEUE_SIZE) {
+          console.warn(`[OfflineQueue] 队列已满(${MAX_QUEUE_SIZE})，丢弃消息:`, entry.messageId)
+          resolve(false) // 队列满未保存，明确返回 false，不再误导调用方
+          return
+        }
+        store.put(entry)
+      }
+      countRequest.onerror = () => resolve(false)
       tx.oncomplete = () => resolve(true)
       tx.onerror = (e) => {
         console.warn('[OfflineQueue] 保存失败:', tx.error)
-        reject(tx.error)
+        resolve(false)
       }
     })
   } catch (e) {
