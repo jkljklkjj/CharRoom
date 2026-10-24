@@ -9,7 +9,7 @@ data class QuotaInfo(
     val weeklyCostFen: Int = 0,
     val weeklyFreeLimitFen: Int = 400,
     val freeRemainingFen: Int = 400,
-    val balanceFen: Long = 0
+    val balanceFen: Long = 0,
 ) {
     val balanceYuan: Double get() = balanceFen / 100.0
     val freeRemainingYuan: Double get() = freeRemainingFen / 100.0
@@ -20,7 +20,7 @@ data class QuotaInfo(
 @Serializable
 data class TokenPrices(
     val inputPrice: Int = 120,
-    val outputPrice: Int = 250
+    val outputPrice: Int = 250,
 )
 
 @Serializable
@@ -28,5 +28,15 @@ data class PayResult(
     val purchaseId: Long = 0,
     val amountFen: Int = 0,
     val codeUrl: String = "",
-    val outTradeNo: String = ""
+    val outTradeNo: String = "",
+)
+
+/** 充值订单状态（只读）。paid=true 表示支付方已确认且已入账。 */
+@Serializable
+data class OrderStatus(
+    val purchaseId: Long = 0,
+    val status: String = "pending",
+    val amountFen: Int = 0,
+    val remainingFen: Int = 0,
+    val paid: Boolean = false,
 )
