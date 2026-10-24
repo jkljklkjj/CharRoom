@@ -40,19 +40,27 @@
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
     <div class="messages" ref="msgList" v-if="currentChatId !== null" @scroll="onMessageScroll">
-      <div v-for="(m,i) in currentMessages" :key="m.messageId || (m.time + '_' + m.user + '_' + i)" :class="['msg', {me: m.user==='you'}]" @contextmenu.prevent="showMessageContextMenu($event, m)">
-        <div class="row">
-          <div class="avatar-col">
-            <img v-if="getAvatar(m.user)" :src="getAvatar(m.user)" class="msg-avatar" />
-            <div v-else class="avatar-placeholder">{{ initials('' + m.user) }}</div>
-          </div>
-          <div class="bubble-col">
-            <div class="meta">
-              <span class="sender">{{ m.user === 'you' ? $t('chat.myself') : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : $t('chat.groupChat')) }}</span>
-              <span class="time">{{ formatRelativeTime(m.time) }}</span>
-              <span v-if="m.user === 'you' && m.isSent === 'sending'" class="status sending" title="发送中">⏳</span>
-              <span v-else-if="m.user === 'you' && m.isSent === 'failed'" class="status failed" title="点击重试" @click.stop="retryMessage(m)">⚠</span>
+      <div v-for="(m,i) in currentMessages" :key="m.messageId || (m.time + '_' + m.user + '_' + i)">
+        <!-- 系统消息（加入群聊/退出群聊等） -->
+        <div v-if="isSystemMessage(m)" class="system-message">
+          <span class="system-text">{{ m.text }}</span>
+          <span class="system-time">{{ formatRelativeTime(m.time) }}</span>
+        </div>
+        <!-- 普通消息 -->
+        <div v-else :class="['msg', {me: m.user===SELF_USER}]" @contextmenu.prevent="showMessageContextMenu($event, m)">
+          <div class="row">
+            <div class="avatar-col">
+              <img v-if="getAvatar(m.user)" :src="getAvatar(m.user)" class="msg-avatar" />
+              <div v-else class="avatar-placeholder">{{ initials('' + m.user) }}</div>
             </div>
+            <div class="bubble-col">
+              <div class="meta">
+                <span class="sender">{{ m.user === SELF_USER ? $t('chat.myself') : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : $t('chat.groupChat')) }}</span>
+                <span class="time">{{ formatRelativeTime(m.time) }}</span>
+                <span v-if="m.user === SELF_USER && m.isSent === MSG_STATUS.SENDING" class="status sending" title="发送中">⏳</span>
+                <span v-else-if="m.user === SELF_USER && m.isSent === MSG_STATUS.SENT" class="status sent" title="已送达">✓</span>
+                <span v-else-if="m.user === SELF_USER && m.isSent === MSG_STATUS.FAILED" class="status failed" title="点击重试" @click.stop="retryMessage(m)">⚠</span>
+              </div>
             <!-- 图片消息 -->
             <div v-if="isImageMessage(m.text)" class="image-message">
               <img :src="extractImageUrl(m.text)" :alt="extractImageAlt(m.text)" @click="openImagePreview(extractImageUrl(m.text))" />
@@ -67,6 +75,7 @@
             </div>
             <!-- 普通文本消息 — 安全：text 已在 store 中通过 DOMPurify.sanitize 预清洗 -->
             <div v-else class="text-content" v-html="formatText(m.text)"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -78,7 +87,7 @@
       <div class="menu-item" @click="shareMessage" v-if="canShare">{{ $t('chat.context.share') }}</div>
       <div class="menu-item" @click="replyMessage">{{ $t('chat.context.reply') }}</div>
       <div class="menu-item" @click="forwardMessage">{{ $t('chat.context.forward') }}</div>
-      <div class="menu-item danger" v-if="selectedMessage?.user === 'you'" @click="deleteMessage">{{ $t('chat.context.delete') }}</div>
+      <div class="menu-item danger" v-if="selectedMessage?.user === SELF_USER" @click="deleteMessage">{{ $t('chat.context.delete') }}</div>
     </div>
 
     <!-- 转发选择弹窗 -->
@@ -106,7 +115,9 @@
 
     <!-- 未选中好友时的占位 -->
     <div class="empty-placeholder" v-if="currentChatId === null">
-      <div class="placeholder-text"></div>
+      <div class="placeholder-illustration">💬</div>
+      <div class="placeholder-title">{{ $t('chat.selectContact') }}</div>
+      <div class="placeholder-hint">{{ $t('chat.selectContactHint') }}</div>
     </div>
 
     <!-- 输入框：只要选中会话就显示 -->
@@ -137,7 +148,7 @@
         <textarea
           v-model="text"
           ref="messageInput"
-          placeholder=""
+          :placeholder="$t('chat.inputPlaceholder')"
           rows="1"
           @keydown.enter.exact.prevent="send"
           @input="autoResize"
@@ -161,7 +172,7 @@ const store = useStore()
 // 注入 store 引用给 chatSocket（替代 window.__chatStore hack）
 chatSocket.setStore(store)
 
-// 相对时间实时刷新：每 30s 更新一次 now，触发模板重渲染（formatRelativeTime 读取 now.value）
+// 相对时间实时刷新：每 60s 更新一次 now，触发模板重渲染（formatRelativeTime 读取 now.value）
 const now = ref(Date.now())
 let relTimeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -200,7 +211,7 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('keydown', handleKeydown)
-  relTimeTimer = setInterval(() => { now.value = Date.now() }, 30000)
+  relTimeTimer = setInterval(() => { now.value = Date.now() }, 60000)
   scrollToBottom()
 })
 onUnmounted(() => {
@@ -280,21 +291,12 @@ const isMobile = computed(() => {
   return windowWidth.value < 768
 })
 
-// 当前会话的消息列表（私聊或群聊）— memoize 避免每次 reactive 变化都 slice
-let _cachedMsgs: readonly ChatMessage[] | null = null
-let _cachedMsgsLen = 0
-let _cachedChatId: Id | null = null
+// 当前会话的消息列表（私聊或群聊）
 const currentMessages = computed(() => {
   if (currentChatId.value == null) return []
-  const msgs = isGroupChat.value ? store.state.groupMessages : store.state.messages
-  // 仅在数组长度变化或切换会话时重新 slice
-  if (msgs === _cachedMsgs && msgs.length === _cachedMsgsLen && currentChatId.value === _cachedChatId) {
-    return _cachedMsgsLen > 100 ? _cachedMsgs!.slice(_cachedMsgsLen - 100) : _cachedMsgs
-  }
-  _cachedMsgs = msgs
-  _cachedMsgsLen = msgs.length
-  _cachedChatId = currentChatId.value
-  return msgs.length > 100 ? msgs.slice(msgs.length - 100) : msgs
+  // 不再 slice(-100)：slice 窗口与「向上加载历史」矛盾（历史插在前面会被窗口截断看不到）。
+  // 渲染数量由 trimMessages/trimGroupMessages 的上限（前后台自适应）控制。
+  return isGroupChat.value ? store.state.groupMessages : store.state.messages
 })
 
 
@@ -398,7 +400,8 @@ function getAvatar(userId: Id) {
 }
 
 import { avatarSrc } from '../utils/format'
-import { AGENT_USER_ID } from '../constants'
+import { AGENT_USER_ID, MSG_STATUS, SELF_USER } from '../constants'
+import { toast } from '../utils/toast'
 
 import { initials } from '../utils/format'
 
@@ -449,6 +452,11 @@ function getFileIcon(filename: string) {
   if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) return '🎵'
   if (['mp4', 'avi', 'mov', 'mkv', 'webm'].includes(ext)) return '🎬'
   return '📄'
+}
+
+// 系统消息检测
+function isSystemMessage(m: ChatMessage) {
+  return m.user === 'system' || (m as { senderId?: string }).senderId === 'system'
 }
 
 // 文本格式化（文本已在 store 中预清洗，此处直接返回）
@@ -504,15 +512,25 @@ function send(){
   const replyFields = reply && reply.messageId
     ? { replyToMessageId: reply.messageId, replyToContent: reply.content, replyToSender: reply.sender }
     : {}
+
+  // 判断是否为 AI 助手（AGENT_USER_ID = 0）
+  const isAgent = !isGroupChat.value && Number(to) === AGENT_USER_ID
+
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
         groupChat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
       }
-    : {
-        type: MSG_TYPE.CHAT,
-        chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
-      }
+    : isAgent
+      ? {
+          // 发给 AI 助手：AGENT_CHAT 类型触发后端 AI 处理
+          type: MSG_TYPE.AGENT_CHAT,
+          chat: { targetClientId: Number(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
+        }
+      : {
+          type: MSG_TYPE.CHAT,
+          chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
+        }
 
   if (isGroupChat.value) {
     store.addGroupMessage({ ...m, groupId: to })
@@ -537,15 +555,21 @@ async function retryMessage(m: ChatMessage) {
 
   // 生成新的 messageId
   const newMessageId = 'local_' + Date.now()
+  const isAgent = !isGroupChat.value && Number(to) === AGENT_USER_ID
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
         groupChat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
       }
-    : {
-        type: MSG_TYPE.CHAT,
-        chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
-      }
+    : isAgent
+      ? {
+          type: MSG_TYPE.AGENT_CHAT,
+          chat: { targetClientId: Number(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
+        }
+      : {
+          type: MSG_TYPE.CHAT,
+          chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
+        }
 
   // 更新状态为发送中
   store.updateMessageStatus(m.messageId, 'sending')
@@ -653,7 +677,7 @@ async function handleFileUpload(file: File) {
   const targetId = currentChatId.value
   // 文件大小校验
   if (file.size > MAX_FILE_SIZE) {
-    alert(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），最大支持 10MB`)
+    toast.error(t('chat.fileTooLarge', { size: (file.size / 1024 / 1024).toFixed(1) }))
     return
   }
 
@@ -678,21 +702,27 @@ async function handleFileUpload(file: File) {
 
   const localMessageId = 'local_' + Date.now()
   const m: ChatMessage = {
-    user: 'you',
+    user: SELF_USER,
     text: file.type.startsWith('image/') ? `![${file.name}](${content})` : content,
     time: new Date().toISOString(),
     targetId,
     messageId: localMessageId
   }
 
+  const isAgentFile = !isGroupChat.value && Number(currentChatId.value) === AGENT_USER_ID
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
         groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
       }
-    : {
-        type: MSG_TYPE.CHAT,
-        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
+    : isAgentFile
+      ? {
+          type: MSG_TYPE.AGENT_CHAT,
+          chat: { targetClientId: Number(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
+        }
+      : {
+          type: MSG_TYPE.CHAT,
+          chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
       }
 
   if (isGroupChat.value) {
@@ -855,8 +885,42 @@ function handleKeydown(e: KeyboardEvent) {
 /* 消息状态图标 */
 .status { font-size: 12px; margin-left: 4px; }
 .status.sending { opacity: 0.5; animation: pulse 1.5s infinite; }
+.status.sent { color: #2ecc71; }
 .status.failed { color: #e74c3c; cursor: pointer; }
 .status.failed:hover { text-decoration: underline; }
+
+/* 系统消息（加入群聊/退出群聊等） */
+.system-message {
+  text-align: center;
+  padding: 8px 16px;
+  margin: 4px 0;
+}
+.system-text {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.05);
+  color: #999;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  line-height: 1.4;
+}
+.system-time {
+  display: block;
+  font-size: 11px;
+  color: #bbb;
+  margin-top: 2px;
+}
+
+/* 暗色主题 */
+:root.dark .system-text,
+[data-theme='dark'] .system-text {
+  background: rgba(255, 255, 255, 0.08);
+  color: #888;
+}
+:root.dark .system-time,
+[data-theme='dark'] .system-time {
+  color: #666;
+}
 
 @keyframes pulse {
   0%, 100% { opacity: 0.5; }
@@ -1093,8 +1157,11 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 /* 空状态样式 */
-.empty-placeholder{flex:1;display:flex;align-items:center;justify-content:center;background:#fafafa}
-.placeholder-text{color:#999;font-size:16px}
+.empty-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);gap:8px;padding:24px;text-align:center}
+.placeholder-illustration{font-size:48px;line-height:1}
+.placeholder-title{font-size:16px;font-weight:600;color:var(--text-primary)}
+.placeholder-hint{font-size:13px;color:var(--muted)}
+.placeholder-text{color:var(--muted, #999);font-size:16px}
 
 /* 上下文菜单样式 */
 .context-menu {
