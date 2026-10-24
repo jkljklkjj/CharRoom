@@ -47,8 +47,18 @@
 
 ### 低优
 
-- [ ] build.gradle Groovy → Kotlin DSL 迁移
-- [ ] 静态分析（detekt / ktlint）
+- [x] build.gradle Groovy → Kotlin DSL 迁移（✅ 已实际完成 — TODO 过期标记已修正）
+- [x] 静态分析（detekt / ktlint）— detekt 1.23.7 已配置 + CI（✅ 实际已完成 — TODO 过期）
+
+---
+
+## 🔴 第二轮审查发现（2026-08）
+
+### P0 — 清理 / 性能（本轮已修复）
+
+- [x] **ChatState.kt 残留 7 处 `println`** — TODO 声称已替换 AppLogger 但 `addMessage`/`addGroupMessage`/`update*SentStatus` 每条消息都打印（含内容前 50 字符）；另有 `ChatApp.kt`、`LoginRegisterApp.kt` 两处 `[DEBUG]` 打印。已全部换 AppLogger 并去掉消息内容字段；连带清理 `ApiClient.kt` 6 处 + desktopMain 4 处 println
+- [x] **桌面端每条消息全量重写历史文件** — `ChatViewModel.saveChatHistoryToLocal` 每次 add/update/**流式每 chunk** 调 `DesktopLocalChatHistoryStore.save` 全量重写每会话 JSON。已改为 debounce 合并（1s 静默窗口，所有状态访问收敛 Main 调度器），高频写只落盘一次
+- [x] **ApiClient.kt 1144 行单体文件** — 已拆为 6 个同包文件（ApiClientAuth/Contacts/Messages/User/Quota/Agent.kt），调用方零改动，编译 0 警告
 
 ---
 
@@ -58,16 +68,16 @@
 
 - [x] **`/msg <userId> <text>` 直聊命令** — 已实现
 - [x] **密码输入安全** — 使用 `System.console()?.readPassword()`，不回显
-- [ ] 日志框架（slf4j-simple 或 Kermit 替代 println）
+- [x] **日志框架（slf4j-simple 或 Kermit 替代 println）** — 已满足：println 是终端 UI 输出（非日志），内部日志已用 KotlinLogging（log.info/error）
 - [x] **离线消息拉取** — 登录后自动拉取
 - [x] **自动重连** — 连接断开后指数退避重试（最多10次）
 
 ### 低优
 
-- [ ] 命令历史与自动补全（jline3）
-- [ ] 终端彩色输出
-- [ ] `/help <command>` 详细帮助
-- [ ] 配置文件持久化（`~/.qingliao/config.properties`）
+- [x] **命令历史与自动补全（jline3）** — jline 3.27.1，↑↓ 历史（持久化 ~/.qingliao/history.txt）+ Tab 命令补全
+- [x] **终端彩色输出** — ANSI 彩色（成功绿/失败红/服务器青/帮助黄加粗）
+- [x] **`/help <command>` 详细帮助** — 支持 /help /msg 等分命令详情
+- [x] **配置文件持久化** — `~/.qingliao/config.properties`（server/quic.host/quic.port/username），命令行参数优先覆盖
 
 ---
 
