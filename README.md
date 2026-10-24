@@ -1,5 +1,7 @@
 # ⚡ CharRoom — 多平台即时通讯客户端
 
+> 开发与 AI 协作先读 [AGENTS.md](AGENTS.md)，Web 另读 [web/AGENTS.md](web/AGENTS.md)。当前根构建使用 Kotlin JVM 插件，通过共享源码目录复用桌面/Android 代码；Web 是独立 JavaScript 应用。以下 KMP、三端同一核心和性能描述属于历史介绍，不代表已经实现或本轮验证。已确认的构建、协议与传输问题见 [现状审查](../docs/architecture/2026-10-23-现状审查.md)。
+
 Kotlin Multiplatform 核心逻辑共享 + Vue 3 Web 前端，AI-Native IM 全平台客户端。
 
 ---
@@ -76,4 +78,4 @@ npm run build
 
 ## 🔗 相邻项目
 
-👉 **[../chatRoom/README.md](../chatRoom/README.md)** — Java 25 + Netty 高性能后端
+👉 **[../chat-room/README.md](../chat-room/README.md)** — Java 25 + Netty 后端

@@ -1,5 +1,7 @@
 # CharRoom Web
 
+> 开发与 AI 协作先读 [AGENTS.md](AGENTS.md)。2026-10-23 检查发现现有源码的生产构建被存储模块缺失导出阻断，Web proto 与后端也存在差异；详见 [现状审查](../../docs/architecture/2026-10-23-现状审查.md) 与 [改造计划](../../docs/architecture/AI友好化与改造计划.md)。下列命令描述预期流程，不表示当前构建已经通过。
+
 基于 Vue 3 + Vite 的轻量 Web 原型，包含项目介绍页和在线聊天原型视图。
 
 快速开始（Node 20）：
