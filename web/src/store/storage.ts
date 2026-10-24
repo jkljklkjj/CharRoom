@@ -1,37 +1,38 @@
+import type { Id, TimeValue, ChatMessage } from '../types/chat'
 import { STORAGE_PREFIX } from './state'
 
-export function sanitizeId(value) {
+export function sanitizeId(value: Id | null | undefined) {
   return String(value || '').trim()
 }
 
-export function buildPrivateHistoryKey(accountId, chatId) {
+export function buildPrivateHistoryKey(accountId: Id, chatId: Id) {
   return `${STORAGE_PREFIX}${sanitizeId(accountId)}_private_${sanitizeId(chatId)}`
 }
 
-export function buildGroupHistoryKey(accountId, groupId) {
+export function buildGroupHistoryKey(accountId: Id, groupId: Id) {
   return `${STORAGE_PREFIX}${sanitizeId(accountId)}_group_${sanitizeId(groupId)}`
 }
 
-export function buildAccountPrefix(accountId) {
+export function buildAccountPrefix(accountId: Id) {
   return `${STORAGE_PREFIX}${sanitizeId(accountId)}_`
 }
 
-export function getConversationKey(conversationId) {
+export function getConversationKey(conversationId: Id | null) {
   return String(conversationId || '')
 }
 
-export function isGroupConversationId(conversationId) {
+export function isGroupConversationId(conversationId: Id | null) {
   return Number(conversationId) < 0
 }
 
-export function normalizeTimeValue(value) {
+export function normalizeTimeValue(value: TimeValue | null | undefined) {
   if (value == null || value === '') return 0
   if (typeof value === 'number') return value
   const parsed = Date.parse(value)
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
-export function getPrivateConversationId(message) {
+export function getPrivateConversationId(message: ChatMessage | null) {
   if (!message) return null
   if (String(message.user) === 'you') {
     return sanitizeId(message.targetId)
@@ -39,7 +40,7 @@ export function getPrivateConversationId(message) {
   return sanitizeId(message.user)
 }
 
-export function loadPrivateConversation(accountId, chatId) {
+export function loadPrivateConversation(accountId: Id, chatId: Id): ChatMessage[] {
   if (!accountId || !chatId) return []
   const key = buildPrivateHistoryKey(accountId, chatId)
   const raw = localStorage.getItem(key)
@@ -53,7 +54,7 @@ export function loadPrivateConversation(accountId, chatId) {
   }
 }
 
-export function loadGroupConversation(accountId, groupId) {
+export function loadGroupConversation(accountId: Id, groupId: Id): ChatMessage[] {
   if (!accountId || !groupId) return []
   const key = buildGroupHistoryKey(accountId, groupId)
   const raw = localStorage.getItem(key)

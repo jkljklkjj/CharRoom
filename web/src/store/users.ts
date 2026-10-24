@@ -1,3 +1,4 @@
+import type { Id, User, Group, ConversationState, ConversationPatch } from '../types/chat'
 import { state } from './state'
 import { getConversationKey, isGroupConversationId, normalizeTimeValue,
          loadGroupConversation, loadPrivateConversation, sanitizeId } from './storage'
@@ -6,9 +7,9 @@ import i18n from '../i18n'
 // ── 会话状态 ──────────────────────────────────
 
 // 缓存会话预览，避免每次用户列表变化都读 localStorage
-const previewCache = new Map() // key: "accountId:conversationId" → { lastIncomingMessageTime, loadedAt }
+const previewCache = new Map<string, ConversationState>() // key: "accountId:conversationId" → { lastIncomingMessageTime, loadedAt }
 
-function loadConversationPreview(accountId, conversationId, forceRefresh = false) {
+function loadConversationPreview(accountId: Id, conversationId: Id, forceRefresh = false) {
   const id = sanitizeId(conversationId)
   if (!accountId || !id) {
     return { lastIncomingMessageTime: 0, unreadCount: 0 }
@@ -16,7 +17,7 @@ function loadConversationPreview(accountId, conversationId, forceRefresh = false
 
   const cacheKey = `${accountId}:${id}`
   if (!forceRefresh && previewCache.has(cacheKey)) {
-    return previewCache.get(cacheKey)
+    return previewCache.get(cacheKey)!
   }
 
   const isGroup = isGroupConversationId(id)
@@ -47,7 +48,7 @@ export function rebuildConversationStates(forceRefresh = false) {
   }
 
   const existingStates = state.conversationStates || {}
-  const nextStates = {}
+  const nextStates: Record<string, ConversationState> = {}
   state.users.forEach(user => {
     if (!user || user.id == null) return
     const preview = loadConversationPreview(state.accountId, user.id, forceRefresh)
@@ -64,7 +65,7 @@ export function rebuildConversationStates(forceRefresh = false) {
  * 当消息变化时调用，清除特定会话的预览缓存。
  * 这样下次 rebuildConversationStates 时会重新读取 localStorage。
  */
-export function invalidateConversationPreview(conversationId) {
+export function invalidateConversationPreview(conversationId: Id) {
   if (!state.accountId) return
   const id = sanitizeId(conversationId)
   if (id) {
@@ -72,7 +73,7 @@ export function invalidateConversationPreview(conversationId) {
   }
 }
 
-export function updateConversationState(conversationId, patch = {}) {
+export function updateConversationState(conversationId: Id, patch: ConversationPatch = {}) {
   const key = getConversationKey(conversationId)
   if (!key) return
   const current = state.conversationStates[key] || { lastIncomingMessageTime: 0, unreadCount: 0 }
@@ -84,7 +85,7 @@ export function updateConversationState(conversationId, patch = {}) {
   }
 }
 
-export function clearConversationUnread(conversationId) {
+export function clearConversationUnread(conversationId: Id) {
   const key = getConversationKey(conversationId)
   if (!key || !state.conversationStates[key]) return
   state.conversationStates = {
@@ -98,17 +99,17 @@ export function clearConversationUnread(conversationId) {
 
 // ── 用户管理 ──────────────────────────────────
 
-export function setUsers(list) {
-  state.users = list
+export function setUsers(list: readonly User[]) {
+  state.users = [...list]
   // 用户列表完全替换，需要强制刷新预览缓存
   rebuildConversationStates(true)
 }
 
-export function setGroups(list) {
-  state.groups = list
+export function setGroups(list: readonly Group[]) {
+  state.groups = [...list]
 }
 
-export function mergeUsers(incoming) {
+export function mergeUsers(incoming: readonly User[]) {
   if (!Array.isArray(incoming)) return
 
   const existingById = new Map(state.users.map(u => [u.id, u]))
@@ -139,7 +140,7 @@ export function mergeUsers(incoming) {
   }
 }
 
-export function cacheUsers(users) {
+export function cacheUsers(users: readonly User[]) {
   try {
     if (state.accountId) {
       const key = `charroom_users_${state.accountId}`
@@ -159,7 +160,7 @@ export function cacheUsers(users) {
   } catch (_) { /* localStorage 满时静默失败 */ }
 }
 
-export function loadCachedUsers() {
+export function loadCachedUsers(): User[] {
   try {
     if (state.accountId) {
       const raw = localStorage.getItem(`charroom_users_${state.accountId}`)
@@ -172,7 +173,7 @@ export function loadCachedUsers() {
   return []
 }
 
-export function addUser(u) {
+export function addUser(u: User) {
   if (!state.users.some(x => x.id === u.id)) {
     state.users.push(u)
     // 新用户需要强制刷新预览缓存
@@ -180,7 +181,7 @@ export function addUser(u) {
   }
 }
 
-export function removeUser(id) {
+export function removeUser(id: Id) {
   if (!state.users.some(u => u.id === id)) return
   state.users = state.users.filter(u => u.id !== id)
   delete state.conversationStates[id]
@@ -193,7 +194,7 @@ export function removeUser(id) {
   }
 }
 
-export function updateUserOnlineStatus(userId, online) {
+export function updateUserOnlineStatus(userId: Id, online: boolean) {
   const idx = state.users.findIndex(user => user.id === userId)
   if (idx >= 0) {
     state.users[idx] = {

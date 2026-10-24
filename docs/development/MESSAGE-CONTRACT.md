@@ -5,7 +5,7 @@
 主定义是相邻后端 `chat-room/src/main/proto/{message,agent_stream}.proto`。Kotlin 编译输入是 `src/main/proto/`，Web 构建输入是 `web/src/proto/`。
 
 - Kotlin 的 `core.MsgType` 是生成的 `MessageWrapperType` 的类型别名，不再维护字符串枚举。构造和分发均使用生成的 protobuf 类型。
-- Web 的 `src/proto/constants.js` 由 `scripts/generate-protocol-constants.cjs` 生成；界面、socket、Agent 流分发都从这里导入。业务常量（例如助手账号）继续留在 `src/constants.js`。
+- Web 的 `src/proto/constants.ts` 由 `scripts/generate-protocol-constants.cjs` 生成；界面、socket、Agent 流分发都从这里导入。业务常量（例如助手账号）继续留在 `src/constants.ts`。
 - `MSG_TYPE`、`PROTO_DEVICE_TYPE`、`CONVERSATION_TYPE`、`AGENT_STREAM_TYPE` 保留协议原名与数值。REST 设备标签仍是 `web` 等字符串；`DEVICE_TYPE_NUM` 是生成的标签到 wire 枚举映射。
 - Web 枚举解码为数字；int64 解码为十进制字符串，避免精度损失。不要把显示名称或 REST 字符串当成 wire 类型。
 
@@ -43,7 +43,7 @@ QUIC 是字节流；Netty/Cronet 回调不是消息边界。每条流持有自�
 - Web：6 项 `npm run test:messages` 契约/行为测试通过。
 - 共享 Kotlin：通过独立 `javac`、`kotlinc`、JUnitCore 执行四个测试类，覆盖 builder、分发、ACK 和增量解帧。ActionLogger 使用空快照测试替身；这不包含 Netty、Cronet、Compose 或实际服务器。
 - 完整桌面/CLI/Android 构建未通过验证：两个 Wrapper 文件仍处于原有删除状态；调用缓存 Gradle 时，在配置阶段报 `Unable to establish loopback connection`。没有恢复 Wrapper。
-- Web 完整构建仍有既存的 `messageDB.js` 缺少 `getMessagesPage` 导出错误。契约测试通过不代表完整构建通过。
+- 后续 TypeScript 迁移已补齐 IndexedDB 分页/删除接口，完整 Web 构建通过；新增存储、Worker 回退与 API 刷新测试，详见 [迁移说明](WEB-TYPESCRIPT.md)。
 
 标准构建恢复后，可运行：
 

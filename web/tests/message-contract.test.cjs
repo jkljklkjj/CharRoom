@@ -1,3 +1,4 @@
+const { readTs, transpile, loadTs } = require('./helpers.cjs')
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -17,7 +18,7 @@ const wire = object => {
 }
 
 test('central protocol constants match every backend enum value', async () => {
-  const constants = new vm.SourceTextModule(fs.readFileSync(path.join(web, 'src/proto/constants.js'), 'utf8'))
+  const constants = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/constants.ts')))
   await constants.link(() => { throw new Error('protocol constants must have no runtime dependencies') })
   await constants.evaluate()
   for (const [name, protoName] of Object.entries({ MSG_TYPE: 'MessageWrapperType',
@@ -33,10 +34,13 @@ async function client() {
   const proto = new vm.SyntheticModule(['default'], function () {
     this.setExport('default', { load: () => protobuf.load(path.join(web, 'public/proto/message.proto')) })
   }, { context })
-  const codec = new vm.SourceTextModule(fs.readFileSync(path.join(web, 'src/proto/index.js'), 'utf8'), { context })
-  await codec.link(() => proto)
+  const shared = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/codec.ts')), { context })
+  await shared.link(() => proto)
+  await shared.evaluate()
+  const codec = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/index.ts')), { context })
+  await codec.link(() => shared)
   await codec.evaluate()
-  const constantsModule = new vm.SourceTextModule(fs.readFileSync(path.join(web, 'src/proto/constants.js'), 'utf8'), { context })
+  const constantsModule = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/constants.ts')), { context })
   await constantsModule.link(() => { throw new Error('unexpected constants import') })
   await constantsModule.evaluate()
   return { context, codec: codec.namespace, codecModule: codec, constantsModule }
@@ -71,7 +75,7 @@ function viewHandler(context, store) {
     normalizeTimestamp: value => new Date(Number(value)).toISOString(),
     api: { getUserDetail: async id => ({ data: { id } }) },
     chatSocket: { sendAck: async () => true } })
-  vm.runInContext(view.slice(start, end) + '\n globalThis.receive = handleIncomingMessage', context)
+  vm.runInContext(transpile(view.slice(start, end) + '\n globalThis.receive = handleIncomingMessage'), context)
   return context.receive
 }
 
@@ -101,11 +105,10 @@ test('server private/group messages and Agent chunks reach the view store', asyn
 test('Worker uses the same numeric enum and int64 contract', async () => {
   const sent = []
   const root = await protobuf.load(path.join(web, 'public/proto/message.proto'))
-  const self = { postMessage: msg => sent.push(msg), importScripts() {} }
-  const context = vm.createContext({ self, ArrayBuffer, Uint8Array, String, Number,
-    protobuf: { load: async () => root, parse: () => ({ root }) },
-    fetch: async () => ({ text: async () => '' }) })
-  vm.runInContext(fs.readFileSync(path.join(web, 'src/proto/worker.js'), 'utf8'), context)
+  const self = { postMessage: msg => sent.push(msg) }
+  await loadTs(path.join(web, 'src/proto/worker.ts'), { self }, {
+    protobufjs: { default: { load: async () => root } }
+  })
   await self.onmessage({ data: { type: 'init', id: -1 } })
   await self.onmessage({ data: { type: 'decode', id: 1,
     payload: wire({ type: types.ACK, ack: { success: true, messageId: 'fixture', seqId: '9007199254740993' } }) } })
@@ -144,7 +147,7 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
       removeMessage: async () => {}, incrementRetry: async () => {}, MAX_RETRIES: 3 }),
     '../utils/device': exportsModule({ getDeviceId: () => 'fixture', getDeviceType: () => 'web' })
   }
-  const socketModule = new vm.SourceTextModule(fs.readFileSync(path.join(web, 'src/services/chatSocket.js'), 'utf8'), { context })
+  const socketModule = new vm.SourceTextModule(readTs(path.join(web, 'src/services/chatSocket.ts')), { context })
   await socketModule.link(name => dependencies[name])
   await socketModule.evaluate()
   const socket = socketModule.namespace

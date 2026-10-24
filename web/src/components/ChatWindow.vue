@@ -17,7 +17,7 @@
       <div class="modal-content" @click.stop>
         <button class="modal-close" @click="showInfoModal = false">✕</button>
         <div class="friend-info" v-if="friendInfo">
-          <img :src="friendInfo.avatar || '/icons/icon-192x192.png'" class="info-avatar" />
+          <img :src="friendInfo.avatarUrl || '/icons/icon-192x192.png'" class="info-avatar" />
           <div class="info-name">{{ friendInfo.name || friendInfo.username || friendInfo.id }}</div>
           <div class="info-id">{{ $t('chat.friendId') }}: {{ friendInfo.id }}</div>
           <div class="info-email" v-if="friendInfo.email">{{ $t('chat.email') }}: {{ friendInfo.email }}</div>
@@ -149,7 +149,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { Id, TimeValue, ChatMessage, User } from '../types/chat'
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
@@ -162,7 +163,7 @@ chatSocket.setStore(store)
 
 // 相对时间实时刷新：每 30s 更新一次 now，触发模板重渲染（formatRelativeTime 读取 now.value）
 const now = ref(Date.now())
-let relTimeTimer = null
+let relTimeTimer: ReturnType<typeof setTimeout> | undefined
 
 // 前后台自适应：切后台时释放部分消息内存
 const handleVisibilityChange = () => {
@@ -176,17 +177,17 @@ const handleVisibilityChange = () => {
 
 const { t } = useI18n()
 const text = ref('')
-const msgList = ref(null)
-const messageInput = ref(null)
+const msgList = ref<HTMLElement | null>(null)
+const messageInput = ref<HTMLTextAreaElement | null>(null)
 const isDragOver = ref(false)
 const showContextMenu = ref(false)
 const contextMenuPos = ref({ x: 0, y: 0 })
-const selectedMessage = ref(null)
+const selectedMessage = ref<ChatMessage | null>(null)
 const canShare = ref('share' in navigator)
 
 // 监听窗口大小变化
 const windowWidth = ref(window.innerWidth)
-let resizeTimer = null
+let resizeTimer: ReturnType<typeof setTimeout> | undefined
 function handleResize() {
   clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
@@ -231,7 +232,7 @@ const isGroupChat = computed(() => {
 const showFriendMenu = ref(false)
 const showInfoModal = ref(false)
 const showDeleteConfirm = ref(false)
-const friendInfo = ref(null)
+const friendInfo = ref<User | null>(null)
 
 function toggleFriendMenu() { showFriendMenu.value = !showFriendMenu.value }
 
@@ -243,7 +244,7 @@ async function showFriendInfo() {
   try {
     const { getUserDetail } = await import('../api')
     const data = await getUserDetail(currentChatUser.value.id)
-    friendInfo.value = data?.data || currentChatUser.value
+    friendInfo.value = data || currentChatUser.value
   } catch (e) {
     console.warn('获取用户详情失败:', e)
     friendInfo.value = currentChatUser.value
@@ -280,15 +281,15 @@ const isMobile = computed(() => {
 })
 
 // 当前会话的消息列表（私聊或群聊）— memoize 避免每次 reactive 变化都 slice
-let _cachedMsgs = null
+let _cachedMsgs: readonly ChatMessage[] | null = null
 let _cachedMsgsLen = 0
-let _cachedChatId = null
+let _cachedChatId: Id | null = null
 const currentMessages = computed(() => {
   if (currentChatId.value == null) return []
   const msgs = isGroupChat.value ? store.state.groupMessages : store.state.messages
   // 仅在数组长度变化或切换会话时重新 slice
   if (msgs === _cachedMsgs && msgs.length === _cachedMsgsLen && currentChatId.value === _cachedChatId) {
-    return _cachedMsgsLen > 100 ? _cachedMsgs.slice(_cachedMsgsLen - 100) : _cachedMsgs
+    return _cachedMsgsLen > 100 ? _cachedMsgs!.slice(_cachedMsgsLen - 100) : _cachedMsgs
   }
   _cachedMsgs = msgs
   _cachedMsgsLen = msgs.length
@@ -357,9 +358,9 @@ watch(() => isGroupChat.value ? store.state.groupMessages.length : store.state.m
 })
 
 // 相对时间格式化（读取 now.value 使模板随 30s 定时器实时刷新）
-function formatRelativeTime(ts) {
+function formatRelativeTime(ts: TimeValue | undefined) {
   if (!ts) return ''
-  const diff = now.value - new Date(ts)
+  const diff = now.value - new Date(ts).getTime()
   const seconds = Math.floor(diff / 1000)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
@@ -391,7 +392,7 @@ const avatarMap = computed(() => {
   return map
 })
 
-function getAvatar(userId) {
+function getAvatar(userId: Id) {
   if (!userId) return null
   return avatarMap.value.get(String(userId)) || null
 }
@@ -402,43 +403,43 @@ import { AGENT_USER_ID } from '../constants'
 import { initials } from '../utils/format'
 
 // 图片消息检测与解析
-function isImageMessage(text) {
+function isImageMessage(text: string) {
   if (!text) return false
   return text.startsWith('![') && text.includes('](data:image/')
 }
 
-function extractImageUrl(text) {
+function extractImageUrl(text: string) {
   const match = text.match(/!\[(.*?)\]\((.*)\)/)
   return match ? match[2] : ''
 }
 
-function extractImageAlt(text) {
+function extractImageAlt(text: string) {
   const match = text.match(/!\[(.*?)\]\((.*)\)/)
   return match ? match[1] : t('chat.imageAlt')
 }
 
-function openImagePreview(url) {
+function openImagePreview(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 // 文件消息检测与解析
-function isFileMessage(text) {
+function isFileMessage(text: string) {
   if (!text) return false
   return text.startsWith('📎 ') && text.includes('(') && text.endsWith('KB)')
 }
 
-function extractFileName(text) {
+function extractFileName(text: string) {
   const match = text.match(/📎 (.*?) \(/)
   return match ? match[1] : t('chat.unknownFile')
 }
 
-function extractFileSize(text) {
+function extractFileSize(text: string) {
   const match = text.match(/\(([\d.]+KB)\)/)
   return match ? match[1] : ''
 }
 
-function getFileIcon(filename) {
-  const ext = filename.split('.').pop().toLowerCase()
+function getFileIcon(filename: string) {
+  const ext = (filename.split('.').pop() || '').toLowerCase()
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '🖼️'
   if (['pdf'].includes(ext)) return '📄'
   if (['doc', 'docx'].includes(ext)) return '📝'
@@ -451,7 +452,7 @@ function getFileIcon(filename) {
 }
 
 // 文本格式化（文本已在 store 中预清洗，此处直接返回）
-function formatText(text) {
+function formatText(text: string) {
   if (!text || typeof text !== "string") return ''
   return text
 }
@@ -487,7 +488,7 @@ function send(){
   const key = isGroupChat.value ? 'group' : 'private'
   if(!text.value.trim() || currentChatId.value == null || _sendLock[key]) return
   _sendLock[key] = true
-  const m = {
+  const m: ChatMessage = {
     user: 'you',
     text: text.value,
     time: new Date().toISOString(),
@@ -506,11 +507,11 @@ function send(){
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId, ...replyFields }
+        groupChat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
       }
     : {
         type: MSG_TYPE.CHAT,
-        chat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId, ...replyFields }
+        chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
       }
 
   if (isGroupChat.value) {
@@ -519,7 +520,7 @@ function send(){
     store.addMessage(m)
   }
 
-  chatSocket.sendWrapper(wrapper).catch(e => console.warn("send failed:", e.message))
+  chatSocket.sendWrapper(wrapper).catch(e => console.warn("send failed:", e instanceof Error ? e.message : String(e)))
   text.value = ''
   cancelReply()
   // 滚动到底部
@@ -529,8 +530,8 @@ function send(){
 /**
  * 重试发送失败的消息。
  */
-async function retryMessage(m) {
-  if (!m || !m.text) return
+async function retryMessage(m: ChatMessage) {
+  if (!m.text || !m.messageId) return
   const to = currentChatId.value
   if (!to) return
 
@@ -539,11 +540,11 @@ async function retryMessage(m) {
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: newMessageId }
+        groupChat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
       }
     : {
         type: MSG_TYPE.CHAT,
-        chat: { targetClientId: String(to), content: m.text, timestamp: Date.parse(m.time), messageId: newMessageId }
+        chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
       }
 
   // 更新状态为发送中
@@ -553,13 +554,13 @@ async function retryMessage(m) {
   try {
     await chatSocket.sendWrapper(wrapper)
   } catch (e) {
-    console.warn("重试失败:", e.message)
+    console.warn("重试失败:", e instanceof Error ? e.message : String(e))
     store.updateMessageStatus(newMessageId, 'failed')
   }
 }
 
 // 处理粘贴事件
-function handlePaste(e) {
+function handlePaste(e: ClipboardEvent) {
   const items = e.clipboardData?.items
   if (!items || currentChatId.value == null) return
 
@@ -597,7 +598,7 @@ function handleDragLeave() {
 }
 
 // 处理文件放下
-function handleDrop(e) {
+function handleDrop(e: DragEvent) {
   isDragOver.value = false
   const files = e.dataTransfer?.files
   if (!files || files.length === 0 || currentChatId.value == null) return
@@ -614,8 +615,8 @@ const MAX_IMAGE_DIM = 1920 // 图片最长边
 /**
  * 压缩图片到指定尺寸，输出 WebP base64。
  */
-function compressImage(file) {
-  return new Promise((resolve, reject) => {
+function compressImage(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
     img.onload = () => {
@@ -630,11 +631,12 @@ function compressImage(file) {
       canvas.width = width
       canvas.height = height
       const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas unavailable')); return }
       ctx.drawImage(img, 0, 0, width, height)
       canvas.toBlob(blob => {
         if (!blob) { reject(new Error('图片压缩失败')); return }
         const reader = new FileReader()
-        reader.onload = () => resolve(reader.result)
+        reader.onload = () => resolve(String(reader.result || ''))
         reader.readAsDataURL(blob)
       }, 'image/webp', 0.85)
     }
@@ -646,7 +648,9 @@ function compressImage(file) {
 /**
  * 发送文件消息（图片压缩后 base64 / 非图片仅传文件名）。
  */
-async function handleFileUpload(file) {
+async function handleFileUpload(file: File) {
+  if (currentChatId.value === null) return
+  const targetId = currentChatId.value
   // 文件大小校验
   if (file.size > MAX_FILE_SIZE) {
     alert(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），最大支持 10MB`)
@@ -660,9 +664,9 @@ async function handleFileUpload(file) {
       content = await compressImage(file)
     } catch (e) {
       console.warn('图片压缩失败，使用原图:', e)
-      content = await new Promise((resolve, reject) => {
+      content = await new Promise<string>((resolve, reject) => {
         const r = new FileReader()
-        r.onload = () => resolve(r.result)
+        r.onload = () => resolve(String(r.result || ''))
         r.onerror = reject
         r.readAsDataURL(file)
       })
@@ -673,26 +677,26 @@ async function handleFileUpload(file) {
   }
 
   const localMessageId = 'local_' + Date.now()
-  const m = {
+  const m: ChatMessage = {
     user: 'you',
     text: file.type.startsWith('image/') ? `![${file.name}](${content})` : content,
     time: new Date().toISOString(),
-    targetId: currentChatId.value,
+    targetId,
     messageId: localMessageId
   }
 
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId }
+        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
       }
     : {
         type: MSG_TYPE.CHAT,
-        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: Date.parse(m.time), messageId: localMessageId }
+        chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
       }
 
   if (isGroupChat.value) {
-    store.addGroupMessage({ ...m, groupId: currentChatId.value })
+    store.addGroupMessage({ ...m, groupId: targetId })
   } else {
     store.addMessage(m)
   }
@@ -702,7 +706,7 @@ async function handleFileUpload(file) {
 }
 
 // 显示消息上下文菜单
-function showMessageContextMenu(e, message) {
+function showMessageContextMenu(e: MouseEvent, message: ChatMessage) {
   e.preventDefault()
   selectedMessage.value = message
   contextMenuPos.value = { x: e.clientX, y: e.clientY }
@@ -742,7 +746,7 @@ async function shareMessage() {
 }
 
 // 回复预览：选中消息后输入框上方显示引用条，发送时携带 replyTo 字段
-const replyTo = ref(null) // { messageId, content, sender }
+const replyTo = ref<{ sender: string; content: string; messageId?: string } | null>(null) // { messageId, content, sender }
 
 // 回复消息（进入预览模式，不再把引用文本塞进输入框）
 function replyMessage() {
@@ -769,7 +773,7 @@ function cancelReply() {
 const forwardDialogOpen = ref(false)
 // 转发目标：好友（排除群组与 AI 助手）
 const forwardTargets = computed(() =>
-  store.state.users.filter(u => u.id > 0 && u.id !== AGENT_USER_ID)
+  store.state.users.filter(u => Number(u.id) > 0 && u.id !== AGENT_USER_ID)
 )
 
 function forwardMessage() {
@@ -778,7 +782,7 @@ function forwardMessage() {
   closeContextMenu()
 }
 
-async function doForward(target) {
+async function doForward(target: User) {
   const content = selectedMessage.value?.text
   forwardDialogOpen.value = false
   if (!content) return
@@ -806,7 +810,7 @@ function deleteMessage() {
 }
 
 // 键盘快捷键处理
-function handleKeydown(e) {
+function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     showContextMenu.value = false
     showFriendMenu.value = false

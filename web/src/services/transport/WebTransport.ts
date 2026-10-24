@@ -1,3 +1,4 @@
+import type { BinaryData, SendOptions } from '../../types/transport'
 /**
  * WebTransport — 基于 WebTransport (QUIC) 的传输实现。
  *
@@ -17,24 +18,14 @@ const STREAM_TYPE = {
 }
 
 export class WebTransport extends ChatTransport {
-  constructor() {
-    super()
-    this._transport = null
-    this._url = ''
-
-    // 控制流（登录/心跳/ACK）
-    this._controlStream = null
-    this._controlWriter = null
-
-    // 会话流池：conversationId → { writer, reader }
-    this._chatStreams = new Map()
-
-    // 入站流读取器
-    this._incomingReader = null
-
-    this._readerActive = false
-    this._closedCalled = false  // 防止 _onclose 重复调用
-  }
+  private _transport: globalThis.WebTransport | null = null
+  private _url = ''
+  private _controlStream: WebTransportBidirectionalStream | null = null
+  private _controlWriter: WritableStreamDefaultWriter<Uint8Array<ArrayBuffer>> | null = null
+  private _chatStreams = new Map<string, { stream: WebTransportBidirectionalStream; writer: WritableStreamDefaultWriter<Uint8Array<ArrayBuffer>> }>()
+  private _incomingReader: ReadableStreamDefaultReader<WebTransportBidirectionalStream> | null = null
+  private _readerActive = false
+  private _closedCalled = false
 
   /**
    * 安全调用 _onclose，防止重复触发。
@@ -49,7 +40,7 @@ export class WebTransport extends ChatTransport {
    * 建立 WebTransport 连接。
    * 连接成功后创建控制流 + 启动入站流监听。
    */
-  async connect(url, token) {
+  async connect(url: string, token: string) {
     this._url = url
     this._closedCalled = false  // 重置关闭标记
 
@@ -106,7 +97,7 @@ export class WebTransport extends ChatTransport {
    * @param {string} [opts.conversationId] - 会话 ID，用于会话流路由
    * @param {string} [opts.streamType] - 流类型：'control' | 'chat'
    */
-  send(data, opts = {}) {
+  send(data: BinaryData, opts: SendOptions = {}) {
     const streamType = opts.streamType || STREAM_TYPE.CONTROL
     const conversationId = opts.conversationId || ''
 
@@ -146,7 +137,7 @@ export class WebTransport extends ChatTransport {
   // ── 控制流 ─────────────────────────────────────
 
   async _createControlStream() {
-    this._controlStream = await this._transport.createBidirectionalStream()
+    this._controlStream = await this._transport!.createBidirectionalStream()
     this._controlWriter = this._controlStream.writable.getWriter()
 
     // 启动控制流读取循环
@@ -154,9 +145,9 @@ export class WebTransport extends ChatTransport {
     this._startControlStreamReading()
   }
 
-  _sendToControlStream(data) {
+  _sendToControlStream(data: BinaryData) {
     if (!this._controlWriter) return false
-    this._controlWriter.write(data).catch(e => {
+    this._controlWriter.write(data instanceof Uint8Array ? data : new Uint8Array(data)).catch(e => {
       console.error('控制流发送异常:', e)
       if (this._onerror) this._onerror(e)
     })
@@ -165,7 +156,7 @@ export class WebTransport extends ChatTransport {
 
   async _startControlStreamReading() {
     try {
-      const reader = this._controlStream.readable.getReader()
+      const reader = this._controlStream!.readable.getReader()
       while (this._readerActive) {
         const { value, done } = await reader.read()
         if (done) break
@@ -192,10 +183,10 @@ export class WebTransport extends ChatTransport {
    * WebTransport 协议：服务端 `QuicWebTransportHandler` 直接处理
    * protobuf MessageWrapper，无需额外 init 帧。
    */
-  _sendToChatStream(conversationId, data) {
+  _sendToChatStream(conversationId: string, data: BinaryData) {
     const entry = this._chatStreams.get(conversationId)
     if (entry && entry.writer) {
-      entry.writer.write(data).catch(e => {
+      entry.writer.write(data instanceof Uint8Array ? data : new Uint8Array(data)).catch(e => {
         console.error(`会话流(${conversationId})发送异常:`, e)
         if (this._onerror) this._onerror(e)
       })
@@ -209,19 +200,19 @@ export class WebTransport extends ChatTransport {
     return true
   }
 
-  async _createChatStream(conversationId, firstData) {
-    const stream = await this._transport.createBidirectionalStream()
+  async _createChatStream(conversationId: string, firstData: BinaryData) {
+    const stream = await this._transport!.createBidirectionalStream()
     const writer = stream.writable.getWriter()
 
     // 直接发 protobuf 消息（WebTransport 无需 init 帧，后端通吃）
-    if (firstData) await writer.write(firstData)
+    if (firstData) await writer.write(firstData instanceof Uint8Array ? firstData : new Uint8Array(firstData))
 
     const entry = { stream, writer }
     this._chatStreams.set(conversationId, entry)
     this._readChatStream(conversationId, stream)
   }
 
-  async _readChatStream(conversationId, stream) {
+  async _readChatStream(conversationId: string, stream: WebTransportBidirectionalStream) {
     try {
       const reader = stream.readable.getReader()
       while (true) {
@@ -232,7 +223,7 @@ export class WebTransport extends ChatTransport {
         }
       }
     } catch (e) {
-      console.debug(`会话流(${conversationId})读取结束:`, e.message)
+      console.debug(`会话流(${conversationId})读取结束:`, e instanceof Error ? e.message : String(e))
     } finally {
       this._chatStreams.delete(conversationId)
     }
@@ -242,7 +233,7 @@ export class WebTransport extends ChatTransport {
 
   async _startListeningIncomingStreams() {
     try {
-      this._incomingReader = this._transport.incomingBidirectionalStreams.getReader()
+      this._incomingReader = this._transport!.incomingBidirectionalStreams.getReader()
       while (true) {
         const { value: stream, done } = await this._incomingReader.read()
         if (done) break
@@ -250,11 +241,11 @@ export class WebTransport extends ChatTransport {
         this._handleIncomingStream(stream)
       }
     } catch (e) {
-      console.debug('WebTransport 入站流监听结束:', e.message)
+      console.debug('WebTransport 入站流监听结束:', e instanceof Error ? e.message : String(e))
     }
   }
 
-  async _handleIncomingStream(stream) {
+  async _handleIncomingStream(stream: WebTransportBidirectionalStream) {
     try {
       const reader = stream.readable.getReader()
       while (true) {
@@ -265,17 +256,14 @@ export class WebTransport extends ChatTransport {
         }
       }
     } catch (e) {
-      console.debug('WebTransport 入站流处理结束:', e.message)
+      console.debug('WebTransport 入站流处理结束:', e instanceof Error ? e.message : String(e))
     }
   }
 
   // ── 工具方法 ────────────────────────────────────
 
   /** 将 Uint8Array 转为 ArrayBuffer */
-  _toArrayBuffer(uint8Array) {
-    return uint8Array.buffer.slice(
-      uint8Array.byteOffset,
-      uint8Array.byteOffset + uint8Array.byteLength
-    )
+  _toArrayBuffer(uint8Array: Uint8Array) {
+    return Uint8Array.from(uint8Array).buffer
   }
 }

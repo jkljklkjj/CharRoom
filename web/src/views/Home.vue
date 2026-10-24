@@ -159,7 +159,10 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { Id } from '../types/chat'
+import type { FriendRequest } from '../types/api'
+import { toast } from '../utils/toast'
 import logoSvg from '../assets/logo.svg'
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -213,13 +216,13 @@ const demoAgentMessage = computed(() => {
 const showReward = ref(false)
 const selectedMethod = ref('alipay')
 const authorEmail = ref(siteConfig.AUTHOR_EMAIL)
-const copyStatus = ref(null) // null | 'copied' | 'failed'
+const copyStatus = ref<'copied' | 'failed' | null>(null) // null | 'copied' | 'failed'
 
 const showRequests = ref(false)
-const friendRequests = ref([]) // array of user objects
+const friendRequests = ref<FriendRequest[]>([]) // array of user objects
 
 function closeReward() { showReward.value = false }
-function selectMethod(method) { selectedMethod.value = method }
+function selectMethod(method: string) { selectedMethod.value = method }
 
 async function copyEmail() {
   try {
@@ -240,17 +243,17 @@ async function loadFriendRequests() {
   }
 }
 
-async function handleAccept(requesterId, idx) {
+async function handleAccept(requesterId: Id, idx: number) {
   const ok = await acceptFriend(requesterId)
   if (ok) {
     // remove from list
     friendRequests.value.splice(idx, 1)
   } else {
-    window.$toast.error(t('sidebar.frAcceptFailed'))
+    toast.error(t('sidebar.frAcceptFailed'))
   }
 }
 
-function handleDownload(url) {
+function handleDownload(url: string) {
   // 给URL添加随机时间戳参数，防止浏览器缓存重定向结果
   const timestamp = Date.now()
   const separator = url.includes('?') ? '&' : '?'

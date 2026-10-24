@@ -22,7 +22,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { Tokens } from '../types/api'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -39,7 +40,7 @@ const isRegister = ref(false)
 const store = useStore()
 const router = useRouter()
 
-const emit = defineEmits(['logged'])
+const emit = defineEmits<{ logged: [tokens: Tokens] }>()
 
 function toggleMode() {
   isRegister.value = !isRegister.value

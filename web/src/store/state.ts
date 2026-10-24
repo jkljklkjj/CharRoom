@@ -1,9 +1,10 @@
+import type { ChatState } from '../types/chat'
 import { reactive } from 'vue'
 
 export const STORAGE_PREFIX = 'charroom_chat_history_'
 export const PAGE_SIZE = 50
 
-export const state = reactive({
+export const state = reactive<ChatState>({
   users: [],
   groups: [],
   messages: [],

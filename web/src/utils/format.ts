@@ -1,3 +1,4 @@
+import type { Id, User } from '../types/chat'
 /**
  * 格式化工具函数
  */
@@ -7,9 +8,9 @@
  * @param {string} name - 用户名
  * @returns {string} 首字母缩写
  */
-export function initials(name) {
+export function initials(name: Id | undefined) {
   if (!name) return 'U'
-  return name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()
+  return String(name).split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()
 }
 
 /**
@@ -17,8 +18,8 @@ export function initials(name) {
  * @param {object} user - 用户对象
  * @returns {string|null} 头像 URL
  */
-export function avatarSrc(user) {
-  if (!user || !user.avatarUrl) return null
+export function avatarSrc(user: User | null | undefined) {
+  if (!user || !user.avatarUrl) return ''
   const v = user.avatarKey
   return v ? (user.avatarUrl + (user.avatarUrl.includes('?') ? '&v=' : '?v=') + encodeURIComponent(v)) : user.avatarUrl
 }

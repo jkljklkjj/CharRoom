@@ -15,7 +15,7 @@ export const MSG_TYPE = Object.freeze({
   "STREAM_INIT_ACK": 11,
   "SYNC_HINT": 12,
   "FRIEND_ACCEPTED": 13
-})
+} as const)
 
 export const PROTO_DEVICE_TYPE = Object.freeze({
   "DEVICE_TYPE_UNSPECIFIED": 0,
@@ -23,14 +23,14 @@ export const PROTO_DEVICE_TYPE = Object.freeze({
   "DESKTOP": 2,
   "WEB": 3,
   "CLI": 4
-})
+} as const)
 
 export const CONVERSATION_TYPE = Object.freeze({
   "CONVERSATION_TYPE_UNSPECIFIED": 0,
   "PRIVATE": 1,
   "GROUP": 2,
   "AGENT": 3
-})
+} as const)
 
 export const AGENT_STREAM_TYPE = Object.freeze({
   "STREAM_TEXT": 0,
@@ -39,11 +39,11 @@ export const AGENT_STREAM_TYPE = Object.freeze({
   "STREAM_USAGE": 3,
   "STREAM_DONE": 4,
   "STREAM_ERROR": 5
-})
+} as const)
 
 export const DEVICE_TYPE_NUM = Object.freeze({
   mobile: PROTO_DEVICE_TYPE.MOBILE,
   desktop: PROTO_DEVICE_TYPE.DESKTOP,
   web: PROTO_DEVICE_TYPE.WEB,
   cli: PROTO_DEVICE_TYPE.CLI
-})
+} as const)

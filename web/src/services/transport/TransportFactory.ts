@@ -7,15 +7,15 @@
 import { WebTransport } from './WebTransport'
 
 let _config = {
-  webTransportUrl: null,
+  webTransportUrl: null as string | null,
 }
 
-export function configureTransport(cfg) {
+export function configureTransport(cfg: Partial<typeof _config>) {
   Object.assign(_config, cfg)
 }
 
 export function isWebTransportSupported() {
-  return typeof WebTransport !== 'undefined'
+  return typeof globalThis.WebTransport !== 'undefined'
 }
 
 export function createTransport() {
@@ -26,7 +26,7 @@ export function createTransport() {
   return new WebTransport()
 }
 
-export function buildWebTransportUrl(host, port) {
+export function buildWebTransportUrl(host: string, port: number) {
   return `https://${host}:${port}/.well-known/webtransport`
 }
 

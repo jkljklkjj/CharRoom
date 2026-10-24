@@ -7,7 +7,7 @@
  * @param {string} password - 密码
  * @returns {{ valid: boolean, message: string }}
  */
-export function validatePassword(password) {
+export function validatePassword(password: string) {
   if (!password) {
     return { valid: false, message: '请输入密码' }
   }
@@ -40,7 +40,7 @@ export function validatePassword(password) {
  * @param {string} email - 邮箱
  * @returns {{ valid: boolean, message: string }}
  */
-export function validateEmail(email) {
+export function validateEmail(email: string) {
   if (!email) {
     return { valid: false, message: '请输入邮箱' }
   }
@@ -58,7 +58,7 @@ export function validateEmail(email) {
  * @param {string} username - 用户名
  * @returns {{ valid: boolean, message: string }}
  */
-export function validateUsername(username) {
+export function validateUsername(username: string) {
   if (!username) {
     return { valid: false, message: '请输入用户名' }
   }

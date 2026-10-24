@@ -1,3 +1,14 @@
+import type { ChatTransport } from './transport/ChatTransport'
+import type { MessageWrapper, ChatMessage, GroupChatMessage } from '../proto/messages'
+import type { useStore } from '../store'
+interface SocketHandlers {
+  onopen?: () => void
+  onmessage?: (message: MessageWrapper) => void
+  onclose?: (event?: unknown) => void
+  onerror?: (error: unknown) => void
+  onAuthFailed?: (reason: string) => void
+  onFriendAccepted?: (userId: number) => void
+}
 import { encodeMessage, decodeMessage } from '../proto'
 import DOMPurify from 'dompurify'
 import i18n from '../i18n'
@@ -8,38 +19,38 @@ import { MSG_TYPE, DEVICE_TYPE_NUM, PROTO_DEVICE_TYPE } from '../proto/constants
 
 // ── 内部变量 ────────────────────────────────────
 
-let transport = null          // ChatTransport 实例
-let handlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerror: () => {} }
-let reconnectTimer = null
-let heartbeatTimer = null
-let heartbeatTimeoutTimer = null
-let ackCheckTimer = null      // ACK 超时检查定时器
-let cacheCleanupTimer = null  // 消息去重缓存清理定时器
+let transport: ChatTransport | null = null          // ChatTransport 实例
+let handlers: SocketHandlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerror: () => {} }
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let heartbeatTimer: ReturnType<typeof setTimeout> | null = null
+let heartbeatTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+let ackCheckTimer: ReturnType<typeof setTimeout> | null = null      // ACK 超时检查定时器
+let cacheCleanupTimer: ReturnType<typeof setTimeout> | null = null  // 消息去重缓存清理定时器
 let heartbeatInterval = 30000 // 30秒心跳
 let heartbeatTimeout = 10000  // 心跳超时10秒
 let currentReconnectDelay = 1000
 let lastHeartbeatResponseTime = 0
 let maxReconnectDelay = 30000
 let stopReconnect = false
-let currentUserId = null
+let currentUserId: string | null = null
 const MAX_MESSAGE_CACHE = 1000
 // 消息去重：Map<messageId, timestamp>，带 TTL 自动过期
-const messageCache = new Map()
+const messageCache = new Map<string, number>()
 const MESSAGE_TTL = 5 * 60 * 1000 // 5 分钟 TTL
 
 // 乐观 UI：待确认消息跟踪 Map<messageId, { sendTime, warned, failed }>
-const pendingAcks = new Map()
+const pendingAcks = new Map<string, { sendTime: number; warned: boolean; failed: boolean }>()
 const ACK_TIMEOUT_MS = 16000  // 8-16s: 发送中 → 16s+: 失败
 
 // ── Store 引用（依赖注入，替代 window.__chatStore） ──
 
-let storeRef = null
+let storeRef: ReturnType<typeof useStore> | null = null
 
 /**
  * 注入 store 引用，chatSocket 内部需要读写 store 时使用。
  * 应在 App 初始化时调用一次。
  */
-export function setStore(store) {
+export function setStore(store: ReturnType<typeof useStore>) {
   storeRef = store
 }
 
@@ -79,7 +90,7 @@ function stopTimers() {
 /**
  * 建立聊天连接。
  */
-export async function connect(hostname, port, token, userId, { onopen, onmessage, onclose, onerror, onAuthFailed, onFriendAccepted } = {}) {
+export async function connect(hostname: string, port: number, token: string, userId: string, { onopen, onmessage, onclose, onerror, onAuthFailed, onFriendAccepted }: SocketHandlers = {}) {
   console.debug('🔌 尝试建立连接:', { hostname, port, hasToken: !!token, userId })
 
   if (!token || typeof token !== 'string' || token.trim() === '') {
@@ -140,7 +151,7 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
     stopHeartbeat()
 
     if (!stopReconnect) {
-      scheduleReconnect(hostname, port, token, currentUserId)
+      scheduleReconnect(hostname, port, token, currentUserId || userId)
     }
 
     if (handlers.onclose) handlers.onclose(event)
@@ -162,7 +173,7 @@ export async function connect(hostname, port, token, userId, { onopen, onmessage
   }
 }
 
-async function sendLogin(token) {
+async function sendLogin(token: string) {
   try {
     const result = await sendWrapper({
       type: MSG_TYPE.LOGIN,
@@ -181,7 +192,7 @@ async function sendLogin(token) {
 /**
  * 发送 protobuf 编码的消息。
  */
-export async function sendWrapper(wrapperObj) {
+export async function sendWrapper(wrapperObj: MessageWrapper) {
   if (!transport || !transport.isConnected()) {
     // 未连接时：持久化到 IndexedDB 离线队列，重连后由 flushOfflineQueue 重发
     if (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT) {
@@ -202,7 +213,7 @@ export async function sendWrapper(wrapperObj) {
     // 限制缓存大小
     if (messageCache.size >= MAX_MESSAGE_CACHE) {
       const firstKey = messageCache.keys().next().value
-      messageCache.delete(firstKey)
+      if (firstKey) messageCache.delete(firstKey)
     }
     messageCache.set(msgId, Date.now())
   }
@@ -226,7 +237,7 @@ export async function sendWrapper(wrapperObj) {
 /**
  * 根据消息类型确定流类型。
  */
-function getStreamType(wrapperObj) {
+function getStreamType(wrapperObj: MessageWrapper) {
   const type = wrapperObj.type
   if (type === MSG_TYPE.ACK || type === MSG_TYPE.HEARTBEAT || type === MSG_TYPE.LOGIN || type === MSG_TYPE.LOGOUT) {
     return 'control'
@@ -240,7 +251,7 @@ function getStreamType(wrapperObj) {
 /**
  * 从消息对象中解析 conversationId。
  */
-function resolveConversationId(wrapperObj) {
+function resolveConversationId(wrapperObj: MessageWrapper) {
   if (wrapperObj.chat) {
     const target = wrapperObj.chat.targetClientId || ''
     const sender = wrapperObj.chat.userId || currentUserId || ''
@@ -294,7 +305,7 @@ async function flushOfflineQueue() {
 /**
  * 发送 ACK 确认消息。
  */
-export async function sendAck(messageId) {
+export async function sendAck(messageId: string) {
   if (!currentUserId || !messageId) return false
   return sendWrapper({
     type: MSG_TYPE.ACK,
@@ -372,7 +383,7 @@ function stopHeartbeat() {
 
 // ── 重连 ────────────────────────────────────────
 
-function scheduleReconnect(hostname, port, token, userId) {
+function scheduleReconnect(hostname: string, port: number, token: string, userId: string) {
   if (reconnectTimer) clearTimeout(reconnectTimer)
 
   console.debug(`将在 ${currentReconnectDelay}ms 后尝试重连...`)
@@ -396,36 +407,26 @@ function scheduleReconnect(hostname, port, token, userId) {
 /**
  * 处理收到的消息（二进制数据）。
  */
-async function handleMessage(rawData) {
-  let processedData = rawData
-
-  // 解码 protobuf
+async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper) {
+  let processedData: MessageWrapper
   if (rawData instanceof ArrayBuffer || rawData instanceof Blob) {
-    let buf
-    if (rawData instanceof Blob) buf = await rawData.arrayBuffer()
-    else buf = rawData
-    try {
-      processedData = await decodeMessage(buf)
-    } catch (err) {
-      console.warn('Protobuf 解码失败:', err.message)
-      processedData = buf
-    }
-  }
+    try { processedData = await decodeMessage(rawData instanceof Blob ? await rawData.arrayBuffer() : rawData) }
+    catch (error) { console.warn('Protobuf 解码失败:', error); return }
+  } else { processedData = rawData }
 
   // 处理服务端响应
   if (processedData && typeof processedData === 'object') {
     lastHeartbeatResponseTime = Date.now()
 
     // 带 success 字段的响应（ResponseMessage / AckMessage）
-    const isSuccess = processedData.success
-      || (processedData.response && processedData.response.success)
+    const isSuccess = processedData.response?.success
     if (isSuccess !== undefined) {
       if (!isSuccess) {
-        const msg = (processedData.response ? processedData.response.message : processedData.message || '').toLowerCase()
+        const msg = (processedData.response?.message || '').toLowerCase()
         if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
           console.debug('🔑 认证失败，停止重连')
           stopReconnect = true
-          handlers.onAuthFailed(msg)
+          handlers.onAuthFailed?.(msg)
         }
         return
       }
@@ -440,11 +441,12 @@ async function handleMessage(rawData) {
     // ACK 确认：更新消息状态 + seqId 游标 + RTT 测量
     if (processedData.type === MSG_TYPE.ACK) {
       lastHeartbeatResponseTime = Date.now()
-      const ack = processedData.ack || processedData
+      const ack = processedData.ack
+      if (!ack) return
 
       // 心跳 ACK 回传 timestamp 用于精确 RTT 测量
-      if (ack.timestamp > 0 && (!ack.messageId || ack.messageId === '')) {
-        recordRttFromAck(ack.timestamp)
+      if (Number(ack.timestamp) > 0 && (!ack.messageId || ack.messageId === '')) {
+        recordRttFromAck(Number(ack.timestamp))
       }
 
       const ackedMsgId = ack.messageId
@@ -462,19 +464,16 @@ async function handleMessage(rawData) {
     // sync_hint：服务端推送的增量同步提示，触发客户端拉取新消息
     // 格式：{ type: "sync_hint", ack: { clientId: conversationId, message: seqId } }
     if (processedData.type === MSG_TYPE.SYNC_HINT) {
-      const hint = processedData.ack || processedData
+      const hint = processedData.ack
+      if (!hint) return
       const conversationId = hint.clientId
-      const seqId = parseInt(hint.message, 10)
+      const seqId = parseInt(hint.message || '', 10)
       if (conversationId && seqId > 0 && storeRef) {
         storeRef.setConversationSeqId(conversationId, seqId)
         if (handlers.onmessage) handlers.onmessage(processedData)
       }
     }
 
-    // 用户在线状态更新
-    if (processedData.clientId !== undefined && processedData.online !== undefined) {
-      // 传给上层
-    }
 
     // 好友请求被接受通知
     if (processedData.type === MSG_TYPE.FRIEND_ACCEPTED && processedData.ack) {
@@ -507,14 +506,14 @@ async function handleMessage(rawData) {
 
 let lastHbSendTime = 0
 let lastHbTimestamp = 0   // 发送心跳时的客户端时间戳
-let rttSamples = []
+let rttSamples: number[] = []
 const MAX_RTT_SAMPLES = 10
 
 /**
  * 记录心跳发送时间。
  * @param {number} timestamp - 发送时的 Date.now()
  */
-function recordHeartbeatSent(timestamp) {
+function recordHeartbeatSent(timestamp: number) {
   lastHbSendTime = Date.now()
   lastHbTimestamp = timestamp
 }
@@ -523,7 +522,7 @@ function recordHeartbeatSent(timestamp) {
  * 收到心跳 ACK 时调用，用服务端回传的 timestamp 计算精确 RTT。
  * @param {number} serverEchoTimestamp - 服务端回传的客户端时间戳
  */
-function recordRttFromAck(serverEchoTimestamp) {
+function recordRttFromAck(serverEchoTimestamp: number) {
   if (lastHbTimestamp > 0 && serverEchoTimestamp === lastHbTimestamp) {
     const rtt = Date.now() - lastHbSendTime
     rttSamples.push(rtt)
@@ -561,11 +560,11 @@ function adaptiveHeartbeatInterval() {
 
 // ── 浏览器通知 ──────────────────────────────────
 
-function showNotification(msg) {
+function showNotification(msg: ChatMessage | GroupChatMessage) {
   if (document.visibilityState === 'visible') return
   if (!('Notification' in window) || Notification.permission !== 'granted') return
 
-  const title = msg.senderName || msg.senderId || '新消息'
+  const title = String(msg.userId || '') || '新消息'
   const body = msg.content || '[图片或其他内容]'
   try {
     new Notification(DOMPurify.sanitize(title), {

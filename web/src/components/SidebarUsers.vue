@@ -65,7 +65,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { Id, User, ConversationState } from '../types/chat'
+import type { FriendRequest } from '../types/api'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
@@ -73,16 +75,16 @@ import api from '../api'
 import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
-const emit = defineEmits(['user-selected', 'open-settings'])
+const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': [] }>()
 
 const store = useStore()
 const { t } = useI18n()
 const showFriendRequests = ref(false)
-const friendRequests = ref([])
+const friendRequests = ref<FriendRequest[]>([])
 const searchQuery = ref('')
 
 // 排序后的用户列表 — memoize 避免每次 conversationStates 变化都重排
-let _sortedUsers = null
+let _sortedUsers: (User & { __index: number; preview: ConversationState })[] | null = null
 let _sortedUsersHash = ''
 const sortedUsers = computed(() => {
   // 构建 hash 用于检测变化
@@ -130,12 +132,12 @@ import { initials, avatarSrc } from '../utils/format'
 import { AGENT_USER_ID } from '../constants'
 import { toast } from '../utils/toast'
 
-function select(u) {
+function select(u: User) {
   store.setSelectedChat(u.id)
   emit('user-selected', u)
 
   // 点击用户时，主动查询该用户的在线状态（排除AI助手和群组）
-  if (u.id > 0 && u.id !== AGENT_USER_ID) {
+  if (Number(u.id) > 0 && u.id !== AGENT_USER_ID) {
     chatSocket.sendWrapper({
       type: MSG_TYPE.CHECK,
       check: {
@@ -175,7 +177,7 @@ async function loadFriendRequests() {
   }
 }
 
-async function handleAccept(userId) {
+async function handleAccept(userId: Id) {
   const friend = await api.acceptFriend(userId)
   if (friend) {
     toast.success(t('sidebar.frAccepted'))
@@ -188,7 +190,7 @@ async function handleAccept(userId) {
   }
 }
 
-async function handleReject(userId) {
+async function handleReject(userId: Id) {
   const ok = await api.rejectFriend(userId)
   if (ok) {
     toast.info(t('sidebar.frRejected'))

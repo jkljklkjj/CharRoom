@@ -10,11 +10,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import type { ToastKind } from '../utils/toast'
 import { registerToast } from '../utils/toast'
 
-const toasts = ref([])
+const toasts = ref<{ id: number; type: ToastKind; message: string }[]>([])
 const visible = ref(false)
 let toastId = 0
 
@@ -38,7 +39,7 @@ onMounted(() => {
   })
 })
 
-function getToastIcon(type) {
+function getToastIcon(type: ToastKind) {
   switch (type) {
     case 'success': return '✓'
     case 'error': return '!'
@@ -47,7 +48,7 @@ function getToastIcon(type) {
   }
 }
 
-function show(message, type = 'info', duration = 3000) {
+function show(message: string, type: ToastKind = 'info', duration = 3000) {
   const id = ++toastId
   const toast = { id, message, type }
   toasts.value.push(toast)
@@ -60,23 +61,23 @@ function show(message, type = 'info', duration = 3000) {
   return id
 }
 
-function success(message, duration = 3000) {
+function success(message: string, duration = 3000) {
   return show(message, 'success', duration)
 }
 
-function error(message, duration = 3000) {
+function error(message: string, duration = 3000) {
   return show(message, 'error', duration)
 }
 
-function info(message, duration = 3000) {
+function info(message: string, duration = 3000) {
   return show(message, 'info', duration)
 }
 
-function warning(message, duration = 3000) {
+function warning(message: string, duration = 3000) {
   return show(message, 'warning', duration)
 }
 
-function remove(id) {
+function remove(id: number) {
   const index = toasts.value.findIndex(t => t.id === id)
   if (index > -1) {
     toasts.value.splice(index, 1)

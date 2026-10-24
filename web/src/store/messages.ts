@@ -1,3 +1,4 @@
+import type { Id, ChatMessage, ConversationPatch } from '../types/chat'
 import { state, PAGE_SIZE } from './state'
 import { AGENT_USER_ID } from '../constants'
 import { getPrivateConversationId, normalizeTimeValue } from './storage'
@@ -5,14 +6,12 @@ import DOMPurify from 'dompurify'
 import { getMessagesPage as dbGetMessagesPage, appendMessage as dbAppendMessage,
          deleteMessage as dbDeleteMessage } from '../utils/messageDB'
 
-// 延迟导入 users.js 避免循环依赖
+// 延迟导入 users.ts 避免循环依赖
+let _updateConversationState: ((id: Id, patch: ConversationPatch) => void) | null = null
+let _invalidateConversationPreview: ((id: Id) => void) | null = null
+let _pendingPatches: { conversationId: Id; patch: ConversationPatch }[] = [] // 缓存首次调用的 patch，等导入完成后执行
 
-// 延迟导入 users.js 避免循环依赖
-let _updateConversationState = null
-let _invalidateConversationPreview = null
-let _pendingPatches = [] // 缓存首次调用的 patch，等导入完成后执行
-
-import('./users.js').then(m => {
+import('./users').then(m => {
   _updateConversationState = m.updateConversationState
   _invalidateConversationPreview = m.invalidateConversationPreview
   // 执行缓存的 patches
@@ -22,7 +21,7 @@ import('./users.js').then(m => {
   _pendingPatches = []
 })
 
-function updateConversationState(conversationId, patch) {
+function updateConversationState(conversationId: Id, patch: ConversationPatch) {
   if (!_updateConversationState) {
     // 导入未完成，缓存 patch
     _pendingPatches.push({ conversationId, patch })
@@ -31,7 +30,7 @@ function updateConversationState(conversationId, patch) {
   _updateConversationState(conversationId, patch)
 }
 
-function invalidatePreview(conversationId) {
+function invalidatePreview(conversationId: Id) {
   if (!_invalidateConversationPreview) return
   _invalidateConversationPreview(conversationId)
 }
@@ -40,7 +39,7 @@ function invalidatePreview(conversationId) {
  * 预清洗消息文本，避免每次渲染都调用 DOMPurify。
  * 在消息存入 store 时执行一次，而非每次 v-html 渲染时执行。
  */
-function sanitizeText(text) {
+function sanitizeText(text: string) {
   if (!text || typeof text !== 'string') return ''
   return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })
 }
@@ -55,15 +54,15 @@ function persistConversationSeqIds() {
   } catch (_) {}
 }
 
-export function getConversationSeqId(conversationId) {
+export function getConversationSeqId(conversationId: Id) {
   const key = String(conversationId)
   return state.conversationSeqIds[key] || 0
 }
 
-export function setConversationSeqId(conversationId, seqId) {
+export function setConversationSeqId(conversationId: Id, seqId: Id) {
   const key = String(conversationId)
   const current = state.conversationSeqIds[key] || 0
-  if (seqId > current) {
+  if (BigInt(seqId) > BigInt(current)) {
     state.conversationSeqIds = {
       ...state.conversationSeqIds,
       [key]: seqId
@@ -74,7 +73,7 @@ export function setConversationSeqId(conversationId, seqId) {
 
 // ── 消息持久化 ────────────────────────────────
 
-async function savePrivateMessage(message) {
+async function savePrivateMessage(message: ChatMessage) {
   if (!state.accountId) return
   const chatId = getPrivateConversationId(message)
   if (!chatId) return
@@ -85,7 +84,7 @@ async function savePrivateMessage(message) {
   }
 }
 
-async function saveGroupMessage(message) {
+async function saveGroupMessage(message: ChatMessage) {
   if (!state.accountId || !message.groupId) return
   const conversationId = `group:${message.groupId}`
   try {
@@ -99,9 +98,9 @@ async function saveGroupMessage(message) {
 
 // 分页游标：conversationId → 已加载的最旧消息 index（null=从头）；
 // 配合 IndexedDB 游标分页，避免每次翻页全量读会话消息
-const pageCursors = new Map()
+const pageCursors = new Map<string, number | null>()
 
-export async function loadConversation(id, isGroup = false) {
+export async function loadConversation(id: Id | null, isGroup = false) {
   if (!id) {
     state.selectedChatId = null
     state.messages = []
@@ -178,7 +177,7 @@ export async function loadOlderMessages() {
 
 // ── 消息操作 ──────────────────────────────────
 
-export function addMessage(m) {
+export function addMessage(m: ChatMessage) {
   const chatId = getPrivateConversationId(m)
   if (!chatId) return
   // 预清洗文本，避免每次渲染调用 DOMPurify
@@ -203,7 +202,7 @@ export function addMessage(m) {
   }
 }
 
-export function upsertAgentStreamMessage(messageId, fullContent, done = false) {
+export function upsertAgentStreamMessage(messageId: string, fullContent: string, done = false) {
   if (!messageId) return
   const existingIndex = state.messages.findIndex(m => m.messageId === messageId)
   if (existingIndex >= 0) {
@@ -226,7 +225,7 @@ export function upsertAgentStreamMessage(messageId, fullContent, done = false) {
   }
 }
 
-export function addGroupMessage(m) {
+export function addGroupMessage(m: ChatMessage) {
   const conversationId = `-${m.groupId}`
   // 预清洗文本，避免每次渲染调用 DOMPurify
   const sanitized = m.text != null ? { ...m, text: sanitizeText(m.text) } : m
@@ -248,7 +247,7 @@ export function addGroupMessage(m) {
   }
 }
 
-export function updateMessageStatus(messageId, status) {
+export function updateMessageStatus(messageId: string, status: import('../types/chat').MessageStatus) {
   for (let i = 0; i < state.messages.length; i++) {
     if (state.messages[i].messageId === messageId) {
       state.messages[i] = { ...state.messages[i], isSent: status }
@@ -263,26 +262,26 @@ export function updateMessageStatus(messageId, status) {
   }
 }
 
-export function setSelectedChat(id) {
+export function setSelectedChat(id: Id | null) {
   loadConversation(id, Number(id) < 0)
 }
 
-export function trimMessages(max) {
+export function trimMessages(max: number) {
   if (state.messages.length > max) {
     state.messages = state.messages.slice(state.messages.length - max)
   }
 }
 
-export function trimGroupMessages(max) {
+export function trimGroupMessages(max: number) {
   if (state.groupMessages.length > max) {
     state.groupMessages = state.groupMessages.slice(state.groupMessages.length - max)
   }
 }
 
-export function deleteMessage(message, isGroup = false) {
+export function deleteMessage(message: ChatMessage, isGroup = false) {
   const byId = message && message.messageId
-    ? m => m.messageId !== message.messageId
-    : m => m !== message
+    ? (m: ChatMessage) => m.messageId !== message.messageId
+    : (m: ChatMessage) => m !== message
   if (isGroup) {
     state.groupMessages = state.groupMessages.filter(byId)
   } else {

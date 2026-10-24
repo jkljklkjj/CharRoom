@@ -77,19 +77,20 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { TokenQuota } from '../types/api'
 import { ref, computed, onMounted } from 'vue'
 import api from '../api'
 
-const emit = defineEmits(['close'])
+const emit = defineEmits<{ close: [] }>()
 
 const loading = ref(true)
 const err = ref('')
-const quota = ref(null)
+const quota = ref<TokenQuota | null>(null)
 const purchaseAmount = ref(10)
 const purchasing = ref(false)
 const qrCodeUrl = ref('')
-const currentPurchaseId = ref(null)
+const currentPurchaseId = ref<string | null>(null)
 
 const presets = [10, 20, 50, 100, 200]
 

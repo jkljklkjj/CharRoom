@@ -113,7 +113,10 @@
   <TokenQuotaDialog v-if="showQuota" @close="showQuota = false" />
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { MessageWrapper } from '../proto/messages'
+import type { Id, TimeValue, User } from '../types/chat'
+import type { OfflineMessage, Tokens } from '../types/api'
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -129,7 +132,7 @@ import siteConfig from '../siteConfig'
 import api from '../api'
 import { AGENT_USER_ID } from '../constants'
 
-function normalizeTimestamp(raw) {
+function normalizeTimestamp(raw: TimeValue | null | undefined) {
   if (raw == null || raw === '') return new Date().toISOString()
   if (typeof raw === 'number') return new Date(raw).toISOString()
   if (typeof raw === 'string') {
@@ -200,19 +203,19 @@ async function saveProfile() {
 // 主题设置
 const theme = ref(localStorage.getItem('theme') || 'auto') // auto, light, dark
 
-function setTheme(newTheme) {
+function setTheme(newTheme: string) {
   theme.value = newTheme
   localStorage.setItem('theme', newTheme)
   applyTheme(newTheme)
 }
 
-function switchLang(lang) {
+function switchLang(lang: string) {
   locale.value = lang
   localStorage.setItem('locale', lang)
   document.documentElement.lang = lang
 }
 
-function applyTheme(theme) {
+function applyTheme(theme: string) {
   if (theme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark')
   } else if (theme === 'light') {
@@ -232,12 +235,12 @@ function handleResize() {
 }
 
 /** 处理 QUIC/WebTransport 收到的消息 */
-function handleIncomingMessage(msg) {
+function handleIncomingMessage(msg: MessageWrapper) {
   try {
     if (msg.type === MSG_TYPE.CHAT && msg.chat) {
       store.addMessage({
         user: String(msg.chat.userId || 'unknown'),
-        text: msg.chat.content,
+        text: msg.chat.content || '',
         time: normalizeTimestamp(msg.chat.timestamp),
         targetId: msg.chat.targetClientId,
         messageId: msg.chat.messageId || undefined,
@@ -250,7 +253,7 @@ function handleIncomingMessage(msg) {
     } else if (msg.type === MSG_TYPE.GROUP_CHAT && msg.groupChat) {
       store.addGroupMessage({
         user: String(msg.groupChat.userId),
-        text: msg.groupChat.content,
+        text: msg.groupChat.content || '',
         time: normalizeTimestamp(msg.groupChat.timestamp),
         groupId: msg.groupChat.targetClientId,
         messageId: msg.groupChat.messageId || undefined,
@@ -263,7 +266,7 @@ function handleIncomingMessage(msg) {
     } else if (msg.type === MSG_TYPE.AGENT_CHAT_STREAM && msg.agentStream) {
       // Agent 流式消息（AgentStreamChunk 协议）
       const stream = msg.agentStream
-      const requestId = stream.requestId || ''
+      const requestId = String(stream.requestId || '')
       if (!requestId) return
 
       const streamType = stream.type
@@ -297,16 +300,17 @@ function handleIncomingMessage(msg) {
       }
     } else if (msg.type === MSG_TYPE.SYNC_HINT) {
       // sync_hint：服务端推送的增量同步提示
-      const hint = msg.ack || msg
+      const hint = msg.ack
+      if (!hint) return
       const conversationId = hint.clientId
-      const seqId = parseInt(hint.message, 10)
+      const seqId = parseInt(hint.message || '', 10)
       if (conversationId && seqId > 0) {
         store.setConversationSeqId(conversationId, seqId)
         // 触发增量同步
         syncConversation(conversationId, seqId)
       }
-    } else if (msg.clientId !== undefined && msg.online !== undefined) {
-      store.updateUserOnlineStatus(parseInt(msg.clientId), msg.online)
+    } else if (msg.response?.clientId !== undefined && msg.response.online !== undefined) {
+      store.updateUserOnlineStatus(parseInt(msg.response.clientId), msg.response.online)
     }
   } catch (e) {
     console.error('处理消息失败', e)
@@ -319,9 +323,9 @@ function handleIncomingMessage(msg) {
  * @param {string} conversationId - 会话 ID
  * @param {number} serverSeqId - 服务端最新 seqId
  */
-async function syncConversation(conversationId, serverSeqId) {
+async function syncConversation(conversationId: string, serverSeqId: Id) {
   const lastSeqId = store.getConversationSeqId(conversationId)
-  if (serverSeqId <= lastSeqId) return
+  if (BigInt(serverSeqId) <= BigInt(lastSeqId)) return
 
   try {
     const result = await api.syncMessages(conversationId, lastSeqId, 50)
@@ -372,8 +376,8 @@ async function syncAllConversations() {
     console.debug("📩 拉取到", allMessages.length, "条离线消息")
 
     // 按 conversationId 分组
-    const privateByConv = {}
-    const groupByConv = {}
+    const privateByConv: Record<string, OfflineMessage[]> = {}
+    const groupByConv: Record<string, OfflineMessage[]> = {}
     for (const msg of allMessages) {
       const convId = msg.conversationId || ''
       if (convId.startsWith('group:')) {
@@ -391,7 +395,7 @@ async function syncAllConversations() {
 
     // 私聊
     for (const [convId, msgs] of Object.entries(privateByConv)) {
-      msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+      msgs.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
       for (const msg of msgs) {
         const isMe = String(msg.senderId) === String(accountId)
         store.addMessage({
@@ -403,14 +407,14 @@ async function syncAllConversations() {
           seqId: msg.seqId
         })
       }
-      const maxSeqId = Math.max(...msgs.map(m => m.seqId || 0))
+      const maxSeqId = Math.max(...msgs.map(m => Number(m.seqId || 0)))
       if (maxSeqId > 0) store.setConversationSeqId(convId, maxSeqId)
     }
 
     // 群聊
     for (const [convId, msgs] of Object.entries(groupByConv)) {
       const gid = convId.replace('group:', '')
-      msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+      msgs.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
       for (const msg of msgs) {
         store.addGroupMessage({
           user: String(msg.senderId),
@@ -421,18 +425,18 @@ async function syncAllConversations() {
           seqId: msg.seqId
         })
       }
-      const maxSeqId = Math.max(...msgs.map(m => m.seqId || 0))
+      const maxSeqId = Math.max(...msgs.map(m => Number(m.seqId || 0)))
       if (maxSeqId > 0) store.setConversationSeqId(convId, maxSeqId)
     }
 
     console.debug(`📡 增量同步完成: ${allMessages.length} 条, ${Object.keys(privateByConv).length} 个私聊会话, ${Object.keys(groupByConv).length} 个群聊`)
   } catch (e) {
-    console.warn("⚠️ 拉取离线消息失败:", e.message)
+    console.warn("⚠️ 拉取离线消息失败:", e instanceof Error ? e.message : String(e))
   }
 }
 
 /** 建立 WebTransport 连接 */
-function connectChat(token, accountId) {
+function connectChat(token: string, accountId: Id) {
   const transportConfig = siteConfig.TRANSPORT || {}
   const host = 'quic.chatlite.xin'
   const port = transportConfig.port || 8080
@@ -443,8 +447,8 @@ function connectChat(token, accountId) {
       // 好友请求被接受，增量添加新好友
       try {
         const friend = await api.getUserDetail(accepterId)
-        if (friend?.data) {
-          store.addUser(friend.data)
+        if (friend) {
+          store.addUser(friend)
           toast.success(t('chat.friendAccepted') || '好友已添加')
         }
       } catch (e) {
@@ -487,7 +491,7 @@ function doLogout() {
 }
 
 /** 保存登录凭证到本地 — access token 用 sessionStorage（XSS 安全），refresh token 用 localStorage */
-function persistTokens(accessToken, refreshToken) {
+function persistTokens(accessToken: string, refreshToken: string) {
   try {
     sessionStorage.setItem('charroom_token', accessToken)
     localStorage.setItem('charroom_refreshToken', refreshToken || '')
@@ -495,7 +499,7 @@ function persistTokens(accessToken, refreshToken) {
 }
 
 /** 获取当前用户信息并标记登录有效 */
-async function initUserSession(accessToken, refreshToken) {
+async function initUserSession(accessToken: string, refreshToken: string) {
   store.setToken(accessToken)
   store.setRefreshToken(refreshToken || '')
 
@@ -527,8 +531,8 @@ async function initUserSession(accessToken, refreshToken) {
       for (const n of notifications) {
         // 获取新好友信息并添加到列表
         const friend = await api.getUserDetail(n.accepterId)
-        if (friend?.data) {
-          store.addUser(friend.data)
+        if (friend) {
+          store.addUser(friend)
         }
       }
       // 标记通知已读
@@ -559,7 +563,7 @@ async function initUserSession(accessToken, refreshToken) {
 }
 
 /** 登录成功回调 */
-async function onLogged(tokens) {
+async function onLogged(tokens: Tokens) {
   const accessToken = tokens?.accessToken || ''
   const refreshToken = tokens?.refreshToken || ''
   if (!accessToken) return
@@ -567,7 +571,7 @@ async function onLogged(tokens) {
 }
 
 // 选中用户，切换到聊天视图
-function onUserSelected(user) {
+function onUserSelected(user: User) {
   if (isMobile.value) {
     currentChatName.value = user.name || user.account || user.username || t('chat.userPrefix', { id: user.id })
     currentView.value = 'chat'

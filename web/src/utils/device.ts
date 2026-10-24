@@ -18,7 +18,7 @@ export function getDeviceId() {
 /**
  * 设备类型，Web 前端固定为 'web'
  */
-export const DEVICE_TYPE = 'web'
+export const DEVICE_TYPE = 'web' as const
 
 /**
  * 获取设备类型

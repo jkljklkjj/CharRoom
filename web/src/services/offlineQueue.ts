@@ -1,3 +1,10 @@
+import type { MessageWrapper } from '../proto/messages'
+import type { SendOptions } from '../types/transport'
+export const MAX_RETRIES = 3
+export interface QueueEntry {
+  messageId: string; wrapperObj: MessageWrapper; buffer: number[] | Uint8Array<ArrayBuffer>
+  opts: SendOptions; timestamp: number; retryCount: number
+}
 /**
  * PWA 离线消息队列（IndexedDB 持久化）。
  *
@@ -9,29 +16,29 @@ const DB_NAME = 'chatlite_offline'
 const DB_VERSION = 1
 const STORE_NAME = 'pending_messages'
 
-let db = null
+let db: IDBDatabase | null = null
 
 /**
  * 打开 IndexedDB 连接（懒初始化）。
  */
-function openDB() {
+function openDB(): Promise<IDBDatabase> {
   if (db) return Promise.resolve(db)
-  return new Promise((resolve, reject) => {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = (event) => {
-      const database = event.target.result
+      const database = request.result
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         const store = database.createObjectStore(STORE_NAME, { keyPath: 'messageId' })
         store.createIndex('timestamp', 'timestamp', { unique: false })
       }
     }
     request.onsuccess = (event) => {
-      db = event.target.result
+      db = request.result
       resolve(db)
     }
     request.onerror = (event) => {
-      console.error('[OfflineQueue] IndexedDB 打开失败:', event.target.error)
-      reject(event.target.error)
+      console.error('[OfflineQueue] IndexedDB 打开失败:', request.error)
+      reject(request.error)
     }
   })
 }
@@ -42,16 +49,16 @@ function openDB() {
  * @param {ArrayBuffer} buffer - 编码后的 protobuf 二进制
  * @param {object} opts - { streamType, conversationId }
  */
-export async function saveToQueue(wrapperObj, buffer, opts) {
+export async function saveToQueue(wrapperObj: MessageWrapper, buffer: ArrayBuffer, opts: SendOptions) {
   try {
     const database = await openDB()
     const tx = database.transaction(STORE_NAME, 'readwrite')
     const store = tx.objectStore(STORE_NAME)
 
-    const entry = {
+    const entry: QueueEntry = {
       messageId: wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId || `offline_${Date.now()}`,
       wrapperObj,
-      buffer: Array.from(new Uint8Array(buffer)), // IndexedDB 不支持 ArrayBuffer，转为数组
+      buffer: new Uint8Array(buffer), // IndexedDB stores typed arrays through structured clone
       opts,
       timestamp: Date.now(),
       retryCount: 0
@@ -62,8 +69,8 @@ export async function saveToQueue(wrapperObj, buffer, opts) {
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve(true)
       tx.onerror = (e) => {
-        console.warn('[OfflineQueue] 保存失败:', e.target.error)
-        reject(e.target.error)
+        console.warn('[OfflineQueue] 保存失败:', tx.error)
+        reject(tx.error)
       }
     })
   } catch (e) {
@@ -76,7 +83,7 @@ export async function saveToQueue(wrapperObj, buffer, opts) {
  * 获取所有待发送的消息。
  * @returns {Array} 待发送消息列表
  */
-export async function getAllPending() {
+export async function getAllPending(): Promise<QueueEntry[]> {
   try {
     const database = await openDB()
     const tx = database.transaction(STORE_NAME, 'readonly')
@@ -85,7 +92,7 @@ export async function getAllPending() {
 
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || [])
-      request.onerror = (e) => reject(e.target.error)
+      request.onerror = (e) => reject(tx.error)
     })
   } catch (e) {
     console.warn('[OfflineQueue] getAllPending 异常:', e)
@@ -97,7 +104,7 @@ export async function getAllPending() {
  * 删除已发送的消息。
  * @param {string} messageId
  */
-export async function removeMessage(messageId) {
+export async function removeMessage(messageId: string) {
   try {
     const database = await openDB()
     const tx = database.transaction(STORE_NAME, 'readwrite')
@@ -125,7 +132,7 @@ export async function clearQueue() {
 /**
  * 获取队列中的消息数量。
  */
-export async function getQueueSize() {
+export async function getQueueSize(): Promise<number> {
   try {
     const database = await openDB()
     const tx = database.transaction(STORE_NAME, 'readonly')
@@ -145,7 +152,7 @@ export async function getQueueSize() {
  * 重试发送单条消息（更新重试计数）。
  * @param {string} messageId
  */
-export async function incrementRetry(messageId) {
+export async function incrementRetry(messageId: string) {
   try {
     const database = await openDB()
     const tx = database.transaction(STORE_NAME, 'readwrite')
@@ -153,7 +160,7 @@ export async function incrementRetry(messageId) {
     const request = store.get(messageId)
 
     request.onsuccess = () => {
-      const entry = request.result
+      const entry = request.result as QueueEntry | undefined
       if (entry) {
         entry.retryCount = (entry.retryCount || 0) + 1
         store.put(entry)

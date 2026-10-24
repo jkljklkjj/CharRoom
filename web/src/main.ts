@@ -21,6 +21,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         // 自动检查更新
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing
+          if (!newWorker) return
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
               // 有新版本可用，可以提示用户刷新

@@ -23,7 +23,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { toast } from '../utils/toast'
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -38,12 +39,12 @@ const email = ref('')
 let password = ''
 const submitting = ref(false)
 const cooldown = ref(0)
-let cooldownTimer = null
+let cooldownTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(() => {
   const pending = store.state.pendingRegister
   if (!pending || !pending.email || !pending.password) {
-    window.$toast.warning(t('verify.noPendingInfo'))
+    toast.warning(t('verify.noPendingInfo'))
     router.push({ name: 'WebApp' })
     return
   }
@@ -65,17 +66,17 @@ onBeforeUnmount(() => {
 })
 
 async function submit() {
-  if (!code.value) { window.$toast.warning(t('verify.inputCode')); return }
+  if (!code.value) { toast.warning(t('verify.inputCode')); return }
   if (submitting.value) return
   submitting.value = true
   try {
     const result = await api.verifyRegister(email.value, code.value, password)
     if (result.ok) {
-      window.$toast.success(t('verify.success'))
+      toast.success(t('verify.success'))
       store.clearPendingRegister()
       router.push({ name: 'WebApp' })
     } else {
-      window.$toast.error(result.error || t('verify.failed'))
+      toast.error(result.error || t('verify.failed'))
     }
   } finally {
     submitting.value = false
@@ -90,20 +91,20 @@ async function resend() {
     // 本地记录冷却到期时间（120s）并启动倒计时
     try { localStorage.setItem('verify:email:cooldown:' + email.value, String(Date.now() + 120000)); } catch (e) {}
     startCooldown(120)
-    window.$toast.success(t('verify.codeResent'))
+    toast.success(t('verify.codeResent'))
   } else {
-    window.$toast.error(result.error || t('verify.sendFailed'))
+    toast.error(result.error || t('verify.sendFailed'))
   }
 }
 
-function startCooldown(seconds) {
+function startCooldown(seconds: number) {
   cooldown.value = seconds
   if (cooldownTimer) clearInterval(cooldownTimer)
   cooldownTimer = setInterval(() => {
     cooldown.value = Math.max(0, cooldown.value - 1)
     if (cooldown.value <= 0 && cooldownTimer) {
       clearInterval(cooldownTimer)
-      cooldownTimer = null
+      cooldownTimer = undefined
     }
   }, 1000)
 }
