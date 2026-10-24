@@ -33,7 +33,7 @@ Gradle 的 `buildQuicNative` 在 preBuild 前调用同一脚本。可用 `-Pquic
 ./gradlew :androidApp:assembleDebug -PquicJniLibsDir=/absolute/path/to/jniLibs
 ```
 
-预构建目录必须包含两个 ABI 各自的 `libchatlite_quic.so` 和 `libc++_shared.so`。不提交 `.so`、NDK 或 target 构建目录。用户工作区中的 Wrapper 删除状态仍由用户管理；Wrapper 不可用时可用已安装的匹配 Gradle 执行上述任务。
+预构建目录必须包含两个 ABI 各自的 `libchatlite_quic.so` 和 `libc++_shared.so`，建议放在构建目录外（如已忽略的 `native/quiche-jni/jniLibs`），避免被 `clean` 清除。Gradle 将预构建库作为输入，不会将其声明成任务输出。不提交 `.so`、NDK 或 target 构建目录。用户工作区中的 Wrapper 删除状态仍由用户管理；Wrapper 不可用时可用已安装的匹配 Gradle 执行上述任务。
 
 ## 验证
 
@@ -66,5 +66,9 @@ python native/tests/run-interop.py \
 | Android 原生库 | arm64-v8a / x86_64 release 交叉编译通过；JNI 主库与 C++ 运行时均为 16 KiB ELF 页对齐 |
 | JNI 协议互通 | 两临时身份双向 48 KiB 单聊、业务 ACK、主机名与 CA 校验通过；使用真实后端 QUIC 入口与合成业务处理 |
 | Android API 适配器 | 使用 SDK API 36 独立编译通过；全局应用状态使用替身，未包含 Compose 应用 |
-| 完整 APK | 未通过：缓存 Gradle 在任务执行前报 `Unable to establish loopback connection`；保留原有 Wrapper 删除状态 |
+| Gradle 启动 | 原 `Unable to establish loopback connection` 已修复：将 Java socket 目录移出默认 AppData/Temp，NIO/HttpClient 与 daemon 通信通过；见 [Windows 构建](../docs/development/WINDOWS-GRADLE.md) |
+| Android 工程编译 | `:androidApp:compileDebugKotlin` 通过，包含真实共享代码、Compose 与 Android QUIC 适配器 |
+| Debug APK | `:androidApp:assembleDebug` 通过；APK v2 签名与 16 KiB ZIP 对齐检查通过，已确认包含两个 ABI 的 JNI 主库和 C++ 运行时。保留原有 Wrapper 删除状态 |
 | 真机/模拟器 | 未运行；没有连接的 Android 设备，未发布安装包或改动线上服务 |
+
+Windows 本次使用 `scripts/gradle-windows.ps1` 和 `-PquicJniLibsDir=<预构建目录>` 执行编译及打包，产物为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`。这是本地 Debug 安装包，不代表 release/R8 或真机收发已验证。

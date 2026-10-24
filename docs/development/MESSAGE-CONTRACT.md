@@ -43,7 +43,7 @@ QUIC 是字节流；Netty/JNI 的读回调不是消息边界。每条流持有�
 
 - Web：6 项 `npm run test:messages` 契约/行为测试通过。
 - 共享 Kotlin：通过独立 `javac`、`kotlinc`、JUnitCore 执行五个测试类，覆盖 builder、分发、ACK、增量解帧与原生 QUIC 会话。ActionLogger 使用空快照测试替身；这不包含 Netty、JNI、Compose 或实际服务器。原生互通验证另见 [原生 QUIC](../../native/README.md)。
-- 完整桌面/CLI/Android 构建未通过验证：两个 Wrapper 文件仍处于原有删除状态；调用缓存 Gradle 时，在配置阶段报 `Unable to establish loopback connection`。没有恢复 Wrapper。
+- 原 `Unable to establish loopback connection` 已通过 [Windows 启动脚本](WINDOWS-GRADLE.md) 修复，完整 `:androidApp:compileDebugKotlin` 与 `:androidApp:assembleDebug` 通过，APK 签名和 ZIP 对齐检查通过。真机、release/R8 与桌面/CLI 构建仍须分别验证；两个 Wrapper 文件仍处于原有删除状态，没有恢复。
 - 后续 TypeScript 迁移已补齐 IndexedDB 分页/删除接口，完整 Web 构建通过；新增存储、Worker 回退与 API 刷新测试，详见 [迁移说明](WEB-TYPESCRIPT.md)。
 
 标准构建恢复后，可运行：

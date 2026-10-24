@@ -1,6 +1,6 @@
 # Android 传输与发送状态核对
 
-2026-10-24：Android 已从 Cronet 切换到 quiche/JNI 的原生 QUIC。已验证原生库与隔离协议互通；APK 和真机验证仍未完成。原生界面三态模型尚未迁移。
+2026-10-24：Android 已从 Cronet 切换到 quiche/JNI 的原生 QUIC。原生库、隔离协议互通、完整 Android Kotlin 编译及 Debug APK 打包已通过；真机验证仍未完成。原生界面三态模型尚未迁移。
 
 ## 界面已经区分了什么
 
@@ -45,6 +45,6 @@ Cronet 的 BidirectionalStream 是 HTTP/2 或 QUIC 上的 HTTP 双向请求，�
 1. 共享会话测试覆盖登录前不可发送、ACK 匹配/拒绝、分片读取、初始化超时、重连、身份不匹配、关闭与首条写入异常的批量回调清理。
 2. Rust 驱动测试通过；两个 Android ABI 的原生共享库已交叉编译，并检查 ELF 的 16 KiB 页对齐和运行时依赖。
 3. 真实 Kotlin/JNI 连接隔离的后端 QuicServer：两个临时身份双向收发 48 KiB 单聊，收到对应业务 ACK；错误主机名和不可信证书均被拒绝。认证及投递使用替身，不访问线上账号、持久化或生产服务。
-4. APK 构建仍受本机 Gradle 的 `Unable to establish loopback connection` 阻断；Android API 适配器已做独立编译（全局状态为测试替身），不能据此宣称整包通过。尚无设备验证安装、群聊、前后台、断网重连与账号切换。
+4. Gradle 的回环启动错误已通过设置工作区内的 Java socket 目录修复，见 [Windows 构建](WINDOWS-GRADLE.md)；完整 `:androidApp:compileDebugKotlin` 与 `:androidApp:assembleDebug` 已通过，包含真实应用状态与 QUIC 适配器。APK 签名和 ZIP 对齐检查通过，两个 ABI 的 JNI/C++ 运行时完整。尚无设备验证安装、群聊、前后台、断网重连与账号切换。
 
 后端目前 protobuf 解析上限为 64 KiB，与拆帧器的 1 MiB 上限不同；Android 按实际限制提前拒绝超限包，避免等待被静默忽略的消息。未修改后端部署、恢复用户删除的 Wrapper 或发布 APK。

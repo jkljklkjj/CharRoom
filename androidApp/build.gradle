@@ -25,10 +25,15 @@ def quicAbis = ['arm64-v8a', 'x86_64']
 def prebuiltQuicDirectory = providers.gradleProperty('quicJniLibsDir').orNull
 def quicJniDirectory = prebuiltQuicDirectory ? file(prebuiltQuicDirectory) : layout.buildDirectory.dir('generated/quic/jniLibs').get().asFile
 def buildQuicNative = tasks.register('buildQuicNative') {
-    inputs.files(rootProject.fileTree('native/quiche-jni') { exclude 'target/**', 'jniLibs/**' })
-    inputs.file(rootProject.file('scripts/build-android-quic.py'))
-    inputs.property('prebuiltDirectory', prebuiltQuicDirectory ?: '')
-    outputs.dir(quicJniDirectory)
+    if (prebuiltQuicDirectory) {
+        // These are caller-owned inputs. Declaring them as outputs lets Gradle's
+        // stale-output cleanup delete prebuilt libraries before validation.
+        inputs.dir(quicJniDirectory)
+    } else {
+        inputs.files(rootProject.fileTree('native/quiche-jni') { exclude 'target/**', 'jniLibs/**' })
+        inputs.file(rootProject.file('scripts/build-android-quic.py'))
+        outputs.dir(quicJniDirectory)
+    }
     doLast {
         if (!prebuiltQuicDirectory) {
             def ndkDirectory = providers.gradleProperty('quicNdkDir').orNull ?: System.getenv('ANDROID_NDK_HOME')
