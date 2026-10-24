@@ -20,6 +20,35 @@
       />
     </div>
 
+    <!-- 添加好友弹窗 -->
+    <div v-if="showAddModal" class="add-friend-modal" @click.self="closeAddModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>{{ $t('sidebar.addFriendTitle') }}</h3>
+          <button class="close-btn" @click="closeAddModal">×</button>
+        </div>
+        <div class="modal-body add-friend-body">
+          <input
+            ref="addAccountInput"
+            v-model="addAccount"
+            class="add-friend-input"
+            type="text"
+            :placeholder="$t('sidebar.addFriendPrompt')"
+            :disabled="addingFriend"
+            @keyup.enter="submitAddFriend"
+            @keyup.esc="closeAddModal"
+          />
+          <p v-if="addError" class="add-friend-error">{{ addError }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeAddModal" :disabled="addingFriend">{{ $t('sidebar.addFriendCancel') }}</button>
+          <button class="confirm-btn" @click="submitAddFriend" :disabled="addingFriend">
+            {{ addingFriend ? $t('sidebar.addFriendSending') : $t('sidebar.addFriendConfirm') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 好友申请弹窗 -->
     <div v-if="showFriendRequests" class="friend-requests-modal" @click.self="toggleFriendRequests">
       <div class="modal-content">
@@ -68,7 +97,7 @@
 <script setup lang="ts">
 import type { Id, User, ConversationState } from '../types/chat'
 import type { FriendRequest } from '../types/api'
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import api from '../api'
@@ -150,10 +179,50 @@ function select(u: User) {
   }
 }
 
+// ── 添加好友（应用内弹窗，替代原生 prompt） ──
+const showAddModal = ref(false)
+const addAccount = ref('')
+const addError = ref('')
+const addingFriend = ref(false)
+const addAccountInput = ref<HTMLInputElement | null>(null)
+
 function onAdd() {
-  const account = prompt(t('sidebar.addFriendPrompt'))
-  if (!account) return
-  api.addFriend(account).then(ok => { if (ok) toast.success(t('sidebar.frSent')) })
+  addAccount.value = ''
+  addError.value = ''
+  showAddModal.value = true
+  // 等弹窗渲染完成后再聚焦输入框
+  requestAnimationFrame(() => addAccountInput.value?.focus())
+}
+
+function closeAddModal() {
+  if (addingFriend.value) return
+  showAddModal.value = false
+}
+
+async function submitAddFriend() {
+  if (addingFriend.value) return
+  const account = addAccount.value.trim()
+  if (!account) {
+    addError.value = t('sidebar.addFriendErrorEmpty')
+    return
+  }
+
+  addError.value = ''
+  addingFriend.value = true
+  try {
+    const result = await api.addFriend(account)
+    if (result.ok) {
+      showAddModal.value = false
+      addAccount.value = ''
+      toast.success(t('sidebar.frSent'))
+    } else {
+      addError.value = result.message || t('sidebar.addFriendFailed')
+    }
+  } catch (e) {
+    addError.value = t('sidebar.addFriendFailed')
+  } finally {
+    addingFriend.value = false
+  }
 }
 
 function openSettings() {
@@ -185,6 +254,22 @@ async function handleAccept(userId: Id) {
     friendRequests.value = friendRequests.value.filter(req => req.id !== userId)
     // 增量添加新好友（不重新请求整个列表）
     store.addUser(friend)
+
+    // 自动发送欢迎消息给新好友
+    try {
+      const welcomeText = '你好！我们已经是好友了，快来聊天吧 👋'
+      await chatSocket.sendWrapper({
+        type: MSG_TYPE.CHAT,
+        chat: {
+          targetClientId: Number(userId),
+          content: welcomeText,
+          timestamp: Date.now(),
+          messageId: 'local_' + Date.now()
+        }
+      })
+    } catch (e) {
+      console.debug('发送欢迎消息失败:', e)
+    }
   } else {
     toast.error(t('sidebar.frAcceptFailed'))
   }
@@ -201,6 +286,19 @@ async function handleReject(userId: Id) {
   }
 }
 
+/** 监听好友请求轮询更新（WebApp 每 2 分钟轮询后通过自定义事件通知） */
+function onFriendRequestsUpdated(e: CustomEvent<FriendRequest[]>) {
+  const requests = e.detail
+  if (Array.isArray(requests)) {
+    const oldCount = friendRequests.value.length
+    friendRequests.value = requests
+    // 新请求到达时显示通知
+    if (requests.length > oldCount && oldCount >= 0) {
+      toast.info(`📩 收到 ${requests.length - oldCount} 个新好友请求`)
+    }
+  }
+}
+
 onMounted(() => {
   // 页面加载时检查是否有好友申请和加载好友列表
   // 只有在token已经通过有效性验证后才调用，避免过期token导致的错误
@@ -208,6 +306,12 @@ onMounted(() => {
     loadFriendRequests()
     loadFriends()
   }
+  // 监听轮询更新
+  window.addEventListener('friend-requests-updated', onFriendRequestsUpdated as EventListener)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('friend-requests-updated', onFriendRequestsUpdated as EventListener)
 })
 
 // 监听登录有效性变化，登录成功后自动加载数据
@@ -233,15 +337,16 @@ async function loadFriends() {
 .users-header{display:flex;align-items:center;justify-content:space-between;padding:12px}
 .header-actions{display:flex;gap:8px;align-items:center}
 .friend-requests-btn{position:relative;background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
-.friend-requests-btn:hover{background:rgba(0,0,0,0.05)}
+.friend-requests-btn:hover{background:var(--hover)}
 .friend-requests-btn.hasRequests{color:#ff7a33}
 .badge{position:absolute;top:-2px;right:-2px;background:#ff4757;color:white;font-size:10px;padding:1px 4px;border-radius:8px;min-width:12px;text-align:center}
 .settings-btn, .add{background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
-.settings-btn:hover, .add:hover{background:rgba(0,0,0,0.05)}
+.settings-btn:hover, .add:hover{background:var(--hover)}
 .users-list{list-style:none;padding:0;margin:0;overflow:auto;flex:1}
 .users-list li{display:flex;align-items:center;padding:10px 12px;cursor:pointer}
+.users-list li:hover{background:var(--hover)}
 .users-list li.active{background:rgba(255,122,51,0.08)}
-.avatar{width:40px;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;background:#f0f0f0}
+.avatar{width:40px;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;background:var(--surface-2, #f0f0f0)}
 .avatar img{width:100%;height:100%;object-fit:cover}
 .meta{flex:1;min-width:0}
 .name-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -254,45 +359,61 @@ async function loadFriends() {
 .search-bar input{
   width: 100%;
   padding: 10px 16px 10px 40px;
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--input-border, #e8e8e8);
   border-radius: 24px;
   font-size: 14px;
-  background: #fafafa url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>') no-repeat 14px center;
+  background: var(--input-bg, #fafafa) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>') no-repeat 14px center;
+  color: var(--text-primary, #222);
   transition: all 0.3s ease;
   box-sizing: border-box;
 }
 .search-bar input:focus{
   outline: none;
   border-color: #ff7a33;
-  background-color: #fff;
+  background-color: var(--input-bg, #fafafa);
   box-shadow: 0 0 0 3px rgba(255, 122, 51, 0.1);
 }
 .search-bar input:hover{
-  border-color: #d0d0d0;
-  background-color: #fff;
+  border-color: var(--input-border, #d0d0d0);
+  background-color: var(--input-bg, #fafafa);
 }
 .search-bar input::placeholder{
-  color: #bbb;
+  color: var(--input-placeholder, #bbb);
 }
+
+/* 添加好友弹窗 */
+.add-friend-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1001}
+.add-friend-body{padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.add-friend-input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--input-border, #e8e8e8);border-radius:8px;font-size:14px;background:var(--input-bg, #fafafa);color:var(--text-primary, #222);outline:none;transition:border-color .2s ease, box-shadow .2s ease}
+.add-friend-input:focus{border-color:var(--accent-2, #ff7a33);box-shadow:0 0 0 3px rgba(255,122,51,0.1)}
+.add-friend-input:disabled{opacity:.6}
+.add-friend-error{margin:0;color:#ff4757;font-size:13px}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;padding:12px 20px 16px;border-top:1px solid var(--surface-border, #eee)}
+.cancel-btn{background:transparent;border:1px solid var(--surface-border, #e0e0e0);color:var(--text-secondary, #666);padding:7px 16px;border-radius:6px;cursor:pointer;font-size:13px}
+.cancel-btn:hover{background:var(--hover)}
+.cancel-btn:disabled{opacity:.5;cursor:not-allowed}
+.confirm-btn{background:var(--accent-2, #ff7a33);color:#fff;border:0;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
+.confirm-btn:hover{filter:brightness(1.08)}
+.confirm-btn:disabled{opacity:.6;cursor:not-allowed}
 
 /* 好友申请弹窗 */
 .friend-requests-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal-content{background:white;border-radius:12px;width:400px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
-.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #eee}
-.modal-header h3{margin:0;font-size:16px}
-.close-btn{background:transparent;border:0;font-size:20px;cursor:pointer;color:#999;padding:0 4px}
-.close-btn:hover{color:#333}
+.modal-content{background:var(--panel, #fff);border-radius:12px;width:400px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--surface-border, #eee)}
+.modal-header h3{margin:0;font-size:16px;color:var(--text-primary, #222)}
+.close-btn{background:transparent;border:0;font-size:20px;cursor:pointer;color:var(--muted, #999);padding:0 4px}
+.close-btn:hover{color:var(--text-primary, #333)}
 .modal-body{padding:12px 0}
-.empty{text-align:center;padding:40px 20px;color:#999;font-size:14px}
+.empty{text-align:center;padding:40px 20px;color:var(--muted, #999);font-size:14px}
 .request-list{list-style:none;padding:0;margin:0}
-.request-item{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #f5f5f5}
+.request-item{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--surface-border, #f5f5f5)}
 .request-item:last-child{border-bottom:0}
 .request-info{display:flex;align-items:center}
 .request-meta .name{font-weight:600;font-size:14px}
-.request-meta .desc{font-size:12px;color:#666;margin-top:2px}
+.request-meta .desc{font-size:12px;color:var(--text-secondary, #666);margin-top:2px}
 .request-actions{display:flex;gap:8px}
 .accept-btn{background:#52c41a;color:white;border:0;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px}
 .accept-btn:hover{background:#43a047}
-.reject-btn{background:#f5f5f5;color:#666;border:0;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px}
-.reject-btn:hover{background:#e0e0e0}
+.reject-btn{background:var(--bubble-bg, #f5f5f5);color:var(--text-secondary, #666);border:0;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+.reject-btn:hover{background:var(--hover)}
 </style>

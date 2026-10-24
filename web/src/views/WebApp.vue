@@ -66,9 +66,22 @@
               <button :class="{ active: locale === 'ja' }" @click="switchLang('ja')">日本語</button>
             </div>
           </div>
-          <button class="quota-btn" @click="showQuota = true">{{ $t('app.settings.tokenQuota') }}</button>
-          <button class="quota-btn" @click="openProfileEdit">{{ $t('app.settings.editProfile') }}</button>
-          <button class="logout-btn" @click="showLogoutConfirm = true">{{ $t('app.settings.logout') }}</button>
+          <div class="settings-divider"></div>
+          <button class="settings-action-btn" @click="openProfileEdit">
+            <span class="action-icon">👤</span>
+            <span class="action-text">{{ $t('app.settings.editProfile') }}</span>
+            <span class="action-arrow">›</span>
+          </button>
+          <button class="settings-action-btn" @click="showQuota = true">
+            <span class="action-icon">📊</span>
+            <span class="action-text">{{ $t('app.settings.tokenQuota') }}</span>
+            <span class="action-arrow">›</span>
+          </button>
+          <div class="settings-divider"></div>
+          <button class="settings-action-btn danger" @click="showLogoutConfirm = true">
+            <span class="action-icon">🚪</span>
+            <span class="action-text">{{ $t('app.settings.logout') }}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -103,7 +116,7 @@
           <div class="settings-item" v-if="profileError">
             <div class="profile-error">{{ profileError }}</div>
           </div>
-          <button class="quota-btn" :disabled="profileSaving" @click="saveProfile">
+          <button class="save-btn" :disabled="profileSaving" @click="saveProfile">
             {{ profileSaving ? $t('app.settings.profileSaving') : $t('app.settings.profileSave') }}
           </button>
         </div>
@@ -131,6 +144,8 @@ import { MSG_TYPE, AGENT_STREAM_TYPE } from '../proto/constants'
 import siteConfig from '../siteConfig'
 import api from '../api'
 import { AGENT_USER_ID } from '../constants'
+// 主题设置（统一由 utils/theme.ts 管理，App.vue 已在全局初始化）
+import { theme, setTheme, initTheme } from '../utils/theme'
 
 function normalizeTimestamp(raw: TimeValue | null | undefined) {
   if (raw == null || raw === '') return new Date().toISOString()
@@ -200,31 +215,12 @@ async function saveProfile() {
   }
 }
 
-// 主题设置
-const theme = ref(localStorage.getItem('theme') || 'auto') // auto, light, dark
-
-function setTheme(newTheme: string) {
-  theme.value = newTheme
-  localStorage.setItem('theme', newTheme)
-  applyTheme(newTheme)
-}
+// 主题设置（theme / setTheme / initTheme 来自 utils/theme.ts）
 
 function switchLang(lang: string) {
   locale.value = lang
   localStorage.setItem('locale', lang)
   document.documentElement.lang = lang
-}
-
-function applyTheme(theme: string) {
-  if (theme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark')
-  } else if (theme === 'light') {
-    document.documentElement.setAttribute('data-theme', 'light')
-  } else {
-    // 自动跟随系统
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
-  }
 }
 
 function handleResize() {
@@ -235,11 +231,33 @@ function handleResize() {
 }
 
 /** 处理 QUIC/WebTransport 收到的消息 */
-function handleIncomingMessage(msg: MessageWrapper) {
+async function handleIncomingMessage(msg: MessageWrapper) {
   try {
     if (msg.type === MSG_TYPE.CHAT && msg.chat) {
+      const senderId = String(msg.chat.userId || 'unknown')
+
+      // 检查发送者是否在好友列表中，不在则同步更新
+      if (senderId !== 'you' && senderId !== String(store.state.accountId)) {
+        const exists = store.state.users.some(u => String(u.id) === senderId)
+        if (!exists) {
+          // 尝试获取用户信息并添加到列表
+          try {
+            const userDetail = await api.getUserDetail(senderId)
+            if (userDetail?.id) {
+              store.addUser(userDetail)
+            } else {
+              // 如果获取失败，创建一个临时用户
+              store.addUser({ id: Number(senderId), username: `用户${senderId}` })
+            }
+          } catch (e) {
+            console.debug('获取新好友信息失败，使用临时信息:', e)
+            store.addUser({ id: Number(senderId), username: `用户${senderId}` })
+          }
+        }
+      }
+
       store.addMessage({
-        user: String(msg.chat.userId || 'unknown'),
+        user: senderId,
         text: msg.chat.content || '',
         time: normalizeTimestamp(msg.chat.timestamp),
         targetId: msg.chat.targetClientId,
@@ -450,6 +468,22 @@ function connectChat(token: string, accountId: Id) {
         if (friend) {
           store.addUser(friend)
           toast.success(t('chat.friendAccepted') || '好友已添加')
+
+          // 自动发送欢迎消息给新好友
+          try {
+            const welcomeText = '你好！我们已经是好友了，快来聊天吧 👋'
+            await chatSocket.sendWrapper({
+              type: MSG_TYPE.CHAT,
+              chat: {
+                targetClientId: Number(accepterId),
+                content: welcomeText,
+                timestamp: Date.now(),
+                messageId: 'local_' + Date.now()
+              }
+            })
+          } catch (e) {
+            console.debug('发送欢迎消息失败:', e)
+          }
         }
       } catch (e) {
         console.warn('获取新好友信息失败:', e)
@@ -473,7 +507,7 @@ async function logout() {
   try {
     await chatSocket.sendWrapper({
       type: MSG_TYPE.LOGOUT,
-      logout: { userId: String(store.state.accountId) }
+      logout: { userId: Number(store.state.accountId) }
     })
   } catch (_) {}
   chatSocket.close()
@@ -559,6 +593,10 @@ async function initUserSession(accessToken: string, refreshToken: string) {
 
   connectChat(accessToken, userRes.id)
   syncAllConversations()
+
+  // 启动好友请求轮询
+  startFriendRequestPolling()
+
   return true
 }
 
@@ -591,19 +629,8 @@ function closeSettings() {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
 
-  // 初始化主题
-  applyTheme(theme.value)
-  // 监听系统主题变化
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-  const handleSystemThemeChange = () => {
-    if (theme.value === 'auto') {
-      applyTheme('auto')
-    }
-  }
-  mediaQuery.addEventListener('change', handleSystemThemeChange)
-  onUnmounted(() => {
-    mediaQuery.removeEventListener('change', handleSystemThemeChange)
-  })
+  // 主题由 App.vue 全局初始化；这里确保本页也已应用（幂等）
+  initTheme()
 
   // 异步恢复登录状态（不阻塞 onMounted）
   restoreSession()
@@ -614,17 +641,39 @@ async function restoreSession() {
   const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
   const savedAccountId = localStorage.getItem('charroom_accountId')
 
-  if (!savedToken || !savedAccountId) {
+  // sessionStorage 在浏览器关闭后清空，但 refreshToken 在 localStorage 中持久保存。
+  // 即使 accessToken 丢失，只要有 refreshToken 就尝试恢复登录。
+  if (!savedAccountId) {
     loading.value = false
     return
   }
 
-  store.setToken(savedToken)
+  // 如果 accessToken 缺失但有 refreshToken，先用它刷新一个新 token
+  let activeToken = savedToken
+  if (!activeToken && savedRefreshToken) {
+    try {
+      const refreshed = await api.refreshToken(savedRefreshToken)
+      if (refreshed?.accessToken) {
+        activeToken = refreshed.accessToken
+        store.setToken(refreshed.accessToken)
+        store.setRefreshToken(refreshed.refreshToken || '')
+        persistTokens(refreshed.accessToken, refreshed.refreshToken)
+      }
+    } catch (e) {
+      console.debug('刷新 token 失败:', e)
+    }
+  }
+
+  if (!activeToken) {
+    loading.value = false
+    return
+  }
+
+  store.setToken(activeToken)
   store.setRefreshToken(savedRefreshToken)
   store.setAccountId(savedAccountId)
 
   // 验证 token，失效则尝试刷新
-  let activeToken = savedToken
   let validated = await api.validateToken()
 
   if (!validated && savedRefreshToken) {
@@ -653,8 +702,35 @@ const handleBeforeUnload = () => {
   if (store.state.token) {
     chatSocket.sendWrapper({
       type: MSG_TYPE.LOGOUT,
-      logout: { userId: String(store.state.accountId) }
+      logout: { userId: Number(store.state.accountId) }
     }).catch(e => console.debug('登出消息发送失败:', e))
+  }
+}
+
+// 好友请求轮询定时器
+let friendRequestPollTimer: ReturnType<typeof setInterval> | null = null
+const FRIEND_REQUEST_POLL_INTERVAL = 2 * 60 * 1000 // 2分钟
+
+/** 启动好友请求轮询 */
+function startFriendRequestPolling() {
+  stopFriendRequestPolling()
+  friendRequestPollTimer = setInterval(async () => {
+    if (!store.state.token || !store.state.loginValid) return
+    try {
+      const requests = await api.getFriendRequests()
+      // 通过自定义事件通知 SidebarUsers 更新
+      window.dispatchEvent(new CustomEvent('friend-requests-updated', { detail: requests }))
+    } catch (e) {
+      console.debug('轮询好友请求失败:', e)
+    }
+  }, FRIEND_REQUEST_POLL_INTERVAL)
+}
+
+/** 停止好友请求轮询 */
+function stopFriendRequestPolling() {
+  if (friendRequestPollTimer) {
+    clearInterval(friendRequestPollTimer)
+    friendRequestPollTimer = null
   }
 }
 
@@ -665,6 +741,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  stopFriendRequestPolling()
 })
 </script>
 
@@ -790,7 +867,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--surface-border-strong, rgba(0, 0, 0, 0.08));
 }
 
 .settings-header h3 {
@@ -819,6 +896,82 @@ onUnmounted(() => {
   font-weight: 600;
   cursor: pointer;
 }
+
+.settings-divider {
+  height: 1px;
+  background: var(--surface-border, rgba(0, 0, 0, 0.04));
+  margin: 8px 0;
+}
+
+.settings-action-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary, #333);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.settings-action-btn:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.settings-action-btn .action-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.settings-action-btn .action-text {
+  flex: 1;
+  text-align: left;
+}
+
+.settings-action-btn .action-arrow {
+  font-size: 18px;
+  color: var(--muted, #999);
+}
+
+.settings-action-btn.danger {
+  color: #ff5f5f;
+}
+
+.settings-action-btn.danger:hover {
+  background: rgba(255, 95, 95, 0.08);
+}
+
+.save-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent-1, #ff7a33), var(--accent-2, #ff5f5f));
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.save-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.save-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 
 
 .profile-dialog { width: min(360px, calc(100% - 40px)); }
