@@ -318,7 +318,13 @@ jobs:
           sdkmanager "ndk;27.3.13750724"
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build libclang-dev
-          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
+          libclang_library="$(find /usr/lib /usr/local/lib \( -type f -o -type l \) \( -name 'libclang.so*' -o -name 'libclang-[0-9]*.so*' \) -print -quit)"
+          if [ -z "$libclang_library" ]; then
+            echo "::error::libclang shared library was not found after installing libclang-dev"
+            exit 1
+          fi
+          echo "LIBCLANG_PATH=$(dirname "$libclang_library")" >> "$GITHUB_ENV"
+          echo "Using libclang at $libclang_library"
         shell: bash
 
       - name: Make gradlew executable
