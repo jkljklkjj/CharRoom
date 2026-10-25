@@ -329,5 +329,5 @@ val jaStrings = Strings(
         "call.video.btn" to "ビデオ通話",
         "call.incoming" to "%s から着信中",
         "common.unknown.error" to "不明なエラー"
-    ) + socialJa
+    ) + socialJa + androidJa
 )

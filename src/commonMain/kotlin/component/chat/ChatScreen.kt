@@ -1,7 +1,6 @@
 package component.chat
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,14 +41,14 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -90,8 +88,6 @@ import core.state.GlobalAppState
 import core.state.GlobalChatState
 import presentation.viewmodel.ChatViewModel
 import com.chatlite.i18n.LocalStrings
-import com.chatlite.i18n.Strings
-import com.chatlite.i18n.currentStrings
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -160,40 +156,17 @@ fun ChatScreen(
     onVideoCallClick: ((String) -> Unit)? = null, // 点击视频通话按钮回调
     onUserMenuClick: ((User) -> Unit)? = null // 点击好友菜单回调（查看资料/删除）
 ) {
-    // 添加进入动画，避免闪动
-    var isReady by remember(user.id) { mutableStateOf(false) }
-    LaunchedEffect(user.id) {
-        kotlinx.coroutines.delay(50) // 短暂延迟让界面准备好
-        isReady = true
-    }
-
-    // 使用 Crossfade 实现平滑过渡
-    Crossfade(
-        targetState = isReady,
-        animationSpec = tween(150, easing = FastOutSlowInEasing)
-    ) { ready ->
-        if (ready) {
-            ChatScreenContent(
-                chatViewModel = chatViewModel,
-                user = user,
-                onAvatarClick = onAvatarClick,
-                onMyAvatarClick = onMyAvatarClick,
-                onBackClick = onBackClick,
-                onVideoCallClick = onVideoCallClick,
-                onUserMenuClick = onUserMenuClick
-            )
-        } else {
-            // 加载状态：显示占位符
-            Box(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = MaterialTheme.colors.primary,
-                    modifier = Modifier.size(48.dp)
-                )
-            }
-        }
+    // Local conversation data can render immediately; no artificial loading delay.
+    androidx.compose.runtime.key(user.id) {
+        ChatScreenContent(
+            chatViewModel = chatViewModel,
+            user = user,
+            onAvatarClick = onAvatarClick,
+            onMyAvatarClick = onMyAvatarClick,
+            onBackClick = onBackClick,
+            onVideoCallClick = onVideoCallClick,
+            onUserMenuClick = onUserMenuClick
+        )
     }
 }
 

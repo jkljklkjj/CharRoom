@@ -45,6 +45,7 @@ import core.state.GlobalAppState
 import core.state.GlobalChatState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import model.Message
 import model.User
 import presentation.viewmodel.ChatViewModel
@@ -63,7 +64,9 @@ fun ChatApp(
     isDarkMode: Boolean,
     onToggleDarkMode: () -> Unit,
     onLogout: () -> Unit,
-    onBackPressed: ((() -> Boolean) -> Unit)? = null
+    onBackPressed: ((() -> Boolean) -> Unit)? = null,
+    navigationRequest: model.ChatNavigationRequest? = null,
+    onNavigationHandled: () -> Unit = {}
 ) {
     val scaffoldState = rememberScaffoldState(snackbarHostState = SnackbarHostState())
     val scope = rememberCoroutineScope()
@@ -89,6 +92,19 @@ fun ChatApp(
     var showUserDetailScreen by remember { mutableStateOf(false) }
     var selectedDetailUserId by remember { mutableStateOf<Int?>(null) }
 
+    LaunchedEffect(navigationRequest?.requestId) {
+        val request = navigationRequest ?: return@LaunchedEffect
+        val user = kotlinx.coroutines.withTimeoutOrNull(15_000) {
+            chatViewModel.usersFlow.first { list -> list.any { it.id == request.chatId } }.first { it.id == request.chatId }
+        }
+        if (user != null) {
+            showSocial = false; showSettingsScreen = false; showProfileScreen = false; showQuotaScreen = false
+            showUserDetailScreen = false; showAddUserDialog = false; showApplicationDialog = false
+            chatViewModel.selectedUser = user
+        } else scaffoldState.snackbarHostState.showSnackbar(s["android.notification.unavailable"])
+        onNavigationHandled()
+    }
+
     // 首次加载：确保token存在后才启动QUIC连接并加载联系人
     LaunchedEffect(Unit) {
         val currentToken = GlobalAppState.currentToken
@@ -100,7 +116,7 @@ fun ChatApp(
         }
 
         // 注册全局消息接收监听器
-        Chat.addMessageReceiveListener(object : MessageReceiveListener {
+        val receiver = object : MessageReceiveListener {
             override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
                                                   seqId: Long, conversationId: String) {
                 // 构建消息对象并添加到聊天状态
@@ -116,6 +132,7 @@ fun ChatApp(
                     conversationId = conversationId
                 )
                 chatViewModel.addMessage(chatMessage)
+                core.PlatformMessageNotifications.privateMessage(senderId, message)
                 // 从消息 payload 更新增量同步游标
                 if (seqId > 0 && conversationId.isNotBlank()) {
                     scope.launch {
@@ -141,6 +158,7 @@ fun ChatApp(
                     conversationId = conversationId
                 )
                 chatViewModel.addGroupMessage(groupMessage)
+                core.PlatformMessageNotifications.groupMessage(groupId, senderId, senderName, message)
                 // 从消息 payload 更新增量同步游标
                 if (seqId > 0 && conversationId.isNotBlank()) {
                     scope.launch {
@@ -148,13 +166,16 @@ fun ChatApp(
                     }
                 }
             }
-        })
+        }
 
         // Agent 流式消息：独立回调，不走 listener 遍历
-        Chat.agentStreamHandler = AgentStreamHandler { messageId, fullContent, done, _ ->
+        val agentHandler = AgentStreamHandler { messageId, fullContent, done, _ ->
             chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
         }
 
+        Chat.addMessageReceiveListener(receiver)
+        Chat.agentStreamHandler = agentHandler
+        try {
         chatViewModel.loadContacts()
 
         // 加载本地聊天历史
@@ -167,6 +188,11 @@ fun ChatApp(
 
         // 拉取好友和群聊请求
         chatViewModel.fetchRequests()
+        kotlinx.coroutines.awaitCancellation()
+        } finally {
+            Chat.removeMessageReceiveListener(receiver)
+            if (Chat.agentStreamHandler === agentHandler) Chat.agentStreamHandler = null
+        }
     }
 
     // 处理刷新
@@ -195,9 +221,11 @@ fun ChatApp(
             }
 
             // 注册系统返回键处理逻辑
-            LaunchedEffect(selectedChatTarget, isSmallScreen, onBackPressed, showSettingsScreen, showProfileScreen, showAddUserDialog, showApplicationDialog, showUserDetailScreen, showSocial) {
-                if (isSmallScreen && onBackPressed != null) {
+            LaunchedEffect(selectedChatTarget, isSmallScreen, onBackPressed, showSettingsScreen, showProfileScreen, showQuotaScreen, showAddUserDialog, showApplicationDialog, showUserDetailScreen, showSocial) {
+                if (onBackPressed != null) {
                     when {
+                        showQuotaScreen -> onBackPressed { showQuotaScreen = false; true }
+                        showProfileScreen -> onBackPressed { showProfileScreen = false; true }
                         showSocial -> onBackPressed { showSocial = false; true }
                         showUserDetailScreen -> {
                             // 在用户详情页时，返回键关闭详情页
@@ -222,7 +250,7 @@ fun ChatApp(
                                 true
                             }
                         }
-                        selectedChatTarget != null -> {
+                        selectedChatTarget != null && isSmallScreen -> {
                             // 在聊天界面时，返回键回到用户列表
                             onBackPressed {
                                 chatViewModel.selectedUser = null

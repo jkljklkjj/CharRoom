@@ -5,6 +5,13 @@ import component.chat.ChatApp
 import presentation.viewmodel.AuthViewModel
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,7 +47,9 @@ fun LoginRegisterApp(
     isDarkMode: Boolean,
     onToggleDarkMode: () -> Unit,
     onBackPressed: ((() -> Boolean) -> Unit)? = null,
-    authViewModel: AuthViewModel = koinInject()
+    authViewModel: AuthViewModel = koinInject(),
+    navigationRequest: model.ChatNavigationRequest? = null,
+    onNavigationHandled: () -> Unit = {}
 ) {
     var isLogin by remember { mutableStateOf(true) }
     var username by remember { mutableStateOf("") } // 注册模式下用户名
@@ -56,6 +65,7 @@ fun LoginRegisterApp(
     var isSuccessMessage by remember { mutableStateOf(false) }
 
     val s = LocalStrings.current
+    val focusManager = LocalFocusManager.current
 
     // 观察认证状态
     val authState by authViewModel.authState.collectAsState()
@@ -107,7 +117,9 @@ fun LoginRegisterApp(
                     isDarkMode = isDarkMode,
                     onToggleDarkMode = onToggleDarkMode,
                     onLogout = ::handleLogout,
-                    onBackPressed = onBackPressed
+                    onBackPressed = onBackPressed,
+                    navigationRequest = navigationRequest,
+                    onNavigationHandled = onNavigationHandled
                 )
             }
         }
@@ -125,7 +137,7 @@ fun LoginRegisterApp(
             val isSubmitting = authState is core.state.AuthState.Loading
 
             Box(
-                modifier = Modifier.fillMaxSize().background(immersiveBackgroundBrush(isDarkMode)),
+                modifier = Modifier.fillMaxSize().background(immersiveBackgroundBrush(isDarkMode)).verticalScroll(rememberScrollState()),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -165,6 +177,8 @@ fun LoginRegisterApp(
                             ) {
                                 TextField(
                                     value = if (isLogin) account else username,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }),
                                     onValueChange = {
                                         if (isLogin) account = it else username = it
                                     },
@@ -204,6 +218,8 @@ fun LoginRegisterApp(
                                     onValueChange = { password = it },
                                     placeholder = { Text(s["login.password"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
                                     visualTransformation = PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }),
                                     enabled = !isSubmitting,
                                     colors = TextFieldDefaults.textFieldColors(
                                         backgroundColor = Color.Transparent,
@@ -234,6 +250,8 @@ fun LoginRegisterApp(
                                 ) {
                                     TextField(
                                         value = email,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }),
                                         onValueChange = { email = it },
                                         placeholder = { Text(s["login.email"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
                                         enabled = !isSubmitting,
@@ -266,6 +284,8 @@ fun LoginRegisterApp(
                                     ) {
                                         TextField(
                                             value = verifyCode,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                                             onValueChange = { verifyCode = it },
                                             placeholder = { Text(s["login.verify.code"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
                                             enabled = !isSubmitting,

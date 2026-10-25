@@ -11,6 +11,8 @@ import core.LocalChatHistoryStore
 import data.repository.AuthRepository
 import data.repository.GlobalAuthRepository
 import core.Chat
+import core.AppSettings
+import com.chatlite.charroom.core.AndroidSettingsStorage
 import com.chatlite.charroom.core.AndroidImageLoader
 import component.dialog.AvatarCropDialogImpl
 import com.chatlite.charroom.component.AndroidAvatarCropDialog
@@ -31,6 +33,7 @@ class ChatApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppSettings.installStorage(AndroidSettingsStorage(this))
 
         // 初始化依赖注入
         KoinInitializer.init {
@@ -63,6 +66,17 @@ class ChatApplication : Application() {
         AvatarCropDialogImpl = AndroidAvatarCropDialog
         // 原生 QUIC：ALPN custom，与后端控制流/会话流协议一致。
         Chat = QuicheChatClient(this)
+        core.PlatformMessageNotifications.sink = object : core.MessageNotificationSink {
+            override fun privateMessage(senderId: Int, content: String) {
+                val user = core.state.GlobalChatState.users.value.firstOrNull { it.id == senderId }
+                chatNotificationManager.showPrivateMessageNotification(senderId, user?.username, content)
+            }
+            override fun groupMessage(groupId: Int, senderId: Int, senderName: String, content: String) {
+                if (senderId == core.state.GlobalAppState.currentUserId) return
+                val group = core.state.GlobalChatState.users.value.firstOrNull { it.id == -groupId }
+                chatNotificationManager.showGroupMessageNotification(groupId, group?.username, senderName, content)
+            }
+        }
         // 初始化日志
         if (BuildConfig.DEBUG) {
             Timber.plant(object : Timber.DebugTree() {

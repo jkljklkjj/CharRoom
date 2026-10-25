@@ -3,27 +3,29 @@
     <div class="users-header">
       <div class="title">{{ $t('sidebar.title') }}</div>
       <div class="header-actions">
-        <button class="settings-btn" :aria-label="$t('social.discover')" @click="emit('open-discovery')">🌐</button>
-        <button class="friend-requests-btn" @click="toggleFriendRequests" :class="{hasRequests: friendRequests.length > 0}">
-          📩
+        <button class="friend-requests-btn" :aria-label="$t('sidebar.frTitle')" :title="$t('sidebar.frTitle')" @click="toggleFriendRequests" :class="{hasRequests: friendRequests.length > 0}">
+          <AppIcon name="requests" />
           <span v-if="friendRequests.length > 0" class="badge">{{ friendRequests.length }}</span>
         </button>
-        <button class="settings-btn" @click="openSettings">⚙️</button>
-        <button class="add" @click="onAdd">＋</button>
+        <button class="settings-btn" :aria-label="$t('app.settings.title')" :title="$t('app.settings.title')" @click="openSettings"><AppIcon name="settings" /></button>
+        <button class="add" :aria-label="$t('sidebar.addFriendTitle')" :title="$t('sidebar.addFriendTitle')" @click="onAdd"><AppIcon name="add" /></button>
       </div>
     </div>
+
+    <button class="discovery-entry" :aria-label="$t('social.discover')" @click="emit('open-discovery')"><AppIcon name="discover" /><span>{{ $t('social.discover') }}<small>{{ $t('polish.discoverySubtitle') }}</small></span><span aria-hidden="true">›</span></button>
 
     <div class="search-bar">
       <input
         v-model="searchQuery"
         type="search"
         :placeholder="$t('sidebar.searchPlaceholder')"
+        :aria-label="$t('sidebar.searchPlaceholder')"
       />
     </div>
 
     <!-- 添加好友弹窗 -->
     <div v-if="showAddModal" class="add-friend-modal" @click.self="closeAddModal">
-      <div class="modal-content">
+      <div ref="addDialog" class="modal-content" role="dialog" aria-modal="true" :aria-label="$t('sidebar.addFriendTitle')" tabindex="-1">
         <div class="modal-header">
           <h3>{{ $t('sidebar.addFriendTitle') }}</h3>
           <button class="close-btn" @click="closeAddModal">×</button>
@@ -52,7 +54,7 @@
 
     <!-- 好友申请弹窗 -->
     <div v-if="showFriendRequests" class="friend-requests-modal" @click.self="toggleFriendRequests">
-      <div class="modal-content">
+      <div ref="requestsDialog" class="modal-content" role="dialog" aria-modal="true" :aria-label="$t('sidebar.frTitle')" tabindex="-1">
         <div class="modal-header">
           <h3>{{ $t('sidebar.frTitle') }}</h3>
           <button class="close-btn" @click="toggleFriendRequests">×</button>
@@ -80,8 +82,11 @@
       </div>
     </div>
 
-    <ul class="users-list">
-      <li v-for="u in filteredUsers" :key="u.id" @click="select(u)" :class="{active: store.state.selectedChatId === u.id}">
+    <div v-if="friendsLoading" class="contacts-empty" role="status">{{ $t('social.loading') }}</div>
+    <div v-else-if="friendsError" class="contacts-empty" role="alert"><p>{{ $t('social.failed') }}</p><button class="cancel-btn" @click="loadFriends">{{ $t('polish.retry') }}</button></div>
+    <div v-else-if="!filteredUsers.length" class="contacts-empty" role="status"><p>{{ $t(searchQuery ? 'polish.noContacts' : 'polish.emptyContacts') }}</p><button class="cancel-btn" @click="searchQuery ? searchQuery = '' : emit('open-discovery')">{{ $t(searchQuery ? 'polish.clearSearch' : 'social.discover') }}</button></div>
+    <ul class="users-list" :aria-label="$t('sidebar.title')">
+      <li v-for="u in filteredUsers" :key="u.id" role="button" tabindex="0" :aria-current="store.state.selectedChatId === u.id ? 'true' : undefined" @click="select(u)" @keydown.enter.prevent="select(u)" @keydown.space.prevent="select(u)" :class="{active: store.state.selectedChatId === u.id}">
         <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="avatar" /></div>
         <div v-else class="avatar">{{ initials(u.name || u.account || u.username) }}</div>
         <div class="meta">
@@ -89,7 +94,7 @@
             <div class="name">{{ u.name || u.account || u.username }}</div>
             <span v-if="u.preview.unreadCount > 0" class="unread-badge">{{ u.preview.unreadCount > 99 ? '99+' : u.preview.unreadCount }}</span>
           </div>
-          <div class="sub">{{ u.status || $t('sidebar.online') }}</div>
+          <div class="sub">{{ u.signature || u.status || $t('polish.startConversation') }}</div>
         </div>
       </li>
     </ul>
@@ -97,12 +102,14 @@
 </template>
 
 <script setup lang="ts">
-import type { Id, User, ConversationState } from '../types/chat'
+import type { Id, User } from '../types/chat'
 import type { FriendRequest } from '../types/api'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import api from '../api'
+import AppIcon from './AppIcon.vue'
+import { useDialog } from '../composables/useDialog'
 import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
@@ -113,24 +120,14 @@ const { t } = useI18n()
 const showFriendRequests = ref(false)
 const friendRequests = ref<FriendRequest[]>([])
 const searchQuery = ref('')
+const friendsLoading = ref(true), friendsError = ref(false)
+const addDialog = ref<HTMLElement | null>(null), requestsDialog = ref<HTMLElement | null>(null)
+useDialog(addDialog, closeAddModal)
+useDialog(requestsDialog, () => { showFriendRequests.value = false })
 
-// 排序后的用户列表 — memoize 避免每次 conversationStates 变化都重排
-let _sortedUsers: (User & { __index: number; preview: ConversationState })[] | null = null
-let _sortedUsersHash = ''
+// Vue computed tracks profile changes as well as conversation activity.
 const sortedUsers = computed(() => {
-  // 构建 hash 用于检测变化
-  const usersHash = store.state.users.map(u => u.id).join(',')
-  const statesHash = Object.entries(store.state.conversationStates)
-    .map(([k, v]) => `${k}:${v.lastIncomingMessageTime}:${v.unreadCount}`)
-    .join('|')
-  const hash = `${usersHash}__${statesHash}`
-
-  if (hash === _sortedUsersHash && _sortedUsers) {
-    return _sortedUsers
-  }
-
-  _sortedUsersHash = hash
-  _sortedUsers = [...store.state.users]
+  return [...store.state.users]
     .map((user, index) => ({
       ...user,
       __index: index,
@@ -146,7 +143,6 @@ const sortedUsers = computed(() => {
       if (unreadDiff !== 0) return unreadDiff
       return a.__index - b.__index
     })
-  return _sortedUsers
 })
 
 const filteredUsers = computed(() => {
@@ -325,19 +321,29 @@ watch(() => store.state.loginValid, (newVal) => {
 })
 
 async function loadFriends() {
+  friendsLoading.value = true; friendsError.value = false
   try {
     const friends = await api.getFriends()
     store.setUsers(friends)
   } catch (e) {
+    friendsError.value = true
     console.warn('加载好友列表失败:', e)
-  }
+  } finally { friendsLoading.value = false }
 }
 </script>
 
 <style scoped>
 .users-wrap{height:100%;display:flex;flex-direction:column}
-.users-header{display:flex;align-items:center;justify-content:space-between;padding:12px}
-.header-actions{display:flex;gap:8px;align-items:center}
+.users-header{display:flex;align-items:center;justify-content:space-between;padding:16px 12px 8px;gap:8px}
+.users-header .title{font-size:19px;font-weight:650;white-space:nowrap}
+.header-actions{display:flex;gap:2px;align-items:center}
+.header-actions button{display:grid;place-items:center;width:40px;height:40px;padding:0;color:var(--text-secondary);border-radius:10px;flex:none}
+.discovery-entry{display:flex;align-items:center;gap:12px;text-align:left;margin:8px 12px 16px;padding:12px;border:1px solid var(--surface-border);border-radius:12px;background:var(--panel);color:var(--text-primary);cursor:pointer}
+.discovery-entry:hover{background:var(--hover)}
+.discovery-entry>svg{color:var(--accent-2);flex:none}
+.discovery-entry>span:first-of-type{flex:1;font-weight:600;font-size:14px}
+.discovery-entry small{display:block;margin-top:4px;color:var(--text-secondary);font-size:12px;font-weight:400}
+.contacts-empty{padding:36px 20px;text-align:center;color:var(--text-secondary);font-size:14px;line-height:1.7}
 .friend-requests-btn{position:relative;background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
 .friend-requests-btn:hover{background:var(--hover)}
 .friend-requests-btn.hasRequests{color:#ff7a33}
@@ -345,7 +351,7 @@ async function loadFriends() {
 .settings-btn, .add{background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
 .settings-btn:hover, .add:hover{background:var(--hover)}
 .users-list{list-style:none;padding:0;margin:0;overflow:auto;flex:1}
-.users-list li{display:flex;align-items:center;padding:10px 12px;cursor:pointer}
+.users-list li{display:flex;align-items:center;padding:12px;margin:2px 8px;border-radius:10px;cursor:pointer;min-height:44px}
 .users-list li:hover{background:var(--hover)}
 .users-list li.active{background:rgba(255,122,51,0.08)}
 .avatar{width:40px;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;background:var(--surface-2, #f0f0f0)}
@@ -353,7 +359,7 @@ async function loadFriends() {
 .meta{flex:1;min-width:0}
 .name-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .meta .name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.meta .sub{font-size:12px;color:var(--muted)}
+.meta .sub{font-size:12px;color:var(--muted);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .unread-badge{background:#ff4757;color:white;font-size:10px;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center;line-height:16px;flex:none}
 
 /* 搜索框样式 */
@@ -364,7 +370,7 @@ async function loadFriends() {
   border: 1px solid var(--input-border, #e8e8e8);
   border-radius: 24px;
   font-size: 14px;
-  background: var(--input-bg, #fafafa) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>') no-repeat 14px center;
+  background: var(--panel) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>') no-repeat 14px center;
   color: var(--text-primary, #222);
   transition: all 0.3s ease;
   box-sizing: border-box;
@@ -372,12 +378,12 @@ async function loadFriends() {
 .search-bar input:focus{
   outline: none;
   border-color: #ff7a33;
-  background-color: var(--input-bg, #fafafa);
+  background-color: var(--panel);
   box-shadow: 0 0 0 3px rgba(255, 122, 51, 0.1);
 }
 .search-bar input:hover{
   border-color: var(--input-border, #d0d0d0);
-  background-color: var(--input-bg, #fafafa);
+  background-color: var(--panel);
 }
 .search-bar input::placeholder{
   color: var(--input-placeholder, #bbb);

@@ -1,6 +1,6 @@
 <template>
   <div class="quota-overlay" @click.self="close">
-    <div class="quota-dialog">
+    <div ref="dialog" class="quota-dialog" role="dialog" aria-modal="true" :aria-label="$t('quota.balance')" tabindex="-1">
       <button class="close-btn" @click="close">✕</button>
 
       <div class="quota-body" v-if="!loading">
@@ -83,9 +83,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { toast } from '../utils/toast'
+import { useDialog } from '../composables/useDialog'
 
 const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
+const dialog = ref<HTMLElement | null>(null)
+useDialog(dialog, () => emit('close'))
 
 const loading = ref(true)
 const err = ref('')

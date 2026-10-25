@@ -1,17 +1,18 @@
 <template>
-  <div class="settings-overlay social-overlay" role="dialog" aria-modal="true" :aria-label="t('social.discover')" @click.self="emit('close')" @keydown.esc="emit('close')">
-    <div class="settings-dialog social-hub">
+  <div class="settings-overlay social-overlay" @click.self="emit('close')">
+    <div ref="dialog" class="settings-dialog social-hub" :class="{ 'room-mode': tab === 'encounter' && !selected }" role="dialog" aria-modal="true" :aria-label="t('social.discover')" tabindex="-1">
       <header class="settings-header"><h2>{{ t('social.discover') }}</h2><button class="close-settings" :aria-label="t('social.close')" @click="emit('close')">×</button></header>
       <nav class="theme-options social-nav" :aria-label="t('social.discover')">
-        <button v-for="item in ['people', 'encounter', 'daily', 'me'] as const" :key="item" :class="{ active: tab === item }" @click="changeTab(item)">{{ t(`social.${item}`) }}</button>
+        <button v-for="item in ['people', 'encounter', 'daily', 'me'] as const" :key="item" :aria-pressed="tab === item" :class="{ active: tab === item }" @click="changeTab(item)">{{ t(`social.${item}`) }}</button>
       </nav>
+      <div class="social-loading-track"><div v-if="busy" class="social-loading-line" role="progressbar" :aria-label="t('social.loading')"></div></div>
       <div class="social-layout" :class="{ 'has-profile': selected, 'profile-only': tab === 'me' }">
         <main class="social-main" v-show="!selected || !mobile">
           <p v-if="error" class="social-error" role="alert">{{ t('social.failed') }} {{ error }}</p>
           <template v-if="tab === 'people'">
-            <form class="social-form" @submit.prevent="loadPeople(false)"><label>{{ t('social.search') }}<input v-model="query" maxlength="60" class="profile-input" /></label><div class="social-actions"><select v-model="channel" class="profile-input" :aria-label="t('social.channel')"><option value="all">{{ t('social.all') }}</option><option value="mutual">{{ t('social.mutual') }}</option><option value="city">{{ t('social.city') }}</option></select><input v-model="tag" :placeholder="t('social.tags')" :aria-label="t('social.tags')" maxlength="24" class="profile-input" /><button class="save-btn" :disabled="busy">{{ t('social.search') }}</button></div></form>
+            <form class="social-form" @submit.prevent="loadPeople(false)"><label>{{ t('social.search') }}<input v-model="query" maxlength="60" class="profile-input" /></label><div class="social-actions"><select v-model="channel" class="profile-input" :aria-label="t('social.channel')"><option value="all">{{ t('social.all') }}</option><option value="mutual">{{ t('social.mutual') }}</option><option value="city">{{ t('social.city') }}</option></select><input v-model="tag" :placeholder="t('social.tags')" :aria-label="t('social.tags')" maxlength="24" class="profile-input" /><button class="save-btn" :disabled="busy">{{ t('polish.searchAction') }}</button></div></form>
             <p class="social-muted">{{ t('social.discoveryHint') }}</p>
-            <p v-if="!people.length && !busy">{{ t('social.empty') }}</p>
+            <div v-if="!people.length && !busy && !error" class="social-empty"><h3>{{ t('polish.noPeople') }}</h3><p class="social-muted">{{ t('social.empty') }}</p><button class="cancel-btn" @click="changeTab('me')">{{ t('social.me') }}</button></div>
             <article v-for="person in people" :key="person.id" class="social-person">
               <div class="social-person-head"><img v-if="person.avatarUrl" :src="person.avatarUrl" class="social-avatar" alt="" /><div v-else class="social-avatar social-initial">{{ person.username.slice(0, 1) }}</div><div><h3>{{ person.username }}</h3><p class="social-muted">{{ person.signature || person.city }}</p></div></div>
               <div class="social-tags"><span v-for="interest in person.interests" :key="interest">{{ interest }}</span></div>
@@ -28,7 +29,7 @@
             <button v-if="daily.nextCursor" class="cancel-btn" :disabled="busy" @click="loadDaily(true)">{{ t('social.more') }}</button>
           </template>
         </main>
-        <aside v-if="selected" class="social-detail"><button v-if="mobile" class="cancel-btn" @click="tab === 'me' ? changeTab('people') : selected = ''">{{ t('social.back') }}</button><SocialProfileCard :key="accountId" :user-id="selected" @blocked="onBlocked" @chat="startChat" @saved="onSaved" /></aside>
+        <aside v-if="selected" class="social-detail"><div v-if="tab !== 'me' || mobile" class="social-detail-header"><button class="cancel-btn" @click="tab === 'me' ? changeTab('people') : selected = ''">‹ {{ t('social.back') }}</button></div><SocialProfileCard :key="accountId" :user-id="selected" @blocked="onBlocked" @chat="startChat" @saved="onSaved" /></aside>
       </div>
     </div>
   </div>
@@ -42,8 +43,11 @@ import { discoverPeople, getDailyQuestion, answerDailyQuestion } from '../api/so
 import type { SocialProfile, DailyQuestion } from '../types/social'
 import SocialProfileCard from './SocialProfileCard.vue'
 import EncounterRoom from './EncounterRoom.vue'
+import { useDialog } from '../composables/useDialog'
 const emit = defineEmits<{ close: []; chat: [profile: SocialProfile] }>()
 const props = withDefaults(defineProps<{ initialTab?: 'people' | 'me' }>(), { initialTab: 'people' })
+const dialog = ref<HTMLElement | null>(null)
+useDialog(dialog, () => emit('close'))
 const store = useStore(), { t } = useI18n(), accountId = computed(() => String(store.state.accountId))
 const tab = ref<'people' | 'encounter' | 'daily' | 'me'>('people'), selected = ref(''), error = ref(''), busy = ref(false)
 const query = ref(''), tag = ref(''), channel = ref('all'), people = ref<SocialProfile[]>([]), nextCursor = ref<number | null>(null)

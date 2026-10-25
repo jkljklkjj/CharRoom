@@ -39,10 +39,10 @@
     </div>
 
     <div v-if="showSettings" class="settings-overlay" @click.self="closeSettings">
-      <div class="settings-dialog">
+      <div ref="settingsDialog" class="settings-dialog" role="dialog" aria-modal="true" :aria-label="$t('app.settings.title')" tabindex="-1">
         <div class="settings-header">
           <h3>{{ $t('app.settings.title') }}</h3>
-          <button class="close-settings" @click="closeSettings">×</button>
+          <button class="close-settings" :aria-label="$t('social.close')" @click="closeSettings">×</button>
         </div>
         <div class="settings-body">
           <div class="settings-item">
@@ -89,7 +89,7 @@
 
     <!-- 退出确认弹窗 -->
     <div v-if="showLogoutConfirm" class="settings-overlay" @click.self="showLogoutConfirm = false">
-      <div class="settings-dialog confirm-dialog">
+      <div ref="logoutDialog" class="settings-dialog confirm-dialog" role="dialog" aria-modal="true" :aria-label="$t('app.settings.logout')" tabindex="-1">
         <div class="confirm-text">{{ $t('app.settings.logoutConfirm') }}</div>
         <div class="confirm-actions">
           <button class="btn cancel" @click="showLogoutConfirm = false">{{ $t('app.cancel') }}</button>
@@ -117,6 +117,7 @@ import ChatWindow from '../components/ChatWindow.vue'
 import SocialHub from '../components/SocialHub.vue'
 import type { SocialProfile } from '../types/social'
 import { toast } from '../utils/toast'
+import { useDialog } from '../composables/useDialog'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, AGENT_STREAM_TYPE } from '../proto/constants'
@@ -159,6 +160,9 @@ function onSocialChat(profile: SocialProfile) {
 }
 const showQuota = ref(false)
 const showLogoutConfirm = ref(false)
+const settingsDialog = ref<HTMLElement | null>(null), logoutDialog = ref<HTMLElement | null>(null)
+useDialog(settingsDialog, closeSettings)
+useDialog(logoutDialog, () => { showLogoutConfirm.value = false })
 const loading = ref(true) // 登录状态验证中
 
 function openProfileEdit() {

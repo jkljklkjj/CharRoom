@@ -8,6 +8,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
 import com.chatlite.i18n.LocalStrings
@@ -44,6 +50,10 @@ fun ChatInputBar(
     val s = LocalStrings.current
     val isSendEnabled = !isSending && (messageText.isNotBlank() || replyPreview != null)
     val focusRequester = remember { FocusRequester() }
+    var input by remember { mutableStateOf(TextFieldValue(messageText, TextRange(messageText.length))) }
+    SideEffect {
+        if (input.text != messageText) input = TextFieldValue(messageText, TextRange(messageText.length))
+    }
 
     Column {
         // 引用回复预览
@@ -65,9 +75,9 @@ fun ChatInputBar(
                 if (onEmojiClick != null) {
                     IconButton(
                         onClick = onEmojiClick,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
-                        Text("😊", style = MaterialTheme.typography.h6)
+                        Icon(Icons.Default.EmojiEmotions, s["polish.emoji"], tint = MaterialTheme.colors.onSurface.copy(alpha = .65f))
                     }
                 }
 
@@ -75,7 +85,7 @@ fun ChatInputBar(
                 if (onAttachClick != null) {
                     IconButton(
                         onClick = onAttachClick,
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(44.dp),
                         enabled = !isUploading
                     ) {
                         if (isUploading && uploadProgress != null) {
@@ -86,7 +96,7 @@ fun ChatInputBar(
                                 color = MaterialTheme.colors.primary
                             )
                         } else {
-                            Text("📎", style = MaterialTheme.typography.h6)
+                            Icon(Icons.Default.AttachFile, s["polish.attach"], tint = MaterialTheme.colors.onSurface.copy(alpha = .65f))
                         }
                     }
                 }
@@ -98,15 +108,15 @@ fun ChatInputBar(
                     shape = RoundedCornerShape(20.dp)
                 ) {
                     TextField(
-                        value = messageText,
-                        onValueChange = onTextChange,
+                        value = input,
+                        onValueChange = { input = it; onTextChange(it.text) },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .focusRequester(focusRequester)
                             .onPreviewKeyEvent { event ->
                                 if (event.type == KeyEventType.KeyDown
                                     && event.key == Key.Enter
-                                    && !event.isShiftPressed
-                                    && !isSending
+                                    && shouldSubmitComposer(isSendEnabled, input.composition != null, event.isShiftPressed, event.isCtrlPressed, event.isAltPressed, event.isMetaPressed)
                                 ) {
                                     onSubmit()
                                     true
@@ -133,9 +143,9 @@ fun ChatInputBar(
 
                 // 发送按钮
                 Button(
-                    onClick = onSubmit,
+                    onClick = { onSubmit(); focusRequester.requestFocus() },
                     enabled = isSendEnabled,
-                    modifier = Modifier.height(36.dp),
+                    modifier = Modifier.height(44.dp).widthIn(min = 64.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         backgroundColor = MaterialTheme.colors.primary,
@@ -157,3 +167,6 @@ fun ChatInputBar(
         }
     }
 }
+
+internal fun shouldSubmitComposer(canSend: Boolean, composing: Boolean, shift: Boolean, ctrl: Boolean, alt: Boolean, meta: Boolean): Boolean =
+    canSend && !composing && !shift && !ctrl && !alt && !meta

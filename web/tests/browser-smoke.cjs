@@ -33,6 +33,7 @@ async function main() {
       const other = id === 91001 ? 91002 : 91001
       const context = await browser.createIncognitoBrowserContext()
       const page = await context.newPage()
+      await page.setViewport({width:1180,height:900})
       await page.setBypassServiceWorker(true)
       page.on('pageerror', error => errors.push(error.message))
       await page.evaluateOnNewDocument(id => {
@@ -96,6 +97,20 @@ async function main() {
     }
     for (const page of pages) await page.waitForFunction(() => globalThis.__workerReplies.includes('init'))
     assert.equal(peers.size, 2)
+    // Confirming a Chinese/Japanese IME candidate must not send the message.
+    await pages[0].type('.composer textarea', '输入法候选')
+    await pages[0].$eval('.composer textarea', element => element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true })))
+    assert.equal(await pages[0].$eval('.composer textarea', element => element.value), '输入法候选')
+    assert.equal(await pages[0].$eval('button.send', element => element.disabled), false)
+    await pages[0].$eval('.composer textarea', element => { element.value = ''; element.dispatchEvent(new Event('input', { bubbles: true })) })
+    assert.equal(await pages[0].$eval('button.send', element => element.disabled), true)
+    // A keyboard user can search, recover from no results, and select a contact.
+    await pages[0].type('.search-bar input', 'no-such-fixture')
+    await pages[0].waitForSelector('.contacts-empty')
+    await pages[0].click('.contacts-empty button')
+    assert.equal(await pages[0].$eval('.search-bar input', element => element.value), '')
+    await pages[0].focus('.users-list li')
+    await pages[0].keyboard.press('Enter')
     for (let index = 0; index < 2; index++) {
       const text = 'typescript-browser-' + index
       await pages[index].type('textarea', text)
@@ -107,6 +122,27 @@ async function main() {
       const replies = await page.evaluate(() => globalThis.__workerReplies)
       assert.ok(replies.includes('encode') && replies.includes('decode'), 'real bundled Worker must encode and decode')
       assert.ok(!replies.includes('error'))
+    }
+    // Reading old messages keeps the scroll position and offers an explicit jump.
+    await pages[1].$eval('.composer textarea', element=>{element.value=Array.from({length:65},(_,i)=>'fixture long line '+i).join('\n');element.dispatchEvent(new Event('input',{bubbles:true}))})
+    await pages[1].click('button.send')
+    await pages[0].waitForFunction(()=>document.querySelector('.messages').scrollHeight>document.querySelector('.messages').clientHeight+400).catch(error=>{throw new Error('Long fixture did not create scrollable content: '+error.message)})
+    await pages[0].waitForFunction(()=>{const el=document.querySelector('.messages');return el.scrollHeight-el.scrollTop-el.clientHeight<10}).catch(error=>{throw new Error('Following new content did not reach the bottom: '+error.message)})
+    await pages[0].$eval('.messages',element=>{element.scrollTop=0;element.dispatchEvent(new Event('scroll'))})
+    await pages[1].type('.composer textarea','fixture newest message');await pages[1].click('button.send')
+    await pages[0].waitForSelector('.jump-latest').catch(async error=>{
+      console.error('Scroll fixture state',await pages[0].evaluate(()=>{const el=document.querySelector('.messages');return {top:el.scrollTop,height:el.scrollHeight,viewport:el.clientHeight,messages:[...document.querySelectorAll('.text-content')].map(item=>item.textContent.slice(-60))}}))
+      throw error
+    })
+    const position=await pages[0].$eval('.messages',element=>({top:element.scrollTop,height:element.scrollHeight,viewport:element.clientHeight}))
+    assert.ok(position.top<100,JSON.stringify(position))
+    await pages[0].click('.jump-latest')
+    await pages[0].waitForFunction(()=>{const el=document.querySelector('.messages');return el.scrollHeight-el.scrollTop-el.clientHeight<64})
+    if(process.env.CLIENT_SCREENSHOT_DIR)fs.mkdirSync(process.env.CLIENT_SCREENSHOT_DIR,{recursive:true})
+    for(const theme of ['light','dark']){
+      await pages[0].evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme)
+      if(theme==='dark')await pages[0].waitForFunction(()=>getComputedStyle(document.querySelector('.search-bar input')).backgroundColor.match(/\d+/g).slice(0,3).every(value=>Number(value)<100),{timeout:2000})
+      if(process.env.CLIENT_SCREENSHOT_DIR)await pages[0].screenshot({path:path.join(process.env.CLIENT_SCREENSHOT_DIR,`chat-${theme}.png`)})
     }
     assert.deepEqual(errors, [])
     console.log('PASS: built app, two isolated accounts, bidirectional messages, ACKs, real Worker; mocked remote APIs/transport')

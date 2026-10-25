@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import com.chatlite.i18n.LocalStrings
 import component.chatHeaderBrush
 
@@ -47,9 +48,9 @@ fun AppTopBar(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = title, style = MaterialTheme.typography.h6, color = MaterialTheme.colors.onBackground)
+                    Text(text = title, style = MaterialTheme.typography.h6, color = MaterialTheme.colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {
-                        Text(text = subtitle, style = MaterialTheme.typography.caption, color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f))
+                        Text(text = subtitle, style = MaterialTheme.typography.caption, color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (actions != null) Row(content = actions)

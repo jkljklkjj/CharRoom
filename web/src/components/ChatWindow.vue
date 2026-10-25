@@ -14,7 +14,7 @@
 
     <!-- 好友信息弹窗 -->
     <div v-if="showInfoModal" class="modal-overlay" @click="showInfoModal = false">
-      <div class="modal-content" @click.stop>
+      <div ref="infoDialog" class="modal-content" role="dialog" aria-modal="true" :aria-label="$t('chat.info')" tabindex="-1" @click.stop>
         <button class="modal-close" @click="showInfoModal = false">✕</button>
         <SocialProfileCard v-if="currentChatId !== null" :user-id="String(currentChatId)" @chat="showInfoModal = false" @blocked="showInfoModal = false" />
       </div>
@@ -22,7 +22,7 @@
 
     <!-- 删除好友确认 -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="showDeleteConfirm = false">
-      <div class="modal-content confirm-dialog" @click.stop>
+      <div ref="deleteDialog" class="modal-content confirm-dialog" role="dialog" aria-modal="true" :aria-label="$t('chat.deleteFriend')" tabindex="-1" @click.stop>
         <div class="confirm-text">{{ $t('chat.deleteConfirm') }}</div>
         <div class="confirm-actions">
           <button class="btn cancel" @click="showDeleteConfirm = false">{{ $t('chat.cancel') }}</button>
@@ -75,6 +75,7 @@
     </div>
 
     <!-- 消息上下文菜单 -->
+    <button v-if="newMessageCount" class="jump-latest" @click="scrollToBottom(true)">{{ $t('polish.newMessages', { count: newMessageCount }) }} ↓</button>
     <div v-if="showContextMenu" class="context-menu" :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }">
       <div class="menu-item" @click="copyMessage">{{ $t('chat.context.copy') }}</div>
       <div class="menu-item" @click="shareMessage" v-if="canShare">{{ $t('chat.context.share') }}</div>
@@ -85,7 +86,7 @@
 
     <!-- 转发选择弹窗 -->
     <div v-if="forwardDialogOpen" class="modal-overlay" @click.self="forwardDialogOpen = false">
-      <div class="modal-content forward-dialog">
+      <div ref="forwardDialog" class="modal-content forward-dialog" role="dialog" aria-modal="true" :aria-label="$t('chat.forward.title')" tabindex="-1">
         <div class="forward-header">
           <h3>{{ $t('chat.forward.title') }}</h3>
           <button class="forward-close" @click="forwardDialogOpen = false">×</button>
@@ -142,12 +143,13 @@
           v-model="text"
           ref="messageInput"
           :placeholder="$t('chat.inputPlaceholder')"
+          :aria-label="$t('chat.inputPlaceholder')"
           rows="1"
-          @keydown.enter.exact.prevent="send"
+          @keydown="composerEnter($event, send)"
           @input="autoResize"
           @focus="onInputFocus"
         ></textarea>
-        <button class="send" type="submit">{{ $t('chat.send') }}</button>
+        <button class="send" type="submit" :disabled="!text.trim()">{{ $t('chat.send') }}</button>
       </form>
     </div>
   </div>
@@ -155,6 +157,8 @@
 
 <script setup lang="ts">
 import SocialProfileCard from './SocialProfileCard.vue'
+import { composerEnter } from '../utils/composer'
+import { useDialog } from '../composables/useDialog'
 import type { Id, TimeValue, ChatMessage, User } from '../types/chat'
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -163,6 +167,10 @@ import chatSocket from '../services/chatSocket'
 import { MSG_TYPE } from '../proto/constants'
 
 const store = useStore()
+const infoDialog = ref<HTMLElement | null>(null), deleteDialog = ref<HTMLElement | null>(null), forwardDialog = ref<HTMLElement | null>(null)
+useDialog(infoDialog, () => { showInfoModal.value = false })
+useDialog(deleteDialog, () => { showDeleteConfirm.value = false })
+useDialog(forwardDialog, () => { forwardDialogOpen.value = false })
 // 注入 store 引用给 chatSocket（替代 window.__chatStore hack）
 chatSocket.setStore(store)
 
@@ -286,9 +294,11 @@ const currentMessages = computed(() => {
 
 
 let _scrollInit = false
+const newMessageCount = ref(0)
 
 // QQ 式滚动：首次定位到底部（无动画），后续仅当接近底部时跟随
 function scrollToBottom(animate = false) {
+  newMessageCount.value = 0
   nextTick(() => {
     const el = msgList.value
     if (!el) return
@@ -309,27 +319,30 @@ watch(currentChatId, () => {
 
 // 向上滚动加载更多历史消息
 let _loadingOlder = false
-function onMessageScroll() {
+async function onMessageScroll() {
   const el = msgList.value
   if (!el || _loadingOlder) return
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 64) newMessageCount.value = 0
   // 距顶部 100px 时触发加载
   if (el.scrollTop < 100) {
     const hasMore = isGroupChat.value ? store.state.hasMoreGroupMessages : store.state.hasMoreMessages
     if (!hasMore) return
     _loadingOlder = true
-    const prevHeight = el.scrollHeight
-    store.loadOlderMessages()
-    // 加载后保持滚动位置不变
-    nextTick(() => {
-      el.scrollTop = el.scrollHeight - prevHeight
-      _loadingOlder = false
-    })
+    const prevHeight = el.scrollHeight, prevTop = el.scrollTop, conversation = currentChatId.value
+    try {
+      const loaded = await store.loadOlderMessages()
+      await nextTick()
+      if (loaded && conversation === currentChatId.value && el === msgList.value) el.scrollTop = prevTop + el.scrollHeight - prevHeight
+    } catch { toast.error(t('social.failed')) }
+    finally { _loadingOlder = false }
   }
 }
 
 // 新消息到达：仅在接近底部时跟随（无动画）
 // 通过监听数组长度变化触发，因为 .push() 不改变引用
-watch(() => isGroupChat.value ? store.state.groupMessages.length : store.state.messages.length, () => {
+watch(() => [currentMessages.value.at(-1)?.messageId || currentMessages.value.at(-1)?.time, currentMessages.value.length] as const, ([last, count], [previousLast, previous]) => {
+  // Prepending history keeps the same last message. It must not act like a new arrival.
+  if (!last || last === previousLast) return
   const el = msgList.value
   if (!el) return
   if (!_scrollInit) {
@@ -340,7 +353,9 @@ watch(() => isGroupChat.value ? store.state.groupMessages.length : store.state.m
   // 在底部附近才跟随
   const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200
   if (nearBottom) {
-    scrollToBottom(true)
+    scrollToBottom(false)
+  } else {
+    newMessageCount.value += Math.max(1, count - previous)
   }
 })
 
@@ -838,7 +853,7 @@ function handleKeydown(e: KeyboardEvent) {
 <style scoped>
 .chat-wrap{display:flex;flex-direction:column;height:100%}
 .chat-top{padding:12px 16px;border-bottom:1px solid var(--surface-border);font-weight:600}
-.messages{flex:1;overflow:auto;padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:12px}
+.messages{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scroll-behavior:auto;padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:12px}
 .msg{display:flex;width:100%}
 .msg .row{display:flex;align-items:flex-start;gap:8px}
 .msg .avatar-col{width:44px;display:flex;align-items:flex-start;justify-content:center;flex-shrink:0}
@@ -1105,6 +1120,11 @@ function handleKeydown(e: KeyboardEvent) {
 
 
 .composer{display:flex;padding:12px;border-top:1px solid var(--surface-border);gap:8px}
+.jump-latest{align-self:center;border:1px solid var(--surface-border);border-radius:20px;background:var(--panel);color:var(--accent-2);padding:9px 18px;margin:6px;cursor:pointer;font-size:13px}
+.composer{align-items:flex-end;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.composer textarea{box-sizing:border-box;min-width:0}
+.composer .send{min-height:44px}
+.composer .send:disabled{opacity:.45;cursor:default;transform:none;box-shadow:none}
 .composer textarea{
   flex:1;
   padding:10px 14px;

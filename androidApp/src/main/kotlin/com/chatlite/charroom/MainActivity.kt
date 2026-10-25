@@ -1,262 +1,197 @@
 package com.chatlite.charroom
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
-import android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.MaterialTheme
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.WindowInsetsCompat
 import com.chatlite.charroom.component.AndroidBackHandler
+import com.chatlite.charroom.component.AndroidConnectivityBanner
 import com.chatlite.charroom.component.AndroidFilePicker
+import com.chatlite.charroom.component.rememberNotificationPreferences
 import com.chatlite.charroom.core.AndroidImageLoader
-import component.settings.CurrentPlatform
-import component.settings.Platform
-import com.chatlite.charroom.core.NetworkChangeReceiver
-import com.chatlite.charroom.service.ChatForegroundService
-import com.chatlite.charroom.ui.theme.ChatTheme
-import com.chatlite.charroom.data.datasource.local.AndroidTokenStorage
-import component.BackHandlerImpl
-import component.io.FilePicker
-import core.GlobalAppUpdateManager
-import core.ImageLoaderImpl
+import com.chatlite.charroom.core.NotificationDestination
 import com.chatlite.charroom.core.initAppUpdateManager
-import androidx.core.graphics.toColorInt
-import org.koin.androidx.compose.koinViewModel
-import presentation.viewmodel.AuthViewModel
+import com.chatlite.charroom.data.datasource.local.AndroidTokenStorage
 import com.chatlite.charroom.presentation.viewmodel.AndroidAuthViewModel
 import com.chatlite.charroom.presentation.viewmodel.AndroidChatViewModel
+import com.chatlite.charroom.service.ChatForegroundService
+import com.chatlite.charroom.ui.theme.ChatTheme
+import com.chatlite.i18n.LocalStrings
+import com.chatlite.i18n.currentStrings
+import com.chatlite.i18n.stringsForLocale
+import component.BackHandlerImpl
+import component.io.FilePicker
+import component.settings.CurrentPlatform
+import component.settings.LocalPlatformSettings
+import component.settings.Platform
+import core.AppSettings
+import core.Chat
+import core.ImageLoaderImpl
+import core.ThemeMode
 import core.state.AuthState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
+import core.state.GlobalAppState
+import kotlinx.coroutines.flow.MutableStateFlow
+import model.ChatNavigationRequest
+import org.koin.androidx.compose.koinViewModel
 import timber.log.Timber
 
 class MainActivity : ComponentActivity() {
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // 权限处理
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val notificationGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
-            if (!notificationGranted) {
-                // 通知权限被拒绝，可以在这里显示提示引导用户去设置中开启
-                Timber.w("通知权限被拒绝，新消息通知将无法显示")
-            }
-        }
-    }
-
-    /**
-     * 检查是否有通知权限
-     */
-    private fun hasNotificationPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        } else {
-            // Android 13以下默认有通知权限
-            true
-        }
-    }
-
-    // 全局返回键处理状态
-    private var onBackPressedCallback: (() -> Boolean)? = null
+    private var uiBack: (() -> Boolean)? = null
+    private data class OpenNotification(val destination: NotificationDestination, val requestId: Long)
+    private val pendingNotification = MutableStateFlow<OpenNotification?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // 初始化跨平台接口实现
         BackHandlerImpl = AndroidBackHandler
         FilePicker = AndroidFilePicker
         ImageLoaderImpl = AndroidImageLoader
-
-        // 初始化平台信息
         CurrentPlatform = Platform.ANDROID
-
-        // 初始化应用更新管理器
         initAppUpdateManager(this)
+        enableEdgeToEdge()
 
-        // 启动时自动检查更新
-        lifecycleScope.launch {
-            try {
-                GlobalAppUpdateManager.checkForUpdates(
-                    platform = "android",
-                    autoDownload = false
-                )
-            } catch (_: Exception) {
-                // 忽略更新检查错误
-            }
-        }
-
-        // 沉浸式状态栏，内容延伸到状态栏下
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        @Suppress("DEPRECATION")
-        window.statusBarColor = "#D78345".toColorInt()
-        @Suppress("DEPRECATION")
-        window.navigationBarColor = "#D78345".toColorInt()
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
-        @Suppress("DEPRECATION")
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-
-        // 启动前台服务保活
-        try {
-            ChatForegroundService.start(this)
-        } catch (e: Exception) {
-            Timber.e(e, "启动前台服务失败")
-        }
-
-        // 注册返回键回调，优先级高于系统默认
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                // 先尝试让Compose层处理返回
-                val handled = onBackPressedCallback?.invoke() ?: false
-                if (!handled) {
-                    // 没有处理，执行默认返回（退出应用）
-                    finish()
+                if (ViewCompat.getRootWindowInsets(window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true) {
+                    WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.ime())
+                    return
                 }
+                if (uiBack?.invoke() != true) moveTaskToBack(true)
             }
         })
-
-        // 请求必要权限
-        requestNecessaryPermissions()
-
-        // 注册网络状态回调
-        NetworkChangeReceiver.registerNetworkCallback(this)
-
-        // 处理通知点击意图
-        handleNotificationIntent(intent)
+        val restored = savedInstanceState?.let {
+            NotificationDestination.parse(it.getString("pending.type"), it.getInt("pending.target"), it.getInt("pending.account"))
+        }
+        if (restored != null) pendingNotification.value = OpenNotification(restored, savedInstanceState!!.getLong("pending.request"))
+        else handleNotificationIntent(intent)
 
         setContent {
-            // 注册文件选择器
-            FilePicker.Register()
-
-            ChatTheme {
-                val context = LocalContext.current
-                val scope = rememberCoroutineScope()
-
-                // 通过依赖注入获取ViewModel
-                val androidAuthViewModel = koinViewModel<AndroidAuthViewModel>()
-                val authViewModel = androidAuthViewModel.viewModel
-                val chatViewModel = org.koin.core.context.GlobalContext.get().get<AndroidChatViewModel>()
-
-                // 观察认证状态
-                val authState by authViewModel.authState.collectAsState()
-
-                LaunchedEffect(Unit) {
-                    // 初始化ViewModel，尝试自动登录
-                    authViewModel.init()
-
-                    // 监听认证状态变化
-                    authViewModel.authState.collect { state ->
-                        when (state) {
+            val theme by AppSettings.themeMode.collectAsState()
+            val language by AppSettings.language.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+            val dark = when (theme) { ThemeMode.SYSTEM -> systemDark; ThemeMode.DARK -> true; ThemeMode.LIGHT -> false }
+            // Configuration changes also update the system locale when following the device.
+            val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+            val strings = remember(language, configuration) { stringsForLocale(AppSettings.getEffectiveLanguage()) }
+            SideEffect {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { dark },
+                    navigationBarStyle = SystemBarStyle.auto(0xE6FFFFFF.toInt(), 0x801B1B1B.toInt()) { dark }
+                )
+                com.chatlite.i18n.updateCurrentStrings(language)
+            }
+            CompositionLocalProvider(LocalStrings provides strings) {
+                ChatTheme(darkTheme = dark) {
+                    FilePicker.Register()
+                    val auth = koinViewModel<AndroidAuthViewModel>().viewModel
+                    val chat = org.koin.core.context.GlobalContext.get().get<AndroidChatViewModel>()
+                    val state by auth.authState.collectAsState()
+                    val selected by chat.selectedChatTargetFlow.collectAsState()
+                    val pending by pendingNotification.collectAsState()
+                    val account = (state as? AuthState.Authenticated)?.userProfile?.id ?: GlobalAppState.currentUserId
+                    var hadSession by remember { mutableStateOf(false) }
+                    val platformSettings = rememberNotificationPreferences(state is AuthState.Authenticated)
+                    LaunchedEffect(state) {
+                        when (val value = state) {
                             is AuthState.Authenticated -> {
-                                // 登录成功，保存token到本地
-                                val userId = state.account.toIntOrNull() ?: 0
-                                AndroidTokenStorage.save(
-                                    context,
-                                    state.accessToken,
-                                    userId,
-                                    state.refreshToken
-                                )
+                                hadSession = true
+                                val id = value.userProfile?.id ?: GlobalAppState.currentUserId ?: value.account.toIntOrNull()
+                                if (id != null && id > 0) AndroidTokenStorage.save(this@MainActivity, value.accessToken, id, value.refreshToken)
+                                startChatService()
                             }
-                            is AuthState.Unauthenticated,
-                            is AuthState.Error -> {
-                                // 未登录或认证失败，清除本地存储
-                                AndroidTokenStorage.clear(context)
-                                chatViewModel.clear()
+                            is AuthState.Unauthenticated, is AuthState.Error -> {
+                                uiBack = null
+                                if (hadSession) {
+                                    hadSession = false
+                                    pendingNotification.value = null
+                                    ChatForegroundService.stop(this@MainActivity)
+                                    Chat.stop()
+                                    AndroidTokenStorage.clear(this@MainActivity)
+                                    chat.clear()
+                                    (application as ChatApplication).chatNotificationManager.cancelAllNotifications()
+                                }
                             }
-                            else -> {}
+                            else -> Unit
                         }
                     }
-                }
-
-                Box(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // 使用commonMain的LoginRegisterApp，统一登录注册逻辑
-                    component.LoginRegisterApp(
-                        isDarkMode = false, // 后续可以添加主题切换
-                        onToggleDarkMode = {},
-                        onBackPressed = { callback ->
-                            onBackPressedCallback = callback
+                    LaunchedEffect(pending?.requestId, account, state is AuthState.Authenticated) {
+                        val request = pending ?: return@LaunchedEffect
+                        if (state is AuthState.Authenticated && account != null && !request.destination.belongsTo(account)) {
+                            pendingNotification.value = null
+                            android.widget.Toast.makeText(this@MainActivity, strings["android.notification.wrongAccount"], android.widget.Toast.LENGTH_LONG).show()
                         }
-                    )
+                    }
+                    LaunchedEffect(selected?.id, account) { cancelVisibleConversation() }
+                    CompositionLocalProvider(LocalPlatformSettings provides platformSettings) {
+                        Column(Modifier.fillMaxSize().background(MaterialTheme.colors.background).safeDrawingPadding().imePadding()) {
+                            if (state is AuthState.Authenticated) AndroidConnectivityBanner()
+                            Box(Modifier.weight(1f).fillMaxWidth()) {
+                                component.LoginRegisterApp(
+                                    isDarkMode = dark,
+                                    onToggleDarkMode = { AppSettings.setThemeMode(if (dark) ThemeMode.LIGHT else ThemeMode.DARK) },
+                                    onBackPressed = { uiBack = it },
+                                    authViewModel = auth,
+                                    navigationRequest = pending?.takeIf { state is AuthState.Authenticated && it.destination.belongsTo(account) }?.let { ChatNavigationRequest(it.requestId, it.destination.chatId) },
+                                    onNavigationHandled = { if (pendingNotification.value?.requestId == pending?.requestId) pendingNotification.value = null }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    private fun requestNecessaryPermissions() {
-        val permissions = mutableListOf<String>()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission()) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+    override fun onSaveInstanceState(outState: Bundle) {
+        pendingNotification.value?.let {
+            outState.putString("pending.type", it.destination.type)
+            outState.putInt("pending.target", it.destination.targetId)
+            outState.putInt("pending.account", it.destination.accountId)
+            outState.putLong("pending.request", it.requestId)
         }
-
-        if (permissions.isNotEmpty()) {
-            requestPermissionLauncher.launch(permissions.toTypedArray())
-        }
+        super.onSaveInstanceState(outState)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleNotificationIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        // 应用回到前台，清除所有通知
-        val app = application as ChatApplication
-        app.chatNotificationManager.cancelAllNotifications()
+        if (!GlobalAppState.currentToken.isNullOrBlank()) startChatService()
+        cancelVisibleConversation()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        try {
-            // 注销网络状态回调
-            NetworkChangeReceiver.unregisterNetworkCallback(this)
-            // 停止前台服务
-            ChatForegroundService.stop(this)
-        } catch (e: Exception) {
-            Timber.e(e, "onDestroy 清理失败")
-        }
+    private fun startChatService() {
+        try { ChatForegroundService.start(this) }
+        catch (failure: RuntimeException) { Timber.w(failure, "Background chat service could not start") }
     }
 
-    /**
-     * 处理通知点击意图
-     */
+    private fun cancelVisibleConversation() {
+        if (GlobalAppState.currentToken.isNullOrBlank()) return
+        val selected = core.state.GlobalChatState.selectedChatTarget.value ?: return
+        val manager = (application as ChatApplication).chatNotificationManager
+        if (selected.id < 0) manager.cancelGroupNotification(-selected.id) else manager.cancelPrivateNotification(selected.id)
+    }
+
     private fun handleNotificationIntent(intent: Intent) {
-        val notificationType = intent.getStringExtra("NOTIFICATION_TYPE") ?: return
-        val userId = intent.getIntExtra("USER_ID", -1)
-        val groupId = intent.getIntExtra("GROUP_ID", -1)
-
-        // 这里可以根据通知类型跳转到对应的聊天界面
-        // 目前暂时只清除通知，后续可以集成到导航逻辑中
-        val app = application as ChatApplication
-        when (notificationType) {
-            "private" -> {
-                if (userId != -1) {
-                    app.chatNotificationManager.cancelPrivateNotification(userId)
-                }
-            }
-            "group" -> {
-                if (groupId != -1) {
-                    app.chatNotificationManager.cancelGroupNotification(groupId)
-                }
-            }
-        }
+        val type = intent.getStringExtra("NOTIFICATION_TYPE") ?: return
+        val id = intent.getIntExtra(if (type == "group") "GROUP_ID" else "USER_ID", 0)
+        val destination = NotificationDestination.parse(type, id, intent.getIntExtra("ACCOUNT_ID", 0))
+        intent.removeExtra("NOTIFICATION_TYPE")
+        if (destination != null) pendingNotification.value = OpenNotification(destination, System.nanoTime())
     }
 }
-

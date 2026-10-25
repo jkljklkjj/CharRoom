@@ -10,9 +10,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4203bc97-a7b6-475b-8b97-b9972e33fdc5" name="更改" comment="优化包结构">
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/CommonComponents.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/ChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/ChatScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/commonMain/kotlin/component/chat/GroupChatScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -165,63 +165,64 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Android App.CharRoom.executor": "Run",
-    "Android App.androidApp.executor": "Run",
-    "Android App.qingliao.CharRoom.androidApp.executor": "Run",
-    "Gradle.CharRoom [:androidApp:build].executor": "Run",
-    "Gradle.CharRoom [:androidApp:clean].executor": "Run",
-    "Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor": "Run",
-    "Gradle.CharRoom [build].executor": "Run",
-    "Gradle.CharRoom [checkRuntime].executor": "Run",
-    "Gradle.CharRoom [clean].executor": "Run",
-    "Gradle.CharRoom [customApk].executor": "Run",
-    "Gradle.CharRoom [customJar].executor": "Run",
-    "Gradle.CharRoom [customProguardReleaseJars].executor": "Run",
-    "Gradle.CharRoom [dependencies].executor": "Run",
-    "Gradle.CharRoom [packageReleaseMsi].executor": "Run",
-    "Gradle.CharRoom [package].executor": "Run",
-    "Gradle.CharRoom [proguardReleaseJars].executor": "Run",
-    "Gradle.desktop.executor": "Run",
-    "Gradle.下载源代码.executor": "Run",
-    "Gradle.升级 Gradle 包装器.executor": "Run",
-    "JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor": "Run",
-    "JAR 应用程序.在线聊天App-1.0.0.jar.executor": "Run",
-    "Kotlin.ChatKt.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.go.formatter.settings.were.checked": "true",
-    "RunOnceActivity.go.migrated.go.modules.settings": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "master",
-    "go.import.settings.migrated": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "模块",
-    "project.structure.proportion": "0.17",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "terminal",
-    "ts.external.directory.path": "D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Android App.CharRoom.executor&quot;: &quot;Run&quot;,
+    &quot;Android App.androidApp.executor&quot;: &quot;Run&quot;,
+    &quot;Android App.qingliao.CharRoom.androidApp.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [:androidApp:compileDebugAndroidTestSources].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [checkRuntime].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customApk].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customJar].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [customProguardReleaseJars].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [dependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [packageReleaseMsi].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [package].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.CharRoom [proguardReleaseJars].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.desktop.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.下载源代码.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.升级 Gradle 包装器.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.CharRoom-desktop-1.0-SNAPSHOT.jar.executor&quot;: &quot;Run&quot;,
+    &quot;JAR 应用程序.在线聊天App-1.0.0.jar.executor&quot;: &quot;Run&quot;,
+    &quot;Kotlin.ChatKt.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;android.gradle.sync.needed&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/lora/qingliao/CharRoom/src/desktopMain/resources/icons&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;模块&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;D:\\Program Files\\JetBrains\\IntelliJ IDEA Ultimate\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "mongo",
-      "mysql",
-      "redis"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;mongo&quot;,
+      &quot;mysql&quot;,
+      &quot;redis&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\lora\qingliao\CharRoom\src\desktopMain\resources\icons" />
@@ -487,13 +488,13 @@
     </configuration>
     <list>
       <item itemvalue="Android App.CharRoom" />
+      <item itemvalue="Gradle.desktop" />
       <item itemvalue="Android App.androidApp" />
       <item itemvalue="Android App.qingliao.CharRoom.androidApp" />
-      <item itemvalue="Gradle.desktop" />
-      <item itemvalue="Gradle.CharRoom [customProguardReleaseJars]" />
-      <item itemvalue="Gradle.CharRoom [customApk]" />
       <item itemvalue="Gradle.CharRoom [build]" />
       <item itemvalue="Gradle.CharRoom [clean]" />
+      <item itemvalue="Gradle.CharRoom [customApk]" />
+      <item itemvalue="Gradle.CharRoom [customProguardReleaseJars]" />
       <item itemvalue="JAR 应用程序.在线聊天App-1.0.0.jar" />
     </list>
     <recent_temporary>
@@ -819,7 +820,10 @@
       <workItem from="1783167149308" duration="4850000" />
       <workItem from="1783173410674" duration="6043000" />
       <workItem from="1783210593310" duration="8967000" />
-      <workItem from="1783232511829" duration="8982000" />
+      <workItem from="1783232511829" duration="10570000" />
+      <workItem from="1783247545941" duration="729000" />
+      <workItem from="1783297730827" duration="18000" />
+      <workItem from="1783297766771" duration="3000" />
     </task>
     <task id="LOCAL-00001" summary="配置">
       <option name="closed" value="true" />

@@ -1,7 +1,8 @@
 <template>
   <section class="social-profile" :data-cover="profile?.cover || 'sunset'" aria-live="polite">
     <div class="social-cover"></div>
-    <p v-if="error" class="social-error" role="alert">{{ error }}</p>
+    <p v-if="error && !profile" class="social-error" role="alert">{{ error }}</p>
+    <button v-if="error && !profile" class="cancel-btn" @click="retryKey++">{{ t('polish.retry') }}</button>
     <p v-if="!profile && !error">{{ t('social.loading') }}</p>
     <template v-if="profile">
       <div class="social-profile-content">
@@ -10,7 +11,10 @@
         <h2>{{ profile.username }}</h2>
         <p class="social-muted">{{ t('social.account') }} {{ profile.id }} · {{ t(`social.relation.${profile.relation}`) }}</p>
         <p v-if="profile.signature">{{ profile.signature }}</p>
+        <p v-if="error" class="social-error" role="alert">{{ error }}</p>
+        <p v-if="notice" class="social-notice" role="status">{{ notice }}</p>
         <form v-if="editing" @submit.prevent="save" class="social-form">
+          <fieldset class="social-fields" :disabled="busy">
           <label>{{ t('social.username') }}<input v-model="form.username" required maxlength="32" class="profile-input" /></label>
           <label>{{ t('social.signature') }}<input v-model="form.signature" maxlength="120" class="profile-input" /></label>
           <label>{{ t('social.bio') }}<textarea v-model="form.bio" maxlength="300" class="profile-input" rows="3"></textarea></label>
@@ -22,7 +26,8 @@
           <label class="social-check"><input v-model="form.discoverable" type="checkbox" />{{ t('social.discoverable') }}</label>
           <label class="social-check"><input v-model="form.mutualDiscovery" type="checkbox" />{{ t('social.mutualDiscovery') }}</label>
           <p class="social-muted">{{ t('social.privacyHint') }}</p>
-          <div class="social-actions"><button class="save-btn" :disabled="busy">{{ t('social.save') }}</button><button type="button" class="cancel-btn" @click="editing = false">{{ t('social.cancel') }}</button></div>
+          <div class="social-actions social-form-footer"><button class="save-btn" :disabled="busy || !form.username.trim()">{{ t(busy ? 'polish.saving' : 'social.save') }}</button><button type="button" class="cancel-btn" :disabled="busy" @click="editing = false">{{ t('social.cancel') }}</button></div>
+          </fieldset>
         </form>
         <template v-else>
           <label v-if="profile.relation === 'SELF'" class="social-form">{{ t('social.preview') }}<select v-model="audience" class="profile-input"><option value="self">{{ t('social.relation.SELF') }}</option><option value="stranger">{{ t('social.stranger') }}</option><option value="friend">{{ t('social.friends') }}</option></select></label>
@@ -62,6 +67,8 @@ const props = defineProps<{ userId: string }>()
 const emit = defineEmits<{ chat: [profile: SocialProfile]; saved: [profile: SocialProfile]; blocked: [id: string] }>()
 const { t } = useI18n()
 const profile = ref<SocialProfile | null>(null), error = ref(''), busy = ref(false), editing = ref(false)
+const notice = ref('')
+const retryKey = ref(0)
 const blocked = ref<Array<{ id: number; username: string }>>([])
 const requesting = ref(false), reporting = ref(false), reason = ref(''), reportReason = ref(''), interestText = ref(''), audience = ref('self')
 let controller = new AbortController(), generation = 0
@@ -71,8 +78,10 @@ const detailsVisible = computed(() => {
   if (profile.value.relation !== 'SELF' || audience.value === 'self') return profile.value.detailsVisible
   return profile.value.settings?.visibility === 'PUBLIC' || (audience.value === 'friend' && profile.value.settings?.visibility === 'FRIENDS')
 })
-watch(() => props.userId, async id => {
+watch(() => `${props.userId}:${retryKey.value}`, async () => {
+  const id = props.userId
   const current = ++generation
+  notice.value = ''
   controller.abort(); controller = new AbortController(); profile.value = null; error.value = ''; busy.value = false; blocked.value = []; reason.value = ''; reportReason.value = ''; editing.value = false; requesting.value = false; reporting.value = false; audience.value = 'self'
   try { const next = await getSocialProfile(id, controller.signal); if (current === generation) { profile.value = next; blocked.value = []; if (next.relation === 'SELF') { const users = await getBlockedUsers(); if (current === generation) blocked.value = users } } }
   catch (failure) { if (current === generation && !controller.signal.aborted) error.value = (failure as Error).message }
@@ -86,14 +95,15 @@ function edit() {
   interestText.value = form.interests.join('、'); editing.value = true
 }
 async function perform(work: () => Promise<void>) {
+  if (busy.value) return
   const current = generation
-  busy.value = true; error.value = ''
+  busy.value = true; error.value = ''; notice.value = ''
   try { await work() } catch (failure) { if (current === generation) error.value = (failure as Error).message }
   finally { if (current === generation) busy.value = false }
 }
-const save = () => perform(async () => { const current = generation; const next = await saveSocialProfile({ ...form, interests: interestText.value.split(/[、,，]/).map(v => v.trim()).filter(Boolean) }); if (current !== generation) return; profile.value = next; editing.value = false; emit('saved', next) })
+const save = () => perform(async () => { const current = generation; const next = await saveSocialProfile({ ...form, interests: interestText.value.split(/[、,，]/).map(v => v.trim()).filter(Boolean) }); if (current !== generation) return; profile.value = next; editing.value = false; notice.value = t('polish.saved'); emit('saved', next) })
 const requestFriend = () => perform(async () => { const id = props.userId; await sendSocialFriendRequest(id, reason.value); if (id !== props.userId || !profile.value) return; profile.value.relation = 'PENDING'; requesting.value = false })
 const block = () => perform(async () => { const id = props.userId; await blockSocialUser(id); if (id === props.userId) emit('blocked', id) })
 const unblock = (id: number) => perform(async () => { const current = generation; await unblockSocialUser(id); if (current === generation) blocked.value = blocked.value.filter(user => user.id !== id) })
-const report = () => perform(async () => { const id = props.userId; await reportSocialUser({ targetId: Number(id), reason: reportReason.value }); if (id === props.userId) { reporting.value = false; reportReason.value = ''; error.value = t('social.reported') } })
+const report = () => perform(async () => { const id = props.userId; await reportSocialUser({ targetId: Number(id), reason: reportReason.value }); if (id === props.userId) { reporting.value = false; reportReason.value = ''; notice.value = t('social.reported') } })
 </script>

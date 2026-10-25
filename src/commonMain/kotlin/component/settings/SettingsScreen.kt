@@ -5,6 +5,8 @@ import com.chatlite.i18n.Strings
 import component.AppTopBar
 import core.AppLog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -156,9 +158,10 @@ fun SettingsScreen(
 
         // Settings options list
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            LocalPlatformSettings.current.invoke()
             // Profile
             SettingItem(
                 icon = Icons.Default.Person,

@@ -24,26 +24,47 @@ enum class ThemeMode(val value: Int) {
  * Persistent user preferences (theme, language) backed by Java Preferences.
  * Exposes reactive [StateFlow]s for Compose integration.
  */
+interface AppSettingsStorage {
+    fun readTheme(): Int
+    fun readLanguage(): String
+    fun writeTheme(value: Int)
+    fun writeLanguage(value: String)
+}
+
 object AppSettings {
-    private val prefs: Preferences? = try {
+    // Android installs SharedPreferences before UI creation; never initialize JVM preferences there.
+    private val prefs: Preferences? by lazy { try {
         Preferences.userNodeForPackage(AppSettings::class.java)
     } catch (e: Exception) {
         null
+    } }
+    private var storage: AppSettingsStorage? = null
+    private var initialized = false
+
+    fun installStorage(value: AppSettingsStorage) {
+        storage = value
+        initialized = false
+        restore()
+        updateCurrentStrings(_language.value)
+    }
+
+    private fun restore() {
+        if (initialized) return
+        initialized = true
+        _themeMode.value = try { ThemeMode.fromValue(storage?.readTheme() ?: prefs?.getInt("theme_mode", 0) ?: 0) } catch (_: Exception) { ThemeMode.SYSTEM }
+        _language.value = try { storage?.readLanguage() ?: prefs?.get("language", "follow") ?: "follow" } catch (_: Exception) { "follow" }
     }
 
     // ── Theme ──
 
-    private val _themeMode = MutableStateFlow(
-        try { ThemeMode.fromValue(prefs?.getInt("theme_mode", 0) ?: 0) }
-        catch (_: Exception) { ThemeMode.SYSTEM }
-    )
-    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+    private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
+    val themeMode: StateFlow<ThemeMode> get() { restore(); return _themeMode.asStateFlow() }
 
     fun setThemeMode(mode: ThemeMode) {
+        restore()
         _themeMode.value = mode
         try {
-            prefs?.putInt("theme_mode", mode.value)
-            prefs?.flush()
+            storage?.writeTheme(mode.value) ?: run { prefs?.putInt("theme_mode", mode.value); prefs?.flush() }
         } catch (_: Exception) {}
     }
 
@@ -51,7 +72,7 @@ object AppSettings {
      * Resolve the effective dark/light boolean for a given (or current) [ThemeMode].
      * SYSTEM mode attempts OS-level detection; defaults to light on failure.
      */
-    fun isDarkMode(mode: ThemeMode = _themeMode.value): Boolean {
+    fun isDarkMode(mode: ThemeMode = themeMode.value): Boolean {
         return when (mode) {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK -> true
@@ -86,23 +107,21 @@ object AppSettings {
 
     // ── Language ──
 
-    private val _language = MutableStateFlow(
-        try { prefs?.get("language", "follow") ?: "follow" }
-        catch (_: Exception) { "follow" }
-    )
-    val language: StateFlow<String> = _language.asStateFlow()
+    private val _language = MutableStateFlow("follow")
+    val language: StateFlow<String> get() { restore(); return _language.asStateFlow() }
 
     fun setLanguage(lang: String) {
+        restore()
         _language.value = lang
         try {
-            prefs?.put("language", lang)
-            prefs?.flush()
+            storage?.writeLanguage(lang) ?: run { prefs?.put("language", lang); prefs?.flush() }
         } catch (_: Exception) {}
         // Update the global strings singleton used outside composable scope
         updateCurrentStrings(lang)
     }
 
     fun getEffectiveLanguage(): String {
+        restore()
         val lang = _language.value
         if (lang == "follow") {
             val defaultLocale = java.util.Locale.getDefault()

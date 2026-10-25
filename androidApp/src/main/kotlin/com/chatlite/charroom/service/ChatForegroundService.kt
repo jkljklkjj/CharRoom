@@ -13,6 +13,8 @@ import com.chatlite.charroom.ChatApplication
 import com.chatlite.charroom.R
 import com.chatlite.charroom.core.ChatNotificationManager
 import core.Chat
+import core.state.GlobalAppState
+import com.chatlite.i18n.currentStrings
 
 class ChatForegroundService : Service() {
     private var isRunning = false
@@ -31,10 +33,10 @@ class ChatForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 ChatNotificationManager.CHANNEL_ID_SERVICE,
-                "聊天服务",
+                currentStrings["android.service.channel"],
                 android.app.NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "保持后台聊天连接"
+                description = currentStrings["android.service.running"]
                 enableLights(false)
                 enableVibration(false)
                 setShowBadge(false)
@@ -45,7 +47,8 @@ class ChatForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!isRunning) {
+        if (!isRunning || GlobalAppState.currentToken.isNullOrBlank()) {
+            stopSelf()
             return START_NOT_STICKY
         }
 
@@ -59,8 +62,8 @@ class ChatForegroundService : Service() {
         )
 
         val notification: Notification = NotificationCompat.Builder(this, ChatApplication.NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("chatlite")
-            .setContentText("聊天服务正在运行")
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(currentStrings["android.service.running"])
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(0xFFD78345.toInt())
             .setColorized(true)
@@ -73,8 +76,7 @@ class ChatForegroundService : Service() {
         // 启动前台服务，类型由 AndroidManifest 中的 foregroundServiceType 决定
         startForeground(ChatApplication.NOTIFICATION_ID, notification)
 
-        // 连接已由UI层(ChatApp)启动，服务仅负责保活和重连
-        // 无需重复调用Chat.start()，避免重复握手
+        if (!Chat.isConnected()) Chat.start()
 
         return START_STICKY
     }
@@ -82,6 +84,9 @@ class ChatForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
+
+    // Android 15+ bounds dataSync foreground execution. Exit promptly instead of crashing.
+    override fun onTimeout(startId: Int, fgsType: Int) { stopSelf() }
 
     override fun onDestroy() {
         super.onDestroy()

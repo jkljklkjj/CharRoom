@@ -2,16 +2,18 @@
 .social-overlay { padding:16px; box-sizing:border-box; }
 .social-hub { width:min(980px,100%); max-height:92dvh; display:flex; flex-direction:column; color:var(--text-primary); }
 .social-hub * { box-sizing:border-box; }
-.social-hub h2 { font-size:18px; margin:0 0 10px; }
+.social-hub h2 { font-size:18px; margin:0 0 10px; line-height:1.5; }
+.social-hub .settings-header h2 { margin:0; }
 .social-hub h3 { font-size:15px; margin:0 0 7px; }
 .social-hub p { overflow-wrap:anywhere; white-space:pre-wrap; }
 .social-hub button { font-family:inherit; }
 .social-hub button:focus-visible, .social-hub input:focus-visible, .social-hub textarea:focus-visible, .social-hub select:focus-visible { outline:2px solid var(--accent-2); outline-offset:2px; }
 .social-nav { padding:14px 20px; border-bottom:1px solid var(--surface-border); }
-.social-layout { overflow:auto; display:grid; grid-template-columns:minmax(0,1fr); min-height:0; }
+.social-layout { overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; display:grid; grid-template-columns:minmax(0,1fr); min-height:0; }
 .social-layout.has-profile { grid-template-columns:minmax(0,1fr) minmax(270px,340px); }
 .social-main, .social-detail { padding:20px; min-width:0; }
 .social-detail { border-left:1px solid var(--surface-border); }
+.social-detail-header { display:flex; align-items:center; margin-bottom:16px; }
 .social-layout.profile-only { grid-template-columns:minmax(0,1fr); }
 .social-layout.profile-only .social-main { display:none; }
 .social-layout.profile-only .social-detail { width:min(640px,100%); margin:0 auto; border-left:0; }
@@ -27,9 +29,23 @@
 .social-hub button:disabled { opacity:.5; cursor:not-allowed; }
 .social-muted { color:var(--text-secondary); font-size:13px; }
 .social-error { color:var(--accent-2); overflow-wrap:anywhere; }
+.social-error, .social-notice { padding:12px 14px; border:1px solid var(--surface-border); border-radius:10px; background:var(--panel); font-size:14px; }
+.social-notice { color:var(--text-primary); border-left:3px solid var(--accent-1); }
+.social-loading-track { height:3px; flex:none; }
+.social-loading-line { height:100%; background:linear-gradient(90deg,var(--accent-1),var(--accent-2)); animation:social-pulse 1s ease-in-out infinite alternate; }
+@keyframes social-pulse { to { opacity:.35; } }
+.social-empty { text-align:center; padding:40px 16px; line-height:1.7; }
+.social-empty p { max-width:320px; margin:10px auto 18px; }
+.social-form-footer { position:sticky; bottom:-20px; padding:14px 0; background:var(--bg); border-top:1px solid var(--surface-border); z-index:1; }
 .social-person { padding:16px; border:1px solid var(--surface-border); border-radius:12px; background:var(--panel); margin:12px 0; }
 .social-person-head { display:flex; align-items:center; gap:12px; }
 .social-person-head p { margin:4px 0; }
+.social-person-head > div:not(.social-avatar) { min-width:0; flex:1; }
+.social-person-head h3 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.social-profile h2 { overflow-wrap:anywhere; }
+.social-tags span { max-width:100%; overflow-wrap:anywhere; }
+.social-fields { display:contents; }
+.social-fields:disabled .profile-input { opacity:.65; }
 .social-avatar { width:46px; height:46px; border-radius:15px; object-fit:cover; flex:none; }
 .social-initial { display:grid; place-items:center; background:var(--bubble-bg); color:var(--accent-2); font-size:22px; }
 .social-tags { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
@@ -45,8 +61,23 @@
 .social-intent { background:var(--bubble-bg); padding:14px; border-radius:10px; margin:16px 0; overflow-wrap:anywhere; }
 .social-intent p { margin-bottom:0; }
 .social-answer { user-select:text; }
-.social-room-messages { display:flex; flex-direction:column; gap:10px; max-height:40dvh; overflow:auto; padding:10px 0; }
+.social-room-messages { display:flex; flex-direction:column; gap:12px; height:clamp(160px,32dvh,360px); overflow:auto; overscroll-behavior:contain; scroll-behavior:auto; padding:14px 4px; scrollbar-gutter:stable; }
 .social-room-message { max-width:85%; align-self:flex-start; background:var(--bubble-bg); padding:10px 14px; border-radius:12px; user-select:text; }
-.social-room-message.mine { align-self:flex-end; background:linear-gradient(135deg,var(--accent-1),var(--accent-2)); color:var(--text-primary); }
+.social-room-message.mine { align-self:flex-end; background:var(--bubble-bg); border:1px solid var(--accent-1); color:var(--text-primary); }
+.social-room-status { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; background:var(--panel); border:1px solid var(--surface-border); border-radius:10px; font-size:14px; }
+.social-room-status time { font-variant-numeric:tabular-nums; font-size:20px; font-weight:600; }
+.social-compose-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.social-room .social-intent { font-size:14px; line-height:1.7; }
+.social-hub.room-mode { height:min(860px,92dvh); }
+.room-mode .social-layout { flex:1; }
+.room-mode .social-main { min-height:0; overflow:auto; }
+.room-mode .social-room { display:flex; flex-direction:column; height:100%; min-height:560px; }
+.room-mode .social-room > * { flex-shrink:0; }
+.room-mode .social-room > h2 { margin-bottom:4px; }
+.room-mode .social-room > p { margin:6px 0 12px; }
+.room-mode .social-room > .social-actions { margin:8px 0; }
+.room-mode .social-room > .social-intent { margin:8px 0; padding:10px 14px; }
+.room-mode .social-room .social-room-messages { flex:1 1 120px; min-height:100px; height:auto; max-height:none; }
+.room-mode .social-room > .social-form { margin:8px 0; }
 .social-room-message p { margin:5px 0 0; user-select:text; }
 @media(max-width:699px) { .social-overlay{padding:0;} .social-hub{max-height:100dvh;height:100dvh;border-radius:0;} .social-layout.has-profile{grid-template-columns:minmax(0,1fr);} .social-detail{border-left:0;} .social-nav{gap:5px;padding:10px;} .social-nav button{min-width:0;padding:9px 5px;} .social-hub .profile-input{font-size:16px;} .social-actions .profile-input{min-width:100%;width:100%;} }

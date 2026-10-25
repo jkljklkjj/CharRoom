@@ -331,5 +331,5 @@ val enStrings = Strings(
         "call.video.btn" to "Video Call",
         "call.incoming" to "%s is calling you",
         "common.unknown.error" to "Unknown error"
-    ) + socialEn
+    ) + socialEn + androidEn
 )

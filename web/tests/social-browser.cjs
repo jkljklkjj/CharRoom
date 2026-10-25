@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
 const puppeteer=require('puppeteer-core')
 const dist=path.resolve(__dirname,'../dist')
 const accounts=[91001,91002], pendingRequests=new Map(), profiles=new Map(), answers=new Map(), sends=[]
-let room=null,queued=null,loseFirstAck=true
+let room=null,queued=null,loseFirstAck=true,delayNextSend=false
 for(const id of accounts)profiles.set(id,{id:String(id),username:'Fixture '+id,signature:'A public fixture',bio:'Only fixture text',interests:['摄影'],city:'杭州',intent:'Discuss a photo',cover:'sunset',relation:'STRANGER',detailsVisible:true,settings:{userId:id,bio:'Only fixture text',interests:['摄影'],city:'杭州',intent:'Discuss a photo',cover:'sunset',visibility:'PUBLIC',discoverable:true,mutualDiscovery:true}})
 const publicProfile=(id,viewer)=>{const profile=JSON.parse(JSON.stringify(profiles.get(id)));if(id!==viewer)delete profile.settings;profile.relation=id===viewer?'SELF':pendingRequests.get(id)===viewer?'PENDING':'STRANGER';return profile}
 function roomView(id,after=0) {
@@ -77,22 +77,38 @@ async function main(){
         const url=new URL(request.url())
         if(url.origin===origin){request.continue();return}
         if(!url.pathname.startsWith('/api/')){request.abort();return}
-        const data=api(url,request.method(),request.postData()?JSON.parse(request.postData()):{},id)
-        request.respond({status:data?.__httpError||200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*','Access-Control-Allow-Methods':'*'},body:JSON.stringify(data?.__httpError?{code:1500,message:'fixture lost acknowledgement'}:{code:0,data})})
+        const body=request.postData()?JSON.parse(request.postData()):{}
+        const data=api(url,request.method(),body,id)
+        const respond=()=>request.respond({status:data?.__httpError||200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*','Access-Control-Allow-Methods':'*'},body:JSON.stringify(data?.__httpError?{code:1500,message:'fixture lost acknowledgement'}:{code:0,data})})
+        if(body.action==='send'&&delayNextSend){delayNextSend=false;setTimeout(respond,600)}else respond()
       })
       await page.goto(origin+'/app');await page.waitForSelector('[aria-label="发现与遇见"]');await page.click('[aria-label="发现与遇见"]');await page.waitForSelector('.social-person');pages.push(page)
     }
     const [a,b]=pages
+    assert.equal(await a.evaluate(()=>document.querySelector('.social-hub').contains(document.activeElement)),true,'dialog takes focus')
+    await a.focus('.social-hub .close-settings');await a.keyboard.down('Shift');await a.keyboard.press('Tab');await a.keyboard.up('Shift')
+    assert.equal(await a.evaluate(()=>document.querySelector('.social-hub').contains(document.activeElement)),true,'Tab remains inside dialog')
+    assert.equal(await a.evaluate(()=>document.body.style.overflow),'hidden')
     await click(a,'.social-person button','看资料');await a.waitForSelector('.social-profile h2')
     await click(a,'.social-profile button','加为好友');await a.type('.social-profile textarea','A fixture introduction');await click(a,'.social-profile button','发送好友申请')
     await a.waitForFunction(()=>[...document.querySelectorAll('.social-profile button')].some(button=>button.textContent.includes('已申请')&&button.disabled))
     for(const page of pages){await click(page,'.social-nav button','轻遇');await click(page,'.social-room button','开始匹配')}
     for(const page of pages){await page.waitForFunction(()=>document.querySelector('.social-room')?.textContent.includes('已遇见'));await click(page,'.social-room button','我准备好了')}
     for(const page of pages)await page.waitForFunction(()=>document.querySelector('.social-room')?.textContent.includes('正在轻聊'))
+    await a.type('.social-room textarea','候选确认')
+    await a.$eval('.social-room textarea',element=>element.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true})))
+    assert.equal(sends.length,0)
+    await a.$eval('.social-room textarea',element=>{element.value='';element.dispatchEvent(new Event('input',{bubbles:true}))})
     await a.type('.social-room textarea','fixture message after a lost acknowledgement');await click(a,'.social-room button','发送')
     await a.waitForFunction(()=>document.querySelector('.social-room [role="alert"]')?.textContent.includes('fixture'))
     await click(a,'.social-room button','发送');await b.waitForFunction(()=>document.querySelector('.social-room-messages')?.textContent.includes('fixture message'))
     assert.equal(sends.length,2);assert.equal(sends[0],sends[1]);assert.equal(room.messages.length,1)
+    delayNextSend=true
+    await a.type('.social-room textarea','submitted fixture');await click(a,'.social-room button','发送')
+    await a.$eval('.social-room textarea',element=>{element.value='下一条消息的草稿';element.dispatchEvent(new Event('input',{bubbles:true}))})
+    await a.waitForFunction(()=>[...document.querySelectorAll('.social-room button')].some(button=>button.textContent.trim()==='发送'&&!button.disabled))
+    assert.equal(await a.$eval('.social-room textarea',element=>element.value),'下一条消息的草稿','late send response must preserve new input')
+    if(process.env.SOCIAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.SOCIAL_SCREENSHOT_DIR,{recursive:true});await a.screenshot({path:path.join(process.env.SOCIAL_SCREENSHOT_DIR,'encounter-desktop.png')})}
     await click(a,'.social-room button','交换名片');assert.equal(await b.$('.social-room .save-btn + .save-btn'),null)
     await click(b,'.social-room button','交换名片');await a.waitForFunction(()=>document.querySelector('.social-room')?.textContent.includes('看资料'))
     await click(a,'.social-room button','再聊五分钟');await click(b,'.social-room button','再聊五分钟')
@@ -105,11 +121,15 @@ async function main(){
     await click(a,'.social-nav button','我的名片');await click(a,'.social-profile button','编辑资料');await a.waitForSelector('.social-profile form')
     const editInputs=await a.$$('.social-profile form input');await editInputs[0].click({clickCount:3});await editInputs[0].type('Updated fixture')
     await click(a,'.social-profile button','保存');await a.waitForFunction(()=>document.querySelector('.social-profile h2')?.textContent==='Updated fixture')
+    assert.ok((await text(a,'.social-profile [role="status"]')).includes('保存'))
     for(const theme of ['light','dark'])for(const width of [1000,390,320]){
       await a.setViewport({width,height:900});await a.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme)
       const overflow=await a.$eval('.social-hub',element=>element.scrollWidth>element.clientWidth+1);assert.equal(overflow,false,`layout ${width}`)
       if(process.env.SOCIAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.SOCIAL_SCREENSHOT_DIR,{recursive:true});await a.screenshot({path:path.join(process.env.SOCIAL_SCREENSHOT_DIR,`profile-${theme}-${width}.png`)})}
     }
+    await a.keyboard.press('Escape');await a.waitForFunction(()=>!document.querySelector('.social-hub'))
+    assert.equal(await a.evaluate(()=>document.body.style.overflow),'')
+    assert.equal(await a.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'发现与遇见','dialog restores trigger focus')
     assert.deepEqual(errors,[])
     console.log('PASS: two accounts, discovery/profile/request, random room readiness, lost-ACK retry, exchange, extension, leave, daily text escaping, edit, dark/mobile layout.')
   } finally {await browser.close();await new Promise(resolve=>server.close(resolve))}

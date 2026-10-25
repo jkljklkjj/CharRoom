@@ -1,23 +1,13 @@
 package component.user
 
-import component.chat.ChatScreen
-import component.chat.GroupChatScreen
 import component.*
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,13 +27,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import core.ApiService
 import core.loadImageBitmapWithCache
@@ -53,16 +43,20 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.material.TextFieldDefaults
+import androidx.compose.material.IconButton
+import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -243,22 +237,21 @@ fun UserList(
                         Text(
                             text = s["contact.list.title"],
                             style = MaterialTheme.typography.subtitle1,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             color = Color.White
                         )
                         Text(
                             text = s["contact.list.online.count"].format(onlineCount, userListState.size),
                             style = MaterialTheme.typography.caption,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             color = Color.White.copy(alpha = 0.8f)
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         ElasticHeaderAction(
-                            icon = Icons.Default.Explore,
-                            contentDescription = s["social.discover"],
-                            onClick = onOpenDiscovery
-                        )
-                        ElasticHeaderAction(
-                            icon = Icons.Default.Search,
+                            icon = Icons.Default.PersonAdd,
                             contentDescription = s["contact.search.add"],
                             onClick = onOpenSearch
                         )
@@ -289,6 +282,24 @@ fun UserList(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        Surface(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onOpenDiscovery),
+            color = MaterialTheme.colors.surface,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = .08f))
+        ) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Default.Explore, null, tint = MaterialTheme.colors.primary)
+                Column(Modifier.weight(1f)) {
+                    Text(s["social.discover"], style = MaterialTheme.typography.subtitle2)
+                    Text(s["polish.discoverySubtitle"], style = MaterialTheme.typography.caption, color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colors.onSurface.copy(alpha = .5f))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         // Search field
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -315,38 +326,28 @@ fun UserList(
                         modifier = Modifier.size(18.dp)
                     )
                 },
+                trailingIcon = if (searchQuery.isNotEmpty()) {
+                    { IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, s["polish.clearSearch"]) } }
+                } else null,
                 singleLine = true
             )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)) {
+            if (filteredUsers.isEmpty()) item {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 36.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(s[if (searchQuery.isBlank()) "polish.emptyContacts" else "polish.noContacts"], color = MaterialTheme.colors.onSurface.copy(alpha = .65f))
+                    TextButton(onClick = { if (searchQuery.isBlank()) onOpenDiscovery() else searchQuery = "" }) {
+                        Text(s[if (searchQuery.isBlank()) "social.discover" else "polish.clearSearch"])
+                    }
+                }
+            }
             items(
                 items = filteredUsers,
                 key = { it.id }
             ) { user ->
-                // Staggered animation: each item has different delay
-                val itemIndex = filteredUsers.indexOf(user)
-                var itemVisible by remember(user.id) { mutableStateOf(false) }
-
-                LaunchedEffect(user.id) {
-                    kotlinx.coroutines.delay(itemIndex * 30L) // 30ms delay per item
-                    itemVisible = true
-                }
-
-                AnimatedVisibility(
-                    visible = itemVisible,
-                    enter = fadeIn(
-                        animationSpec = tween(200, easing = FastOutSlowInEasing)
-                    ) + slideInHorizontally(
-                        initialOffsetX = { -it / 4 }, // slide in from left
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        )
-                    )
-                ) {
                 val displayName = buildDisplayName(user)
                 val preview = userPreviews[user]
                 val subtitle = preview?.subtitle ?: ""
@@ -383,7 +384,7 @@ fun UserList(
                             onUserClick(user)
                         }
                         .background(cardColor, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .padding(horizontal = 10.dp, vertical = 12.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -391,13 +392,9 @@ fun UserList(
                     ) {
                         // Online dot
                         if (showOnlineDot(user)) {
-                            val pulseScale = if (user.online == true) {
-                                rememberPulseAnimation()
-                            } else 1f
                             Box(
                                 modifier = Modifier
                                     .size(7.dp)
-                                    .graphicsLayer { scaleX = pulseScale; scaleY = pulseScale }
                                     .background(
                                         color = if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1),
                                         shape = CircleShape
@@ -486,7 +483,6 @@ fun UserList(
                         }
                     }
                 }
-                } // End AnimatedVisibility
             }
         }
     }
@@ -498,40 +494,13 @@ private fun ElasticHeaderAction(
     contentDescription: String,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val scale = rememberElasticScale(interactionSource, pressedScale = 0.86f)
-
-    Surface(
-        modifier = Modifier
-            .size(34.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
-        color = Color.White.copy(alpha = 0.2f),
-        shape = CircleShape,
-        elevation = 0.dp
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = contentDescription, tint = Color.White)
-        }
+    IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+        Icon(icon, contentDescription = contentDescription, tint = Color.White, modifier = Modifier.size(22.dp))
     }
 }
 
 private fun buildDisplayName(user: User): String {
-    if (user.id < 0 || ServerConfig.isAgentAssistant(user.id)) {
-        return user.username
-    }
-    return when (user.online) {
-        true -> "${user.username}${currentStrings["contact.online"]}"
-        false -> "${user.username}${currentStrings["contact.offline"]}"
-        null -> "${user.username}${currentStrings["contact.syncing"]}"
-    }
+    return user.username
 }
 
 private fun showOnlineDot(user: User): Boolean {

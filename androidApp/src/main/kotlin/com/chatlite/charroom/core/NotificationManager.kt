@@ -5,180 +5,68 @@ import android.app.NotificationChannel
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.chatlite.charroom.MainActivity
 import com.chatlite.charroom.R
-import kotlin.random.Random
+import com.chatlite.i18n.currentStrings
+import core.state.GlobalAppState
 
-/**
- * 安卓端通知管理器
- * 负责处理新消息通知、渠道创建、通知点击等功能
- */
 class ChatNotificationManager(private val context: Context) {
-    private val notificationManager = NotificationManagerCompat.from(context)
-
-    // 通知渠道ID
+    private val manager = NotificationManagerCompat.from(context)
     companion object {
         const val CHANNEL_ID_MESSAGES = "chat_messages_channel"
         const val CHANNEL_ID_SERVICE = "chat_service_channel"
-        const val NOTIFICATION_ID_SERVICE = 1001
-        private const val NOTIFICATION_ID_BASE = 2000
+        const val NOTIFICATION_ID_SERVICE = 1
+        private const val MESSAGE_ID = 0
     }
-
     init {
-        createNotificationChannels()
+        manager.createNotificationChannels(listOf(
+            NotificationChannel(CHANNEL_ID_MESSAGES, currentStrings["android.notification.channel"], android.app.NotificationManager.IMPORTANCE_HIGH).apply { enableVibration(true) },
+            NotificationChannel(CHANNEL_ID_SERVICE, currentStrings["android.service.channel"], android.app.NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) }
+        ))
     }
 
-    /**
-     * 创建通知渠道（Android O及以上需要）
-     */
-    private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // 消息通知渠道
-            val messageChannel = NotificationChannel(
-                CHANNEL_ID_MESSAGES,
-                "新消息通知",
-                android.app.NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "收到新消息时的通知"
-                enableLights(true)
-                enableVibration(true)
-                setShowBadge(true)
-                vibrationPattern = longArrayOf(100, 200, 100, 200)
-            }
+    fun showPrivateMessageNotification(senderId: Int, senderName: String?, message: String) =
+        show("private", senderId, senderName ?: context.getString(R.string.app_name), message)
 
-            // 前台服务通知渠道（已经在ChatForegroundService中创建，这里保持一致）
-            val serviceChannel = NotificationChannel(
-                CHANNEL_ID_SERVICE,
-                "聊天服务",
-                android.app.NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "保持后台聊天连接"
-                enableLights(false)
-                enableVibration(false)
-                setShowBadge(false)
-            }
+    fun showGroupMessageNotification(groupId: Int, groupName: String?, senderName: String?, message: String) =
+        show("group", groupId, listOfNotNull(groupName, senderName).joinToString(" · ").ifBlank { currentStrings["android.notifications"] }, message)
 
-            notificationManager.createNotificationChannels(listOf(messageChannel, serviceChannel))
-        }
-    }
-
-    /**
-     * 显示私聊消息通知
-     */
-    fun showPrivateMessageNotification(senderId: Int, senderName: String?, message: String) {
-        // 如果应用在前台，不显示通知
-        if (AppLifecycleObserver.isAppInForeground) {
-            return
-        }
-
-        val displayName = senderName ?: "陌生人"
-
-        // 创建通知点击意图
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+    private fun show(type: String, target: Int, title: String, content: String) {
+        if (AppLifecycleObserver.isAppInForeground || GlobalAppState.currentToken.isNullOrBlank()) return
+        val destination = NotificationDestination.parse(type, target, GlobalAppState.currentUserId ?: 0) ?: return
+        if (!manager.areNotificationsEnabled()) return
+        val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("NOTIFICATION_TYPE", "private")
-            putExtra("USER_ID", senderId)
+            data = Uri.parse("chatlite://notification/${destination.accountId}/$type/$target")
+            putExtra("NOTIFICATION_TYPE", type)
+            putExtra(if (type == "group") "GROUP_ID" else "USER_ID", target)
+            putExtra("ACCOUNT_ID", destination.accountId)
         }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            senderId,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // 构建通知
+        val pending = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val publicVersion = NotificationCompat.Builder(context, CHANNEL_ID_MESSAGES)
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle(context.getString(R.string.app_name))
+            .setContentText(currentStrings["android.notification.newMessage"]).build()
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_MESSAGES)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(displayName)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(Notification.CATEGORY_MESSAGE)
-            .setAutoCancel(true)
-            .setDefaults(Notification.DEFAULT_SOUND or Notification.DEFAULT_VIBRATE)
-            .build()
-
-        // 显示通知，使用senderId作为通知ID，这样同一个用户的消息会覆盖
-        try {
-            if (notificationManager.areNotificationsEnabled()) {
-                notificationManager.notify(NOTIFICATION_ID_BASE + senderId, notification)
-            }
-        } catch (_: SecurityException) {
-            // 没有通知权限，忽略
-        }
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle(title)
+            .setContentText(content).setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .setContentIntent(pending).setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setPublicVersion(publicVersion)
+            .setCategory(Notification.CATEGORY_MESSAGE).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setGroup("messages:${destination.accountId}").build()
+        try { manager.notify(destination.tag, MESSAGE_ID, notification) } catch (_: SecurityException) { }
     }
 
-    /**
-     * 显示群聊消息通知
-     */
-    fun showGroupMessageNotification(groupId: Int, groupName: String?, senderName: String?, message: String) {
-        // 如果应用在前台，不显示通知
-        if (AppLifecycleObserver.isAppInForeground) {
-            return
-        }
-
-        val displayGroupName = groupName ?: "群组"
-        val displaySenderName = senderName ?: "未知用户"
-
-        // 创建通知点击意图
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("NOTIFICATION_TYPE", "group")
-            putExtra("GROUP_ID", groupId)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            -groupId, // 使用负的groupId作为requestCode，避免和私聊冲突
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // 构建通知
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID_MESSAGES)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("$displayGroupName · $displaySenderName")
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(Notification.CATEGORY_MESSAGE)
-            .setAutoCancel(true)
-            .setDefaults(Notification.DEFAULT_SOUND or Notification.DEFAULT_VIBRATE)
-            .build()
-
-        // 显示通知，使用groupId作为通知ID，同一个群的消息会覆盖
-        try {
-            if (notificationManager.areNotificationsEnabled()) {
-                notificationManager.notify(NOTIFICATION_ID_BASE + (-groupId), notification)
-            }
-        } catch (_: SecurityException) {
-            // 没有通知权限，忽略
-        }
-    }
-
-    /**
-     * 取消所有消息通知
-     */
+    /** Leave the foreground service notification intact, including during logout cleanup. */
     fun cancelAllNotifications() {
-        notificationManager.cancelAll()
+        manager.activeNotifications.filter { it.tag?.startsWith("messages:") == true }.forEach { manager.cancel(it.tag, it.id) }
     }
-
-    /**
-     * 取消特定用户的私聊通知
-     */
-    fun cancelPrivateNotification(userId: Int) {
-        notificationManager.cancel(NOTIFICATION_ID_BASE + userId)
-    }
-
-    /**
-     * 取消特定群组的通知
-     */
-    fun cancelGroupNotification(groupId: Int) {
-        notificationManager.cancel(NOTIFICATION_ID_BASE + (-groupId))
+    fun cancelPrivateNotification(userId: Int) = cancel("private", userId)
+    fun cancelGroupNotification(groupId: Int) = cancel("group", groupId)
+    private fun cancel(type: String, target: Int) {
+        val destination = NotificationDestination.parse(type, target, GlobalAppState.currentUserId ?: 0) ?: return
+        manager.cancel(destination.tag, MESSAGE_ID)
     }
 }
