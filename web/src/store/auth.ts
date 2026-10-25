@@ -1,6 +1,7 @@
 import type { Id, PendingRegister } from '../types/chat'
 import { state } from './state'
 import { buildAccountPrefix } from './storage'
+import { clearOwnProfileCache } from '../utils/socialProfileCache'
 import { rebuildConversationStates } from './users'
 
 export function setToken(t: string) { state.token = t }
@@ -27,6 +28,7 @@ export function clearAll() {
       .filter(key => key.startsWith(prefix))
       .forEach(key => localStorage.removeItem(key))
     try { localStorage.removeItem(`charroom_seqids_${state.accountId}`) } catch (_) {}
+    clearOwnProfileCache(accountId)
     // 清除 IndexedDB 消息数据
     import('../utils/messageDB').then(m => m.clearAllMessages(accountId)).catch(() => {})
   }

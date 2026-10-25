@@ -62,10 +62,15 @@
 import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getSocialProfile, saveSocialProfile, sendSocialFriendRequest, blockSocialUser, reportSocialUser, getBlockedUsers, unblockSocialUser } from '../api/social'
+import { useStore } from '../store'
+import { loadOwnProfileCache, saveOwnProfileCache } from '../utils/socialProfileCache'
 import type { SocialProfile, SocialEdit } from '../types/social'
 const props = defineProps<{ userId: string }>()
 const emit = defineEmits<{ chat: [profile: SocialProfile]; saved: [profile: SocialProfile]; blocked: [id: string] }>()
 const { t } = useI18n()
+const store = useStore()
+/** 是否在看自己的名片（只有本人资料走本地缓存） */
+const isOwn = computed(() => String(store.state.accountId) === String(props.userId))
 const profile = ref<SocialProfile | null>(null), error = ref(''), busy = ref(false), editing = ref(false)
 const notice = ref('')
 const retryKey = ref(0)
@@ -83,7 +88,12 @@ watch(() => `${props.userId}:${retryKey.value}`, async () => {
   const current = ++generation
   notice.value = ''
   controller.abort(); controller = new AbortController(); profile.value = null; error.value = ''; busy.value = false; blocked.value = []; reason.value = ''; reportReason.value = ''; editing.value = false; requesting.value = false; reporting.value = false; audience.value = 'self'
-  try { const next = await getSocialProfile(id, controller.signal); if (current === generation) { profile.value = next; blocked.value = []; if (next.relation === 'SELF') { const users = await getBlockedUsers(); if (current === generation) blocked.value = users } } }
+  // 本人名片：先渲染本地缓存，接口返回后再覆盖（失败时缓存仍可见）
+  if (isOwn.value) {
+    const cached = loadOwnProfileCache(store.state.accountId)
+    if (cached) profile.value = cached
+  }
+  try { const next = await getSocialProfile(id, controller.signal); if (current === generation) { profile.value = next; blocked.value = []; if (next.relation === 'SELF') { saveOwnProfileCache(store.state.accountId, next); const users = await getBlockedUsers(); if (current === generation) blocked.value = users } } }
   catch (failure) { if (current === generation && !controller.signal.aborted) error.value = (failure as Error).message }
 }, { immediate: true })
 onBeforeUnmount(() => { generation++; controller.abort() })
@@ -101,7 +111,7 @@ async function perform(work: () => Promise<void>) {
   try { await work() } catch (failure) { if (current === generation) error.value = (failure as Error).message }
   finally { if (current === generation) busy.value = false }
 }
-const save = () => perform(async () => { const current = generation; const next = await saveSocialProfile({ ...form, interests: interestText.value.split(/[、,，]/).map(v => v.trim()).filter(Boolean) }); if (current !== generation) return; profile.value = next; editing.value = false; notice.value = t('polish.saved'); emit('saved', next) })
+const save = () => perform(async () => { const current = generation; const next = await saveSocialProfile({ ...form, interests: interestText.value.split(/[、,，]/).map(v => v.trim()).filter(Boolean) }); if (current !== generation) return; profile.value = next; if (next.relation === 'SELF') saveOwnProfileCache(store.state.accountId, next); editing.value = false; notice.value = t('polish.saved'); emit('saved', next) })
 const requestFriend = () => perform(async () => { const id = props.userId; await sendSocialFriendRequest(id, reason.value); if (id !== props.userId || !profile.value) return; profile.value.relation = 'PENDING'; requesting.value = false })
 const block = () => perform(async () => { const id = props.userId; await blockSocialUser(id); if (id === props.userId) emit('blocked', id) })
 const unblock = (id: number) => perform(async () => { const current = generation; await unblockSocialUser(id); if (current === generation) blocked.value = blocked.value.filter(user => user.id !== id) })

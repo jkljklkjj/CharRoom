@@ -29,7 +29,7 @@
             <template v-if="daily">
               <h2>{{ daily.question }}</h2><p class="social-muted">{{ daily.day }} · {{ t('social.dailyHint') }}</p>
               <form class="social-form" @submit.prevent="saveAnswer"><label>{{ t('social.yourAnswer') }}<textarea v-model="answer" maxlength="500" class="profile-input" rows="3"></textarea></label><button class="save-btn" :disabled="busy">{{ t('social.publish') }}</button><p class="social-muted">{{ t('social.answerPrivacy') }}</p></form>
-              <article v-for="item in daily.answers" :key="item.id" class="social-person"><p class="social-answer">{{ item.content }}</p><div class="social-actions"><span>{{ item.author.username }}</span><button class="cancel-btn" @click="selected = item.author.id">{{ t('social.view') }}</button></div></article>
+              <article v-for="item in daily.answers" :key="item.id" class="social-person social-answer-card"><p class="social-answer">{{ item.content }}</p><div class="social-actions"><div class="social-author"><img v-if="item.author.avatarUrl" :src="item.author.avatarUrl" class="social-avatar social-avatar-sm" alt="" /><div v-else class="social-avatar social-avatar-sm social-initial">{{ item.author.username.slice(0, 1) }}</div><span class="social-author-name">{{ item.author.username }}</span></div><button class="cancel-btn" @click="selected = item.author.id">{{ t('social.view') }}</button></div></article>
               <p v-if="!daily.answers.length">{{ t('social.noAnswers') }}</p>
               <button v-if="daily.nextCursor" class="cancel-btn" :disabled="busy" @click="loadDaily(true)">{{ t('social.more') }}</button>
             </template>
