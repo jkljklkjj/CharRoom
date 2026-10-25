@@ -38,6 +38,8 @@ export interface Group {
 export interface ConversationState {
   lastIncomingMessageTime: number
   unreadCount: number
+  /** 最新一条消息的预览文本（联系人列表第二行）；无历史消息时为空 */
+  lastMessagePreview?: string
 }
 export type ConversationPatch = Partial<ConversationState> & { unreadDelta?: number }
 export interface PendingRegister { email: string; password: string; username?: string }

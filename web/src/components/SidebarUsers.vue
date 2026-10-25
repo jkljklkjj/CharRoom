@@ -94,7 +94,7 @@
             <div class="name">{{ u.name || u.account || u.username }}</div>
             <span v-if="u.preview.unreadCount > 0" class="unread-badge">{{ u.preview.unreadCount > 99 ? '99+' : u.preview.unreadCount }}</span>
           </div>
-          <div class="sub">{{ u.signature || u.status || $t('polish.startConversation') }}</div>
+          <div class="sub">{{ u.preview.lastMessagePreview || u.signature || u.status || $t('polish.startConversation') }}</div>
         </div>
       </li>
     </ul>

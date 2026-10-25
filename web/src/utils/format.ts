@@ -23,3 +23,17 @@ export function avatarSrc(user: User | null | undefined) {
   const v = user.avatarKey
   return v ? (user.avatarUrl + (user.avatarUrl.includes('?') ? '&v=' : '?v=') + encodeURIComponent(v)) : user.avatarUrl
 }
+
+export const PREVIEW_MAX_LENGTH = 60
+
+/**
+ * 会话预览文本：压平换行与连续空白并截断，用于联系人列表第二行展示最新消息。
+ * 存储与渲染共用同一处理，保证 IndexedDB 元数据与界面一致。
+ */
+export function conversationPreviewText(
+  message: { text?: string | null } | null | undefined,
+  maxLength = PREVIEW_MAX_LENGTH
+): string {
+  const text = typeof message?.text === 'string' ? message.text.replace(/\s+/g, ' ').trim() : ''
+  return text.length > maxLength ? text.slice(0, maxLength) + '…' : text
+}

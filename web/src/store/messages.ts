@@ -2,6 +2,7 @@ import type { Id, ChatMessage, ConversationPatch } from '../types/chat'
 import { state, PAGE_SIZE } from './state'
 import { AGENT_USER_ID } from '../constants'
 import { getPrivateConversationId, normalizeTimeValue } from './storage'
+import { conversationPreviewText } from '../utils/format'
 import DOMPurify from 'dompurify'
 import { getMessagesPage as dbGetMessagesPage, appendMessage as dbAppendMessage,
          deleteMessage as dbDeleteMessage } from '../utils/messageDB'
@@ -203,10 +204,14 @@ export function addMessage(m: ChatMessage) {
   if (String(m.user) !== 'you') {
     updateConversationState(chatId, {
       lastIncomingMessageTime: normalizeTimeValue(m.time || m.timestamp),
+      lastMessagePreview: conversationPreviewText(sanitized),
       unreadDelta: String(state.selectedChatId) === String(chatId) ? 0 : 1
     })
     // 清除预览缓存，下次 rebuild 时重新读取
     invalidatePreview(chatId)
+  } else {
+    // 自己发出的消息同样更新联系人列表第二行的预览（不改变 incoming 排序时间）
+    updateConversationState(chatId, { lastMessagePreview: conversationPreviewText(sanitized) })
   }
   savePrivateMessage(sanitized)
   if (m.seqId != null) {
@@ -251,10 +256,13 @@ export function addGroupMessage(m: ChatMessage) {
   if (String(m.user) !== String(state.accountId)) {
     updateConversationState(conversationId, {
       lastIncomingMessageTime: normalizeTimeValue(m.time || m.timestamp),
+      lastMessagePreview: conversationPreviewText(sanitized),
       unreadDelta: Math.abs(Number(state.selectedChatId)) === Number(m.groupId) ? 0 : 1
     })
     // 清除预览缓存，下次 rebuild 时重新读取
     invalidatePreview(conversationId)
+  } else {
+    updateConversationState(conversationId, { lastMessagePreview: conversationPreviewText(sanitized) })
   }
   saveGroupMessage(sanitized)
   if (m.seqId != null) {

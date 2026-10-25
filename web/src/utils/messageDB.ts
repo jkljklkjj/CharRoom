@@ -1,4 +1,5 @@
 import type { ChatMessage, Id } from '../types/chat'
+import { conversationPreviewText } from './format'
 
 const DB_NAME = 'charroom_messages'
 // v2: 复合排序索引；v3: 会话元数据；v4: 兼容历史分支同版本号不同 schema
@@ -14,6 +15,8 @@ interface StoredMessage {
 export interface ConversationMeta {
   id: string; accountId: string; conversationId: string
   lastIncomingMessageTime: number
+  /** 最新一条消息的预览文本；v4 之前的元数据可能缺失（由 getLastMessage 补写） */
+  lastMessagePreview?: string
 }
 export interface MessagePage { messages: ChatMessage[]; beforeIndex: number | null; hasMore: boolean }
 let databasePromise: Promise<IDBDatabase> | null = null
@@ -87,13 +90,22 @@ function record(accountId: Id, conversationId: Id, message: ChatMessage, index: 
 function metaRecord(accountId: Id, conversationId: Id, lastTime: number) {
   return { id: `${accountId}:${conversationId}`, accountId: String(accountId), conversationId: String(conversationId), lastIncomingMessageTime: lastTime }
 }
-function touchConversationMeta(tx: IDBTransaction, accountId: Id, conversationId: Id, messageTime: number) {
+function touchConversationMeta(tx: IDBTransaction, accountId: Id, conversationId: Id, message: ChatMessage) {
+  const messageTime = messageTimestamp(message)
   const metaStore = tx.objectStore(META_STORE_NAME)
   const metaId = `${accountId}:${conversationId}`
   const metaGet = metaStore.get(metaId)
   metaGet.onsuccess = () => {
     const meta = metaGet.result as ConversationMeta | undefined
-    metaStore.put(metaRecord(accountId, conversationId, Math.max(meta?.lastIncomingMessageTime || 0, messageTime)))
+    const previousTime = meta?.lastIncomingMessageTime || 0
+    // 只有这条消息不早于已有记录时才覆盖预览，避免乱序写入把预览改回旧消息
+    const lastMessagePreview = messageTime >= previousTime
+      ? conversationPreviewText(message)
+      : (meta?.lastMessagePreview || '')
+    metaStore.put({
+      ...metaRecord(accountId, conversationId, Math.max(previousTime, messageTime)),
+      lastMessagePreview
+    })
   }
 }
 export function saveMessage(accountId: Id, conversationId: Id, message: ChatMessage, index: number) {
@@ -103,7 +115,7 @@ export function saveMessage(accountId: Id, conversationId: Id, message: ChatMess
     tx.oncomplete = () => resolve()
     tx.onerror = tx.onabort = () => reject(tx.error)
     tx.objectStore(STORE_NAME).put(record(accountId, conversationId, message, index))
-    touchConversationMeta(tx, accountId, conversationId, messageTimestamp(message))
+    touchConversationMeta(tx, accountId, conversationId, message)
   }))
 }
 export function saveMessages(accountId: Id, conversationId: Id, messages: readonly ChatMessage[]) {
@@ -119,10 +131,15 @@ export function saveMessages(accountId: Id, conversationId: Id, messages: readon
       if (cursor) { cursor.delete(); cursor.continue() }
       else messages.forEach((message, index) => store.put(record(accountId, conversationId, message, index)))
     }
-    // 同步会话元数据（最后消息时间取批内最大值）
-    const maxTime = messages.reduce((max, message) => Math.max(max, messageTimestamp(message)), 0)
-    if (maxTime > 0) {
-      tx.objectStore(META_STORE_NAME).put(metaRecord(accountId, conversationId, maxTime))
+    // 同步会话元数据（最后消息时间与预览都取批内最新一条）
+    const newest = messages.reduce<ChatMessage | null>((best, message) => (
+      !best || messageTimestamp(message) >= messageTimestamp(best) ? message : best
+    ), null)
+    if (newest && messageTimestamp(newest) > 0) {
+      tx.objectStore(META_STORE_NAME).put({
+        ...metaRecord(accountId, conversationId, messageTimestamp(newest)),
+        lastMessagePreview: conversationPreviewText(newest)
+      })
     }
   }))
 }
@@ -161,7 +178,7 @@ export function appendMessage(accountId: Id, conversationId: Id, message: ChatMe
       const last = request.result?.value as StoredMessage | undefined
       store.put(record(accountId, conversationId, message, last ? last.index + 1 : 0))
     }
-    touchConversationMeta(tx, accountId, conversationId, messageTimestamp(message))
+    touchConversationMeta(tx, accountId, conversationId, message)
   }))
 }
 function deleteRows(index: string, key: IDBKeyRange, match: (row: StoredMessage) => boolean = () => true) {
@@ -224,4 +241,36 @@ export async function getConversationMeta(accountId: Id, conversationId: Id): Pr
     request.onsuccess = () => resolve((request.result || null) as ConversationMeta | null)
     request.onerror = () => reject(request.error)
   })
+}
+
+/**
+ * 读取单个会话最新一条消息（倒序游标一步），用于元数据缺预览时的补写。
+ */
+export async function getLastMessage(accountId: Id, conversationId: Id): Promise<ChatMessage | null> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(ORDER_INDEX)
+      .openCursor(orderedRange(accountId, conversationId), 'prev')
+    request.onsuccess = () => resolve((request.result?.value as StoredMessage | undefined)?.message ?? null)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+/**
+ * 合并写入会话预览文本（不改动时间），用于升级前旧元数据的补写。
+ */
+export function setConversationPreview(accountId: Id, conversationId: Id, preview: string) {
+  const db = openDB()
+  return db.then(database => new Promise<void>((resolve, reject) => {
+    const tx = database.transaction(META_STORE_NAME, 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = tx.onabort = () => reject(tx.error)
+    const store = tx.objectStore(META_STORE_NAME)
+    const request = store.get(`${accountId}:${conversationId}`)
+    request.onsuccess = () => {
+      const meta = request.result as ConversationMeta | undefined
+      if (!meta) return
+      store.put({ ...meta, lastMessagePreview: preview })
+    }
+  }))
 }

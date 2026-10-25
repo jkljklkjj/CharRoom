@@ -1,14 +1,16 @@
 import type { Id, User, Group, ConversationState, ConversationPatch } from '../types/chat'
 import { state } from './state'
 import { getConversationKey, sanitizeId } from './storage'
-import { getAllConversationMeta } from '../utils/messageDB'
+import { getAllConversationMeta, getLastMessage, setConversationPreview } from '../utils/messageDB'
+import { conversationPreviewText } from '../utils/format'
 import i18n from '../i18n'
 
 // ── 会话状态 ──────────────────────────────────
 
-// 会话预览缓存：accountId → Map<conversationId, lastIncomingMessageTime>
+// 会话预览缓存：accountId → Map<conversationId, { 最后消息时间, 预览文本 }>
 // 数据源为 IndexedDB conversation_meta（localStorage 旧 key 在迁移后已无写入）
-const previewCache = new Map<string, Map<string, number>>()
+interface ConversationPreviewEntry { time: number; preview: string }
+const previewCache = new Map<string, Map<string, ConversationPreviewEntry>>()
 
 /** 会话 key 统一约定：私聊 = 对方 id 字符串；群聊 = "group:<absId>" */
 function normalizeConversationId(conversationId: Id): string {
@@ -17,20 +19,52 @@ function normalizeConversationId(conversationId: Id): string {
   return Number(id) < 0 ? `group:${Math.abs(Number(id))}` : id
 }
 
-async function loadConversationMetaMap(accountId: Id, forceRefresh = false): Promise<Map<string, number>> {
+async function loadConversationMetaMap(accountId: Id, forceRefresh = false): Promise<Map<string, ConversationPreviewEntry>> {
   const cacheKey = String(accountId)
   if (!forceRefresh && previewCache.has(cacheKey)) {
     return previewCache.get(cacheKey)!
   }
-  let map = new Map<string, number>()
+  let map = new Map<string, ConversationPreviewEntry>()
   try {
     const metas = await getAllConversationMeta(accountId)
-    map = new Map(metas.map(m => [m.conversationId, m.lastIncomingMessageTime || 0]))
+    map = new Map(metas.map(m => [m.conversationId, {
+      time: m.lastIncomingMessageTime || 0,
+      preview: m.lastMessagePreview || ''
+    }]))
   } catch (_) {
     // IndexedDB 不可用时回退空 map（预览时间为 0，聊天本身不受影响）
   }
   previewCache.set(cacheKey, map)
   return map
+}
+
+/**
+ * 升级前写入的会话元数据没有预览文本：读该会话最新一条消息补上，只补一次。
+ * 异步、失败静默；补写的文本同时回写 IndexedDB 与内存预览缓存。
+ */
+function backfillMissingPreviews(accountId: Id, metaMap: Map<string, ConversationPreviewEntry>) {
+  const missing = [...metaMap.entries()]
+    .filter(([, entry]) => entry.time > 0 && !entry.preview)
+    .map(([convId]) => convId)
+  if (!missing.length) return
+  Promise.all(missing.map(async convId => {
+    const preview = conversationPreviewText(await getLastMessage(accountId, convId))
+    if (preview) await setConversationPreview(accountId, convId, preview)
+    return { convId, preview }
+  })).then(results => {
+    for (const { convId, preview } of results) {
+      const entry = metaMap.get(convId)
+      if (entry && !entry.preview) entry.preview = preview
+      // 私聊会话 key 即用户 id，直接回填到已写入的会话状态
+      const current = state.conversationStates[convId]
+      if (preview && current && !current.lastMessagePreview) {
+        state.conversationStates = {
+          ...state.conversationStates,
+          [convId]: { ...current, lastMessagePreview: preview }
+        }
+      }
+    }
+  }).catch(() => { /* 补写失败保持原样，下次 rebuild 再试 */ })
 }
 
 /**
@@ -43,7 +77,7 @@ export async function rebuildConversationStates(forceRefresh = false) {
     state.conversationStates = {}
     return
   }
-  let metaMap = new Map<string, number>()
+  let metaMap = new Map<string, ConversationPreviewEntry>()
   try {
     metaMap = await loadConversationMetaMap(state.accountId, forceRefresh)
   } catch (_) { /* 保留空 map */ }
@@ -54,14 +88,18 @@ export async function rebuildConversationStates(forceRefresh = false) {
     if (!user || user.id == null) return
     const key = String(user.id)
     const convId = normalizeConversationId(key)
-    const dbTime = convId ? (metaMap.get(convId) || 0) : 0
+    const entry = convId ? metaMap.get(convId) : undefined
+    const dbTime = entry?.time || 0
     const current = nextStates[key] || ({} as ConversationState)
     nextStates[key] = {
       lastIncomingMessageTime: Math.max(dbTime, current.lastIncomingMessageTime || 0),
-      unreadCount: current.unreadCount || 0
+      unreadCount: current.unreadCount || 0,
+      // 重建期间新到达的消息（patch 已更新预览）优先于库里的旧预览
+      lastMessagePreview: (entry?.preview || '') || current.lastMessagePreview || undefined
     }
   })
   state.conversationStates = nextStates
+  backfillMissingPreviews(state.accountId, metaMap)
 }
 
 /**
@@ -84,7 +122,9 @@ export function updateConversationState(conversationId: Id, patch: ConversationP
     lastIncomingMessageTime: Math.max(current.lastIncomingMessageTime || 0, patch.lastIncomingMessageTime || 0),
     unreadCount: patch.unreadCount != null
       ? Math.max(0, patch.unreadCount)
-      : Math.max(0, (current.unreadCount || 0) + (patch.unreadDelta || 0))
+      : Math.max(0, (current.unreadCount || 0) + (patch.unreadDelta || 0)),
+    // 只更新未读数等 patch 不应抹掉已有的预览文本
+    lastMessagePreview: patch.lastMessagePreview !== undefined ? patch.lastMessagePreview : current.lastMessagePreview
   }
 }
 

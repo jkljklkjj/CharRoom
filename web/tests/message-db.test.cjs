@@ -70,6 +70,30 @@ test('conversation meta tracks last message time and clears with conversation', 
   assert.equal(await db.getConversationMeta('A', '41'), null)
   assert.equal((await db.getAllConversationMeta('A')).length, 1)
 })
+test('conversation meta keeps the newest message preview and supports backfill', async () => {
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
+    indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
+  })
+  await db.appendMessage('A', '41', { user: '41', text: '在吗？', time: 1000 })
+  await db.appendMessage('A', '41', { user: 'you', text: '在的\n刚忙完', time: 2000 })
+  // 乱序到达的旧消息不能把预览改回旧内容
+  await db.appendMessage('A', '41', { user: '41', text: '旧消息', time: 500 })
+  const meta = await db.getConversationMeta('A', '41')
+  assert.equal(meta.lastMessagePreview, '在的 刚忙完')
+  assert.equal(meta.lastIncomingMessageTime, 2000)
+  // 升级前的元数据没有预览：用最新一条（按插入顺序）补写，不改时间
+  await db.appendMessage('A', '42', { user: '42', text: '升级前的老会话', time: 1500 })
+  assert.equal((await db.getLastMessage('A', '42')).text, '升级前的老会话')
+  await db.setConversationPreview('A', '42', '补写后的预览')
+  const backfilled = await db.getConversationMeta('A', '42')
+  assert.equal(backfilled.lastMessagePreview, '补写后的预览')
+  assert.equal(backfilled.lastIncomingMessageTime, 1500)
+  // 无消息的会话返回 null，账号之间互不影响
+  assert.equal(await db.getLastMessage('A', '99'), null)
+  await db.appendMessage('B', '41', { user: '41', text: '另一个账号', time: 4000 })
+  assert.equal((await db.getConversationMeta('A', '41')).lastMessagePreview, '在的 刚忙完')
+  assert.equal((await db.getConversationMeta('B', '41')).lastMessagePreview, '另一个账号')
+})
 test('legacy branch v3 schema (accountId_conversationId_index) upgrades to the ordered index', async () => {
   // 旧本地分支曾用 version 3 + 'accountId_conversationId_index' 索引名，
   // 与当前代码同版本号但 schema 不同——upgrade 不会触发，必须靠版本提升修复
