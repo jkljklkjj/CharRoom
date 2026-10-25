@@ -1,0 +1,4 @@
+interface:
+  display_name: "轻聊客户端验证"
+  short_description: "检查 Web、桌面与 Android 构建前提，按改动选择回归并报告阻断"
+  default_prompt: "使用 $charroom-client-check 验证本次客户端改动，分别报告各端通过、失败和未运行项目。"
