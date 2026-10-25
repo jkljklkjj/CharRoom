@@ -156,6 +156,7 @@
 </template>
 
 <script setup lang="ts">
+import { chatTargetId, sidebarUsers } from '../utils/contactDirectory'
 import SocialProfileCard from './SocialProfileCard.vue'
 import { composerEnter } from '../utils/composer'
 import { useDialog } from '../composables/useDialog'
@@ -233,7 +234,7 @@ const currentChatId = computed(() => {
 // 当前选中的聊天用户
 const currentChatUser = computed(() => {
   if (currentChatId.value == null) return null
-  return store.state.users.find(u => String(u.id) === String(currentChatId.value)) || null
+  return sidebarUsers(store.state.users, store.state.groups).find(u => String(u.id) === String(currentChatId.value)) || null
 })
 
 // 是否为群聊
@@ -519,7 +520,7 @@ function send(){
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
+        groupChat: { targetClientId: chatTargetId(to!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
       }
     : isAgent
       ? {
@@ -533,7 +534,7 @@ function send(){
         }
 
   if (isGroupChat.value) {
-    store.addGroupMessage({ ...m, groupId: to })
+    store.addGroupMessage({ ...m, groupId: chatTargetId(to!) })
   } else {
     store.addMessage(m)
   }
@@ -559,7 +560,7 @@ async function retryMessage(m: ChatMessage) {
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
+        groupChat: { targetClientId: chatTargetId(to!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
       }
     : isAgent
       ? {
@@ -713,7 +714,7 @@ async function handleFileUpload(file: File) {
   const wrapper = isGroupChat.value
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
+        groupChat: { targetClientId: chatTargetId(currentChatId.value!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
       }
     : isAgentFile
       ? {
@@ -726,7 +727,7 @@ async function handleFileUpload(file: File) {
       }
 
   if (isGroupChat.value) {
-    store.addGroupMessage({ ...m, groupId: targetId })
+    store.addGroupMessage({ ...m, groupId: chatTargetId(targetId) })
   } else {
     store.addMessage(m)
   }

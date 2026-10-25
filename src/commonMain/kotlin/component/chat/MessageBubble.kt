@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -28,6 +27,7 @@ import com.chatlite.i18n.LocalStrings
 import model.ChatMessage
 import model.MessageType
 import component.bubbleShape
+import component.qingliaoPalette
 import component.sidebarHeaderBrush
 import core.loadImageBitmapWithCache
 
@@ -67,15 +67,16 @@ fun MessageBubble(
     onLongClick: () -> Unit
 ) {
     val s = LocalStrings.current
+    val palette = qingliaoPalette(isDarkMode)
     val bubbleBorderColor = if (isMine) {
         Color.Transparent
     } else {
-        MaterialTheme.colors.primary.copy(alpha = if (isDarkMode) 0.24f else 0.14f)
+        palette.line.copy(alpha = 0.65f)
     }
     val bubbleTextColor = if (isMine) {
-        MaterialTheme.colors.onPrimary
+        palette.onMessage
     } else {
-        MaterialTheme.colors.onSurface
+        palette.ink
     }
     val bubbleShape = bubbleShape(isMine)
 
@@ -107,12 +108,6 @@ fun MessageBubble(
             Box(
                 modifier = Modifier
                     .widthIn(max = maxBubbleWidth)
-                    .shadow(
-                        elevation = if (isMine) 6.dp else 3.dp,
-                        shape = RoundedCornerShape(18.dp),
-                        ambientColor = Color.Black.copy(alpha = 0.1f),
-                        spotColor = Color.Black.copy(alpha = 0.08f)
-                    )
                     .clip(bubbleShape)
                     .background(bubbleBrush)
                     .border(1.dp, bubbleBorderColor, bubbleShape)
@@ -123,7 +118,7 @@ fun MessageBubble(
                     .let {
                         if (isMine && !message.chatIsSent) it.alpha(0.7f) else it
                     }
-                    .padding(horizontal = 11.dp, vertical = 9.dp)
+                    .padding(horizontal = 15.dp, vertical = 12.dp)
             ) {
                 Column {
                     // 发送者名称（群聊）
@@ -175,7 +170,7 @@ fun MessageBubble(
                         Text(
                             text = formatTime(message.chatTimestamp),
                             style = MaterialTheme.typography.caption,
-                            color = bubbleTextColor.copy(alpha = 0.6f),
+                            color = bubbleTextColor.copy(alpha = 0.76f),
                             modifier = Modifier.align(
                                 if (isMine) Alignment.End else Alignment.Start
                             )

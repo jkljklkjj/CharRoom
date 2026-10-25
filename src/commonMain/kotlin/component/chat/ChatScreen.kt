@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,6 +80,9 @@ import androidx.compose.material.IconButton
 import androidx.compose.ui.draw.alpha
 import component.io.FilePicker
 import component.UserAvatar
+import component.QingliaoColors
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Videocam
 import component.chatHeaderBrush
 import component.rememberElasticScale
 import component.refinedMessageBubbleBrush
@@ -185,10 +189,6 @@ private fun ChatScreenContent(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     // 从ViewModel收集用户列表状态
     val allUsers by chatViewModel.usersFlow.collectAsState()
-
-    // 消息气泡宽度适配所有设备
-    // 使用容器宽度的 70% 为参考，桌面端上限 400dp 保证可读性
-    val maxBubbleWidth = 400.dp
 
     // 使用 per-conversation StateFlow，消息到达时只更新本会话的订阅者
     val userMessages by GlobalChatState.messagesFor(user.id).collectAsState()
@@ -442,353 +442,360 @@ private fun ChatScreenContent(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(12.dp).statusBarsPadding().imePadding()) {
-        // Chat header
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.18f else 0.6f),
-            shape = RoundedCornerShape(16.dp),
-            elevation = 0.dp
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(chatHeaderBrush(isDarkMode))
-                    .padding(horizontal = 8.dp, vertical = 8.dp)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // Reserve room for avatars and padding before measuring a long message.
+        val maxBubbleWidth = (maxWidth - 108.dp).coerceIn(120.dp, 400.dp)
+        Column(modifier = Modifier.fillMaxSize().background(QingliaoColors.paper).padding(horizontal = 12.dp, vertical = 8.dp).statusBarsPadding().imePadding()) {
+            // Chat header
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = QingliaoColors.paper,
+                shape = RoundedCornerShape(0.dp),
+                elevation = 0.dp
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 返回按钮（仅在onBackClick存在时显示）
-                    onBackClick?.let { onBack ->
-                        val backInteraction = remember { MutableInteractionSource() }
-                        val backScale = rememberElasticScale(backInteraction, pressedScale = 0.86f)
-                        IconButton(
-                            onClick = onBack,
-                            interactionSource = backInteraction,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .graphicsLayer { scaleX = backScale; scaleY = backScale }
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = s["chat.back"],
-                                tint = MaterialTheme.colors.onBackground
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-
-                    // 用户头像
-                    UserAvatar(
-                        user = user,
-                        size = 36.dp,
-                        onClick = { onAvatarClick?.invoke(user) }
-                    )
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    // 在线状态指示器
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1))
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = user.username,
-                            style = MaterialTheme.typography.subtitle1,
-                            color = MaterialTheme.colors.onBackground,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = if (user.online == true) s["chat.status.online"] else if (user.online == false) s["chat.status.offline"] else s["chat.status.syncing"],
-                            style = MaterialTheme.typography.caption,
-                            color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f)
-                        )
-                    }
-
-                    // 视频通话按钮
-                    val callInteraction = remember { MutableInteractionSource() }
-                    val callScale = rememberElasticScale(callInteraction, pressedScale = 0.86f)
-                    IconButton(
-                        onClick = { onVideoCallClick?.invoke(user.id.toString()) },
-                        interactionSource = callInteraction,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .graphicsLayer { scaleX = callScale; scaleY = callScale }
-                    ) {
-                        Text(text = "📹")
-                    }
-
-                    // 好友菜单按钮
-                    Box {
-                        var showMenu by remember { mutableStateOf(false) }
-                        val menuInteraction = remember { MutableInteractionSource() }
-                        val menuScale = rememberElasticScale(menuInteraction, pressedScale = 0.86f)
-                        IconButton(
-                            onClick = { showMenu = true },
-                            interactionSource = menuInteraction,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .graphicsLayer { scaleX = menuScale; scaleY = menuScale }
-                        ) {
-                            Text(text = "⋯")
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(onClick = { showMenu = false; onUserMenuClick?.invoke(user) }) {
-                                Text(s["friend.menu.info"])
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(chatHeaderBrush(isDarkMode))
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // 返回按钮（仅在onBackClick存在时显示）
+                        onBackClick?.let { onBack ->
+                            val backInteraction = remember { MutableInteractionSource() }
+                            val backScale = rememberElasticScale(backInteraction, pressedScale = 0.97f)
+                            IconButton(
+                                onClick = onBack,
+                                interactionSource = backInteraction,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .graphicsLayer { scaleX = backScale; scaleY = backScale }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = s["chat.back"],
+                                    tint = MaterialTheme.colors.onBackground
+                                )
                             }
-                            DropdownMenuItem(onClick = { showMenu = false; showDeleteConfirm = true }) {
-                                Text(s["friend.menu.delete"], color = MaterialTheme.colors.error)
-                            }
+                            Spacer(modifier = Modifier.width(4.dp))
                         }
-                    }
-                }
-            }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+                        // 用户头像
+                        UserAvatar(
+                            user = user,
+                            size = 36.dp,
+                            onClick = { onAvatarClick?.invoke(user) }
+                        )
 
-        // Message list header END - removed commented out search field
+                        Spacer(modifier = Modifier.width(10.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Surface(
-            modifier = Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
-            color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.2f else 0.5f),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.05f)),
-            elevation = 0.dp
-        ) {
-            // 监听滚动位置，滚动到顶部时加载更多历史
-            LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll) {
-                if (hasInitializedScroll && !isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                    isLoadingMore = true
-                    val olderMessages = LocalChatHistoryStore.getPrivateMessagesPage(
-                        accountId = GlobalAppState.currentUserId.toString(),
-                        userId = user.id,
-                        page = currentPage,
-                        pageSize = 50
-                    )
-                    if (olderMessages.isNotEmpty()) {
-                        chatViewModel.prependMessages(olderMessages)
-                        currentPage++
-                    } else {
-                        hasMoreHistory = false
-                    }
-                    isLoadingMore = false
-                }
-            }
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
-                state = listState,
-                reverseLayout = false // 正常顺序，最新消息在底部
-            ) {
-                // 加载更多提示
-                if (isLoadingMore) {
-                    item(key = "loading_indicator") {
+                        // 在线状态指示器
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colors.primary
-                            )
-                        }
-                    }
-                } else if (!hasMoreHistory && userMessages.isNotEmpty()) {
-                    item(key = "no_more_messages") {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = s["chat.no.earlier.messages"],
-                                style = MaterialTheme.typography.caption,
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                text = user.username,
+                                style = MaterialTheme.typography.subtitle1,
+                                color = MaterialTheme.colors.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            Text(
+                                text = if (user.online == true) s["chat.status.online"] else if (user.online == false) s["chat.status.offline"] else s["chat.status.syncing"],
+                                style = MaterialTheme.typography.caption,
+                                color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f)
+                            )
+                        }
+
+                        if (onVideoCallClick != null) {
+                            // 视频通话按钮
+                            val callInteraction = remember { MutableInteractionSource() }
+                            val callScale = rememberElasticScale(callInteraction, pressedScale = 0.97f)
+                            IconButton(
+                                onClick = { onVideoCallClick(user.id.toString()) },
+                                interactionSource = callInteraction,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .graphicsLayer { scaleX = callScale; scaleY = callScale }
+                            ) {
+                                Icon(Icons.Default.Videocam, s["paper.videoCall"], tint = QingliaoColors.muted)
+                            }
+
+                        }
+
+                        // 好友菜单按钮
+                        Box {
+                            var showMenu by remember { mutableStateOf(false) }
+                            val menuInteraction = remember { MutableInteractionSource() }
+                            val menuScale = rememberElasticScale(menuInteraction, pressedScale = 0.97f)
+                            IconButton(
+                                onClick = { showMenu = true },
+                                interactionSource = menuInteraction,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .graphicsLayer { scaleX = menuScale; scaleY = menuScale }
+                            ) {
+                                Icon(Icons.Default.MoreHoriz, s["paper.chatActions"], tint = QingliaoColors.muted)
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(onClick = { showMenu = false; onUserMenuClick?.invoke(user) }) {
+                                    Text(s["friend.menu.info"])
+                                }
+                                DropdownMenuItem(onClick = { showMenu = false; showDeleteConfirm = true }) {
+                                    Text(s["friend.menu.delete"], color = MaterialTheme.colors.error)
+                                }
+                            }
                         }
                     }
                 }
+            }
 
-                itemsIndexed(
-                    items = displayMessages,
-                    key = { index, message -> "${user.id}_${message.messageId}_${message.timestamp}" }
-                ) { index, message ->
-                    // 显示日期分隔线
-                    if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
-                        DateSeparator(timestamp = message.timestamp)
-                    }
+            Spacer(modifier = Modifier.height(8.dp))
 
-                    // 动画规则：仅新消息（页面打开后新收到/新发送的）显示弹出动画
-                    // 历史消息（包括滚动加载的）直接显示，无动画
-                    val messageTime = message.timestamp
-                    val isNewMessage = messageTime > pageCreateTime && !animatedMessageIds.contains(message.messageId)
-                    var visible by remember(message.messageId) { mutableStateOf(!isNewMessage) }
+            // Message list header END - removed commented out search field
 
-                    LaunchedEffect(message.messageId) {
-                        if (isNewMessage) {
-                            visible = true
-                            animatedMessageIds.add(message.messageId)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                modifier = Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
+                color = QingliaoColors.paper,
+                shape = RoundedCornerShape(0.dp),
+                elevation = 0.dp
+            ) {
+                // 监听滚动位置，滚动到顶部时加载更多历史
+                LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll) {
+                    if (hasInitializedScroll && !isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                        isLoadingMore = true
+                        val olderMessages = LocalChatHistoryStore.getPrivateMessagesPage(
+                            accountId = GlobalAppState.currentUserId.toString(),
+                            userId = user.id,
+                            page = currentPage,
+                            pageSize = 50
+                        )
+                        if (olderMessages.isNotEmpty()) {
+                            chatViewModel.prependMessages(olderMessages)
+                            currentPage++
+                        } else {
+                            hasMoreHistory = false
                         }
+                        isLoadingMore = false
                     }
+                }
 
-                    AnimatedVisibility(
-                        visible = visible,
-                        enter = if (isNewMessage) fadeIn(
-                            animationSpec = tween(200, easing = FastOutSlowInEasing)
-                        ) + scaleIn(
-                            initialScale = 0.85f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
-                        ) + slideInVertically(
-                            initialOffsetY = { it / 4 },
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
-                        ) else fadeIn(initialAlpha = 1f), // 历史消息无动画直接显示
-                        modifier = Modifier
-                            .fillMaxWidth()
-                    ) {
-                        Column {
-                            MessageBubble(
-                                message = message,
-                                isMine = message.sender,
-                                isDarkMode = isDarkMode,
-                                maxBubbleWidth = maxBubbleWidth,
-                                bubbleBrush = refinedMessageBubbleBrush(message.sender, isDarkMode),
-                                showTimestamp = true,
-                                senderAvatar = {
-                                    UserAvatar(
-                                        user = user,
-                                        size = 32.dp,
-                                        onClick = { onAvatarClick?.invoke(user) }
-                                    )
-                                },
-                                myAvatar = if (currentUser != null) {
-                                    {
-                                        UserAvatar(
-                                            user = currentUser!!,
-                                            size = 32.dp,
-                                            onClick = { onMyAvatarClick?.invoke() }
-                                        )
-                                    }
-                                } else null,
-                                onResend = { resendMessage(chatViewModel, user, message) },
-                                onLongClick = {
-                                    longPressMessage = message
-                                    showLongPressMenu = true
-                                }
-                            )
-
-                            // 长按菜单
-                            if (longPressMessage?.messageId == message.messageId) {
-                                MessageLongPressMenu(
-                                    expanded = showLongPressMenu,
-                                    onDismiss = { showLongPressMenu = false },
-                                    message = message,
-                                    isSelf = message.sender,
-                                    onCopy = { copyMessage(message) },
-                                    onDelete = { deleteMessage(message) },
-                                    onForward = {
-                                        forwardMessage = message
-                                        showLongPressMenu = false
-                                        showForwardDialog = true
-                                    },
-                                    onReply = {
-                                        replyToMessage = message
-                                        showLongPressMenu = false
-                                    },
-                                    onShare = { /* shareText unavailable on Android */ }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 10.dp),
+                    state = listState,
+                    reverseLayout = false // 正常顺序，最新消息在底部
+                ) {
+                    // 加载更多提示
+                    if (isLoadingMore) {
+                        item(key = "loading_indicator") {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colors.primary
+                                )
+                            }
+                        }
+                    } else if (!hasMoreHistory && userMessages.isNotEmpty()) {
+                        item(key = "no_more_messages") {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = s["chat.no.earlier.messages"],
+                                    style = MaterialTheme.typography.caption,
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                                 )
                             }
                         }
                     }
 
-                    if (message.sender && !message.isSent) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
+                    itemsIndexed(
+                        items = displayMessages,
+                        key = { index, message -> "${user.id}_${message.messageId}_${message.timestamp}" }
+                    ) { index, message ->
+                        // 显示日期分隔线
+                        if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
+                            DateSeparator(timestamp = message.timestamp)
+                        }
+
+                        // 动画规则：仅新消息（页面打开后新收到/新发送的）显示弹出动画
+                        // 历史消息（包括滚动加载的）直接显示，无动画
+                        val messageTime = message.timestamp
+                        val isNewMessage = messageTime > pageCreateTime && !animatedMessageIds.contains(message.messageId)
+                        var visible by remember(message.messageId) { mutableStateOf(!isNewMessage) }
+
+                        LaunchedEffect(message.messageId) {
+                            if (isNewMessage) {
+                                visible = true
+                                animatedMessageIds.add(message.messageId)
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = visible,
+                            enter = if (isNewMessage) fadeIn(
+                                animationSpec = tween(200, easing = FastOutSlowInEasing)
+                            ) + scaleIn(
+                                initialScale = 0.98f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            ) + slideInVertically(
+                                initialOffsetY = { (it / 8).coerceAtMost(12) },
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            ) else fadeIn(initialAlpha = 1f), // 历史消息无动画直接显示
+                            modifier = Modifier
+                                .fillMaxWidth()
                         ) {
-                            Text(
-                                text = s["chat.send.failed"],
-                                style = MaterialTheme.typography.caption,
-                                color = MaterialTheme.colors.error
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = s["chat.resend"],
-                                style = MaterialTheme.typography.caption,
-                                color = MaterialTheme.colors.primary,
-                                modifier = Modifier.clickable {
-                                    chatViewModel.retryMessage(message)
+                            Column {
+                                MessageBubble(
+                                    message = message,
+                                    isMine = message.sender,
+                                    isDarkMode = isDarkMode,
+                                    maxBubbleWidth = maxBubbleWidth,
+                                    bubbleBrush = refinedMessageBubbleBrush(message.sender, isDarkMode),
+                                    showTimestamp = true,
+                                    senderAvatar = {
+                                        UserAvatar(
+                                            user = user,
+                                            size = 32.dp,
+                                            onClick = { onAvatarClick?.invoke(user) }
+                                        )
+                                    },
+                                    myAvatar = if (currentUser != null) {
+                                        {
+                                            UserAvatar(
+                                                user = currentUser!!,
+                                                size = 32.dp,
+                                                onClick = { onMyAvatarClick?.invoke() }
+                                            )
+                                        }
+                                    } else null,
+                                    onResend = { resendMessage(chatViewModel, user, message) },
+                                    onLongClick = {
+                                        longPressMessage = message
+                                        showLongPressMenu = true
+                                    }
+                                )
+
+                                // 长按菜单
+                                if (longPressMessage?.messageId == message.messageId) {
+                                    MessageLongPressMenu(
+                                        expanded = showLongPressMenu,
+                                        onDismiss = { showLongPressMenu = false },
+                                        message = message,
+                                        isSelf = message.sender,
+                                        onCopy = { copyMessage(message) },
+                                        onDelete = { deleteMessage(message) },
+                                        onForward = {
+                                            forwardMessage = message
+                                            showLongPressMenu = false
+                                            showForwardDialog = true
+                                        },
+                                        onReply = {
+                                            replyToMessage = message
+                                            showLongPressMenu = false
+                                        },
+                                        onShare = { /* shareText unavailable on Android */ }
+                                    )
                                 }
-                            )
+                            }
+                        }
+
+                        if (message.sender && !message.isSent) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = s["chat.send.failed"],
+                                    style = MaterialTheme.typography.caption,
+                                    color = MaterialTheme.colors.error
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = s["chat.resend"],
+                                    style = MaterialTheme.typography.caption,
+                                    color = MaterialTheme.colors.primary,
+                                    modifier = Modifier.clickable {
+                                        chatViewModel.retryMessage(message)
+                                    }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+
+            // agent 流式输出时，同一条消息内容会持续增长，需要在内容变化后再次贴底
+            if (ServerConfig.isAgentAssistant(user.id)) {
+                val latestMessage = userMessages.lastOrNull()
+                LaunchedEffect(latestMessage?.messageId, latestMessage?.message) {
+                    if (latestMessage != null) {
+                        kotlinx.coroutines.delay(16.milliseconds)
+                        runCatching {
+                            listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
-        }
 
-        // agent 流式输出时，同一条消息内容会持续增长，需要在内容变化后再次贴底
-        if (ServerConfig.isAgentAssistant(user.id)) {
-            val latestMessage = userMessages.lastOrNull()
-            LaunchedEffect(latestMessage?.messageId, latestMessage?.message) {
-                if (latestMessage != null) {
-                    kotlinx.coroutines.delay(16.milliseconds)
-                    runCatching {
-                        listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                    }
-                }
-            }
-        }
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Column {
-            ChatInputBar(
-                messageText = messageText,
-                onTextChange = { messageText = it },
-                onSubmit = { submitMessage() },
-                isSending = isSending,
-                isUploading = isUploading,
-                replyPreview = replyToMessage?.let { _ ->
-                    {
-                        ReplyPreviewBar(
-                            replyToMessage = replyToMessage,
-                            senderName = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
-                            onCancel = { replyToMessage = null }
-                        )
-                    }
-                },
-                onClearReply = { replyToMessage = null },
-                onEmojiClick = { showEmojiPanel = !showEmojiPanel },
-                onAttachClick = { pickImage() }
-            )
-
-            // 表情面板
-            if (showEmojiPanel) {
-                EmojiPickerPanel(
-                    onEmojiSelected = ::onEmojiSelected,
-                    modifier = Modifier.fillMaxWidth()
+            Column {
+                ChatInputBar(
+                    messageText = messageText,
+                    onTextChange = { messageText = it },
+                    onSubmit = { submitMessage() },
+                    isSending = isSending,
+                    isUploading = isUploading,
+                    replyPreview = replyToMessage?.let { _ ->
+                        {
+                            ReplyPreviewBar(
+                                replyToMessage = replyToMessage,
+                                senderName = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
+                                onCancel = { replyToMessage = null }
+                            )
+                        }
+                    },
+                    onClearReply = { replyToMessage = null },
+                    onEmojiClick = { showEmojiPanel = !showEmojiPanel },
+                    onAttachClick = { pickImage() }
                 )
+
+                // 表情面板
+                if (showEmojiPanel) {
+                    EmojiPickerPanel(
+                        onEmojiSelected = ::onEmojiSelected,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
+
     }
 
     // 转发选择对话框

@@ -1,7 +1,7 @@
 <template>
   <div class="users-wrap">
     <div class="users-header">
-      <div class="title">{{ $t('sidebar.title') }}</div>
+      <div class="title">{{ $t('app.brand') }}</div>
       <div class="header-actions">
         <button class="friend-requests-btn" :aria-label="$t('sidebar.frTitle')" :title="$t('sidebar.frTitle')" @click="toggleFriendRequests" :class="{hasRequests: friendRequests.length > 0}">
           <AppIcon name="requests" />
@@ -13,7 +13,16 @@
 
     <button class="discovery-entry" :aria-label="$t('social.discover')" @click="emit('open-discovery')"><AppIcon name="discover" /><span>{{ $t('social.discover') }}<small>{{ $t('polish.discoverySubtitle') }}</small></span><span aria-hidden="true">›</span></button>
 
-    <!-- 搜索与添加好友统一在“发现与遇见”中完成：找人 → 名片 → 加好友 -->
+    <div class="sidebar-tabs" role="tablist" :aria-label="$t('sidebar.navigation')">
+      <button v-for="item in tabs" :key="item" :id="`sidebar-tab-${item}`" role="tab"
+        :aria-selected="tab === item" :tabindex="tab === item ? 0 : -1" aria-controls="sidebar-panel"
+        @click="emit('update:tab', item)" @keydown="onTabKeydown($event, item)">{{ $t(`sidebar.${item}`) }}</button>
+    </div>
+    <div class="search-bar">
+      <input type="search" :value="query" :aria-label="$t(tab === 'contacts' ? 'sidebar.searchContacts' : 'sidebar.searchMessages')"
+        :placeholder="$t(tab === 'contacts' ? 'sidebar.searchContacts' : 'sidebar.searchMessages')" @input="emit('update:query', ($event.target as HTMLInputElement).value)" />
+      <button v-if="query" class="clear-search" :aria-label="$t('sidebar.clearSearch')" @click="emit('update:query', '')">×</button>
+    </div>
 
     <!-- 好友申请弹窗 -->
     <div v-if="showFriendRequests" class="friend-requests-modal" @click.self="toggleFriendRequests">
@@ -45,22 +54,32 @@
       </div>
     </div>
 
-    <div v-if="friendsLoading" class="contacts-empty" role="status">{{ $t('social.loading') }}</div>
-    <div v-else-if="friendsError" class="contacts-empty" role="alert"><p>{{ $t('social.failed') }}</p><button class="cancel-btn" @click="loadFriends">{{ $t('polish.retry') }}</button></div>
-    <div v-else-if="!sortedUsers.length" class="contacts-empty" role="status"><p>{{ $t('polish.emptyContacts') }}</p><button class="cancel-btn" @click="emit('open-discovery')">{{ $t('social.discover') }}</button></div>
-    <ul class="users-list" :aria-label="$t('sidebar.title')">
-      <li v-for="u in sortedUsers" :key="u.id" role="button" tabindex="0" :aria-current="store.state.selectedChatId === u.id ? 'true' : undefined" @click="select(u)" @keydown.enter.prevent="select(u)" @keydown.space.prevent="select(u)" :class="{active: store.state.selectedChatId === u.id}">
-        <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="avatar" /></div>
-        <div v-else class="avatar">{{ initials(u.name || u.account || u.username) }}</div>
-        <div class="meta">
-          <div class="name-row">
-            <div class="name">{{ u.name || u.account || u.username }}</div>
-            <span v-if="u.preview.unreadCount > 0" class="unread-badge">{{ u.preview.unreadCount > 99 ? '99+' : u.preview.unreadCount }}</span>
-          </div>
-          <div class="sub">{{ u.preview.lastMessagePreview || u.signature || u.status || $t('polish.startConversation') }}</div>
-        </div>
-      </li>
-    </ul>
+    <div id="sidebar-panel" class="directory-panel" role="tabpanel" :aria-labelledby="`sidebar-tab-${tab}`" :aria-busy="friendsLoading">
+      <div v-if="friendsLoading" class="contacts-empty" role="status">{{ $t('social.loading') }}</div>
+      <div v-else-if="friendsError" class="contacts-empty" role="alert"><p>{{ $t('social.failed') }}</p><button class="cancel-btn" @click="loadFriends">{{ $t('polish.retry') }}</button></div>
+      <div v-else-if="!visibleCount" class="contacts-empty" role="status">
+        <p>{{ $t(query.trim() ? 'sidebar.noMatches' : 'polish.emptyContacts') }}</p>
+        <button class="cancel-btn" @click="query.trim() ? emit('update:query', '') : emit('open-discovery')">{{ $t(query.trim() ? 'sidebar.clearSearch' : 'social.discover') }}</button>
+      </div>
+      <ul v-else class="users-list" :aria-label="$t(`sidebar.${tab}`)">
+        <template v-for="section in sections" :key="section.key">
+          <li v-if="section.label && section.users.length" class="section-heading"><h3>{{ section.label }} <span>{{ section.users.length }}</span></h3></li>
+          <li v-for="u in section.users" :key="u.id" class="user-row" role="button" tabindex="0"
+            :data-contact-id="u.id" :aria-current="String(store.state.selectedChatId) === String(u.id) ? 'true' : undefined"
+            @click="select(u)" @keydown.enter.prevent="select(u)" @keydown.space.prevent="select(u)" :class="{active: String(store.state.selectedChatId) === String(u.id)}">
+            <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="" /></div>
+            <div v-else class="avatar" :class="{ 'group-avatar': Number(u.id) < 0 }">{{ initials(contactName(u)) }}</div>
+            <div class="meta">
+              <div class="name-row">
+                <div class="name">{{ contactName(u) }}</div>
+                <span v-if="tab === 'messages' && unreadCount(u) > 0" class="unread-badge">{{ unreadCount(u) > 99 ? '99+' : unreadCount(u) }}</span>
+              </div>
+              <div class="sub">{{ subtitle(u) }}</div>
+            </div>
+          </li>
+        </template>
+      </ul>
+    </div>
   </div>
 </template>
 
@@ -76,19 +95,25 @@ import { useDialog } from '../composables/useDialog'
 import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
-const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': []; 'open-discovery': [] }>()
+import { contactDirectory, contactName, matchesContact, sidebarUsers, chatTargetId, type SidebarTab } from '../utils/contactDirectory'
+
+const props = defineProps<{ tab: SidebarTab; query: string }>()
+const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': []; 'open-discovery': []; 'update:tab': [tab: SidebarTab]; 'update:query': [query: string] }>()
+const tabs: SidebarTab[] = ['messages', 'contacts']
 
 const store = useStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const showFriendRequests = ref(false)
 const friendRequests = ref<FriendRequest[]>([])
 const friendsLoading = ref(true), friendsError = ref(false)
 const requestsDialog = ref<HTMLElement | null>(null)
 useDialog(requestsDialog, () => { showFriendRequests.value = false })
 
+const allUsers = computed(() => sidebarUsers(store.state.users, store.state.groups))
+
 // Vue computed tracks profile changes as well as conversation activity.
 const sortedUsers = computed(() => {
-  return [...store.state.users]
+  return allUsers.value
     .map((user, index) => ({
       ...user,
       __index: index,
@@ -105,6 +130,25 @@ const sortedUsers = computed(() => {
       return a.__index - b.__index
     })
 })
+
+const directory = computed(() => contactDirectory(allUsers.value, store.state.accountId, props.query, locale.value))
+const sections = computed(() => props.tab === 'contacts'
+  ? [{ key: 'friends', label: t('sidebar.friends'), users: directory.value.friends }, { key: 'groups', label: t('sidebar.groups'), users: directory.value.groups }]
+  : [{ key: 'messages', label: '', users: sortedUsers.value.filter(user => matchesContact(user, props.query)) }])
+const visibleCount = computed(() => sections.value.reduce((total, section) => total + section.users.length, 0))
+const unreadCount = (user: User) => store.state.conversationStates[String(user.id)]?.unreadCount || 0
+function subtitle(user: User) {
+  if (props.tab === 'contacts') return user.signature || t(Number(user.id) < 0 ? 'sidebar.groupId' : 'sidebar.accountId', { id: chatTargetId(user.id) })
+  return store.state.conversationStates[String(user.id)]?.lastMessagePreview || user.signature || user.status || t('polish.startConversation')
+}
+function onTabKeydown(event: KeyboardEvent, tab: SidebarTab) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const next = event.key === 'Home' ? 'messages' : event.key === 'End' ? 'contacts' : tab === 'messages' ? 'contacts' : 'messages'
+  emit('update:tab', next)
+  const button = event.currentTarget as HTMLElement
+  button.parentElement?.querySelector<HTMLButtonElement>(`#sidebar-tab-${next}`)?.focus()
+}
 
 import { initials, avatarSrc } from '../utils/format'
 import { AGENT_USER_ID } from '../constants'
@@ -238,7 +282,7 @@ async function loadFriends() {
 </script>
 
 <style scoped>
-.users-wrap{height:100%;display:flex;flex-direction:column}
+.users-wrap{height:100%;min-height:0;display:flex;flex-direction:column}
 .users-header{display:flex;align-items:center;justify-content:space-between;padding:16px 12px 8px;gap:8px}
 .users-header .title{font-size:19px;font-weight:650;white-space:nowrap}
 .header-actions{display:flex;gap:2px;align-items:center}
@@ -248,6 +292,20 @@ async function loadFriends() {
 .discovery-entry>svg{color:var(--accent-2);flex:none}
 .discovery-entry>span:first-of-type{flex:1;font-weight:600;font-size:14px}
 .discovery-entry small{display:block;margin-top:4px;color:var(--text-secondary);font-size:12px;font-weight:400}
+.sidebar-tabs{display:flex;gap:6px;padding:0 12px 12px}
+.sidebar-tabs button{flex:1;min-height:44px;border:0;border-radius:12px;background:transparent;color:var(--text-secondary);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.sidebar-tabs button[aria-selected="true"]{background:#ffead8;color:#98451e}
+[data-theme="dark"] .sidebar-tabs button[aria-selected="true"]{background:#493024;color:#ffb785}
+.sidebar-tabs button:focus-visible,.user-row:focus-visible{outline:2px solid var(--accent-2);outline-offset:-2px}
+.search-bar{display:flex;align-items:center;margin:0 12px 10px;border:1px solid var(--surface-border);background:var(--panel);border-radius:12px;min-height:44px}
+.search-bar:focus-within{border-color:var(--accent-2)}
+.search-bar input{width:100%;min-width:0;background:transparent;color:var(--text-primary);border:0;outline:0;padding:12px;font:inherit;font-size:13px}
+.search-bar input::-webkit-search-cancel-button{display:none}
+.clear-search{border:0;background:transparent;color:var(--text-secondary);font-size:20px;min-width:44px;min-height:44px;cursor:pointer}
+.directory-panel{display:flex;flex-direction:column;min-height:0;flex:1;overflow:auto}
+.section-heading h3{font-size:12px;font-weight:500;color:var(--text-secondary);margin:16px 24px 6px;display:flex;gap:8px}
+.section-heading span{font-variant-numeric:tabular-nums}
+.group-avatar{color:var(--accent-2)}
 .contacts-empty{padding:36px 20px;text-align:center;color:var(--text-secondary);font-size:14px;line-height:1.7}
 .friend-requests-btn{position:relative;background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
 .friend-requests-btn:hover{background:var(--hover)}
@@ -256,10 +314,10 @@ async function loadFriends() {
 .settings-btn{background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
 .settings-btn:hover{background:var(--hover)}
 .users-list{list-style:none;padding:0;margin:0;overflow:auto;flex:1}
-.users-list li{display:flex;align-items:center;padding:12px;margin:2px 8px;border-radius:10px;cursor:pointer;min-height:44px}
-.users-list li:hover{background:var(--hover)}
-.users-list li.active{background:rgba(255,122,51,0.08)}
-.avatar{width:40px;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;background:var(--surface-2, #f0f0f0)}
+.users-list .user-row{display:flex;align-items:center;padding:12px;margin:2px 8px;border-radius:10px;cursor:pointer;min-height:44px}
+.users-list .user-row:hover{background:var(--hover)}
+.users-list .user-row.active{background:rgba(255,122,51,0.08)}
+.avatar{flex:none;width:40px;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;background:var(--surface-2, #f0f0f0)}
 .avatar img{width:100%;height:100%;object-fit:cover}
 .meta{flex:1;min-width:0}
 .name-row{display:flex;align-items:center;justify-content:space-between;gap:8px}

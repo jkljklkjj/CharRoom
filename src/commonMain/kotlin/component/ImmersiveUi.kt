@@ -19,45 +19,36 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-val CoolOrangeLightColors: Colors = lightColors(
-    primary = Color(0xFFFF7A33),
-    primaryVariant = Color(0xFFE8601A),
-    secondary = Color(0xFFFF9966),
-    secondaryVariant = Color(0xFFFF8533),
-    background = Color(0xFFFFF8F5),
-    surface = Color(0xFFFFFFFF),
-    onPrimary = Color(0xFFFFFFFF),
-    onSecondary = Color(0xFF222222),
-    onBackground = Color(0xFF222222),
-    onSurface = Color(0xFF222222),
-    error = Color(0xFFFF4757),
-    onError = Color(0xFFFFFFFF)
-)
+val CoolOrangeLightColors: Colors = qingliaoPalette(false).let { p ->
+    lightColors(
+        primary = p.action, primaryVariant = p.onApricot,
+        secondary = p.onApricot, secondaryVariant = p.action,
+        background = p.paper, surface = p.surface,
+        onPrimary = p.onAction, onSecondary = p.onAction,
+        onBackground = p.ink, onSurface = p.ink,
+        error = Color(0xFFB63B36), onError = Color.White
+    )
+}
 
-val CoolOrangeDarkColors: Colors = darkColors(
-    primary = Color(0xFFFF9966),
-    primaryVariant = Color(0xFFE8601A),
-    secondary = Color(0xFFFFB380),
-    secondaryVariant = Color(0xFFFF9966),
-    background = Color(0xFF1A1A1A),
-    surface = Color(0xFF2D2D2D),
-    onPrimary = Color(0xFF222222),
-    onSecondary = Color(0xFFFFFFFF),
-    onBackground = Color(0xFFFFFFFF),
-    onSurface = Color(0xFFCCCCCC),
-    error = Color(0xFFFF6B6B),
-    onError = Color(0xFF1A1A1A)
-)
+val CoolOrangeDarkColors: Colors = qingliaoPalette(true).let { p ->
+    darkColors(
+        primary = p.action, primaryVariant = p.onApricot,
+        secondary = p.onApricot, secondaryVariant = p.action,
+        background = p.paper, surface = p.surface,
+        onPrimary = p.onAction, onSecondary = p.onAction,
+        onBackground = p.ink, onSurface = p.ink,
+        error = Color(0xFFFFA49B), onError = Color(0xFF44201C)
+    )
+}
 
 val CoolOrangeShapes = Shapes(
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(18.dp)
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp)
 )
 
 /**
@@ -72,90 +63,37 @@ fun bubbleShape(isMine: Boolean) = if (isMine) {
 }
 
 fun immersiveBackgroundBrush(isDarkMode: Boolean): Brush {
-    return if (isDarkMode) {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFF1A1A1A),
-                Color(0xFF222222),
-                Color(0xFF2A2A2A)
-            )
-        )
-    } else {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFFFFF8F5),
-                Color(0xFFFFF0E6),
-                Color(0xFFFFE8D8)
-            )
-        )
-    }
+    val p = qingliaoPalette(isDarkMode)
+    return Brush.verticalGradient(listOf(p.surface, p.paper))
 }
 
 fun sidebarHeaderBrush(isDarkMode: Boolean): Brush {
-    return if (isDarkMode) {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFFCC5A1A),
-                Color(0xFFE8601A),
-                Color(0xFFFF7A33)
-            )
-        )
-    } else {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFFFF7A33),
-                Color(0xFFFF8C4A),
-                Color(0xFFFF9966)
-            )
-        )
-    }
+    val p = qingliaoPalette(isDarkMode)
+    return Brush.linearGradient(listOf(p.accent, p.action))
 }
 
 fun chatHeaderBrush(isDarkMode: Boolean): Brush {
-    return if (isDarkMode) {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFF2D2D2D),
-                Color(0xFF333333)
-            )
-        )
-    } else {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFFFFF8F5),
-                Color(0xFFFFF0E6)
-            )
-        )
-    }
+    val p = qingliaoPalette(isDarkMode)
+    return Brush.verticalGradient(listOf(p.paper, p.paper))
 }
 
 fun messageBubbleBrush(isMine: Boolean, isDarkMode: Boolean): Brush {
-    return if (isMine) {
-        if (isDarkMode) {
-            Brush.linearGradient(listOf(Color(0xFFE8601A), Color(0xFFFF7A33)))
-        } else {
-            Brush.linearGradient(listOf(Color(0xFFFF9A66), Color(0xFFFF7A33)))
-        }
-    } else {
-        if (isDarkMode) {
-            Brush.linearGradient(listOf(Color(0xFF3D3D3D), Color(0xFF3D3D3D)))
-        } else {
-            Brush.linearGradient(listOf(Color(0xFFF5F5F5), Color(0xFFF5F5F5)))
-        }
-    }
+    val p = qingliaoPalette(isDarkMode)
+    val color = if (isMine) p.message else p.surface
+    return Brush.verticalGradient(listOf(color, color))
 }
 
 @Composable
 fun rememberElasticScale(
     interactionSource: InteractionSource,
-    pressedScale: Float = 0.92f
+    pressedScale: Float = 0.97f
 ): Float {
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
         )
     )
     return scale
@@ -169,7 +107,7 @@ fun rememberBubbleAnimation(): Float {
     val scale by animateFloatAsState(
         targetValue = 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium
         )
     )
@@ -219,49 +157,8 @@ fun gradientBorderBrush(isDarkMode: Boolean): Brush {
 /**
  * 更精致的消息气泡渐变
  */
-fun refinedMessageBubbleBrush(isMine: Boolean, isDarkMode: Boolean): Brush {
-    return if (isMine) {
-        if (isDarkMode) {
-            Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFFFF7A33),
-                    Color(0xFFE8601A)
-                ),
-                center = androidx.compose.ui.geometry.Offset(0.3f, 0.3f),
-                radius = 300f
-            )
-        } else {
-            Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFFFFB380),
-                    Color(0xFFFF7A33)
-                ),
-                center = androidx.compose.ui.geometry.Offset(0.3f, 0.3f),
-                radius = 300f
-            )
-        }
-    } else {
-        if (isDarkMode) {
-            Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFF454545),
-                    Color(0xFF3D3D3D)
-                ),
-                center = androidx.compose.ui.geometry.Offset(0.7f, 0.3f),
-                radius = 300f
-            )
-        } else {
-            Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFFFAFAFA),
-                    Color(0xFFF5F5F5)
-                ),
-                center = androidx.compose.ui.geometry.Offset(0.7f, 0.3f),
-                radius = 300f
-            )
-        }
-    }
-}
+fun refinedMessageBubbleBrush(isMine: Boolean, isDarkMode: Boolean): Brush =
+    messageBubbleBrush(isMine, isDarkMode)
 
 /**
  * 现代对话框容器 - 带遮罩层 + 居中卡片

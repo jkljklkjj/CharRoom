@@ -13,6 +13,7 @@
       <template v-if="isMobile">
         <!-- 好友列表视图 -->
         <SidebarUsers
+          v-model:tab="sidebarTab" v-model:query="sidebarQueries[sidebarTab]"
           class="sidebar"
           v-if="currentView === 'list'"
           @user-selected="onUserSelected"
@@ -33,7 +34,7 @@
 
       <!-- 桌面端视图 -->
       <template v-else>
-        <SidebarUsers class="sidebar" @open-settings="showSettings = true" @open-discovery="showSocial = true" />
+        <SidebarUsers v-model:tab="sidebarTab" v-model:query="sidebarQueries[sidebarTab]" class="sidebar" @open-settings="showSettings = true" @open-discovery="showSocial = true" />
         <ChatWindow class="chat" />
       </template>
     </div>
@@ -112,6 +113,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
+import type { SidebarTab } from '../utils/contactDirectory'
 import TokenQuotaDialog from '../components/TokenQuotaDialog.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import SocialHub from '../components/SocialHub.vue'
@@ -147,6 +149,8 @@ const { t, locale } = useI18n()
 
 // 移动端适配
 const isMobile = ref(window.innerWidth < 768)
+const sidebarTab = ref<SidebarTab>('messages')
+const sidebarQueries = ref({ messages: '', contacts: '' })
 const currentView = ref('list') // 'list' | 'chat'
 const currentChatName = ref('')
 const showSettings = ref(false)
@@ -450,6 +454,9 @@ function connectChat(token: string, accountId: Id) {
 
 /** 清除本地登录状态 */
 function clearAuth() {
+  sidebarTab.value = 'messages'
+  sidebarQueries.value = { messages: '', contacts: '' }
+  currentView.value = 'list'
   sessionStorage.removeItem('charroom_token')
   localStorage.removeItem('charroom_refreshToken')
   localStorage.removeItem('charroom_accountId')

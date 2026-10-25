@@ -2,8 +2,21 @@ package com.chatlite.i18n
 
 val enStrings = Strings(
     mapOf(
+        "contacts.tab.messages" to "Messages",
+        "contacts.tab.contacts" to "Contacts",
+        "contacts.directory" to "Your people, in one place",
+        "contacts.search" to "Search name or account",
+        "contacts.friends" to "Friends",
+        "contacts.groups" to "Groups",
+        "contacts.groupId" to "Group %d",
+        "contacts.accountId" to "Account %d",
         // ── App ──
         "app.name" to "ChatLite",
+        "paper.videoCall" to "Video call",
+        "paper.chatActions" to "Conversation actions",
+        "paper.brand" to "Qingliao",
+        "paper.greeting" to "Good to see you.",
+        "paper.conversations" to "Recent conversations",
         "app.title" to "Chat Room",
         "app.select.contact" to "Select a contact to start chatting",
 

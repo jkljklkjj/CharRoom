@@ -2,8 +2,21 @@ package com.chatlite.i18n
 
 val jaStrings = Strings(
     mapOf(
+        "contacts.tab.messages" to "メッセージ",
+        "contacts.tab.contacts" to "連絡先",
+        "contacts.directory" to "つながりを、ひとつの場所に",
+        "contacts.search" to "名前・アカウントで検索",
+        "contacts.friends" to "友だち",
+        "contacts.groups" to "グループ",
+        "contacts.groupId" to "グループ %d",
+        "contacts.accountId" to "アカウント %d",
         // ── App ──
         "app.name" to "チャットライト",
+        "paper.videoCall" to "ビデオ通話",
+        "paper.chatActions" to "会話の操作",
+        "paper.brand" to "軽聊",
+        "paper.greeting" to "今日は、何を話そう。",
+        "paper.conversations" to "最近の会話",
         "app.title" to "チャットルーム",
         "app.select.contact" to "連絡先を選択してチャットを開始",
 

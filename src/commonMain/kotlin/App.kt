@@ -2,12 +2,9 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import com.chatlite.i18n.LocalStrings
 import com.chatlite.i18n.stringsForLocale
-import component.CoolOrangeDarkColors
-import component.CoolOrangeLightColors
-import component.CoolOrangeShapes
+import component.QingliaoTheme
 import component.LoginRegisterApp
 import core.AppSettings
-import core.ThemeMode
 
 @Composable
 fun App(
@@ -26,10 +23,7 @@ fun App(
     }
 
     CompositionLocalProvider(LocalStrings provides strings) {
-        MaterialTheme(
-            colors = if (isDarkMode) CoolOrangeDarkColors else CoolOrangeLightColors,
-            shapes = CoolOrangeShapes
-        ) {
+        QingliaoTheme(darkTheme = isDarkMode) {
             // 桌面端菜单栏
             menuBar?.invoke()
 

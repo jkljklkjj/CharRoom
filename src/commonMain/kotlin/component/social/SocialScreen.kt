@@ -36,6 +36,7 @@ import model.*
 import presentation.viewmodel.SocialViewModel
 import java.util.UUID
 import component.UserAvatar
+import component.QingliaoColors
 import kotlinx.coroutines.launch
 
 @Composable
@@ -175,13 +176,16 @@ private fun SocialProfilePanel(profile: SocialProfile,busy: Boolean,vm: SocialVi
     var reason by remember(profile.id) { mutableStateOf("") }
     var audience by remember(profile.id) { mutableStateOf("self") }
     Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        val palette = QingliaoColors
         val coverColors=when(profile.cover) {
-            "ocean" -> listOf(MaterialTheme.colors.primaryVariant,MaterialTheme.colors.primary)
-            "forest" -> listOf(MaterialTheme.colors.secondaryVariant,MaterialTheme.colors.secondary)
-            else -> listOf(MaterialTheme.colors.primary,MaterialTheme.colors.secondary)
+            "ocean" -> listOf(palette.surface, palette.apricot)
+            "forest" -> listOf(palette.apricot, palette.paper)
+            else -> listOf(palette.message, palette.apricot, palette.paper)
         }
         Box(Modifier.fillMaxWidth().height(142.dp)) {
-            Box(Modifier.fillMaxWidth().height(96.dp).background(Brush.horizontalGradient(coverColors), RoundedCornerShape(16.dp)))
+            Box(Modifier.fillMaxWidth().height(96.dp).background(Brush.horizontalGradient(coverColors), RoundedCornerShape(22.dp))) {
+                Text(s["paper.brand"], Modifier.align(Alignment.TopEnd).padding(20.dp), style = MaterialTheme.typography.subtitle2, color = palette.onApricot)
+            }
             Row(Modifier.align(Alignment.BottomStart).padding(horizontal = 16.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colors.background, border = BorderStroke(3.dp, MaterialTheme.colors.background)) {
                     UserAvatar(profile.asUser(),size=72.dp)
@@ -189,7 +193,7 @@ private fun SocialProfilePanel(profile: SocialProfile,busy: Boolean,vm: SocialVi
                 Text(profile.username,style=MaterialTheme.typography.h5, modifier = Modifier.padding(bottom = 4.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
-        Text(s["social.account"]+" "+profile.id+" · "+s["social.relation.${profile.relation}"],style=MaterialTheme.typography.caption)
+        Text(s["social.account"]+" "+profile.id+" · "+s["social.relation.${profile.relation}"],style=MaterialTheme.typography.caption, color = palette.muted)
         profile.signature?.takeIf { it.isNotBlank() }?.let { Text(it) }
         if(editing) {
             ProfileEditor(profile,busy,vm::save) { editing=false }

@@ -1,0 +1,15 @@
+// Opt-in offline rendering. Normal application and test source sets are unchanged.
+gradle.projectsEvaluated {
+    def client = gradle.rootProject
+    client.sourceSets.test.kotlin.srcDir(client.file('scripts/preview'))
+    client.tasks.register('renderPaperPreview', JavaExec) {
+        group = 'verification'
+        description = 'Render the orange paper components with fictional, offline data.'
+        dependsOn client.tasks.named('testClasses')
+        classpath = client.sourceSets.test.runtimeClasspath
+        mainClass = 'preview.PaperPreviewKt'
+        args client.layout.buildDirectory.dir('ui-preview').get().asFile.absolutePath
+        systemProperty 'java.awt.headless', 'true'
+        systemProperty 'file.encoding', 'UTF-8'
+    }
+}

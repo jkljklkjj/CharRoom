@@ -36,6 +36,7 @@ import component.dialog.AddUserOrGroupDialog
 import component.dialog.ApplicationDialog
 import component.user.UserDetailScreen
 import component.user.UserList
+import component.user.SidebarTab
 import component.user.ProfileScreen
 import component.social.SocialScreen
 import core.AgentStreamHandler
@@ -78,6 +79,12 @@ fun ChatApp(
     val selectedChatTarget by chatViewModel.selectedChatTargetFlow.collectAsState()
     val users by chatViewModel.usersFlow.collectAsState()
     val refreshTrigger by remember { mutableLongStateOf(0L) }
+    // Keep navigation and each tab's query when the mobile list leaves composition.
+    var sidebarTab by remember(token) { mutableStateOf(SidebarTab.MESSAGES) }
+    var messageQuery by remember(token) { mutableStateOf("") }
+    var contactQuery by remember(token) { mutableStateOf("") }
+    val sidebarQuery = if (sidebarTab == SidebarTab.CONTACTS) contactQuery else messageQuery
+    val updateSidebarQuery: (String) -> Unit = { if (sidebarTab == SidebarTab.CONTACTS) contactQuery = it else messageQuery = it }
 
     // 对话框状态
     var showAddUserDialog by remember { mutableStateOf(false) }
@@ -282,10 +289,12 @@ fun ChatApp(
                                     slideOutHorizontally(tween(250)) { it } + fadeOut(tween(150))
                             }
                         },
-                        contentKey = { it?.id ?: -1 }
+                        contentKey = { it?.id?.let { id -> "chat:$id" } ?: "list" }
                     ) { chatTarget ->
                         if (chatTarget == null) {
                             UserList(
+                                selectedTab = sidebarTab, onTabSelected = { sidebarTab = it },
+                                searchQuery = sidebarQuery, onSearchQueryChange = updateSidebarQuery,
                                 selectedUserId = null,
                                 onOpenSearch = { showAddUserDialog = true },
                                 onOpenSettings = { showSettingsScreen = true },
@@ -302,7 +311,8 @@ fun ChatApp(
                             )
                         } else {
                             key(chatTarget.id) {
-                                ChatScreen(
+                                ContactChatScreen(
+                                    token = token,
                                     chatViewModel = chatViewModel,
                                     user = chatTarget,
                                     onAvatarClick = { user ->
@@ -319,8 +329,10 @@ fun ChatApp(
                 // 桌面端/平板布局：左右分栏
                 else -> {
                     Row(modifier = Modifier.fillMaxSize()) {
-                        Box(modifier = Modifier.width(320.dp).fillMaxSize()) {
+                        Box(modifier = Modifier.width(if (windowSize.width >= 1000.dp) 350.dp else 300.dp).fillMaxSize()) {
                             UserList(
+                                selectedTab = sidebarTab, onTabSelected = { sidebarTab = it },
+                                searchQuery = sidebarQuery, onSearchQueryChange = updateSidebarQuery,
                                 selectedUserId = selectedChatTarget?.id,
                                 onOpenSearch = { showAddUserDialog = true },
                                 onOpenSettings = { showSettingsScreen = true },
@@ -345,7 +357,8 @@ fun ChatApp(
                         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                             if (selectedChatTarget != null) {
                                 key(selectedChatTarget!!.id) {
-                                    ChatScreen(
+                                    ContactChatScreen(
+                                        token = token,
                                         chatViewModel = chatViewModel,
                                         user = selectedChatTarget!!,
                                         onAvatarClick = { user ->

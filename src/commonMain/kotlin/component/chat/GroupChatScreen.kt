@@ -62,6 +62,7 @@ import core.FileUploader
 import component.io.FilePicker
 import core.LocalChatHistoryStore
 import component.chatHeaderBrush
+import component.QingliaoColors
 import component.messageBubbleBrush
 import com.chatlite.i18n.LocalStrings
 import core.state.GlobalAppState
@@ -300,10 +301,10 @@ fun GroupChatScreen(
         )
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(14.dp).statusBarsPadding().imePadding()) {
+    Column(modifier = modifier.fillMaxSize().background(QingliaoColors.paper).padding(12.dp).statusBarsPadding().imePadding()) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colors.surface.copy(alpha = 0.2f),
+            color = QingliaoColors.paper,
             shape = RoundedCornerShape(18.dp),
             elevation = 0.dp
         ) {
@@ -353,9 +354,8 @@ fun GroupChatScreen(
 
         Surface(
             modifier = Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
-            color = MaterialTheme.colors.surface.copy(alpha = if (isDarkMode) 0.3f else 0.6f),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
+            color = QingliaoColors.paper,
+            shape = RoundedCornerShape(0.dp),
             elevation = 0.dp
         ) {
             // 监听滚动位置，滚动到顶部时加载更多历史

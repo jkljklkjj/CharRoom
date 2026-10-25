@@ -42,6 +42,8 @@
 
 安装包、签名与发布另见 [packaging/README.md](packaging/README.md) 和工作流，不以发版任务替代 PR 检查。Wrapper 缺失时报告阻断并确认已有删除意图，不自动还原用户删除或下载不明版本。
 
+橙色纸感 UI 的离线 Compose 预览见 [设计与预览说明](docs/design/ORANGE-PAPER.md)；使用虚构数据，不启动应用连接。
+
 Windows 遇到 `Unable to establish loopback connection` / `UnixDomainSockets.connect0` 时，使用 `scripts/gradle-windows.ps1` 将 Java socket 放在工作区内；不要只改 daemon 参数或全局网络策略。诊断与已安装 Gradle 的选择方式见 [Windows 构建](docs/development/WINDOWS-GRADLE.md)。
 
 ## 修改约定

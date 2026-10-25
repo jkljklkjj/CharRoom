@@ -2,8 +2,21 @@ package com.chatlite.i18n
 
 val zhStrings = Strings(
     mapOf(
+        "contacts.tab.messages" to "消息",
+        "contacts.tab.contacts" to "联系人",
+        "contacts.directory" to "常联系的人，都在这里",
+        "contacts.search" to "搜索姓名或账号",
+        "contacts.friends" to "好友",
+        "contacts.groups" to "群聊",
+        "contacts.groupId" to "群号 %d",
+        "contacts.accountId" to "账号 %d",
         // ── App ──
         "app.name" to "轻聊",
+        "paper.videoCall" to "视频通话",
+        "paper.chatActions" to "会话操作",
+        "paper.brand" to "轻聊",
+        "paper.greeting" to "今天，聊点什么。",
+        "paper.conversations" to "最近的对话",
         "app.title" to "聊天室",
         "app.select.contact" to "选择一个联系人开始聊天",
 
