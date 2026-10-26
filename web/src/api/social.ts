@@ -19,7 +19,7 @@ export function discoverPeople(filters: { q?: string; tag?: string; channel?: st
 }
 export const sendSocialFriendRequest = (targetId: string, reason: string) => request<boolean>('/friend-requests', 'POST', { targetId, reason })
 export const blockSocialUser = (targetId: string) => request<boolean>(`/blocks/${encodeURIComponent(targetId)}`, 'POST')
-export const getBlockedUsers = () => request<Array<{ id: number; username: string }>>('/blocks')
+export const getBlockedUsers = (signal?: AbortSignal) => request<Array<{ id: number; username: string }>>('/blocks', 'GET', undefined, signal)
 export const unblockSocialUser = (targetId: number) => request<boolean>(`/blocks/${targetId}`, 'DELETE')
 export const reportSocialUser = (input: { targetId?: number; roomId?: string; reason: string }) => request<boolean>('/reports', 'POST', input)
 export const getDailyQuestion = (cursor = '', signal?: AbortSignal) => request<DailyQuestion>(`/daily?cursor=${encodeURIComponent(cursor)}`, 'GET', undefined, signal)

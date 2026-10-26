@@ -48,3 +48,8 @@ Wrapper 缺失时保留用户删除，使用既有 `scripts/gradle-windows.ps1` 
 该路径由 Android 子项目解析，指向项目自有的预编译目录；没有恢复 Wrapper、修改 NDK 配置或重新编译 JNI。输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`。构建通过不代表 JNI 源码重建或真机运行通过。
 
 本轮未进行真机、真实 QUIC 收发或真实后端双账号联调。随机房走现有 REST 地址，普通消息的 QUIC 目标仍需独立核实；测试不要使用默认线上地址。
+
+
+## 手机 Web 交互增量（2026-10-26）
+
+可见视口约束、纯展示名片、独立操作区及最新回归记录见 [手机 Web 设计说明](../design/SOCIAL-MOBILE.md)。

@@ -1,19 +1,34 @@
 <template>
-  <section class="social-profile" :data-cover="profile?.cover || 'sunset'" aria-live="polite">
-    <div class="social-cover"></div>
-    <p v-if="error && !profile" class="social-error" role="alert">{{ error }}</p>
-    <button v-if="error && !profile" class="cancel-btn" @click="retryKey++">{{ t('polish.retry') }}</button>
-    <p v-if="!profile && !error">{{ t('social.loading') }}</p>
-    <template v-if="profile">
-      <div class="social-profile-content">
-        <img v-if="profile.avatarUrl" :src="profile.avatarUrl" class="social-avatar" alt="" />
-        <div v-else class="social-avatar social-initial">{{ profile.username.slice(0, 1) }}</div>
-        <h2>{{ profile.username }}</h2>
-        <p class="social-muted">{{ t('social.account') }} {{ profile.id }} · {{ t(`social.relation.${profile.relation}`) }}</p>
-        <p v-if="profile.signature">{{ profile.signature }}</p>
+  <section ref="profileRoot" class="social-profile" :data-cover="profile?.cover || 'sunset'">
+    <div v-if="!profile" class="social-profile-placeholder" :aria-busy="!error">
+      <p v-if="error" class="social-error" role="alert">{{ error }}</p>
+      <button v-if="error" class="cancel-btn" @click="retryKey++">{{ t('polish.retry') }}</button>
+      <p v-else class="social-empty-loading" role="status"><span class="social-spinner" aria-hidden="true"></span>{{ t('social.loading') }}</p>
+    </div>
+    <template v-else>
+      <!-- The card is presentation only. All controls live in the separate tools area. -->
+      <article v-if="!editing" class="social-profile-card">
+        <div class="social-cover" aria-hidden="true"></div>
+        <div class="social-profile-content">
+          <img v-if="profile.avatarUrl" :src="profile.avatarUrl" class="social-avatar" alt="" />
+          <div v-else class="social-avatar social-initial">{{ profile.username.slice(0, 1) }}</div>
+          <h2 tabindex="-1">{{ profile.username }}</h2>
+          <p class="social-muted social-profile-account">{{ t('social.account') }} {{ profile.id }} · {{ t(`social.relation.${profile.relation}`) }}</p>
+          <p v-if="profile.signature" class="social-profile-signature">{{ profile.signature }}</p>
+          <template v-if="detailsVisible">
+            <section v-if="profile.bio"><h3>{{ t('social.bio') }}</h3><p>{{ profile.bio }}</p></section>
+            <div v-if="profile.interests?.length" class="social-tags"><span v-for="tag in profile.interests" :key="tag">{{ tag }}</span></div>
+            <p v-if="profile.city" class="social-muted">{{ t('social.city') }} · {{ profile.city }}</p>
+            <section v-if="profile.intent" class="social-intent"><h3>{{ t('social.intent') }}</h3><p>{{ profile.intent }}</p></section>
+          </template>
+          <p v-else class="social-muted">{{ t('social.hidden') }}</p>
+        </div>
+      </article>
+      <div class="social-profile-tools">
         <p v-if="error" class="social-error" role="alert">{{ error }}</p>
         <p v-if="notice" class="social-notice" role="status">{{ notice }}</p>
-        <form v-if="editing" @submit.prevent="save" class="social-form">
+        <h2 v-if="editing">{{ t('social.edit') }}</h2>
+        <form v-if="editing" @submit.prevent="save" class="social-form social-profile-editor">
           <fieldset class="social-fields" :disabled="busy">
           <label>{{ t('social.username') }}<input v-model="form.username" required maxlength="32" class="profile-input" /></label>
           <label>{{ t('social.signature') }}<input v-model="form.signature" maxlength="120" class="profile-input" /></label>
@@ -30,28 +45,24 @@
           </fieldset>
         </form>
         <template v-else>
-          <label v-if="profile.relation === 'SELF'" class="social-form">{{ t('social.preview') }}<select v-model="audience" class="profile-input"><option value="self">{{ t('social.relation.SELF') }}</option><option value="stranger">{{ t('social.stranger') }}</option><option value="friend">{{ t('social.friends') }}</option></select></label>
-          <template v-if="detailsVisible">
-            <section v-if="profile.bio"><h3>{{ t('social.bio') }}</h3><p>{{ profile.bio }}</p></section>
-            <div class="social-tags"><span v-for="tag in profile.interests" :key="tag">{{ tag }}</span></div>
-            <p v-if="profile.city" class="social-muted">{{ t('social.city') }} · {{ profile.city }}</p>
-            <section v-if="profile.intent" class="social-intent"><h3>{{ t('social.intent') }}</h3><p>{{ profile.intent }}</p></section>
-          </template>
-          <p v-else class="social-muted">{{ t('social.hidden') }}</p>
-          <div class="social-actions">
-            <button v-if="profile.relation === 'SELF'" class="save-btn" @click="edit">{{ t('social.edit') }}</button>
-            <button v-else-if="profile.relation === 'FRIEND'" class="save-btn" @click="emit('chat', profile)">{{ t('social.chat') }}</button>
-            <button v-else class="save-btn" :disabled="busy || profile.relation === 'PENDING'" @click="requesting = !requesting">{{ t(profile.relation === 'PENDING' ? 'social.pending' : 'social.add') }}</button>
+          <div class="social-actions social-profile-primary">
+            <button v-if="profile.relation === 'SELF'" class="save-btn" :disabled="busy || !profile.settings" @click="edit">{{ t('social.edit') }}</button>
+            <button v-else-if="profile.relation === 'FRIEND'" class="save-btn" :disabled="busy" @click="emit('chat', profile)">{{ t('social.chat') }}</button>
+            <button v-else class="save-btn" :disabled="busy || profile.relation === 'PENDING'" :aria-expanded="requesting" @click="requesting = !requesting">{{ t(profile.relation === 'PENDING' ? 'social.pending' : 'social.add') }}</button>
           </div>
+          <details v-if="profile.relation === 'SELF'" class="social-profile-secondary">
+            <summary>{{ t('social.preview') }}</summary>
+            <label class="social-form">{{ t('social.preview') }}<select v-model="audience" class="profile-input"><option value="self">{{ t('social.relation.SELF') }}</option><option value="stranger">{{ t('social.stranger') }}</option><option value="friend">{{ t('social.friends') }}</option></select></label>
+          </details>
           <section v-if="profile.relation === 'SELF' && blocked.length">
             <h3>{{ t('social.blockedList') }}</h3>
             <div v-for="person in blocked" :key="person.id" class="social-actions"><span>{{ person.username }}</span><button class="cancel-btn" :disabled="busy" @click="unblock(person.id)">{{ t('social.unblock') }}</button></div>
           </section>
           <form v-if="requesting" class="social-form" @submit.prevent="requestFriend"><label>{{ t('social.requestReason') }}<textarea v-model="reason" maxlength="120" class="profile-input" rows="2"></textarea></label><button class="save-btn" :disabled="busy">{{ t('social.sendRequest') }}</button></form>
-          <template v-if="profile.relation !== 'SELF'">
+          <details v-if="profile.relation !== 'SELF'" class="social-profile-secondary"><summary>{{ t('social.moreActions') }}</summary>
             <div class="social-actions"><button class="cancel-btn" :disabled="busy" @click="block">{{ t('social.block') }}</button><button class="cancel-btn" @click="reporting = !reporting">{{ t('social.report') }}</button></div>
             <form v-if="reporting" class="social-form" @submit.prevent="report"><label>{{ t('social.reportReason') }}<textarea v-model="reportReason" required maxlength="500" class="profile-input"></textarea></label><button class="save-btn" :disabled="busy">{{ t('social.submit') }}</button></form>
-          </template>
+          </details>
         </template>
       </div>
     </template>
@@ -59,18 +70,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getSocialProfile, saveSocialProfile, sendSocialFriendRequest, blockSocialUser, reportSocialUser, getBlockedUsers, unblockSocialUser } from '../api/social'
 import type { SocialProfile, SocialEdit } from '../types/social'
-const props = defineProps<{ userId: string }>()
-const emit = defineEmits<{ chat: [profile: SocialProfile]; saved: [profile: SocialProfile]; blocked: [id: string] }>()
+const props = defineProps<{ userId: string; initialProfile?: SocialProfile | null; initialBlocked?: Array<{ id: number; username: string }> }>()
+const emit = defineEmits<{ chat: [profile: SocialProfile]; saved: [profile: SocialProfile]; blocked: [id: string]; changed: [] }>()
 const { t } = useI18n()
 const profile = ref<SocialProfile | null>(null), error = ref(''), busy = ref(false), editing = ref(false)
 const notice = ref('')
+const profileRoot = ref<HTMLElement | null>(null)
 const retryKey = ref(0)
 const blocked = ref<Array<{ id: number; username: string }>>([])
 const requesting = ref(false), reporting = ref(false), reason = ref(''), reportReason = ref(''), interestText = ref(''), audience = ref('self')
+watch(editing, async () => {
+  await nextTick()
+  const root = profileRoot.value
+  const target = root?.querySelector<HTMLElement>(editing.value ? '.social-profile-editor input' : '.social-profile-card h2')
+  target?.focus({ preventScroll: true })
+  const panel = root?.closest<HTMLElement>('.social-detail')
+  if (panel) panel.scrollTop = 0
+})
 let controller = new AbortController(), generation = 0
 const form = reactive<SocialEdit>({ username: '', signature: '', bio: '', interests: [], city: '', intent: '', cover: 'sunset', visibility: 'SELF', discoverable: false, mutualDiscovery: false })
 const detailsVisible = computed(() => {
@@ -83,6 +103,7 @@ watch(() => `${props.userId}:${retryKey.value}`, async () => {
   const current = ++generation
   notice.value = ''
   controller.abort(); controller = new AbortController(); profile.value = null; error.value = ''; busy.value = false; blocked.value = []; reason.value = ''; reportReason.value = ''; editing.value = false; requesting.value = false; reporting.value = false; audience.value = 'self'
+  if (retryKey.value === 0 && props.initialProfile?.id === id) { profile.value = props.initialProfile; blocked.value = props.initialBlocked || []; return }
   try { const next = await getSocialProfile(id, controller.signal); if (current === generation) { profile.value = next; blocked.value = []; if (next.relation === 'SELF') { const users = await getBlockedUsers(); if (current === generation) blocked.value = users } } }
   catch (failure) { if (current === generation && !controller.signal.aborted) error.value = (failure as Error).message }
 }, { immediate: true })
@@ -98,7 +119,7 @@ async function perform(work: () => Promise<void>) {
   if (busy.value) return
   const current = generation
   busy.value = true; error.value = ''; notice.value = ''
-  try { await work() } catch (failure) { if (current === generation) error.value = (failure as Error).message }
+  try { await work(); if (current === generation) emit('changed') } catch (failure) { if (current === generation) error.value = (failure as Error).message }
   finally { if (current === generation) busy.value = false }
 }
 const save = () => perform(async () => { const current = generation; const next = await saveSocialProfile({ ...form, interests: interestText.value.split(/[、,，]/).map(v => v.trim()).filter(Boolean) }); if (current !== generation) return; profile.value = next; editing.value = false; notice.value = t('polish.saved'); emit('saved', next) })

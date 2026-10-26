@@ -39,11 +39,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { EncounterState } from '../types/social'
 import { useEncounter } from '../composables/useEncounter'
 import { reportSocialUser } from '../api/social'
 import { composerEnter } from '../utils/composer'
 const emit = defineEmits<{ profile: [id: string]; daily: [] }>()
-const { t } = useI18n(), { room, error, busy, action } = useEncounter()
+const props = defineProps<{ initialRoom?: EncounterState }>()
+const { t } = useI18n(), { room, error, busy, action } = useEncounter(props.initialRoom)
 const draft = ref(''), reporting = ref(false), reportReason = ref(''), now = ref(Date.now()), queuedAt = ref(Date.now())
 const messagesElement = ref<HTMLElement | null>(null), unseen = ref(0)
 let following = true

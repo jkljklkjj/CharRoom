@@ -1,4 +1,9 @@
 {
+  "social.preparing": "Preparing {page}. Switching when ready.",
+  "social.preparingEntry": "Preparing your content…",
+  "social.loadTimeout": "Loading timed out. Please try again.",
+  "social.filters": "Search filters",
+  "social.moreActions": "More options",
   "sidebar.navigation": "Chat navigation",
   "sidebar.messages": "Messages",
   "sidebar.contacts": "Contacts",

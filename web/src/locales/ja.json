@@ -1,4 +1,9 @@
 {
+  "social.preparing": "{page}の準備中です。完了後に切り替えます",
+  "social.preparingEntry": "コンテンツを準備しています…",
+  "social.loadTimeout": "読み込みがタイムアウトしました。再試行してください",
+  "social.filters": "絞り込み条件",
+  "social.moreActions": "その他の操作",
   "sidebar.navigation": "チャットナビゲーション",
   "sidebar.messages": "メッセージ",
   "sidebar.contacts": "連絡先",

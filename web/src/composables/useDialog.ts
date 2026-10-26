@@ -2,7 +2,7 @@ import { watch, type Ref } from 'vue'
 
 const dialogs: HTMLElement[] = []
 let previousOverflow = ''
-const focusable = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+const focusable = 'button:not(:disabled), summary, [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
 /** Keep stacked dialogs keyboard accessible and return focus to their trigger. */
 export function useDialog(root: Ref<HTMLElement | null>, close: () => void) {

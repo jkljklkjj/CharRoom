@@ -3,8 +3,8 @@ import store from '../store'
 import { actEncounter, getEncounter } from '../api/social'
 import type { EncounterState, EncounterAction } from '../types/social'
 
-export function useEncounter() {
-  const room = ref<EncounterState>({ state: 'IDLE', messages: [] })
+export function useEncounter(initial?: EncounterState) {
+  const room = ref<EncounterState>(initial || { state: 'IDLE', messages: [] })
   const error = ref(''), busy = ref(false)
   let timer: ReturnType<typeof setTimeout> | undefined
   let controller = new AbortController(), generation = 0, revision = 0, disposed = false
@@ -45,7 +45,7 @@ export function useEncounter() {
     if (!disposed && store.state.token) void poll()
   }
   watch(() => String(store.state.accountId), reset)
-  onMounted(() => { void poll() })
+  onMounted(() => { if (initial) timer = setTimeout(poll, 1200); else void poll() })
   onBeforeUnmount(() => { disposed = true; generation++; clearTimeout(timer); controller.abort() })
   return { room, error, busy, action }
 }

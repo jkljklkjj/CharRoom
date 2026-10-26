@@ -1,4 +1,9 @@
 {
+  "social.preparing": "正在准备{page}，就绪后切换",
+  "social.preparingEntry": "正在准备内容，请稍候",
+  "social.loadTimeout": "加载超时，请重试",
+  "social.filters": "筛选条件",
+  "social.moreActions": "更多操作",
   "sidebar.navigation": "聊天导航",
   "sidebar.messages": "消息",
   "sidebar.contacts": "联系人",
