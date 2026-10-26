@@ -122,3 +122,22 @@ test('legacy branch v3 schema (accountId_conversationId_index) upgrades to the o
   assert.deepEqual(Array.from(page.messages, m => m.text), ['legacy branch row', 'appended'])
   assert.equal((await db.getConversationMeta('A', '41')).lastIncomingMessageTime, 1000)
 })
+
+test('history merge is idempotent, ordered and retains concurrent live messages and other accounts', async () => {
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
+    indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
+  })
+  const first = { user: '41', text: 'old', time: 1000, messageId: '9007199254740993' }
+  const second = { ...first, text: 'same timestamp', messageId: '9007199254740994' }
+  await db.appendMessage('A', '41', { ...first, time: 2000, text: 'live', messageId: '9007199254740995' })
+  await db.appendMessage('B', '41', first)
+  await Promise.all([db.mergeHistoryMessages('A', '41', [second, first]),
+    db.appendMessage('A', '41', { ...first, time: 3000, text: 'during sync', messageId: '9007199254740996' })])
+  await db.mergeHistoryMessages('A', '41', [first, second])
+  await db.appendMessage('A', '41', first) // delayed live delivery of an already restored message
+  assert.deepEqual(Array.from(await db.getMessages('A', '41'), m => m.text), ['old', 'same timestamp', 'live', 'during sync'])
+  assert.equal((await db.getMessages('B', '41')).length, 1)
+  const latest = await db.getMessagesPage('A', '41', null, 2)
+  assert.deepEqual(Array.from(latest.messages, m => m.text), ['live', 'during sync'])
+  assert.deepEqual(Array.from((await db.getMessagesPage('A', '41', latest.beforeIndex, 2)).messages, m => m.text), ['old', 'same timestamp'])
+})

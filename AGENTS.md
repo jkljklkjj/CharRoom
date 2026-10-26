@@ -58,6 +58,8 @@ Windows 遇到 `Unable to establish loopback connection` / `UnixDomainSockets.co
 - 生产连接必须验证证书和服务端身份；开发证书例外应由显式环境开关约束，不能默认关闭校验。
 - 本地联调显式设置 REST/QUIC 地址；`ServerConfig`、`ApiEndpoints` 和 CLI 有线上默认值。不要使用真实用户数据做测试。
 
+新设备七天历史恢复与本地落库约定见 [历史恢复](docs/development/RECENT-HISTORY.md)；不要以离线消息接口或服务端提示直接推进本机同步游标。
+
 ## 已知基线
 
 社交发现与资料卡：`component/social/SocialScreen.kt` → `presentation/viewmodel/SocialViewModel.kt` → `data/repository/SocialRepository.kt`；Web 独立实现。入口、权限契约和验证见 [社交发现](docs/development/SOCIAL-DISCOVERY.md)。

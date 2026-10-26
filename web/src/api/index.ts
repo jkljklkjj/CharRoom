@@ -4,7 +4,7 @@ import { safeFetch, API_BASE, refreshToken } from './http'
 import { getTokenQuota, getTokenPrices, purchaseTokens, getPurchaseStatus } from './quota'
 import * as copilotApi from './copilot'
 import type { Id, User, Group } from '../types/chat'
-import type { Tokens, LoginResult, OfflineMessage, SyncResult, FriendRequest, FriendNotification, UserProfile } from '../types/api'
+import type { Tokens, LoginResult, OfflineMessage, SyncResult, RecentHistoryRequest, RecentHistoryPage, FriendRequest, FriendNotification, UserProfile } from '../types/api'
 export { safeFetch, API_BASE, refreshToken }
 
 export async function login(account: string, password: string): Promise<LoginResult> {
@@ -67,6 +67,15 @@ export async function verifyRegister(email: string, code: string, password: stri
     return { ok: false, error: errorMsg }
   }
   return { ok: true, data: body?.data }
+}
+
+/** Account-authorized seven-day history, independent of delivery flags and device cursors. */
+export async function getRecentMessages(request: RecentHistoryRequest = {}): Promise<RecentHistoryPage> {
+  const { ok, body } = await safeFetch<RecentHistoryPage>(`${API_BASE}/messages/recent`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request)
+  })
+  if (!ok || !body?.data) throw new Error('Recent history synchronization failed')
+  return body.data
 }
 
 export async function getOfflineMessages(pageSize?: number) {
@@ -279,6 +288,7 @@ export default {
   getCurrentUser,
   validateToken,
   getOfflineMessages,
+  getRecentMessages,
   addFriend,
   getFriendRequests,
   acceptFriend,

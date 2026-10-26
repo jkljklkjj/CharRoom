@@ -327,8 +327,10 @@ class ChatState {
      */
     suspend fun prependMessages(
         newMessages: List<Message>,
-        markAsUnread: Boolean = false
+        markAsUnread: Boolean = false,
+        isCurrentAccount: () -> Boolean = { true }
     ) = messagesMutex.withLock {
+        if (!isCurrentAccount()) return@withLock
         val inserted = _messageCache.prepend(newMessages)
         if (inserted.isNotEmpty()) {
             val affectedUsers = inserted.map { privateConversationId(it) }.distinct()
@@ -390,8 +392,10 @@ class ChatState {
      */
     suspend fun prependGroupMessages(
         newMessages: List<GroupMessage>,
-        markAsUnread: Boolean = false
+        markAsUnread: Boolean = false,
+        isCurrentAccount: () -> Boolean = { true }
     ) = groupMessagesMutex.withLock {
+        if (!isCurrentAccount()) return@withLock
         val inserted = _groupMessageCache.prepend(newMessages)
         if (inserted.isNotEmpty()) {
             val affectedGroups = inserted.map { groupConversationId(it) }.distinct()

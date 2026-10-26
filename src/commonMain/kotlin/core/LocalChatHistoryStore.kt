@@ -13,7 +13,10 @@ interface LocalChatHistoryStoreProvider {
      * @param privateMessages 私聊消息列表
      * @param groupMessages 群聊消息列表
      */
+    /** Merge by message ID; a UI snapshot may contain only a page of the full local history. */
     fun save(accountId: String, privateMessages: List<Message>, groupMessages: List<GroupMessage>)
+
+    fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean)
 
     /**
      * 恢复聊天历史（默认加载最近100条）

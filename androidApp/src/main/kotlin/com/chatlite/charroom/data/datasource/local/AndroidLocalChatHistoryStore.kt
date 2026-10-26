@@ -59,10 +59,27 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                         messageType = groupMsg.messageType,
                         fileUrl = groupMsg.fileUrl,
                         fileName = groupMsg.fileName,
-                        fileSize = groupMsg.fileSize
+                        fileSize = groupMsg.fileSize,
+                        seqId = groupMsg.seqId,
+                        conversationId = groupMsg.conversationId
                     )
                 })
             }
+    }
+
+    @Synchronized
+    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
+        if (!this::context.isInitialized) return
+        val prefix = if (isGroup) "group_" else "private_"
+        getAccountDir(accountId).listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
+            val rows = JSONArray(file.readText())
+            val kept = JSONArray()
+            for (index in 0 until rows.length()) {
+                val row = rows.getJSONObject(index)
+                if (row.optString("messageId") != messageId) kept.put(row)
+            }
+            file.writeText(kept.toString())
+        }
     }
 
     override fun restore(accountId: String): RestoredChatHistory {
@@ -288,13 +305,22 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
 
     // 内部方法
 
+    @Synchronized
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
         runCatching {
             val file = getHistoryFile(accountId, targetId, isGroup)
-            val array = JSONArray()
-            messages.takeLast(500).forEach { // 只保留最近500条
-                array.put(messageToJson(it))
+            val records = linkedMapOf<String, JSONObject>()
+            if (file.exists()) {
+                val existing = JSONArray(file.readText())
+                for (index in 0 until existing.length()) {
+                    val row = existing.getJSONObject(index)
+                    records[row.optString("messageId")] = row
+                }
             }
+            messages.forEach { records[it.messageId] = messageToJson(it) }
+            val array = JSONArray()
+            records.values.sortedWith(compareBy<JSONObject> { it.optLong("timestamp") }
+                .thenBy { it.optString("messageId").toLongOrNull() ?: 0L }).forEach { array.put(it) }
             file.writeText(array.toString())
         }.onFailure {
             timber.log.Timber.w(it, "操作失败")
@@ -359,6 +385,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("fileUrl", message.fileUrl)
             put("fileName", message.fileName)
             put("fileSize", message.fileSize)
+            put("seqId", message.seqId)
+            put("conversationId", message.conversationId)
         }
     }
 
@@ -378,6 +406,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("fileUrl", message.fileUrl)
             put("fileName", message.fileName)
             put("fileSize", message.fileSize)
+            put("seqId", message.seqId)
+            put("conversationId", message.conversationId)
         }
     }
 
@@ -403,7 +433,9 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 messageType = messageType,
                 fileUrl = json.optString("fileUrl").takeIf { it.isNotEmpty() },
                 fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
-                fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
+                fileSize = if (!json.isNull("fileSize")) json.optLong("fileSize") else null,
+                seqId = json.optLong("seqId", 0),
+                conversationId = json.optString("conversationId", "")
             )
         } else {
             Message(
@@ -420,7 +452,9 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 messageType = messageType,
                 fileUrl = json.optString("fileUrl").takeIf { it.isNotEmpty() },
                 fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
-                fileSize = if (json.has("fileSize")) json.optLong("fileSize") else null
+                fileSize = if (!json.isNull("fileSize")) json.optLong("fileSize") else null,
+                seqId = json.optLong("seqId", 0),
+                conversationId = json.optString("conversationId", "")
             )
         }
     }

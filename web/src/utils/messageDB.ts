@@ -2,12 +2,13 @@ import type { ChatMessage, Id } from '../types/chat'
 import { conversationPreviewText } from './format'
 
 const DB_NAME = 'charroom_messages'
-// v2: 复合排序索引；v3: 会话元数据；v4: 兼容历史分支同版本号不同 schema
+// v2: 复合排序索引；v3: 会话元数据；v4: 兼容历史分支 schema；v5: 按消息 ID 去重索引
 // （旧本地分支也用过 version 3 但索引名不同，同版本不会触发 upgrade，必须提升版本号）
-const DB_VERSION = 4
+const DB_VERSION = 5
 const STORE_NAME = 'messages'
 const META_STORE_NAME = 'conversation_meta'
 const ORDER_INDEX = 'account_conversation_index'
+const MESSAGE_ID_INDEX = 'account_conversation_message_id'
 interface StoredMessage {
   id: string; accountId: string; conversationId: string
   message: ChatMessage; index: number; timestamp: string | number
@@ -38,6 +39,7 @@ function openDB(): Promise<IDBDatabase> {
       if (!store.indexNames.contains('conversationId')) store.createIndex('conversationId', 'conversationId')
       if (!store.indexNames.contains('accountId_conversationId')) store.createIndex('accountId_conversationId', ['accountId', 'conversationId'])
       if (!store.indexNames.contains(ORDER_INDEX)) store.createIndex(ORDER_INDEX, ['accountId', 'conversationId', 'index'])
+      if (!store.indexNames.contains(MESSAGE_ID_INDEX)) store.createIndex(MESSAGE_ID_INDEX, ['accountId', 'conversationId', 'message.messageId'])
       // v3: 会话元数据（预览用最后消息时间），避免重建预览时全量读消息
       if (!db.objectStoreNames.contains(META_STORE_NAME)) {
         const meta = db.createObjectStore(META_STORE_NAME, { keyPath: 'id' })
@@ -173,13 +175,53 @@ export function appendMessage(accountId: Id, conversationId: Id, message: ChatMe
     tx.oncomplete = () => resolve()
     tx.onerror = tx.onabort = () => reject(tx.error)
     const store = tx.objectStore(STORE_NAME)
-    const request = store.index(ORDER_INDEX).openCursor(orderedRange(accountId, conversationId), 'prev')
-    request.onsuccess = () => {
-      const last = request.result?.value as StoredMessage | undefined
-      store.put(record(accountId, conversationId, message, last ? last.index + 1 : 0))
+    const append = () => {
+      const request = store.index(ORDER_INDEX).openCursor(orderedRange(accountId, conversationId), 'prev')
+      request.onsuccess = () => {
+        const last = request.result?.value as StoredMessage | undefined
+        store.put(record(accountId, conversationId, message, last ? last.index + 1 : 0))
+      }
     }
+    if (message.messageId) {
+      const existing = store.index(MESSAGE_ID_INDEX).get([String(accountId), String(conversationId), message.messageId])
+      existing.onsuccess = () => {
+        const row = existing.result as StoredMessage | undefined
+        if (row) store.put(record(accountId, conversationId, { ...row.message, ...message }, row.index))
+        else append()
+      }
+    } else append()
     touchConversationMeta(tx, accountId, conversationId, message)
   }))
+}
+/** Merge one history page atomically with live/local rows, preserving stable message IDs. */
+export async function mergeHistoryMessages(accountId: Id, conversationId: Id, messages: readonly ChatMessage[]) {
+  const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = tx.onabort = () => reject(tx.error)
+    const store = tx.objectStore(STORE_NAME)
+    const request = store.index(ORDER_INDEX).getAll(orderedRange(accountId, conversationId))
+    request.onsuccess = () => {
+      const rows = request.result as StoredMessage[]
+      const merged = new Map<string, ChatMessage>()
+      rows.forEach(row => merged.set(row.message.messageId || row.id, row.message))
+      messages.forEach(message => {
+        if (!message.messageId) return
+        merged.set(message.messageId, { ...message, ...merged.get(message.messageId) })
+      })
+      const sorted = [...merged.values()].sort((a, b) => {
+        const time = messageTimestamp(a) - messageTimestamp(b)
+        if (time) return time
+        const left = a.messageId || '', right = b.messageId || ''
+        if (/^\d+$/.test(left) && /^\d+$/.test(right)) return BigInt(left) < BigInt(right) ? -1 : BigInt(left) > BigInt(right) ? 1 : 0
+        return left.localeCompare(right)
+      })
+      rows.forEach(row => store.delete(row.id))
+      sorted.forEach((message, index) => store.put(record(accountId, conversationId, message, index)))
+      if (sorted.length) touchConversationMeta(tx, accountId, conversationId, sorted[sorted.length - 1])
+    }
+  })
 }
 function deleteRows(index: string, key: IDBKeyRange, match: (row: StoredMessage) => boolean = () => true) {
   return write(store => {

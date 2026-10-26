@@ -4,6 +4,13 @@ export interface FetchResult<T> { ok: boolean; status: number; body: ApiBody<T> 
 export interface Tokens { accessToken: string; refreshToken: string }
 export type LoginResult = ({ ok: true } & Tokens) | { ok: false; error: string }
 export interface OfflineMessage {
+  messageType?: number
+  fileUrl?: string
+  fileName?: string
+  fileSize?: number
+  replyToMessageId?: string
+  replyToContent?: string
+  replyToSender?: string
   id?: string
   messageId?: string
   senderId: Id
@@ -34,4 +41,9 @@ export interface PurchaseStatus {
   amountFen?: number
   remainingFen?: number
   paid: boolean
+}
+
+export interface RecentHistoryRequest { windowEnd?: number; afterTimestamp?: number; afterId?: string; limit?: number }
+export interface RecentHistoryPage {
+  messages: OfflineMessage[]; windowEnd: number; nextTimestamp: number | null; nextId: string | null; hasMore: boolean
 }

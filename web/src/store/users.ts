@@ -77,10 +77,12 @@ export async function rebuildConversationStates(forceRefresh = false) {
     state.conversationStates = {}
     return
   }
+  const accountId = state.accountId
   let metaMap = new Map<string, ConversationPreviewEntry>()
   try {
-    metaMap = await loadConversationMetaMap(state.accountId, forceRefresh)
+    metaMap = await loadConversationMetaMap(accountId, forceRefresh)
   } catch (_) { /* 保留空 map */ }
+  if (state.accountId !== accountId) return
 
   // 从当前 state 起步，保留重建期间的新 patch（unreadCount / 更新的时间）
   const nextStates: Record<string, ConversationState> = { ...state.conversationStates }

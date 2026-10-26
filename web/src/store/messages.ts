@@ -5,7 +5,7 @@ import { getPrivateConversationId, normalizeTimeValue } from './storage'
 import { conversationPreviewText } from '../utils/format'
 import DOMPurify from 'dompurify'
 import { getMessagesPage as dbGetMessagesPage, appendMessage as dbAppendMessage,
-         deleteMessage as dbDeleteMessage } from '../utils/messageDB'
+         mergeHistoryMessages as dbMergeHistoryMessages, deleteMessage as dbDeleteMessage } from '../utils/messageDB'
 
 // 延迟导入 users.ts 避免循环依赖
 let _updateConversationState: ((id: Id, patch: ConversationPatch) => void) | null = null
@@ -199,7 +199,7 @@ export function addMessage(m: ChatMessage) {
   // 预清洗文本，避免每次渲染调用 DOMPurify
   const sanitized = m.text != null ? { ...m, text: sanitizeText(m.text) } : m
   if (String(state.selectedChatId) === String(chatId)) {
-    state.messages.push(sanitized)
+    if (!m.messageId || !state.messages.some(row => row.messageId === m.messageId)) state.messages.push(sanitized)
   }
   if (String(m.user) !== 'you') {
     updateConversationState(chatId, {
@@ -213,12 +213,45 @@ export function addMessage(m: ChatMessage) {
     // 自己发出的消息同样更新联系人列表第二行的预览（不改变 incoming 排序时间）
     updateConversationState(chatId, { lastMessagePreview: conversationPreviewText(sanitized) })
   }
-  savePrivateMessage(sanitized)
   if (m.seqId != null) {
     const partnerId = chatId
     const ids = [Number(state.accountId), Number(partnerId)].sort((a, b) => a - b)
     const convId = 'user:' + ids[0] + ':' + ids[1]
     setConversationSeqId(convId, m.seqId)
+  }
+  return savePrivateMessage(sanitized)
+}
+
+/** Bootstrap pages do not increase unread counts or advance incremental seq cursors. */
+export async function restoreHistoryPage(accountId: string, messages: ChatMessage[]) {
+  if (String(state.accountId) !== accountId) return
+  const conversations = new Map<string, ChatMessage[]>()
+  for (const message of messages) {
+    const key = message.groupId ? `group:${message.groupId}` : getPrivateConversationId(message)
+    if (!key) continue
+    const batch = conversations.get(String(key)) || []
+    batch.push({ ...message, text: sanitizeText(message.text || '') })
+    conversations.set(String(key), batch)
+  }
+  for (const [conversationId, batch] of conversations) {
+    if (String(state.accountId) !== accountId) return
+    await dbMergeHistoryMessages(accountId, conversationId, batch)
+    if (String(state.accountId) !== accountId) return
+    batch.forEach(message => alreadySeen(message.messageId))
+    const isGroup = conversationId.startsWith('group:')
+    const uiId = isGroup ? `-${conversationId.slice(6)}` : conversationId
+    invalidatePreview(uiId)
+    if (String(state.selectedChatId) !== uiId) continue
+    const page = await dbGetMessagesPage(accountId, conversationId, null, PAGE_SIZE)
+    if (String(state.accountId) !== accountId || String(state.selectedChatId) !== uiId) continue
+    pageCursors.set(conversationId, page.beforeIndex)
+    if (isGroup) {
+      state.groupMessages = page.messages
+      state.hasMoreGroupMessages = page.hasMore
+    } else {
+      state.messages = page.messages
+      state.hasMoreMessages = page.hasMore
+    }
   }
 }
 
@@ -251,7 +284,7 @@ export function addGroupMessage(m: ChatMessage) {
   // 预清洗文本，避免每次渲染调用 DOMPurify
   const sanitized = m.text != null ? { ...m, text: sanitizeText(m.text) } : m
   if (Math.abs(Number(state.selectedChatId)) === Number(m.groupId)) {
-    state.groupMessages.push(sanitized)
+    if (!m.messageId || !state.groupMessages.some(row => row.messageId === m.messageId)) state.groupMessages.push(sanitized)
   }
   if (String(m.user) !== String(state.accountId)) {
     updateConversationState(conversationId, {
@@ -264,11 +297,11 @@ export function addGroupMessage(m: ChatMessage) {
   } else {
     updateConversationState(conversationId, { lastMessagePreview: conversationPreviewText(sanitized) })
   }
-  saveGroupMessage(sanitized)
   if (m.seqId != null) {
     const convId = 'group:' + m.groupId
     setConversationSeqId(convId, m.seqId)
   }
+  return saveGroupMessage(sanitized)
 }
 
 export function updateMessageStatus(messageId: string, status: import('../types/chat').MessageStatus) {

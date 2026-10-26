@@ -1,6 +1,9 @@
 package presentation.viewmodel
 
 import core.Chat
+import core.restoreRecentHistory
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import core.GlobalApiService
 import core.LocalChatHistoryStore
 import core.AppLogger
@@ -317,7 +320,7 @@ open class ChatViewModel(
     val groupRequests: StateFlow<List<User>> = _groupRequests.asStateFlow()
 
     /**
-     * 加载好友和群组列表 + 触发 SeqId 增量同步。
+     * 加载好友和群组列表；历史恢复独立于联系人加载。
      */
     fun loadContacts() {
         sessionScope.launch(Dispatchers.IO) {
@@ -330,68 +333,20 @@ open class ChatViewModel(
             if (contacts.isNotEmpty()) {
                 chatState.replaceUsersPreservingOrder(contacts)
                 loadConversationSeqIds()
-                syncAllConversations(contacts)
                 saveConversationSeqIds()
-            }
-        }
-    }
-
-    /**
-     * 启动增量同步：一次性拉取所有离线消息，按 conversationId 分发。
-     *
-     * 相比 per-conversation 循环调用 syncMessages，用单次 getOfflineMessages()
-     * 批量获取所有新消息，再按 conversationId 拆分插入，减少 N+1 API 开销。
-     */
-    private suspend fun syncAllConversations(contacts: List<User>) {
-        try {
-            // 一次性拉取所有离线消息（服务端按 seqId 游标过滤）
-            val allMessages = chatRepository.getOfflineMessages()
-            if (allMessages.isEmpty()) return
-
-            // 按 conversationId 分组
-            val (privateMsgIds, groupMsgIds) = allMessages.partition { it.conversationId.isBlank() || !it.conversationId.startsWith("group:") }
-
-            // 私聊消息：按 conversationId 分发
-            val privateByConv = privateMsgIds.groupBy { msg ->
-                if (msg.conversationId.isNotBlank()) msg.conversationId
-                else {
-                    val ids = listOf(GlobalAppState.currentUserId?.toString() ?: "0", msg.senderId.toString()).sorted()
-                    "user:${ids[0]}:${ids[1]}"
+                val token = GlobalAppState.currentToken
+                if (token != null) {
+                    try {
+                        val ids = contacts.map { it.id }.filter { it > 0 && it != AGENT_ASSISTANT_ID }
+                        if (ids.isNotEmpty()) batchOnlineStatus(token, ids).forEach { (id, online) ->
+                            id.toIntOrNull()?.let { chatState.updateUserOnlineStatus(it, online) }
+                        }
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        AppLogger.w("加载联系人在线状态失败: ${e.message}")
+                    }
                 }
             }
-            privateByConv.forEach { (convId, msgs) ->
-                chatState.prependMessages(msgs.sortedBy { it.timestamp }, markAsUnread = true)
-                // 更新 seqId 游标到这批消息的最大值
-                val maxSeqId = msgs.maxOfOrNull { it.seqId } ?: return@forEach
-                if (maxSeqId > 0L) chatState.updateConversationSeqId(convId, maxSeqId)
-            }
-
-            // 群聊消息
-            val groupByConv = groupMsgIds.groupBy { it.conversationId }
-            groupByConv.forEach { (convId, msgs) ->
-                val groupMessages = msgs.map { msg ->
-                    val gid = convId.removePrefix("group:").toIntOrNull() ?: return@forEach
-                    GroupMessage(
-                        groupId = gid,
-                        senderName = msg.senderId.toString(),
-                        text = msg.message,
-                        senderId = msg.senderId,
-                        timestamp = msg.timestamp,
-                        isSent = true,
-                        messageId = msg.messageId,
-                        seqId = msg.seqId,
-                        conversationId = convId
-                    )
-                }
-                chatState.prependGroupMessages(groupMessages.sortedBy { it.timestamp }, markAsUnread = true)
-                val maxSeqId = msgs.maxOfOrNull { it.seqId } ?: return@forEach
-                if (maxSeqId > 0L) chatState.updateConversationSeqId(convId, maxSeqId)
-            }
-
-            AppLogger.d(" 增量同步完成: ${allMessages.size} 条消息, ${privateByConv.size} 个私聊会话, ${groupByConv.size} 个群聊会话")
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            AppLogger.d(" 增量同步失败: ${e.message}")
         }
     }
 
@@ -471,170 +426,31 @@ open class ChatViewModel(
         }
     }
 
-    /**
-     * 增量同步所有会话（基于 seqId 游标）。
-     * 对每个好友构建 conversationId，从服务器拉取增量消息，去重后加入消息列表。
-     */
-    open suspend fun syncAllConversations() {
-        AppLogger.d(" 开始增量同步所有会话")
+    private val historySyncMutex = Mutex()
 
-        val currentUserId = GlobalAppState.currentUserId ?: run {
-            AppLogger.d(" 当前用户ID为空，跳过同步")
-            return
-        }
-
-        // 1. 从本地存储恢复 seqId 游标
+    /** Restore the last seven days even when this device has no contacts or seq cursor. */
+    open suspend fun syncAllConversations() = historySyncMutex.withLock {
+        val owner = GlobalAppState.currentUserId ?: return@withLock
+        val token = GlobalAppState.currentToken ?: return@withLock
+        val ownerSession = sessionJob
+        fun isCurrent() = GlobalAppState.currentUserId == owner && sessionJob === ownerSession && ownerSession.isActive
         try {
-            val savedSeqIds = LocalChatHistoryStore.restoreConversationSeqIds()
-            if (savedSeqIds.isNotEmpty()) {
-                for ((convId, seqId) in savedSeqIds) {
-                    chatState.updateConversationSeqId(convId, seqId)
-                }
-                AppLogger.d(" 从本地恢复了 ${savedSeqIds.size} 个会话的 seqId 游标")
+            restoreRecentHistory(::isCurrent, { cursor -> core.getRecentHistoryPage(token, cursor) }) { rows ->
+                if (!isCurrent()) return@restoreRecentHistory
+                val privateMessages = rows.filterNot { it.isGroup }.map { it.privateMessage(owner) }
+                val groupMessages = rows.filter { it.isGroup }.map { it.groupMessage() }
+                // Persist the whole page before proceeding; the UI LRU may keep fewer records.
+                LocalChatHistoryStore.save(owner.toString(), privateMessages, groupMessages)
+                if (!isCurrent()) return@restoreRecentHistory
+                chatState.prependMessages(privateMessages, markAsUnread = false, isCurrentAccount = ::isCurrent)
+                if (!isCurrent()) return@restoreRecentHistory
+                chatState.prependGroupMessages(groupMessages, markAsUnread = false, isCurrentAccount = ::isCurrent)
             }
+            AppLogger.d("最近七天历史恢复结束")
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            AppLogger.d(" 恢复 seqId 游标失败: ${e.message}")
+            AppLogger.w("最近历史恢复失败: ${e.message}")
         }
-
-        // 2. 获取好友列表
-        val friends = try {
-            chatRepository.fetchFriends()
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            AppLogger.d(" 获取好友列表失败: ${e.message}")
-            return
-        }
-
-        // 批量拉取在线状态
-        try {
-            val token = GlobalAppState.currentToken
-            if (token != null && friends.isNotEmpty()) {
-                val friendIds = friends.map { it.id }.filter { it > 0 && it != AGENT_ASSISTANT_ID }
-                val statusMap = batchOnlineStatus(token, friendIds)
-                for ((userIdStr, online) in statusMap) {
-                    val userId = userIdStr.toIntOrNull() ?: continue
-                    chatState.updateUserOnlineStatus(userId, online)
-                }
-                AppLogger.d(" 批量在线状态已更新: ${statusMap.size} 人")
-            }
-        } catch (_: Exception) { }
-
-        AppLogger.d(" 开始同步 ${friends.size} 个好友的会话")
-
-        // 3. 对每个好友进行增量同步
-        for (friend in friends) {
-            val smallId = minOf(currentUserId, friend.id)
-            val bigId = maxOf(currentUserId, friend.id)
-            val conversationId = "user:$smallId:$bigId"
-
-            var lastSeqId = chatState.getConversationSeqId(conversationId)
-            var hasMore = true
-            var pageCount = 0
-            // 循环外构建 existingIds，循环内增量更新
-            val existingIds = mutableSetOf<String>()
-            chatState.messages.value.forEach { existingIds.add(it.messageId) }
-
-            while (hasMore) {
-                try {
-                    val result = chatRepository.syncMessages(conversationId, lastSeqId, 50)
-                    if (result.messages.isEmpty()) break
-
-                    pageCount++
-                    // 去重：过滤掉已存在的消息
-                    val newMessages = result.messages.filter { it.messageId !in existingIds }
-
-                    AppLogger.d(" 会话 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条, lastSeqId=$lastSeqId, nextSeqId=${result.nextSeqId}, hasMore=${result.hasMore}")
-
-                    // 按时间戳顺序逐条插入
-                    for (msg in newMessages) {
-                        chatState.addMessage(msg)
-                        existingIds.add(msg.messageId)  // 增量更新
-                    }
-
-                    // 更新该会话的 seqId 游标
-                    if (result.nextSeqId > lastSeqId) {
-                        chatState.updateConversationSeqId(conversationId, result.nextSeqId)
-                        lastSeqId = result.nextSeqId
-                    }
-
-                    hasMore = result.hasMore && result.messages.size >= 50
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    AppLogger.d(" 同步会话 $conversationId 失败: ${e.message}")
-                    break
-                }
-            }
-        }
-
-        // 4. 增量同步群聊消息
-        try {
-            val groups = chatRepository.fetchGroups()
-            AppLogger.d(" 开始同步 ${groups.size} 个群聊")
-            for (group in groups) {
-                val conversationId = "group:${group.id}"
-                var lastSeqId = chatState.getConversationSeqId(conversationId)
-                var hasMore = true
-                var pageCount = 0
-                // 循环外构建 existingIds，循环内增量更新
-                val existingIds = mutableSetOf<String>()
-                chatState.groupMessages.value.forEach { existingIds.add(it.messageId) }
-
-                while (hasMore) {
-                    try {
-                        val result = chatRepository.syncMessages(conversationId, lastSeqId, 50)
-                        if (result.messages.isEmpty()) break
-
-                        pageCount++
-                        val newMessages = result.messages.filter { it.messageId !in existingIds }
-
-                        AppLogger.d(" 群聊 $conversationId: 第 $pageCount 页, 获取 ${result.messages.size} 条, 新增 ${newMessages.size} 条")
-
-                        for (msg in newMessages) {
-                            val groupMsg = GroupMessage(
-                                groupId = group.id,
-                                senderName = "",
-                                text = msg.message,
-                                senderId = msg.senderId,
-                                timestamp = msg.timestamp,
-                                messageId = msg.messageId,
-                                seqId = msg.seqId,
-                                conversationId = conversationId
-                            )
-                            chatState.addGroupMessage(groupMsg)
-                            existingIds.add(msg.messageId)  // 增量更新
-                        }
-
-                        if (result.nextSeqId > lastSeqId) {
-                            chatState.updateConversationSeqId(conversationId, result.nextSeqId)
-                            lastSeqId = result.nextSeqId
-                        }
-
-                        hasMore = result.hasMore && result.messages.size >= 50
-                    } catch (e: Exception) {
-                        if (e is kotlinx.coroutines.CancellationException) throw e
-                        AppLogger.d(" 同步群聊 $conversationId 失败: ${e.message}")
-                        break
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            AppLogger.d(" 获取群聊列表失败: ${e.message}")
-        }
-
-        // 6. 持久化 seqId 游标
-        try {
-            LocalChatHistoryStore.saveConversationSeqIds(chatState.conversationSeqIds.value)
-            AppLogger.d(" seqId 游标已持久化到本地存储")
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            AppLogger.d(" 持久化 seqId 游标失败: ${e.message}")
-        }
-
-        // 7. 保存消息到本地存储
-        saveChatHistoryToLocal()
-        AppLogger.d(" 增量同步完成")
     }
 
     /**
@@ -723,7 +539,9 @@ open class ChatViewModel(
      */
     fun deleteMessage(messageId: String) {
         sessionScope.launch {
+            val owner = GlobalAppState.currentUserId ?: return@launch
             chatState.deleteMessage(messageId)
+            withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), messageId, false) }
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
                 saveChatHistoryToLocal()
@@ -736,7 +554,9 @@ open class ChatViewModel(
      */
     fun deleteGroupMessage(messageId: String) {
         sessionScope.launch {
+            val owner = GlobalAppState.currentUserId ?: return@launch
             chatState.deleteGroupMessage(messageId)
+            withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), messageId, true) }
             // 异步保存到本地存储
             launch(Dispatchers.IO) {
                 saveChatHistoryToLocal()
@@ -1083,6 +903,7 @@ open class ChatViewModel(
             val accountId = userId.toString()
             try {
                 val history = LocalChatHistoryStore.restore(accountId)
+                if (GlobalAppState.currentUserId != userId) return@launch
                 if (history.privateMessages.isNotEmpty() || history.groupMessages.isNotEmpty()) {
                     // 加载到聊天状态
                     chatState.prependMessages(history.privateMessages, markAsUnread = false)

@@ -171,3 +171,16 @@ suspend fun batchOnlineStatus(token: String, userIds: List<Int>): Map<String, Bo
     }
 }
 
+
+/** Never treat an unavailable history endpoint as an empty, successfully restored history. */
+suspend fun getRecentHistoryPage(token: String, cursor: RecentHistoryCursor): RecentHistoryPage {
+    val response = httpClient.post(ApiEndpoints.url("/messages/recent")) {
+        header("Authorization", "Bearer $token")
+        contentType(ContentType.Application.Json)
+        setBody(cursor)
+    }
+    check(response.status.isSuccess()) { "History request failed: ${response.status.value}" }
+    val body = response.body<ApiResponse<RecentHistoryPage>>()
+    check(body.isSuccess) { "History request rejected: ${body.code}" }
+    return checkNotNull(body.data) { "History response is missing data" }
+}

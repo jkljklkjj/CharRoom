@@ -21,7 +21,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     override fun save(accountId: String, privateMessages: List<Message>, groupMessages: List<GroupMessage>) {
         // 保存私聊消息
         privateMessages
-            .groupBy { it.receiverId }
+            .groupBy { if (it.sender) it.receiverId else it.senderId }
             .forEach { (receiverId, messages) ->
                 saveMessages(accountId, receiverId.toString(), false, messages)
             }
@@ -45,10 +45,23 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                         messageType = groupMsg.messageType,
                         fileUrl = groupMsg.fileUrl,
                         fileName = groupMsg.fileName,
-                        fileSize = groupMsg.fileSize
+                        fileSize = groupMsg.fileSize,
+                        seqId = groupMsg.seqId,
+                        conversationId = groupMsg.conversationId
                     )
                 })
             }
+    }
+
+    @Synchronized
+    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
+        val prefix = if (isGroup) "group_" else "private_"
+        getAccountDir(accountId).listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
+            val rows = objectMapper.readTree(file) as? ArrayNode ?: return@forEach
+            val kept = objectMapper.createArrayNode()
+            rows.filter { it.path("messageId").asText() != messageId }.forEach { kept.add(it) }
+            file.writeText(objectMapper.writeValueAsString(kept))
+        }
     }
 
     override fun restore(accountId: String): RestoredChatHistory {
@@ -293,13 +306,22 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
 
     // 内部方法
 
+    @Synchronized
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
         runCatching {
             val file = getHistoryFile(accountId, targetId, isGroup)
-            val array = objectMapper.createArrayNode()
-            messages.takeLast(500).forEach { // 只保留最近500条
-                array.add(messageToJson(it))
+            // Merge pages with disk history: an in-memory LRU snapshot is not the full conversation.
+            val records = linkedMapOf<String, ObjectNode>()
+            if (file.exists()) {
+                val existing = objectMapper.readTree(file) as? ArrayNode
+                existing?.forEach { row ->
+                    if (row is ObjectNode) records[row.path("messageId").asText()] = row
+                }
             }
+            messages.forEach { records[it.messageId] = messageToJson(it) }
+            val array = objectMapper.createArrayNode()
+            records.values.sortedWith(compareBy<ObjectNode> { it.path("timestamp").asLong() }
+                .thenBy { it.path("messageId").asText().toLongOrNull() ?: 0L }).forEach { array.add(it) }
             file.writeText(objectMapper.writeValueAsString(array))
         }.onFailure {
             logger.warn(it) { "LocalChatHistoryStore operation failed" }
@@ -366,6 +388,8 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("fileUrl", message.fileUrl)
             put("fileName", message.fileName)
             put("fileSize", message.fileSize)
+            put("seqId", message.seqId)
+            put("conversationId", message.conversationId)
         }
     }
 
@@ -391,7 +415,9 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 messageType = messageType,
                 fileUrl = json.path("fileUrl").asText(null),
                 fileName = json.path("fileName").asText(null),
-                fileSize = if (json.has("fileSize")) json.path("fileSize").asLong() else null
+                fileSize = if (json.hasNonNull("fileSize")) json.path("fileSize").asLong() else null,
+                seqId = json.path("seqId").asLong(0),
+                conversationId = json.path("conversationId").asText("")
             )
         } else {
             Message(
@@ -408,7 +434,9 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 messageType = messageType,
                 fileUrl = json.path("fileUrl").asText(null),
                 fileName = json.path("fileName").asText(null),
-                fileSize = if (json.has("fileSize")) json.path("fileSize").asLong() else null
+                fileSize = if (json.hasNonNull("fileSize")) json.path("fileSize").asLong() else null,
+                seqId = json.path("seqId").asLong(0),
+                conversationId = json.path("conversationId").asText("")
             )
         }
     }

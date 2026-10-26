@@ -283,7 +283,7 @@ async function handleIncomingMessage(msg: MessageWrapper) {
       const conversationId = hint.clientId
       const seqId = parseInt(hint.message || '', 10)
       if (conversationId && seqId > 0) {
-        store.setConversationSeqId(conversationId, seqId)
+        // 服务端提示不是客户端已应用游标。
         // 触发增量同步
         syncConversation(conversationId, seqId)
       }
@@ -345,71 +345,37 @@ async function syncConversation(conversationId: string, serverSeqId: Id) {
 }
 
 async function syncAllConversations() {
-  const accountId = store.state.accountId
+  const accountId = String(store.state.accountId)
   if (!accountId) return
-  console.debug("📡 拉取离线消息...")
+  let request: import('../types/api').RecentHistoryRequest = { limit: 100 }
   try {
-    const allMessages = await api.getOfflineMessages()
-    if (!allMessages || allMessages.length === 0) return
-    console.debug("📩 拉取到", allMessages.length, "条离线消息")
-
-    // 按 conversationId 分组
-    const privateByConv: Record<string, OfflineMessage[]> = {}
-    const groupByConv: Record<string, OfflineMessage[]> = {}
-    for (const msg of allMessages) {
-      const convId = msg.conversationId || ''
-      if (convId.startsWith('group:')) {
-        if (!groupByConv[convId]) groupByConv[convId] = []
-        groupByConv[convId].push(msg)
-      } else {
-        const cid = convId || (() => {
-          const ids = [Number(accountId), Number(msg.senderId)].sort((a, b) => a - b)
-          return 'user:' + ids[0] + ':' + ids[1]
-        })()
-        if (!privateByConv[cid]) privateByConv[cid] = []
-        privateByConv[cid].push(msg)
+    while (String(store.state.accountId) === accountId) {
+      const page = await api.getRecentMessages(request)
+      if (String(store.state.accountId) !== accountId) return
+      const messages = page.messages.map(msg => {
+        const isMe = String(msg.senderId) === accountId
+        const common = { user: isMe ? 'you' : String(msg.senderId), text: msg.message,
+          time: msg.timestamp, messageId: msg.id || msg.messageId || undefined, seqId: msg.seqId,
+          messageType: msg.messageType === 1 ? 'image' : msg.messageType === 2 ? 'file' : 'text',
+          fileUrl: msg.fileUrl, fileName: msg.fileName, fileSize: msg.fileSize,
+          replyTo: msg.replyToMessageId ? { messageId: msg.replyToMessageId,
+            content: msg.replyToContent || '', sender: msg.replyToSender || '' } : undefined }
+        return msg.conversationId?.startsWith('group:')
+          ? { ...common, user: String(msg.senderId), groupId: msg.conversationId.slice(6) }
+          : { ...common, targetId: isMe ? String(msg.receiverId) : String(msg.senderId) }
+      })
+      await store.restoreHistoryPage(accountId, messages)
+      if (String(store.state.accountId) !== accountId) return
+      await store.rebuildConversationStates(true)
+      if (!page.hasMore) return
+      if (!page.nextId || page.nextTimestamp == null ||
+          (page.nextId === request.afterId && page.nextTimestamp === request.afterTimestamp)) {
+        throw new Error('Recent history cursor did not advance')
       }
+      request = { windowEnd: page.windowEnd, afterTimestamp: page.nextTimestamp, afterId: page.nextId, limit: 100 }
     }
-
-    // 私聊
-    for (const [convId, msgs] of Object.entries(privateByConv)) {
-      msgs.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
-      for (const msg of msgs) {
-        const isMe = String(msg.senderId) === String(accountId)
-        store.addMessage({
-          user: isMe ? 'you' : String(msg.senderId),
-          text: msg.message,
-          time: msg.timestamp,
-          targetId: isMe ? String(msg.receiverId) : String(msg.senderId),
-          messageId: msg.id || msg.messageId || undefined,
-          seqId: msg.seqId
-        })
-      }
-      const maxSeqId = Math.max(...msgs.map(m => Number(m.seqId || 0)))
-      if (maxSeqId > 0) store.setConversationSeqId(convId, maxSeqId)
-    }
-
-    // 群聊
-    for (const [convId, msgs] of Object.entries(groupByConv)) {
-      const gid = convId.replace('group:', '')
-      msgs.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
-      for (const msg of msgs) {
-        store.addGroupMessage({
-          user: String(msg.senderId),
-          text: msg.message,
-          time: msg.timestamp,
-          groupId: gid,
-          messageId: msg.id || msg.messageId || undefined,
-          seqId: msg.seqId
-        })
-      }
-      const maxSeqId = Math.max(...msgs.map(m => Number(m.seqId || 0)))
-      if (maxSeqId > 0) store.setConversationSeqId(convId, maxSeqId)
-    }
-
-    console.debug(`📡 增量同步完成: ${allMessages.length} 条, ${Object.keys(privateByConv).length} 个私聊会话, ${Object.keys(groupByConv).length} 个群聊`)
-  } catch (e) {
-    console.warn("⚠️ 拉取离线消息失败:", e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    console.warn('Recent history synchronization failed:', error)
   }
 }
 
