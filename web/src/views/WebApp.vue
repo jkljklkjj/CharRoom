@@ -529,6 +529,9 @@ function closeSettings() {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
 
+  // 应用视图锁定文档滚动：保留顶部安全区留白，但页面整体不参与拖拽/橡皮筋
+  document.body.classList.add('app-viewport')
+
   // 主题由 App.vue 全局初始化；这里确保本页也已应用（幂等）
   initTheme()
 
@@ -653,6 +656,7 @@ onUnmounted(() => {
   stopFriendRequestPolling()
   sessionEpoch.renew()
   chatSocket.close()
+  document.body.classList.remove('app-viewport')
 })
 </script>
 
@@ -662,7 +666,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  height: 100%;
   background: #f8f9fa;
 }
 
@@ -686,7 +690,8 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
-.app-wrap{height:100dvh;display:flex;flex-direction:column}
+/* 高度跟随 body 内容盒（已扣掉顶部/底部安全区留白），避免多出可拖拽的溢出区域 */
+.app-wrap{height:100%;display:flex;flex-direction:column}
 .app-main{display:flex;flex:1;min-height:0}
 .sidebar{width:260px;border-right:1px solid rgba(0,0,0,0.04);background:var(--bg)}
 .chat{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -697,20 +702,21 @@ onUnmounted(() => {
     display: block;
     position: relative;
     width: 100%;
-    height: 100dvh;
+    height: 100%;
   }
 
   /* 移动端下的sidebar占满全屏 */
   .app-main.mobile-view .sidebar {
     width: 100%;
-    height: 100dvh;
+    height: 100%;
     border-right: none;
   }
 
   /* 移动端聊天视图 */
   .app-main.mobile-view .chat-view {
     position: fixed;
-    top: 0;
+    /* 固定在视口上时同样让开顶部安全区，保持与侧边栏一致的留白 */
+    top: env(safe-area-inset-top, 0);
     left: 0;
     right: 0;
     bottom: 0;

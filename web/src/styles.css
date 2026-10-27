@@ -51,6 +51,19 @@ body {
   padding-right: env(safe-area-inset-right, 0);
 }
 
+/* 应用视图锁定文档滚动：顶部安全区留白仍然保留，但文档本身不再可滚动，
+   下拉拖拽/橡皮筋时不会把这块留白拖出来，也不会把整体页面拉下去。 */
+body.app-viewport {
+  box-sizing: border-box;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body.app-viewport #app {
+  height: 100%;
+}
+
 /* 2. 触摸体验优化 */
 * {
   /* 禁用长按选择/复制，提升应用感 */

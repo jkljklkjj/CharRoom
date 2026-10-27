@@ -55,8 +55,17 @@
     </div>
 
     <div id="sidebar-panel" class="directory-panel" role="tabpanel" :aria-labelledby="`sidebar-tab-${tab}`" :aria-busy="friendsLoading">
-      <div v-if="friendsLoading" class="contacts-empty" role="status">{{ $t('social.loading') }}</div>
-      <div v-else-if="friendsError" class="contacts-empty" role="alert"><p>{{ $t('social.failed') }}</p><button class="cancel-btn" @click="loadFriends">{{ $t('polish.retry') }}</button></div>
+      <!-- 加载态用骨架行占位：与真实联系人行同尺寸，不出文字，避免加载前后布局跳变 -->
+      <ul v-if="friendsLoading && !visibleCount" class="users-list skeleton-list" role="status" :aria-label="$t('social.loading')">
+        <li v-for="n in 7" :key="n" class="user-row skeleton-row" aria-hidden="true">
+          <div class="avatar skeleton-avatar"></div>
+          <div class="meta">
+            <div class="skeleton-line skeleton-name"></div>
+            <div class="skeleton-line skeleton-sub"></div>
+          </div>
+        </li>
+      </ul>
+      <div v-else-if="friendsError && !visibleCount" class="contacts-empty" role="alert"><p>{{ $t('social.failed') }}</p><button class="cancel-btn" @click="loadFriends">{{ $t('polish.retry') }}</button></div>
       <div v-else-if="!visibleCount" class="contacts-empty" role="status">
         <p>{{ $t(query.trim() ? 'sidebar.noMatches' : 'polish.emptyContacts') }}</p>
         <button class="cancel-btn" @click="query.trim() ? emit('update:query', '') : emit('open-discovery')">{{ $t(query.trim() ? 'sidebar.clearSearch' : 'social.discover') }}</button>
@@ -302,18 +311,26 @@ async function loadFriends() {
 .search-bar input{width:100%;min-width:0;background:transparent;color:var(--text-primary);border:0;outline:0;padding:12px;font:inherit;font-size:13px}
 .search-bar input::-webkit-search-cancel-button{display:none}
 .clear-search{border:0;background:transparent;color:var(--text-secondary);font-size:20px;min-width:44px;min-height:44px;cursor:pointer}
-.directory-panel{display:flex;flex-direction:column;min-height:0;flex:1;overflow:auto}
+.directory-panel{display:flex;flex-direction:column;min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}
 .section-heading h3{font-size:12px;font-weight:500;color:var(--text-secondary);margin:16px 24px 6px;display:flex;gap:8px}
 .section-heading span{font-variant-numeric:tabular-nums}
 .group-avatar{color:var(--accent-2)}
 .contacts-empty{padding:36px 20px;text-align:center;color:var(--text-secondary);font-size:14px;line-height:1.7}
+/* 加载骨架：尺寸与 .user-row 一致，刷新已有数据时不闪 */
+.skeleton-list{overflow:hidden}
+.skeleton-row{pointer-events:none}
+.skeleton-avatar,.skeleton-line{background:var(--surface-2,#f0f0f0);animation:sidebar-skeleton 1.2s ease-in-out infinite alternate}
+.skeleton-line{height:12px;border-radius:6px}
+.skeleton-name{width:44%}
+.skeleton-sub{width:70%;height:11px;margin-top:8px}
+@keyframes sidebar-skeleton{from{opacity:1}to{opacity:.55}}
 .friend-requests-btn{position:relative;background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
 .friend-requests-btn:hover{background:var(--hover)}
 .friend-requests-btn.hasRequests{color:#ff7a33}
 .badge{position:absolute;top:-2px;right:-2px;background:#ff4757;color:white;font-size:10px;padding:1px 4px;border-radius:8px;min-width:12px;text-align:center}
 .settings-btn{background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
 .settings-btn:hover{background:var(--hover)}
-.users-list{list-style:none;padding:0;margin:0;overflow:auto;flex:1}
+.users-list{list-style:none;padding:0;margin:0;overflow:auto;flex:1;overscroll-behavior:contain}
 .users-list .user-row{display:flex;align-items:center;padding:12px;margin:2px 8px;border-radius:10px;cursor:pointer;min-height:44px}
 .users-list .user-row:hover{background:var(--hover)}
 .users-list .user-row.active{background:rgba(255,122,51,0.08)}
