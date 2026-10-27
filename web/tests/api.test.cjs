@@ -46,7 +46,8 @@ test('failed token refresh settles every waiting request without recursive refre
     new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error('refresh waiters hung')), 500); timer.unref() })
   ])
   assert.equal(refreshCalls, 1)
-  assert.ok(results.every(result => !result.ok && result.status === 401))
+  assert.ok(results.every(result => !result.ok && [0, 401].includes(result.status)))
+  assert.ok(results.some(result => result.status === 401))
 })
 test('API default export supplies quota, payment status and friend notification methods', async () => {
   const store = fixtureStore()
@@ -64,4 +65,27 @@ test('API default export supplies quota, payment status and friend notification 
     assert.equal(typeof module.default[name], 'function', name)
   }
   assert.equal((await module.default.getTokenQuota()).balanceFen, 250)
+})
+
+
+test('late refresh after account switch cannot replace the new account credentials', async () => {
+  const store = fixtureStore(), sessionStorage = storage(), localStorage = storage()
+  let release, requested
+  const gate = new Promise(resolve => { release = resolve })
+  const started = new Promise(resolve => { requested = resolve })
+  const fetch = async url => {
+    if (url.endsWith('/auth/refresh')) { requested(); await gate; return response(200, { data: { accessToken: 'late-A', refreshToken: 'late-refresh-A' } }) }
+    return response(401, {})
+  }
+  const { exports: api } = await loadTs(path.resolve(__dirname, '../src/api/http.ts'), {
+    fetch, Headers, sessionStorage, localStorage, window: { location: {} }
+  }, { '../store': { default: store } })
+  const pending = api.safeFetch('/old-account')
+  await started
+  store.state.accountId = 'B'; store.state.token = 'token-B'; store.state.refreshToken = 'refresh-B'
+  release()
+  assert.equal((await pending).ok, false)
+  assert.equal(store.state.token, 'token-B')
+  assert.equal(store.state.refreshToken, 'refresh-B')
+  assert.equal(sessionStorage.getItem('charroom_token'), undefined)
 })

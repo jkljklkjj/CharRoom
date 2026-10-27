@@ -10,6 +10,7 @@
 - REST：`src/api/index.ts`（请求与刷新在 `http.ts`）；状态：`src/store/{state,auth,users,messages,storage}.ts`。
 - 实时：`src/services/chatSocket.ts` → `src/services/transport/TransportFactory.ts` / `WebTransport.ts`。文件名 chatSocket 不代表 WebSocket。
 - 本地存储：`src/utils/messageDB.ts`；待发消息：`src/services/offlineQueue.ts`。新设备七天历史入口与 IndexedDB 合并规则见 [历史恢复](../docs/development/RECENT-HISTORY.md)。
+- 增量补拉：`src/services/conversationSync.ts`；登录生命周期：`sessionEpoch.ts` / `sessionBootstrap.ts`（同目录）；消息虚拟列表：`src/components/VirtualMessageList.vue`。游标落库边界、IndexedDB v6 和验证命令见 [客户端优化](../docs/development/CLIENT-SYNC-AND-PERFORMANCE.md)。
 - protobuf：`src/proto/index.ts` / `worker.ts`（通过共享 `codec.ts` 编解码），运行时 URL `/proto/message.proto`；公共资源在 `public/proto/`。
 - 协议常量：`src/proto/constants.ts`，由 `scripts/generate-protocol-constants.cjs` 生成；组件从这里导入，不再从 chatSocket 服务导入类型常量。业务常量仍在 `src/constants.ts`；wire 接口 `src/proto/messages.ts` 同时生成，store/UI 类型放 `src/types/`。
 - PWA/构建：`vite.config.ts`、`scripts/generate-static-site-files.cjs`；文案在 `src/locales/` 三份语言文件。

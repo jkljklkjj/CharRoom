@@ -60,7 +60,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             val rows = objectMapper.readTree(file) as? ArrayNode ?: return@forEach
             val kept = objectMapper.createArrayNode()
             rows.filter { it.path("messageId").asText() != messageId }.forEach { kept.add(it) }
-            file.writeText(objectMapper.writeValueAsString(kept))
+            AtomicHistoryFile.write(file, objectMapper.writeValueAsString(kept))
         }
     }
 
@@ -213,7 +213,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             val folder = java.io.File(userHome, HISTORY_DIR_NAME)
             if (!folder.exists()) folder.mkdirs()
             val file = java.io.File(folder, "seq_ids.json")
-            file.writeText(objectMapper.writeValueAsString(ids))
+            AtomicHistoryFile.write(file, objectMapper.writeValueAsString(ids))
         }.onFailure {
             logger.warn(it) { "LocalChatHistoryStore operation failed" }
         }
@@ -256,7 +256,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 })
             }
             node.set<ArrayNode>("group", groupArray)
-            file.writeText(objectMapper.writeValueAsString(node))
+            AtomicHistoryFile.write(file, objectMapper.writeValueAsString(node))
         }.onFailure {
             logger.warn(it) { "savePendingMessages failed" }
         }
@@ -322,7 +322,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             val array = objectMapper.createArrayNode()
             records.values.sortedWith(compareBy<ObjectNode> { it.path("timestamp").asLong() }
                 .thenBy { it.path("messageId").asText().toLongOrNull() ?: 0L }).forEach { array.add(it) }
-            file.writeText(objectMapper.writeValueAsString(array))
+            AtomicHistoryFile.write(file, objectMapper.writeValueAsString(array))
         }.onFailure {
             logger.warn(it) { "LocalChatHistoryStore operation failed" }
         }

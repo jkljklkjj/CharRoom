@@ -4,7 +4,7 @@
 
 后端返回固定 `windowEnd`、`nextTimestamp`、`nextId`、`hasMore`；后续请求携带同一窗口与联合游标，直到无下一页。消息 ID 与 seqId 保持十进制字符串（Kotlin 需要时转 Long），时间戳是 epoch 毫秒。失败保留已应用页面，下次登录从第一页重复恢复并去重；没有永久的“已完成”标记。
 
-历史恢复不增加未读数、不修改送达标记、不推进增量 seq 游标。Web 用 `restoreHistoryPage` 按会话批量合并，IndexedDB v5 增加按账号、会话、消息 ID 的索引，防止恢复与实时重投重复落库。会话记录按时间和 ID 排序，账号切换后丢弃旧响应并保留同步期间的新消息。
+历史恢复不增加未读数、不修改送达标记、不推进增量 seq 游标。Web 用 `restoreHistoryPage` 按会话批量合并，IndexedDB v6 使用消息 ID 索引去重、时间与 ID 的复合索引排序，并在升级事务中迁移旧行。历史页只更新传入记录，分页游标不会因补入旧记录而重新编号。账号切换后丢弃旧响应并保留同步期间的新消息。后续的增量同步、虚拟列表和桌面原子替换见 [客户端优化](CLIENT-SYNC-AND-PERFORMANCE.md)。
 
 Kotlin 使用 `core/RecentHistory.kt` 的明确 wire DTO 与分页协调函数。每页先写入账号所属的本地文件，再合并到 UI；UI 的 200 条 LRU 不代表完整历史。桌面与 Android 按对方 ID 保存私聊、按消息 ID 合并文件，不再以 500 条截断历史；手动删除消息显式移除文件内的记录。文件同时保存 seqId、conversationId 和附件/引用字段，字段本身不代表同步进度。
 

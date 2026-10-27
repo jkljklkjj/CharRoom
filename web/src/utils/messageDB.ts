@@ -2,16 +2,17 @@ import type { ChatMessage, Id } from '../types/chat'
 import { conversationPreviewText } from './format'
 
 const DB_NAME = 'charroom_messages'
-// v2: 复合排序索引；v3: 会话元数据；v4: 兼容历史分支 schema；v5: 按消息 ID 去重索引
+// v2: 插入顺序；v3: 会话元数据；v4: 旧分支兼容；v5: 消息 ID 去重；v6: 稳定时间/ID 游标
 // （旧本地分支也用过 version 3 但索引名不同，同版本不会触发 upgrade，必须提升版本号）
-const DB_VERSION = 5
+const DB_VERSION = 6
 const STORE_NAME = 'messages'
 const META_STORE_NAME = 'conversation_meta'
-const ORDER_INDEX = 'account_conversation_index'
+const ORDER_INDEX = 'account_conversation_index' // retained for allocating legacy row keys
+const TIME_INDEX = 'account_conversation_time_id'
 const MESSAGE_ID_INDEX = 'account_conversation_message_id'
 interface StoredMessage {
   id: string; accountId: string; conversationId: string
-  message: ChatMessage; index: number; timestamp: string | number
+  message: ChatMessage; index: number; timestamp: number; sortId: string
 }
 export interface ConversationMeta {
   id: string; accountId: string; conversationId: string
@@ -19,7 +20,8 @@ export interface ConversationMeta {
   /** 最新一条消息的预览文本；v4 之前的元数据可能缺失（由 getLastMessage 补写） */
   lastMessagePreview?: string
 }
-export interface MessagePage { messages: ChatMessage[]; beforeIndex: number | null; hasMore: boolean }
+export type MessageCursor = [number, string, string]
+export interface MessagePage { messages: ChatMessage[]; beforeIndex: MessageCursor | null; hasMore: boolean }
 let databasePromise: Promise<IDBDatabase> | null = null
 function openDB(): Promise<IDBDatabase> {
   databasePromise ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -40,6 +42,7 @@ function openDB(): Promise<IDBDatabase> {
       if (!store.indexNames.contains('accountId_conversationId')) store.createIndex('accountId_conversationId', ['accountId', 'conversationId'])
       if (!store.indexNames.contains(ORDER_INDEX)) store.createIndex(ORDER_INDEX, ['accountId', 'conversationId', 'index'])
       if (!store.indexNames.contains(MESSAGE_ID_INDEX)) store.createIndex(MESSAGE_ID_INDEX, ['accountId', 'conversationId', 'message.messageId'])
+      if (!store.indexNames.contains(TIME_INDEX)) store.createIndex(TIME_INDEX, ['accountId', 'conversationId', 'timestamp', 'sortId', 'id'])
       // v3: 会话元数据（预览用最后消息时间），避免重建预览时全量读消息
       if (!db.objectStoreNames.contains(META_STORE_NAME)) {
         const meta = db.createObjectStore(META_STORE_NAME, { keyPath: 'id' })
@@ -52,9 +55,9 @@ function openDB(): Promise<IDBDatabase> {
         const cursor = cursorRequest.result
         if (!cursor) return
         const row = cursor.value as StoredMessage
-        if (typeof row.accountId !== 'string' || typeof row.conversationId !== 'string') {
-          cursor.update({ ...row, accountId: String(row.accountId), conversationId: String(row.conversationId) })
-        }
+        const normalized = record(row.accountId, row.conversationId, row.message, row.index,
+          typeof row.timestamp === 'number' ? row.timestamp : row.index)
+        cursor.update({ ...normalized, id: row.id })
         cursor.continue()
       }
     }
@@ -62,18 +65,23 @@ function openDB(): Promise<IDBDatabase> {
   return databasePromise
 }
 /** 提取消息时间戳（兼容 time / timestamp / ISO 字符串） */
-function messageTimestamp(message: ChatMessage): number {
-  const v = message.time ?? message.timestamp ?? Date.now()
-  if (typeof v === 'number') return v
+function messageTimestamp(message: ChatMessage, fallback = Date.now()): number {
+  const v = message.time ?? message.timestamp ?? fallback
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.max(0, v) : fallback
+  if (/^\d+$/.test(v)) return Number(v)
   const parsed = Date.parse(String(v))
-  return Number.isNaN(parsed) ? Date.now() : parsed
+  return Number.isNaN(parsed) ? fallback : Math.max(0, parsed)
 }
 function range(accountId: Id, conversationId: Id) {
   return IDBKeyRange.only([String(accountId), String(conversationId)])
 }
-function orderedRange(accountId: Id, conversationId: Id, beforeIndex: number | null = null) {
+function orderedRange(accountId: Id, conversationId: Id, before: MessageCursor | null = null) {
+  return IDBKeyRange.bound([String(accountId), String(conversationId), 0, '', ''],
+    [String(accountId), String(conversationId), ...(before ?? [Number.MAX_SAFE_INTEGER, '\uffff', '\uffff'])], false, before !== null)
+}
+function allocationRange(accountId: Id, conversationId: Id) {
   return IDBKeyRange.bound([String(accountId), String(conversationId), 0],
-    [String(accountId), String(conversationId), beforeIndex ?? Number.MAX_SAFE_INTEGER], false, beforeIndex !== null)
+    [String(accountId), String(conversationId), Number.MAX_SAFE_INTEGER])
 }
 async function write(operation: (store: IDBObjectStore) => void): Promise<void> {
   const db = await openDB()
@@ -84,10 +92,11 @@ async function write(operation: (store: IDBObjectStore) => void): Promise<void> 
     operation(tx.objectStore(STORE_NAME))
   })
 }
-function record(accountId: Id, conversationId: Id, message: ChatMessage, index: number): StoredMessage {
+function record(accountId: Id, conversationId: Id, message: ChatMessage, index: number, fallback = Date.now()): StoredMessage {
   return { id: `${accountId}:${conversationId}:${index}`, accountId: String(accountId), conversationId: String(conversationId),
     // Vue reactive proxies cannot be cloned by IndexedDB.
-    message: JSON.parse(JSON.stringify(message)) as ChatMessage, index, timestamp: messageTimestamp(message) }
+    message: JSON.parse(JSON.stringify(message)) as ChatMessage, index, timestamp: messageTimestamp(message, fallback),
+    sortId: message.messageId && /^\d+$/.test(message.messageId) ? `n:${message.messageId.padStart(32, '0')}` : `s:${String(index).padStart(20, '0')}` }
 }
 function metaRecord(accountId: Id, conversationId: Id, lastTime: number) {
   return { id: `${accountId}:${conversationId}`, accountId: String(accountId), conversationId: String(conversationId), lastIncomingMessageTime: lastTime }
@@ -148,23 +157,23 @@ export function saveMessages(accountId: Id, conversationId: Id, messages: readon
 export async function getMessages(accountId: Id, conversationId: Id): Promise<ChatMessage[]> {
   const db = await openDB()
   return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(ORDER_INDEX).getAll(orderedRange(accountId, conversationId))
+    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(TIME_INDEX).getAll(orderedRange(accountId, conversationId))
     request.onsuccess = () => resolve((request.result as StoredMessage[]).map(row => row.message))
     request.onerror = () => reject(request.error)
   })
 }
-export async function getMessagesPage(accountId: Id, conversationId: Id, beforeIndex: number | null = null, limit = 50): Promise<MessagePage> {
-  if (limit <= 0 || beforeIndex === 0) return { messages: [], beforeIndex: null, hasMore: false }
+export async function getMessagesPage(accountId: Id, conversationId: Id, beforeIndex: MessageCursor | null = null, limit = 50): Promise<MessagePage> {
+  if (limit <= 0) return { messages: [], beforeIndex: null, hasMore: false }
   const db = await openDB()
   return new Promise((resolve, reject) => {
     const rows: StoredMessage[] = []
-    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(ORDER_INDEX).openCursor(orderedRange(accountId, conversationId, beforeIndex), 'prev')
+    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(TIME_INDEX).openCursor(orderedRange(accountId, conversationId, beforeIndex), 'prev')
     request.onerror = () => reject(request.error)
     request.onsuccess = () => {
       const cursor = request.result
       if (cursor && rows.length < limit) { rows.push(cursor.value as StoredMessage); cursor.continue(); return }
       rows.reverse()
-      resolve({ messages: rows.map(row => row.message), beforeIndex: rows[0]?.index ?? null, hasMore: !!cursor })
+      resolve({ messages: rows.map(row => row.message), beforeIndex: rows[0] ? [rows[0].timestamp, rows[0].sortId, rows[0].id] : null, hasMore: !!cursor })
     }
   })
 }
@@ -176,7 +185,7 @@ export function appendMessage(accountId: Id, conversationId: Id, message: ChatMe
     tx.onerror = tx.onabort = () => reject(tx.error)
     const store = tx.objectStore(STORE_NAME)
     const append = () => {
-      const request = store.index(ORDER_INDEX).openCursor(orderedRange(accountId, conversationId), 'prev')
+      const request = store.index(ORDER_INDEX).openCursor(allocationRange(accountId, conversationId), 'prev')
       request.onsuccess = () => {
         const last = request.result?.value as StoredMessage | undefined
         store.put(record(accountId, conversationId, message, last ? last.index + 1 : 0))
@@ -186,40 +195,39 @@ export function appendMessage(accountId: Id, conversationId: Id, message: ChatMe
       const existing = store.index(MESSAGE_ID_INDEX).get([String(accountId), String(conversationId), message.messageId])
       existing.onsuccess = () => {
         const row = existing.result as StoredMessage | undefined
-        if (row) store.put(record(accountId, conversationId, { ...row.message, ...message }, row.index))
+        if (row) store.put(record(accountId, conversationId, { ...row.message, ...message }, row.index, row.timestamp))
         else append()
       }
     } else append()
     touchConversationMeta(tx, accountId, conversationId, message)
   }))
 }
-/** Merge one history page atomically with live/local rows, preserving stable message IDs. */
+/** Batch upsert by message ID: no full conversation scan, renumbering or replacement. */
 export async function mergeHistoryMessages(accountId: Id, conversationId: Id, messages: readonly ChatMessage[]) {
+  const batch = new Map(messages.filter(m => m.messageId).map(m => [m.messageId!, m]))
+  if (!batch.size) return
   const db = await openDB()
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite')
     tx.oncomplete = () => resolve()
     tx.onerror = tx.onabort = () => reject(tx.error)
     const store = tx.objectStore(STORE_NAME)
-    const request = store.index(ORDER_INDEX).getAll(orderedRange(accountId, conversationId))
-    request.onsuccess = () => {
-      const rows = request.result as StoredMessage[]
-      const merged = new Map<string, ChatMessage>()
-      rows.forEach(row => merged.set(row.message.messageId || row.id, row.message))
-      messages.forEach(message => {
-        if (!message.messageId) return
-        merged.set(message.messageId, { ...message, ...merged.get(message.messageId) })
-      })
-      const sorted = [...merged.values()].sort((a, b) => {
-        const time = messageTimestamp(a) - messageTimestamp(b)
-        if (time) return time
-        const left = a.messageId || '', right = b.messageId || ''
-        if (/^\d+$/.test(left) && /^\d+$/.test(right)) return BigInt(left) < BigInt(right) ? -1 : BigInt(left) > BigInt(right) ? 1 : 0
-        return left.localeCompare(right)
-      })
-      rows.forEach(row => store.delete(row.id))
-      sorted.forEach((message, index) => store.put(record(accountId, conversationId, message, index)))
-      if (sorted.length) touchConversationMeta(tx, accountId, conversationId, sorted[sorted.length - 1])
+    const last = store.index(ORDER_INDEX).openCursor(allocationRange(accountId, conversationId), 'prev')
+    last.onsuccess = () => {
+      let index = ((last.result?.value as StoredMessage | undefined)?.index ?? -1) + 1
+      let remaining = batch.size, newest: ChatMessage | null = null
+      for (const [id, message] of batch) {
+        const request = store.index(MESSAGE_ID_INDEX).get([String(accountId), String(conversationId), id])
+        request.onsuccess = () => {
+          const old = request.result as StoredMessage | undefined
+          // Local send status/live edits win over a bootstrap copy of the same ID.
+          const merged = { ...message, ...old?.message }
+          const row = record(accountId, conversationId, merged, old ? old.index : index++, old?.timestamp)
+          store.put(row)
+          if (!newest || row.timestamp >= messageTimestamp(newest)) newest = merged
+          if (--remaining === 0 && newest) touchConversationMeta(tx, accountId, conversationId, newest)
+        }
+      }
     }
   })
 }
@@ -291,7 +299,7 @@ export async function getConversationMeta(accountId: Id, conversationId: Id): Pr
 export async function getLastMessage(accountId: Id, conversationId: Id): Promise<ChatMessage | null> {
   const db = await openDB()
   return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(ORDER_INDEX)
+    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(TIME_INDEX)
       .openCursor(orderedRange(accountId, conversationId), 'prev')
     request.onsuccess = () => resolve((request.result?.value as StoredMessage | undefined)?.message ?? null)
     request.onerror = () => reject(request.error)

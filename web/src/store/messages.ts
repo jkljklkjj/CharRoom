@@ -1,4 +1,4 @@
-import type { Id, ChatMessage, ConversationPatch } from '../types/chat'
+import type { Id, ChatMessage } from '../types/chat'
 import { state, PAGE_SIZE } from './state'
 import { AGENT_USER_ID } from '../constants'
 import { getPrivateConversationId, normalizeTimeValue } from './storage'
@@ -7,34 +7,9 @@ import DOMPurify from 'dompurify'
 import { getMessagesPage as dbGetMessagesPage, appendMessage as dbAppendMessage,
          mergeHistoryMessages as dbMergeHistoryMessages, deleteMessage as dbDeleteMessage } from '../utils/messageDB'
 
-// 延迟导入 users.ts 避免循环依赖
-let _updateConversationState: ((id: Id, patch: ConversationPatch) => void) | null = null
-let _invalidateConversationPreview: ((id: Id) => void) | null = null
-let _pendingPatches: { conversationId: Id; patch: ConversationPatch }[] = [] // 缓存首次调用的 patch，等导入完成后执行
-
-import('./users').then(m => {
-  _updateConversationState = m.updateConversationState
-  _invalidateConversationPreview = m.invalidateConversationPreview
-  // 执行缓存的 patches
-  for (const { conversationId, patch } of _pendingPatches) {
-    _updateConversationState(conversationId, patch)
-  }
-  _pendingPatches = []
-})
-
-function updateConversationState(conversationId: Id, patch: ConversationPatch) {
-  if (!_updateConversationState) {
-    // 导入未完成，缓存 patch
-    _pendingPatches.push({ conversationId, patch })
-    return
-  }
-  _updateConversationState(conversationId, patch)
-}
-
-function invalidatePreview(conversationId: Id) {
-  if (!_invalidateConversationPreview) return
-  _invalidateConversationPreview(conversationId)
-}
+import { updateConversationState, invalidateConversationPreview as invalidatePreview } from './users'
+import { sessionEpoch } from '../services/sessionEpoch'
+import type { MessageCursor } from '../utils/messageDB'
 
 /**
  * 预清洗消息文本，避免每次渲染都调用 DOMPurify。
@@ -50,7 +25,7 @@ function sanitizeText(text: string) {
 function persistConversationSeqIds() {
   try {
     if (state.accountId) {
-      localStorage.setItem(`charroom_seqids_${state.accountId}`, JSON.stringify(state.conversationSeqIds))
+      localStorage.setItem(`charroom_seqids_${state.accountId}`, JSON.stringify({ version: 2, cursors: state.conversationSeqIds }))
     }
   } catch (_) {}
 }
@@ -97,83 +72,61 @@ async function saveGroupMessage(message: ChatMessage) {
 
 // ── 会话加载 + 分页 ───────────────────────────
 
-// 分页游标：conversationId → 已加载的最旧消息 index（null=从头）；
-// 配合 IndexedDB 游标分页，避免每次翻页全量读会话消息
-const pageCursors = new Map<string, number | null>()
+// Cursors belong to a view generation. Switching A→B→A invalidates both old requests.
+const pageCursors = new Map<string, MessageCursor | null>()
+let viewGeneration = 0
+let loadingOlder: { generation: number; promise: Promise<boolean> } | null = null
 
-export async function loadConversation(id: Id | null, isGroup = false) {
-  if (!id) {
-    state.selectedChatId = null
-    state.messages = []
-    state.groupMessages = []
-    state.hasMoreMessages = true
-    state.hasMoreGroupMessages = true
-    return
-  }
-  state.selectedChatId = id
-  if (state.accountId) {
-    if (isGroup) {
-      state.messages = []
-      const conversationId = `group:${Math.abs(Number(id))}`
-      const page = await dbGetMessagesPage(state.accountId, conversationId, null, PAGE_SIZE)
-      state.groupMessages = page.messages
-      state.hasMoreGroupMessages = page.hasMore
-      pageCursors.set(conversationId, page.beforeIndex)
-    } else {
-      state.groupMessages = []
-      const conversationId = String(id)
-      const page = await dbGetMessagesPage(state.accountId, conversationId, null, PAGE_SIZE)
-      state.messages = page.messages
-      state.hasMoreMessages = page.hasMore
-      pageCursors.set(conversationId, page.beforeIndex)
-    }
-  } else {
-    state.messages = []
-    state.groupMessages = []
-    state.hasMoreMessages = true
-    state.hasMoreGroupMessages = true
-  }
+function currentView() {
+  const generation = viewGeneration, accountId = String(state.accountId), selected = state.selectedChatId
+  const session = sessionEpoch.capture()
+  return { accountId, selected, generation,
+    isCurrent: () => session.isCurrent() && viewGeneration === generation && String(state.accountId) === accountId && state.selectedChatId === selected }
 }
 
-export async function loadOlderMessages() {
-  if (!state.selectedChatId || !state.accountId) return false
-
-  const isGroup = Number(state.selectedChatId) < 0
+export async function loadConversation(id: Id | null, isGroup = false) {
+  viewGeneration++
+  pageCursors.clear()
+  state.selectedChatId = id
+  state.messages = []
+  state.groupMessages = []
+  state.hasMoreMessages = true
+  state.hasMoreGroupMessages = true
+  if (!id || !state.accountId) return
+  const view = currentView()
+  const conversationId = isGroup ? `group:${Math.abs(Number(id))}` : String(id)
+  const page = await dbGetMessagesPage(view.accountId, conversationId, null, PAGE_SIZE)
+  if (!view.isCurrent()) return
   if (isGroup) {
-    if (!state.hasMoreGroupMessages) return false
-    const conversationId = `group:${Math.abs(Number(state.selectedChatId))}`
-    const beforeIndex = pageCursors.get(conversationId)
-    if (beforeIndex == null) {
-      state.hasMoreGroupMessages = false
-      return false
-    }
-    const page = await dbGetMessagesPage(state.accountId, conversationId, beforeIndex, PAGE_SIZE)
-    if (page.messages.length === 0) {
-      state.hasMoreGroupMessages = false
-      return false
-    }
-    state.groupMessages = [...page.messages, ...state.groupMessages]
+    state.groupMessages = page.messages
     state.hasMoreGroupMessages = page.hasMore
-    pageCursors.set(conversationId, page.beforeIndex)
-    return true
   } else {
-    if (!state.hasMoreMessages) return false
-    const conversationId = String(state.selectedChatId)
-    const beforeIndex = pageCursors.get(conversationId)
-    if (beforeIndex == null) {
-      state.hasMoreMessages = false
-      return false
-    }
-    const page = await dbGetMessagesPage(state.accountId, conversationId, beforeIndex, PAGE_SIZE)
-    if (page.messages.length === 0) {
-      state.hasMoreMessages = false
-      return false
-    }
-    state.messages = [...page.messages, ...state.messages]
+    state.messages = page.messages
     state.hasMoreMessages = page.hasMore
-    pageCursors.set(conversationId, page.beforeIndex)
-    return true
   }
+  pageCursors.set(conversationId, page.beforeIndex)
+}
+
+export function loadOlderMessages(): Promise<boolean> {
+  if (!state.selectedChatId || !state.accountId) return Promise.resolve(false)
+  if (loadingOlder?.generation === viewGeneration) return loadingOlder.promise
+  const view = currentView(), isGroup = Number(view.selected) < 0
+  const conversationId = isGroup ? `group:${Math.abs(Number(view.selected))}` : String(view.selected)
+  const before = pageCursors.get(conversationId)
+  if (!(isGroup ? state.hasMoreGroupMessages : state.hasMoreMessages) || !before) return Promise.resolve(false)
+  const flight = { generation: view.generation, promise: Promise.resolve(false) }
+  flight.promise = dbGetMessagesPage(view.accountId, conversationId, before, PAGE_SIZE).then(page => {
+    if (!view.isCurrent()) return false
+    const current = isGroup ? state.groupMessages : state.messages
+    const ids = new Set(current.map(m => m.messageId).filter(Boolean))
+    const merged = [...page.messages.filter(m => !m.messageId || !ids.has(m.messageId)), ...current]
+    if (isGroup) { state.groupMessages = merged; state.hasMoreGroupMessages = page.hasMore }
+    else { state.messages = merged; state.hasMoreMessages = page.hasMore }
+    pageCursors.set(conversationId, page.beforeIndex)
+    return page.messages.length > 0
+  }).finally(() => { if (loadingOlder === flight) loadingOlder = null })
+  loadingOlder = flight
+  return flight.promise
 }
 
 // ── 消息操作 ──────────────────────────────────
@@ -181,7 +134,10 @@ export async function loadOlderMessages() {
 // 最近处理过的 messageId（防重复入列：后端未收到 ACK 会 30s×3 重发，
 // 重连补拉/增量同步也可能与实时推送重复）
 const seenMessageIds = new Set<string>()
+let seenVersion = -1
 function alreadySeen(messageId?: string | null): boolean {
+  const version = sessionEpoch.capture().version
+  if (version !== seenVersion) { seenVersion = version; seenMessageIds.clear() }
   if (!messageId) return false
   if (seenMessageIds.has(messageId)) return true
   seenMessageIds.add(messageId)
@@ -213,18 +169,15 @@ export function addMessage(m: ChatMessage) {
     // 自己发出的消息同样更新联系人列表第二行的预览（不改变 incoming 排序时间）
     updateConversationState(chatId, { lastMessagePreview: conversationPreviewText(sanitized) })
   }
-  if (m.seqId != null) {
-    const partnerId = chatId
-    const ids = [Number(state.accountId), Number(partnerId)].sort((a, b) => a - b)
-    const convId = 'user:' + ids[0] + ':' + ids[1]
-    setConversationSeqId(convId, m.seqId)
-  }
   return savePrivateMessage(sanitized)
 }
 
 /** Bootstrap pages do not increase unread counts or advance incremental seq cursors. */
 export async function restoreHistoryPage(accountId: string, messages: ChatMessage[]) {
-  if (String(state.accountId) !== accountId) return
+  const session = sessionEpoch.capture()
+  const isCurrent = () => session.isCurrent() && String(state.accountId) === accountId
+  if (!isCurrent()) return
+  if (messages.some(message => !message.messageId)) throw new Error('History message is missing its stable ID')
   const conversations = new Map<string, ChatMessage[]>()
   for (const message of messages) {
     const key = message.groupId ? `group:${message.groupId}` : getPrivateConversationId(message)
@@ -234,16 +187,18 @@ export async function restoreHistoryPage(accountId: string, messages: ChatMessag
     conversations.set(String(key), batch)
   }
   for (const [conversationId, batch] of conversations) {
-    if (String(state.accountId) !== accountId) return
+    if (!isCurrent()) return
     await dbMergeHistoryMessages(accountId, conversationId, batch)
-    if (String(state.accountId) !== accountId) return
+    if (!isCurrent()) return
     batch.forEach(message => alreadySeen(message.messageId))
     const isGroup = conversationId.startsWith('group:')
     const uiId = isGroup ? `-${conversationId.slice(6)}` : conversationId
     invalidatePreview(uiId)
     if (String(state.selectedChatId) !== uiId) continue
-    const page = await dbGetMessagesPage(accountId, conversationId, null, PAGE_SIZE)
-    if (String(state.accountId) !== accountId || String(state.selectedChatId) !== uiId) continue
+    const view = currentView()
+    const loaded = isGroup ? state.groupMessages.length : state.messages.length
+    const page = await dbGetMessagesPage(accountId, conversationId, null, Math.max(PAGE_SIZE, loaded + batch.length))
+    if (!isCurrent() || !view.isCurrent() || String(state.selectedChatId) !== uiId) continue
     pageCursors.set(conversationId, page.beforeIndex)
     if (isGroup) {
       state.groupMessages = page.messages
@@ -296,10 +251,6 @@ export function addGroupMessage(m: ChatMessage) {
     invalidatePreview(conversationId)
   } else {
     updateConversationState(conversationId, { lastMessagePreview: conversationPreviewText(sanitized) })
-  }
-  if (m.seqId != null) {
-    const convId = 'group:' + m.groupId
-    setConversationSeqId(convId, m.seqId)
   }
   return saveGroupMessage(sanitized)
 }

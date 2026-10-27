@@ -19,6 +19,7 @@ import { MSG_TYPE, DEVICE_TYPE_NUM, PROTO_DEVICE_TYPE } from '../proto/constants
 
 // ── 内部变量 ────────────────────────────────────
 
+let connectionGeneration = 0
 let transport: ChatTransport | null = null          // ChatTransport 实例
 let handlers: SocketHandlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerror: () => {} }
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -121,6 +122,7 @@ export async function connect(hostname: string, port: number, token: string, use
     throw new Error(i18n.global.t('error.webTransportNotSupported'))
   }
 
+  const generation = ++connectionGeneration
   stopReconnect = false
   currentUserId = userId
   handlers = {
@@ -139,10 +141,12 @@ export async function connect(hostname: string, port: number, token: string, use
   }
 
   // 创建 WebTransport 传输层
-  transport = createTransport()
+  const connection = createTransport()
+  transport = connection
 
   // 设置事件回调
   transport.onopen = () => {
+    if (generation !== connectionGeneration) return
     console.debug('✅ 连接成功')
     currentReconnectDelay = 1000
 
@@ -160,10 +164,11 @@ export async function connect(hostname: string, port: number, token: string, use
   }
 
   transport.onmessage = (rawData) => {
-    handleMessage(rawData)
+    if (generation === connectionGeneration) void handleMessage(rawData, generation)
   }
 
   transport.onclose = (event) => {
+    if (generation !== connectionGeneration) return
     console.warn('[CS] ❌ 连接关闭, stopReconnect=' + stopReconnect)
     console.warn('[CS] onclose 堆栈:', new Error().stack)
     stopHeartbeat()
@@ -176,6 +181,7 @@ export async function connect(hostname: string, port: number, token: string, use
   }
 
   transport.onerror = (event) => {
+    if (generation !== connectionGeneration) return
     console.warn('[CS] 💥 传输错误:', event)
     console.warn('[CS] onerror 堆栈:', new Error().stack)
     if (handlers.onerror) handlers.onerror(event)
@@ -184,8 +190,8 @@ export async function connect(hostname: string, port: number, token: string, use
   // 建立连接
   try {
     const finalUrl = buildWebTransportUrl(hostname, port)
-    await transport.connect(finalUrl, token)
-    return transport
+    await connection.connect(finalUrl, token)
+    return generation === connectionGeneration ? connection : null
   } catch (e) {
     console.error('❌ 连接失败:', e)
     throw e
@@ -212,10 +218,12 @@ async function sendLogin(token: string) {
  * 发送 protobuf 编码的消息。
  */
 export async function sendWrapper(wrapperObj: MessageWrapper) {
+  const generation = connectionGeneration, connection = transport
   if (!transport || !transport.isConnected()) {
     // 未连接时：持久化到 IndexedDB 离线队列，重连后由 flushOfflineQueue 重发
     if (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT) {
       const buffer = await encodeMessage(wrapperObj)
+      if (generation !== connectionGeneration) return false
       saveToQueue(wrapperObj, buffer, {}).catch(e =>
         console.warn('[OfflineQueue] 保存到 IndexedDB 失败:', e)
       )
@@ -224,6 +232,7 @@ export async function sendWrapper(wrapperObj: MessageWrapper) {
   }
 
   const buffer = await encodeMessage(wrapperObj)
+  if (generation !== connectionGeneration || !connection?.isConnected()) return false
 
   // 消息去重检查
   const msgId = wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId
@@ -242,7 +251,8 @@ export async function sendWrapper(wrapperObj: MessageWrapper) {
   const conversationId = resolveConversationId(wrapperObj)
 
   // transport.send 返回真实 write 状态（Promise<boolean>），失败不会误判成功
-  const sent = await transport.send(buffer, { streamType, conversationId })
+  const sent = await connection.send(buffer, { streamType, conversationId })
+  if (generation !== connectionGeneration) return false
 
   // 乐观 UI：跟踪待确认消息（私聊 + 群聊）
   if (msgId && (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT)) {
@@ -298,12 +308,15 @@ function resolveConversationId(wrapperObj: MessageWrapper) {
  * 刷新 IndexedDB 离线队列：网络恢复后自动重发离线消息。
  */
 async function flushOfflineQueue() {
+  const generation = connectionGeneration
   try {
     const pending = await getAllPending()
+    if (generation !== connectionGeneration) return
     if (pending.length === 0) return
 
     console.debug(`[OfflineQueue] 发送离线队列中的 ${pending.length} 条消息`)
     for (const entry of pending) {
+      if (generation !== connectionGeneration) return
       // 超过最大重试次数直接丢弃，避免无限重发
       if (entry.retryCount >= MAX_RETRIES) {
         console.warn(`[OfflineQueue] 丢弃超出重试上限的消息: ${entry.messageId} (retryCount=${entry.retryCount})`)
@@ -319,6 +332,7 @@ async function flushOfflineQueue() {
 
         if (transport && transport.isConnected()) {
           const ok = await transport.send(buffer, { streamType, conversationId })
+          if (generation !== connectionGeneration) return
           if (ok) {
             await removeMessage(entry.messageId)
           } else {
@@ -330,6 +344,7 @@ async function flushOfflineQueue() {
           break // 连接断开，停止发送
         }
       } catch (e) {
+        if (generation !== connectionGeneration) return
         console.warn('[OfflineQueue] 发送失败:', entry.messageId, e)
         await incrementRetry(entry.messageId)
       }
@@ -354,6 +369,8 @@ export async function sendAck(messageId: string) {
  * 关闭连接。
  */
 export function close() {
+  connectionGeneration++
+  messageCache.clear()
   stopReconnect = true
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
@@ -441,12 +458,14 @@ function scheduleReconnect(hostname: string, port: number, token: string, userId
 /**
  * 处理收到的消息（二进制数据）。
  */
-async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper) {
+async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, generation = connectionGeneration) {
   let processedData: MessageWrapper
   if (rawData instanceof ArrayBuffer || rawData instanceof Blob) {
     try { processedData = await decodeMessage(rawData instanceof Blob ? await rawData.arrayBuffer() : rawData) }
     catch (error) { console.warn('Protobuf 解码失败:', error); return }
   } else { processedData = rawData }
+
+  if (generation !== connectionGeneration) return
 
   // 处理服务端响应
   if (processedData && typeof processedData === 'object') {
@@ -472,7 +491,7 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper) {
       lastHeartbeatResponseTime = Date.now()
       return
     }
-    // ACK 确认：更新消息状态 + seqId 游标 + RTT 测量
+    // ACK confirms this send; history synchronization owns the applied cursor.
     if (processedData.type === MSG_TYPE.ACK) {
       lastHeartbeatResponseTime = Date.now()
       const ack = processedData.ack
@@ -488,9 +507,9 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper) {
         pendingAcks.delete(ackedMsgId)
         if (storeRef) storeRef.updateMessageStatus(ackedMsgId, ack.success === false ? 'failed' : 'sent')
       }
-      // 更新 seqId 游标（用于增量同步断点续拉）
-      if (ack.seqId != null && ack.conversationId && storeRef) {
-        storeRef.setConversationSeqId(ack.conversationId, ack.seqId)
+      if (ack.success !== false && ack.seqId != null && ack.conversationId) {
+        handlers.onmessage?.({ type: MSG_TYPE.SYNC_HINT,
+          ack: { clientId: ack.conversationId, message: String(ack.seqId) } })
       }
       return
     }
@@ -501,11 +520,9 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper) {
       const hint = processedData.ack
       if (!hint) return
       const conversationId = hint.clientId
-      const seqId = parseInt(hint.message || '', 10)
-      if (conversationId && seqId > 0 && storeRef) {
-        storeRef.setConversationSeqId(conversationId, seqId)
-        if (handlers.onmessage) handlers.onmessage(processedData)
-      }
+      const seqId = hint.message || ''
+      if (conversationId && /^\d+$/.test(seqId) && BigInt(seqId) > 0n) handlers.onmessage?.(processedData)
+      return
     }
 
 

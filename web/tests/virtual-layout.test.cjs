@@ -1,0 +1,15 @@
+const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path')
+const { loadTs } = require('./helpers.cjs')
+test('large histories render a bounded range with variable heights and preserve anchor offsets', async () => {
+  const { exports: { virtualLayout } } = await loadTs(path.resolve(__dirname, '../src/utils/virtualLayout.ts'))
+  const keys = Array.from({ length: 10000 }, (_, i) => String(i)), heights = new Map([['10', 500]])
+  const before = virtualLayout(keys, heights)
+  const anchor = before.offsets[5000] + 35
+  const range = before.range(anchor, 800)
+  assert.ok(range.end - range.start < 25)
+  assert.equal(before.indexAt(anchor), 5000)
+  heights.set('10', 900)
+  const after = virtualLayout(['older', ...keys], heights)
+  assert.equal(after.offsets[5001] + 35 - anchor, 500)
+  assert.deepEqual({ ...virtualLayout([], new Map()).range(0, 800) }, { start: 0, end: 0 })
+})

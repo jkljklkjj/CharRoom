@@ -71,7 +71,7 @@ function viewHandler(context, store) {
   const start = view.lastIndexOf('\n', functionStart) + 1
   const end = view.indexOf('/** 登录后拉取所有会话的离线消息 */', start)
   assert.ok(start >= 0 && end > start)
-  Object.assign(context, { store, MSG_TYPE: types, AGENT_STREAM_TYPE: agentTypes,
+  Object.assign(context, { sessionEpoch: { capture: () => ({ isCurrent: () => true }) }, syncConversation: async () => {}, store, MSG_TYPE: types, AGENT_STREAM_TYPE: agentTypes,
     normalizeTimestamp: value => new Date(Number(value)).toISOString(),
     api: { getUserDetail: async id => ({ data: { id } }) },
     chatSocket: { sendAck: async () => true } })
@@ -121,11 +121,12 @@ test('Worker uses the same numeric enum and int64 contract', async () => {
 test('real decoded CHAT reaches the UI and only a successful server ACK marks sent', async () => {
   const { context, codecModule, constantsModule } = await client()
   context.document = { visibilityState: 'visible' }
-  const statuses = [], received = []
+  const statuses = [], received = [], cursorWrites = [], syncRequests = []
   const store = { state: { accountId: '42', users: [{ id: '41' }] },
-    addMessage: msg => received.push(msg), setConversationSeqId() {},
+    addMessage: msg => received.push(msg), setConversationSeqId: (...args) => cursorWrites.push(args),
     updateMessageStatus: (...args) => statuses.push(args) }
   const receive = viewHandler(context, store)
+  context.syncConversation = (...args) => syncRequests.push(args)
   let transport
   const exportsModule = entries => new vm.SyntheticModule(Object.keys(entries), function () {
     for (const [name, value] of Object.entries(entries)) this.setExport(name, value)
@@ -165,11 +166,33 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
     assert.equal(received.length, 1)
     for (const [messageId, success] of [['accepted', true], ['rejected', false]]) {
       await socket.sendWrapper({ type: types.CHAT, chat: { targetClientId: '41', content: 'fixture', messageId } })
-      transport.onmessage(wire({ type: types.ACK, ack: { messageId, success } }))
+      transport.onmessage(wire({ type: types.ACK, ack: { messageId, success, seqId: '9007199254740993', conversationId: 'user:41:42' } }))
       await until(() => statuses.some(([id]) => id === messageId))
     }
+    transport.onmessage(wire({ type: types.SYNC_HINT, ack: { clientId: 'user:41:42', message: '9007199254740995' } }))
+    await until(() => syncRequests.some(([, seq]) => seq === '9007199254740995'))
+    assert.equal(syncRequests.filter(([, seq]) => seq === '9007199254740995').length, 1, 'hint dispatches once')
+    assert.equal(cursorWrites.length, 0, 'ACK/hint must not advance the applied cursor')
     assert.ok(statuses.some(([id, status]) => id === 'accepted' && status === 'sent'))
     assert.ok(statuses.some(([id, status]) => id === 'rejected' && status === 'failed'))
     assert.ok(!statuses.some(([id, status]) => id === 'rejected' && status === 'sent'))
+    let release
+    const blocked = new Promise(resolve => { release = resolve })
+    class DelayedBlob extends Blob {
+      async arrayBuffer() { await blocked; return wire({ type: types.CHAT,
+        chat: { userId: '41', targetClientId: '42', content: 'stale connection', messageId: 'stale' } }) }
+    }
+    const before = received.length
+    transport.onmessage(new DelayedBlob())
+    socket.close()
+    await socket.connect('fixture.invalid', 443, 'new-fixture-token', '42', { onmessage: receive })
+    release()
+    await new Promise(resolve => setTimeout(resolve, 30))
+    assert.equal(received.length, before, 'a previous connection decode cannot reach the new session')
+    const abandoned = socket.sendWrapper({ type: types.CHAT,
+      chat: { targetClientId: '41', content: 'old session encoding', messageId: 'abandoned' } })
+    socket.close()
+    await socket.connect('fixture.invalid', 443, 'another-fixture-token', '42', { onmessage: receive })
+    assert.equal(await abandoned, false, 'old asynchronous encoding must not send on a new connection')
   } finally { socket.close() }
 })

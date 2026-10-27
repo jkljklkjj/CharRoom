@@ -141,3 +141,46 @@ test('history merge is idempotent, ordered and retains concurrent live messages 
   assert.deepEqual(Array.from(latest.messages, m => m.text), ['live', 'during sync'])
   assert.deepEqual(Array.from((await db.getMessagesPage('A', '41', latest.beforeIndex, 2)).messages, m => m.text), ['old', 'same timestamp'])
 })
+
+test('history insertion leaves existing pagination cursors stable and only writes incoming IDs', async () => {
+  const { IDBObjectStore } = require('fake-indexeddb')
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
+    indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
+  })
+  for (const id of ['30', '40', '50']) await db.appendMessage('A', '41', { user: '41', text: id, messageId: id, time: Number(id) })
+  const page = await db.getMessagesPage('A', '41', null, 2)
+  let puts = 0, deletes = 0, fullReads = 0
+  const original = { put: IDBObjectStore.prototype.put, delete: IDBObjectStore.prototype.delete, getAll: IDBObjectStore.prototype.getAll }
+  IDBObjectStore.prototype.put = function (...args) { if (this.name === 'messages') puts++; return original.put.apply(this, args) }
+  IDBObjectStore.prototype.delete = function (...args) { if (this.name === 'messages') deletes++; return original.delete.apply(this, args) }
+  IDBObjectStore.prototype.getAll = function (...args) { if (this.name === 'messages') fullReads++; return original.getAll.apply(this, args) }
+  try {
+    await db.mergeHistoryMessages('A', '41', [{ user: '41', text: '10', messageId: '10', time: 10 }])
+    assert.equal(puts, 1)
+    assert.equal(deletes, 0)
+    assert.equal(fullReads, 0)
+  } finally { Object.assign(IDBObjectStore.prototype, original) }
+  const older = await db.getMessagesPage('A', '41', page.beforeIndex, 10)
+  assert.deepEqual(Array.from(older.messages, row => row.messageId), ['10', '30'])
+})
+
+test('version 5 history upgrades to timestamp/ID order without changing account ownership or send status', async () => {
+  const indexedDB = new IDBFactory()
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.open('charroom_messages', 5)
+    request.onupgradeneeded = () => {
+      const store = request.result.createObjectStore('messages', { keyPath: 'id' })
+      for (const [index, time, id] of [[0, 3000, '9007199254740995'], [1, 1000, '9007199254740993'], [2, 1000, '9007199254740994']]) {
+        store.put({ id: `A:41:${index}`, accountId: 'A', conversationId: '41', index, timestamp: time,
+          message: { messageId: id, user: 'you', time, text: id, isSent: 'failed' } })
+      }
+    }
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => { request.result.close(); resolve() }
+  })
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), { indexedDB, IDBKeyRange, structuredClone })
+  const rows = await db.getMessages('A', '41')
+  assert.deepEqual(Array.from(rows, row => row.messageId), ['9007199254740993', '9007199254740994', '9007199254740995'])
+  assert.ok(rows.every(row => row.isSent === 'failed'))
+  assert.equal((await db.getMessages('B', '41')).length, 0)
+})

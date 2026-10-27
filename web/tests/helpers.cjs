@@ -11,7 +11,7 @@ function transpile(source, fileName = 'fixture.ts') {
 function readTs(file) { return transpile(fs.readFileSync(file, 'utf8'), file) }
 async function loadTs(file, globals = {}, stubs = {}) {
   const context = vm.createContext({ console, ArrayBuffer, Uint8Array, Blob, URL, String, Number,
-    setTimeout, clearTimeout, setInterval, clearInterval, ...globals })
+    setTimeout, clearTimeout, setInterval, clearInterval, AbortController, AbortSignal, ...globals })
   const cache = new Map()
   function moduleFor(file) {
     if (cache.has(file)) return cache.get(file)

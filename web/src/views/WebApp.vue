@@ -107,7 +107,7 @@
 <script setup lang="ts">
 import type { MessageWrapper } from '../proto/messages'
 import type { Id, TimeValue, User } from '../types/chat'
-import type { OfflineMessage, Tokens } from '../types/api'
+import type { Tokens } from '../types/api'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -125,6 +125,10 @@ import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, AGENT_STREAM_TYPE } from '../proto/constants'
 import siteConfig from '../siteConfig'
 import api from '../api'
+import { ConversationSync } from '../services/conversationSync'
+import { bootstrapSession } from '../services/sessionBootstrap'
+import { sessionEpoch } from '../services/sessionEpoch'
+import { historyMessages } from '../utils/historyMessages'
 import { AGENT_USER_ID } from '../constants'
 // 主题设置（统一由 utils/theme.ts 管理，App.vue 已在全局初始化）
 import { theme, setTheme, initTheme } from '../utils/theme'
@@ -192,6 +196,7 @@ function handleResize() {
 
 /** 处理 QUIC/WebTransport 收到的消息 */
 async function handleIncomingMessage(msg: MessageWrapper) {
+  const session = sessionEpoch.capture()
   try {
     if (msg.type === MSG_TYPE.CHAT && msg.chat) {
       const senderId = String(msg.chat.userId || 'unknown')
@@ -203,6 +208,7 @@ async function handleIncomingMessage(msg: MessageWrapper) {
           // 尝试获取用户信息并添加到列表
           try {
             const userDetail = await api.getUserDetail(senderId)
+            if (!session.isCurrent()) return
             if (userDetail?.id) {
               store.addUser(userDetail)
             } else {
@@ -210,13 +216,15 @@ async function handleIncomingMessage(msg: MessageWrapper) {
               store.addUser({ id: Number(senderId), username: `用户${senderId}` })
             }
           } catch (e) {
+            if (!session.isCurrent()) return
             console.debug('获取新好友信息失败，使用临时信息:', e)
             store.addUser({ id: Number(senderId), username: `用户${senderId}` })
           }
         }
       }
 
-      store.addMessage({
+      if (!session.isCurrent()) return
+      await store.addMessage({
         user: senderId,
         text: msg.chat.content || '',
         time: normalizeTimestamp(msg.chat.timestamp),
@@ -224,12 +232,13 @@ async function handleIncomingMessage(msg: MessageWrapper) {
         messageId: msg.chat.messageId || undefined,
         seqId: msg.chat.seqId || undefined
       })
-      // 从消息 payload 中更新 seqId 游标（后端全链路携带 seqId）
+      if (!session.isCurrent()) return
+      // Live delivery requests authoritative history; it does not prove a complete prefix.
       if (msg.chat.seqId && msg.chat.conversationId) {
-        store.setConversationSeqId(msg.chat.conversationId, msg.chat.seqId)
+        void syncConversation(msg.chat.conversationId, msg.chat.seqId)
       }
     } else if (msg.type === MSG_TYPE.GROUP_CHAT && msg.groupChat) {
-      store.addGroupMessage({
+      await store.addGroupMessage({
         user: String(msg.groupChat.userId),
         text: msg.groupChat.content || '',
         time: normalizeTimestamp(msg.groupChat.timestamp),
@@ -237,9 +246,10 @@ async function handleIncomingMessage(msg: MessageWrapper) {
         messageId: msg.groupChat.messageId || undefined,
         seqId: msg.groupChat.seqId || undefined
       })
-      // 从消息 payload 中更新 seqId 游标
+      if (!session.isCurrent()) return
+      // The group history cursor is committed only after a complete response is stored.
       if (msg.groupChat.seqId && msg.groupChat.conversationId) {
-        store.setConversationSeqId(msg.groupChat.conversationId, msg.groupChat.seqId)
+        void syncConversation(msg.groupChat.conversationId, msg.groupChat.seqId)
       }
     } else if (msg.type === MSG_TYPE.AGENT_CHAT_STREAM && msg.agentStream) {
       // Agent 流式消息（AgentStreamChunk 协议）
@@ -281,8 +291,8 @@ async function handleIncomingMessage(msg: MessageWrapper) {
       const hint = msg.ack
       if (!hint) return
       const conversationId = hint.clientId
-      const seqId = parseInt(hint.message || '', 10)
-      if (conversationId && seqId > 0) {
+      const seqId = hint.message || ''
+      if (conversationId && /^\d+$/.test(seqId) && BigInt(seqId) > 0n) {
         // 服务端提示不是客户端已应用游标。
         // 触发增量同步
         syncConversation(conversationId, seqId)
@@ -299,73 +309,39 @@ async function handleIncomingMessage(msg: MessageWrapper) {
 /**
  * 增量同步单个会话（sync_hint 触发）。
  * @param {string} conversationId - 会话 ID
- * @param {number} serverSeqId - 服务端最新 seqId
+ * @param serverSeqId - 服务端最新 seqId（十进制字符串）
  */
+const incrementalSync = new ConversationSync({
+  capture: () => {
+    const owner = String(store.state.accountId), session = sessionEpoch.capture()
+    return { key: `${owner}:${session.version}`, isCurrent: () => session.isCurrent() && String(store.state.accountId) === owner }
+  },
+  cursor: conversation => store.getConversationSeqId(conversation),
+  fetch: (conversation, after) => api.syncMessages(conversation, after, 50),
+  apply: async (_, rows) => {
+    const owner = String(store.state.accountId)
+    await store.restoreHistoryPage(owner, historyMessages(rows, owner))
+  },
+  commit: (conversation, cursor) => store.setConversationSeqId(conversation, cursor)
+})
+
 async function syncConversation(conversationId: string, serverSeqId: Id) {
-  const lastSeqId = store.getConversationSeqId(conversationId)
-  if (BigInt(serverSeqId) <= BigInt(lastSeqId)) return
-
-  try {
-    const result = await api.syncMessages(conversationId, lastSeqId, 50)
-    if (!result || !result.messages || result.messages.length === 0) return
-
-    const accountId = store.state.accountId
-    for (const msg of result.messages) {
-      const isMe = String(msg.senderId) === String(accountId)
-      // 后端 Message.id 即客户端 messageId（fromProto: id = chat.getMessageId()）
-      const messageId = msg.id || msg.messageId || undefined
-      if (conversationId.startsWith('group:')) {
-        store.addGroupMessage({
-          user: String(msg.senderId),
-          text: msg.message,
-          time: msg.timestamp,
-          groupId: conversationId.replace('group:', ''),
-          messageId,
-          seqId: msg.seqId
-        })
-      } else {
-        store.addMessage({
-          user: isMe ? 'you' : String(msg.senderId),
-          text: msg.message,
-          time: msg.timestamp,
-          targetId: isMe ? String(msg.receiverId) : String(msg.senderId),
-          messageId,
-          seqId: msg.seqId
-        })
-      }
-    }
-
-    if (result.nextSeqId) {
-      store.setConversationSeqId(conversationId, result.nextSeqId)
-    }
-    console.debug(`📡 增量同步 ${conversationId}: ${result.messages.length} 条消息`)
-  } catch (e) {
-    console.warn('增量同步失败:', conversationId, e)
-  }
+  try { await incrementalSync.run(conversationId, serverSeqId) }
+  catch (error) { console.warn('Incremental synchronization failed:', conversationId, error) }
 }
 
 async function syncAllConversations() {
   const accountId = String(store.state.accountId)
   if (!accountId) return
+  const session = sessionEpoch.capture()
   let request: import('../types/api').RecentHistoryRequest = { limit: 100 }
   try {
-    while (String(store.state.accountId) === accountId) {
+    while (session.isCurrent() && String(store.state.accountId) === accountId) {
       const page = await api.getRecentMessages(request)
-      if (String(store.state.accountId) !== accountId) return
-      const messages = page.messages.map(msg => {
-        const isMe = String(msg.senderId) === accountId
-        const common = { user: isMe ? 'you' : String(msg.senderId), text: msg.message,
-          time: msg.timestamp, messageId: msg.id || msg.messageId || undefined, seqId: msg.seqId,
-          messageType: msg.messageType === 1 ? 'image' : msg.messageType === 2 ? 'file' : 'text',
-          fileUrl: msg.fileUrl, fileName: msg.fileName, fileSize: msg.fileSize,
-          replyTo: msg.replyToMessageId ? { messageId: msg.replyToMessageId,
-            content: msg.replyToContent || '', sender: msg.replyToSender || '' } : undefined }
-        return msg.conversationId?.startsWith('group:')
-          ? { ...common, user: String(msg.senderId), groupId: msg.conversationId.slice(6) }
-          : { ...common, targetId: isMe ? String(msg.receiverId) : String(msg.senderId) }
-      })
+      if (!session.isCurrent() || String(store.state.accountId) !== accountId) return
+      const messages = historyMessages(page.messages, accountId)
       await store.restoreHistoryPage(accountId, messages)
-      if (String(store.state.accountId) !== accountId) return
+      if (!session.isCurrent() || String(store.state.accountId) !== accountId) return
       await store.rebuildConversationStates(true)
       if (!page.hasMore) return
       if (!page.nextId || page.nextTimestamp == null ||
@@ -381,16 +357,20 @@ async function syncAllConversations() {
 
 /** 建立 WebTransport 连接 */
 function connectChat(token: string, accountId: Id) {
+  const session = sessionEpoch.capture()
+  const isCurrent = () => session.isCurrent() && String(store.state.accountId) === String(accountId)
   const transportConfig = siteConfig.TRANSPORT || {}
   const host = 'quic.chatlite.xin'
   const port = transportConfig.port || 8080
-  chatSocket.connect(host, port, token, String(accountId), {
-    onmessage: handleIncomingMessage,
-    onAuthFailed: () => logout(),
+  return chatSocket.connect(host, port, token, String(accountId), {
+    onmessage: msg => { if (isCurrent()) void handleIncomingMessage(msg) },
+    onAuthFailed: () => { if (isCurrent()) void logout() },
     onFriendAccepted: async (accepterId) => {
+      if (!isCurrent()) return
       // 好友请求被接受，增量添加新好友
       try {
         const friend = await api.getUserDetail(accepterId)
+        if (!isCurrent()) return
         if (friend) {
           store.addUser(friend)
           toast.success(t('chat.friendAccepted') || '好友已添加')
@@ -420,6 +400,8 @@ function connectChat(token: string, accountId: Id) {
 
 /** 清除本地登录状态 */
 function clearAuth() {
+  stopFriendRequestPolling()
+  chatSocket.close()
   sidebarTab.value = 'messages'
   sidebarQueries.value = { messages: '', contacts: '' }
   currentView.value = 'list'
@@ -433,12 +415,15 @@ function clearAuth() {
 }
 
 async function logout() {
+  sessionEpoch.renew()
+  const session = sessionEpoch.capture()
   try {
     await chatSocket.sendWrapper({
       type: MSG_TYPE.LOGOUT,
       logout: { userId: Number(store.state.accountId) }
     })
   } catch (_) {}
+  if (!session.isCurrent()) return
   chatSocket.close()
   store.clearAll()
   clearAuth()
@@ -463,69 +448,55 @@ function persistTokens(accessToken: string, refreshToken: string) {
 
 /** 获取当前用户信息并标记登录有效 */
 async function initUserSession(accessToken: string, refreshToken: string) {
+  sessionEpoch.renew()
+  chatSocket.close()
+  stopFriendRequestPolling()
+  const attempt = sessionEpoch.capture()
   store.setToken(accessToken)
   store.setRefreshToken(refreshToken || '')
-
   const userRes = await api.getCurrentUser()
-  if (!userRes?.id) {
-    clearAuth()
-    return false
-  }
+  if (!attempt.isCurrent()) return false
+  if (!userRes?.id) { clearAuth(); return false }
 
   store.setAccountId(userRes.id)
+  const owner = String(userRes.id), session = sessionEpoch.capture()
+  const isCurrent = () => session.isCurrent() && String(store.state.accountId) === owner
   store.setLoginValid(true)
-  persistTokens(accessToken, refreshToken)
-  localStorage.setItem('charroom_accountId', String(userRes.id))
-
-  // 好友列表增量更新：先展示缓存，再静默 merge
+  persistTokens(store.state.token, store.state.refreshToken)
+  localStorage.setItem('charroom_accountId', owner)
   const cached = store.loadCachedUsers()
-  if (cached.length > 0) {
-    store.mergeUsers(cached)  // 即时呈现缓存
-  }
+  if (cached.length) store.mergeUsers(cached)
 
-  const friends = await api.getFriends()
-  store.mergeUsers(friends || [])   // 静默 merge，不重建 DOM
-  store.cacheUsers(friends || [])   // 缓存到 localStorage
-
-  // 同步离线期间的好友接受通知
-  try {
-    const notifications = await api.getFriendNotifications()
-    if (notifications && notifications.length > 0) {
-      for (const n of notifications) {
-        // 获取新好友信息并添加到列表
-        const friend = await api.getUserDetail(n.accepterId)
-        if (friend) {
-          store.addUser(friend)
-        }
+  // Each task owns its post-await checks. Contacts/groups must not delay history or transport.
+  void bootstrapSession(() => connectChat(store.state.token, userRes.id), {
+    history: syncAllConversations,
+    contacts: async () => {
+      const friends = await api.getFriends()
+      if (!isCurrent()) return
+      store.mergeUsers(friends || [])
+      store.cacheUsers(friends || [])
+      const ids = (friends || []).map(friend => friend.id).filter(id => id && id !== AGENT_USER_ID)
+      if (!ids.length) return
+      const statuses = await api.getOnlineStatus(ids)
+      if (!isCurrent()) return
+      for (const [id, online] of Object.entries(statuses)) store.updateUserOnlineStatus(id, online)
+    },
+    groups: async () => {
+      const groups = await api.getMyGroups()
+      if (isCurrent()) store.setGroups(groups || [])
+    },
+    notifications: async () => {
+      const notifications = await api.getFriendNotifications()
+      if (!isCurrent() || !notifications?.length) return
+      for (const notification of notifications) {
+        const friend = await api.getUserDetail(notification.accepterId)
+        if (!isCurrent()) return
+        if (friend) store.addUser(friend)
       }
-      // 标记通知已读
-      await api.markFriendNotificationsRead()
+      if (isCurrent()) await api.markFriendNotificationsRead()
     }
-  } catch (e) {
-    console.warn('同步好友通知失败:', e)
-  }
-
-  // 批量拉取好友在线状态
-  if (friends && friends.length > 0) {
-    const friendIds = friends.map(f => f.id).filter(id => id && id !== AGENT_USER_ID)
-    if (friendIds.length > 0) {
-      const statusMap = await api.getOnlineStatus(friendIds)
-      for (const [userId, online] of Object.entries(statusMap)) {
-        store.updateUserOnlineStatus(parseInt(userId), online)
-      }
-    }
-  }
-
-  // 获取用户的群聊列表
-  const myGroups = await api.getMyGroups()
-  store.setGroups(myGroups || [])
-
-  connectChat(accessToken, userRes.id)
-  syncAllConversations()
-
-  // 启动好友请求轮询
+  }, isCurrent, (name, error) => console.warn('Session initialization task failed:', name, error))
   startFriendRequestPolling()
-
   return true
 }
 
@@ -566,6 +537,7 @@ onMounted(() => {
 })
 
 async function restoreSession() {
+  const attempt = sessionEpoch.capture()
   const savedToken = sessionStorage.getItem('charroom_token')
   const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
   const savedAccountId = localStorage.getItem('charroom_accountId')
@@ -582,6 +554,7 @@ async function restoreSession() {
   if (!activeToken && savedRefreshToken) {
     try {
       const refreshed = await api.refreshToken(savedRefreshToken)
+      if (!attempt.isCurrent()) return
       if (refreshed?.accessToken) {
         activeToken = refreshed.accessToken
         store.setToken(refreshed.accessToken)
@@ -600,19 +573,24 @@ async function restoreSession() {
 
   store.setToken(activeToken)
   store.setRefreshToken(savedRefreshToken)
+  if (!attempt.isCurrent()) return
   store.setAccountId(savedAccountId)
+  const validation = sessionEpoch.capture()
 
   // 验证 token，失效则尝试刷新
   let validated = await api.validateToken()
+  if (!validation.isCurrent()) return
 
   if (!validated && savedRefreshToken) {
     const refreshed = await api.refreshToken(savedRefreshToken)
+    if (!validation.isCurrent()) return
     if (refreshed?.accessToken) {
       activeToken = refreshed.accessToken
       store.setToken(refreshed.accessToken)
       store.setRefreshToken(refreshed.refreshToken || '')
       persistTokens(refreshed.accessToken, refreshed.refreshToken)
       validated = await api.validateToken()
+      if (!validation.isCurrent()) return
     }
   }
 
@@ -643,10 +621,12 @@ const FRIEND_REQUEST_POLL_INTERVAL = 2 * 60 * 1000 // 2分钟
 /** 启动好友请求轮询 */
 function startFriendRequestPolling() {
   stopFriendRequestPolling()
+  const session = sessionEpoch.capture()
   friendRequestPollTimer = setInterval(async () => {
     if (!store.state.token || !store.state.loginValid) return
     try {
       const requests = await api.getFriendRequests()
+      if (!session.isCurrent()) return
       // 通过自定义事件通知 SidebarUsers 更新
       window.dispatchEvent(new CustomEvent('friend-requests-updated', { detail: requests }))
     } catch (e) {
@@ -671,6 +651,8 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('beforeunload', handleBeforeUnload)
   stopFriendRequestPolling()
+  sessionEpoch.renew()
+  chatSocket.close()
 })
 </script>
 

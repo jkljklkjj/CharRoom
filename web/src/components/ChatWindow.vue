@@ -32,8 +32,8 @@
     </div>
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
-    <div class="messages" ref="msgList" v-if="currentChatId !== null" @scroll="onMessageScroll">
-      <div v-for="(m,i) in currentMessages" :key="m.messageId || (m.time + '_' + m.user + '_' + i)">
+    <VirtualMessageList class="messages" ref="virtualList" v-if="currentChatId !== null" :items="currentMessages" @scroll="onMessageScroll" v-slot="{ item: m }">
+      <div>
         <!-- 系统消息（加入群聊/退出群聊等） -->
         <div v-if="isSystemMessage(m)" class="system-message">
           <span class="system-text">{{ m.text }}</span>
@@ -72,7 +72,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </VirtualMessageList>
 
     <!-- 消息上下文菜单 -->
     <button v-if="newMessageCount" class="jump-latest" @click="scrollToBottom(true)">{{ $t('polish.newMessages', { count: newMessageCount }) }} ↓</button>
@@ -158,6 +158,7 @@
 <script setup lang="ts">
 import { chatTargetId, sidebarUsers } from '../utils/contactDirectory'
 import SocialProfileCard from './SocialProfileCard.vue'
+import VirtualMessageList from './VirtualMessageList.vue'
 import { composerEnter } from '../utils/composer'
 import { useDialog } from '../composables/useDialog'
 import type { Id, TimeValue, ChatMessage, User } from '../types/chat'
@@ -179,19 +180,10 @@ chatSocket.setStore(store)
 const now = ref(Date.now())
 let relTimeTimer: ReturnType<typeof setTimeout> | undefined
 
-// 前后台自适应：切后台时释放部分消息内存
-const handleVisibilityChange = () => {
-  const hidden = document.hidden
-  const MAX = 200
-  const MIN = 50
-  const target = hidden ? MIN : MAX
-  store.trimMessages(target)
-  store.trimGroupMessages(target)
-}
-
 const { t } = useI18n()
 const text = ref('')
-const msgList = ref<HTMLElement | null>(null)
+const virtualList = ref<InstanceType<typeof VirtualMessageList> | null>(null)
+const msgList = computed(() => virtualList.value?.element ?? null)
 const messageInput = ref<HTMLTextAreaElement | null>(null)
 const isDragOver = ref(false)
 const showContextMenu = ref(false)
@@ -212,7 +204,6 @@ function handleResize() {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   document.addEventListener('click', handleClickOutside)
-  document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('keydown', handleKeydown)
   relTimeTimer = setInterval(() => { now.value = Date.now() }, 60000)
   scrollToBottom()
@@ -221,7 +212,6 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleClickOutside)
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
   if (relTimeTimer) clearInterval(relTimeTimer)
   clearTimeout(resizeTimer)
 })
@@ -289,7 +279,7 @@ const isMobile = computed(() => {
 const currentMessages = computed(() => {
   if (currentChatId.value == null) return []
   // 不再 slice(-100)：slice 窗口与「向上加载历史」矛盾（历史插在前面会被窗口截断看不到）。
-  // 渲染数量由 trimMessages/trimGroupMessages 的上限（前后台自适应）控制。
+  // VirtualMessageList bounds mounted DOM while retaining loaded history and stable pagination.
   return isGroupChat.value ? store.state.groupMessages : store.state.messages
 })
 
