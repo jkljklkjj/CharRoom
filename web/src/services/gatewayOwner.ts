@@ -13,7 +13,15 @@ export async function discoverGatewayOwner(token: string, host: string, port: nu
   })
   const data = result.body?.data
   if (!result.ok || result.body?.code !== 0 || !data || !Array.isArray(data.gateways)) throw new Error('Gateway owner discovery failed')
-  if (data.ownerEndpoint) return parseGatewayEndpoint(data.ownerEndpoint)
+  if (data.ownerEndpoint) {
+    // 旧网关未配置 endpoint 时曾把 gatewayId 写进成员记录，客户端不应因此整条连接失败：
+    // 单网关时回退到内置地址，多网关时无法安全猜测 owner 地址，仍然抛错。
+    try {
+      return parseGatewayEndpoint(data.ownerEndpoint)
+    } catch (error) {
+      if (data.gateways.length > 1) throw error
+    }
+  }
   if (data.gateways.length > 1) throw new Error('Owner gateway endpoint is not configured')
   return { host, port }
 }
