@@ -81,6 +81,7 @@ export interface AckMessage {
   seqId?: WireLong
   conversationId?: string
   timestamp?: WireLong
+  serverMessageId?: string
 }
 
 export interface MessageWrapper {

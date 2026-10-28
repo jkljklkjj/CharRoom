@@ -58,7 +58,6 @@ class MainActivity : ComponentActivity() {
         FilePicker = AndroidFilePicker
         ImageLoaderImpl = AndroidImageLoader
         CurrentPlatform = Platform.ANDROID
-        initAppUpdateManager(this)
         enableEdgeToEdge()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -142,7 +141,7 @@ class MainActivity : ComponentActivity() {
                                     onToggleDarkMode = { AppSettings.setThemeMode(if (dark) ThemeMode.LIGHT else ThemeMode.DARK) },
                                     onBackPressed = { uiBack = it },
                                     authViewModel = auth,
-                                    navigationRequest = pending?.takeIf { state is AuthState.Authenticated && it.destination.belongsTo(account) }?.let { ChatNavigationRequest(it.requestId, it.destination.chatId) },
+                                    navigationRequest = pending?.takeIf { state is AuthState.Authenticated && it.destination.belongsTo(account) }?.let { ChatNavigationRequest(it.requestId, it.destination.conversation) },
                                     onNavigationHandled = { if (pendingNotification.value?.requestId == pending?.requestId) pendingNotification.value = null }
                                 )
                             }
@@ -184,7 +183,7 @@ class MainActivity : ComponentActivity() {
         if (GlobalAppState.currentToken.isNullOrBlank()) return
         val selected = core.state.GlobalChatState.selectedChatTarget.value ?: return
         val manager = (application as ChatApplication).chatNotificationManager
-        if (selected.id < 0) manager.cancelGroupNotification(-selected.id) else manager.cancelPrivateNotification(selected.id)
+        if (selected.isGroup) manager.cancelGroupNotification(selected.id) else manager.cancelPrivateNotification(selected.id)
     }
 
     private fun handleNotificationIntent(intent: Intent) {

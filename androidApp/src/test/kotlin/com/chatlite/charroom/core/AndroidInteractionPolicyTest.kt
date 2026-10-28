@@ -8,8 +8,8 @@ class AndroidInteractionPolicyTest {
     @Test fun notificationRoutesPrivateAndGroupWithoutColliding() {
         val direct = NotificationDestination.parse("private", 42, 9)!!
         val group = NotificationDestination.parse("group", 42, 9)!!
-        assertEquals(42, direct.chatId)
-        assertEquals(-42, group.chatId)
+        assertEquals(model.ConversationKey.privateChat(42), direct.conversation)
+        assertEquals(model.ConversationKey.group(42), group.conversation)
         assertNotEquals(direct.tag, group.tag)
         assertNotEquals(direct.tag, NotificationDestination.parse("private", 42, 10)!!.tag)
     }

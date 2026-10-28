@@ -66,7 +66,7 @@ class AndroidRemoteDataSource(
 
     suspend fun getFriendList(token: String): List<User> {
         return networkRepository.fetchFriendAndGroupList(token)
-            .filter { it.id > 0 } // 好友ID为正值
+            .filter { !it.isGroup && it.id > 0 }
             .map { localUser ->
                 User(
                     id = localUser.id,
@@ -82,10 +82,10 @@ class AndroidRemoteDataSource(
 
     suspend fun getGroupList(token: String): List<Group> {
         return networkRepository.fetchFriendAndGroupList(token)
-            .filter { it.id < 0 } // 群组ID为负值
+            .filter { it.isGroup }
             .map { localUser ->
                 Group(
-                    id = -localUser.id, // Android端群组id是负值，转换为正值
+                    id = localUser.id,
                     name = localUser.username
                 )
             }
@@ -116,7 +116,7 @@ class AndroidRemoteDataSource(
     suspend fun getGroupDetail(token: String, groupId: String): Group? {
         return networkRepository.getGroupDetail(groupId, token)?.let { localUser ->
             Group(
-                id = -localUser.id,
+                id = localUser.id,
                 name = localUser.username
             )
         }

@@ -30,9 +30,10 @@ async function main() {
         close() {}
       }
     })
-    const now = Date.now(), rows = Array.from({ length: 1200 }, (_, i) => ({
+    const total=Number(process.env.HISTORY_ROWS||1200)
+    const now = Date.now(), rows = Array.from({ length: total }, (_, i) => ({
       id: String(i + 1), senderId: '91002', receiverId: '91001', conversationId: 'user:91001:91002',
-      seqId: String(i + 1), message: `Fixture message ${i + 1}` + '\nvariable row height'.repeat(i % 6), timestamp: now - 1200000 + i * 1000
+      seqId: String(i + 1), message: `Fixture message ${i + 1}` + '\nvariable row height'.repeat(i % 6), timestamp: now - total*1000 + i * 1000
     }))
     await page.setRequestInterception(true)
     page.on('request', request => {
@@ -40,8 +41,10 @@ async function main() {
       if (url.origin === origin) { request.continue(); return }
       if (!url.pathname.startsWith('/api/')) { request.abort(); return }
       let data = []
+      if (url.pathname === '/api/cluster/owner') data = { ownerGatewayId: 'fixture', ownerEndpoint: '', gateways: [{ gatewayId: 'fixture' }] }
       if (url.pathname === '/api/auth/validate') data = { valid: true }
       if (url.pathname === '/api/users/me') data = { id: 91001, username: 'Fixture self' }
+      if(url.pathname==='/api/contacts/snapshot')data=url.searchParams.get('version')==='fixture'?{version:'fixture',unchanged:true}:{version:'fixture',unchanged:false,users:[{id:91002,username:'Fixture friend'},{id:91003,username:'Another friend'}],groups:[]}
       if (url.pathname === '/api/friends') data = [{ id: 91002, username: 'Fixture friend' }]
       if (url.pathname === '/api/users/online-status') data = {}
       if (url.pathname === '/api/messages/recent') {
@@ -52,16 +55,41 @@ async function main() {
       void request.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' }, body: JSON.stringify({ code: 0, data }) })
     })
     await page.goto(origin + '/app')
-    await page.waitForSelector('[data-contact-id="91002"]')
+    await page.waitForSelector('[data-contact-id="user:91002"]')
     stage = 'restore 1200 rows'
-    await page.waitForFunction(async () => {
+    await page.waitForFunction(async expected => {
       const db = await new Promise(resolve => { const r = indexedDB.open('charroom_messages'); r.onsuccess = () => resolve(r.result) })
-      try { return await new Promise(resolve => { const r = db.transaction('messages').objectStore('messages').count(); r.onsuccess = () => resolve(r.result === 1200) }) }
+      try { return await new Promise(resolve => { const r = db.transaction('messages').objectStore('messages').count(); r.onsuccess = () => resolve(r.result === expected) }) }
       finally { db.close() }
-    })
-    await page.click('[data-contact-id="91002"]')
+    },{},total)
+    await page.click('[data-contact-id="user:91002"]')
     stage = 'open history'
     await page.waitForSelector('.messages[data-message-count="50"]')
+    if(total>2000){
+      stage='bounded 2000-row window'
+      for(let expected=100;expected<=2000;expected+=50){
+        await page.$eval('.messages',el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'))})
+        await page.waitForFunction(count=>Number(document.querySelector('.messages')?.dataset.messageCount)>=count,{},expected)
+      }
+      await page.$eval('.messages',el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'))})
+      await page.waitForSelector('.jump-latest')
+      assert.equal(await page.$eval('.messages',el=>Number(el.dataset.messageCount)),2000)
+      assert.ok(await page.$$eval('.virtual-message-row',rows=>rows.length<50))
+      await page.click('.jump-latest');await page.waitForSelector('.messages[data-message-count="50"]')
+      await page.waitForFunction(last=>document.querySelector('.messages')?.textContent.includes(`Fixture message ${last}`),{},total)
+      assert.equal(await page.$('.jump-latest'),null)
+      assert.deepEqual(errors,[])
+      console.log(`PASS: ${total} durable messages, 2000-row active window, bounded DOM, older pagination and return to latest.`)
+      return
+    }
+    if(process.env.HISTORY_SCREENSHOT_DIR){
+      fs.mkdirSync(process.env.HISTORY_SCREENSHOT_DIR,{recursive:true})
+      for(const theme of ['light','dark']){
+        await page.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme)
+        await page.screenshot({path:path.join(process.env.HISTORY_SCREENSHOT_DIR,`chat-${theme}.png`)})
+      }
+      await page.evaluate(()=>document.documentElement.setAttribute('data-theme','light'))
+    }
     for (let expected = 100; expected <= 1200; expected += 50) {
       await page.$eval('.messages', el => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')) })
       await page.waitForFunction(count => Number(document.querySelector('.messages')?.dataset.messageCount) >= count, {}, expected).catch(error => { throw new Error(`pagination ${expected}: ${error.message}`) })
@@ -103,13 +131,37 @@ async function main() {
       const current = await page.$eval('.messages', (el, key) => ({ scrollTop: el.scrollTop, total: el.scrollHeight, rows: [...el.querySelectorAll('.virtual-message-row')].map(row => ({ key: row.dataset.messageKey, top: row.getBoundingClientRect().top - el.getBoundingClientRect().top })).filter(row => row.key === key) }), before.key)
       throw new Error(`anchor ${JSON.stringify({ before, current })}: ${error.message}`)
     })
+    stage='cached conversation return'
+    // Enter the enlarged row beyond the 100px estimate. Restoring only its
+    // offset would select a different row before ResizeObserver measures it.
+    await page.$eval('.messages',(el,key)=>{
+      const row=[...el.querySelectorAll('.virtual-message-row')].find(row=>row.dataset.messageKey===key)
+      el.scrollTop+=row.getBoundingClientRect().top-el.getBoundingClientRect().top+180
+      el.dispatchEvent(new Event('scroll'))
+    },resizedKey)
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+    const reading=await page.$eval('.messages',el=>{
+      const top=el.getBoundingClientRect().top,row=[...el.querySelectorAll('.virtual-message-row')].find(row=>row.getBoundingClientRect().bottom>top+16)
+      return {key:row.dataset.messageKey,offset:row.getBoundingClientRect().top-top}
+    })
+    await page.click('[data-contact-id="user:91003"]')
+    await page.waitForFunction(()=>document.querySelector('.messages')?.dataset.messageCount==='0')
+    await page.click('[data-contact-id="user:91002"]')
+    await page.waitForFunction(()=>document.querySelector('.messages')?.dataset.messageCount==='1200')
+    await page.waitForFunction(reading=>{
+      const el=document.querySelector('.messages'),row=[...el.querySelectorAll('.virtual-message-row')].find(row=>row.dataset.messageKey===reading.key)
+      return row && Math.abs(row.getBoundingClientRect().top-el.getBoundingClientRect().top-reading.offset)<3
+    },{},reading).catch(async error=>{
+      const current=await page.$eval('.messages',(el,key)=>({scrollTop:el.scrollTop,total:el.scrollHeight,rows:[...el.querySelectorAll('.virtual-message-row')].map(row=>({key:row.dataset.messageKey,top:row.getBoundingClientRect().top-el.getBoundingClientRect().top})),key}),reading.key)
+      throw new Error(`cached anchor ${JSON.stringify({reading,current})}: ${error.message}`)
+    })
     await page.setViewport({ width: 390, height: 844 })
     stage = 'mobile navigation'
-    await page.waitForSelector('.mobile-view [data-contact-id="91002"]')
-    await page.click('.mobile-view [data-contact-id="91002"]')
+    await page.waitForSelector('.mobile-view [data-contact-id="user:91002"]')
+    await page.click('.mobile-view [data-contact-id="user:91002"]')
     await page.waitForFunction(() => !!document.querySelector('.messages'))
     assert.deepEqual(errors, [])
-    console.log('PASS: 1200 paged history rows, stable local pagination, bounded DOM, bottom jump, variable-height anchor, mobile resize.')
+    console.log('PASS: 1200 paged history rows, stable local pagination, bounded DOM, bottom jump, variable-height anchor, cached conversation/reading restoration, mobile resize.')
   } catch (error) { throw new Error(`${stage}: ${error.stack || error.message}`) }
   finally { await browser.close(); await new Promise(resolve => server.close(resolve)) }
 }

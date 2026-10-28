@@ -7,7 +7,6 @@ import core.RestoredChatHistory
 import model.GroupMessage
 import model.Message
 import model.MessageType
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -49,7 +48,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                         senderId = groupMsg.senderId,
                         message = groupMsg.text,
                         sender = false,
-                        receiverId = -groupId, // 使用负的groupId表示群聊
+                        receiverId = groupId,
                         timestamp = groupMsg.timestamp,
                         isSent = groupMsg.isSent,
                         messageId = groupMsg.messageId,
@@ -61,25 +60,29 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                         fileName = groupMsg.fileName,
                         fileSize = groupMsg.fileSize,
                         seqId = groupMsg.seqId,
-                        conversationId = groupMsg.conversationId
+                        conversationId = groupMsg.conversationId,
+                        deliveryState = groupMsg.deliveryState
                     )
                 })
             }
     }
 
-    @Synchronized
-    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
-        if (!this::context.isInitialized) return
-        val prefix = if (isGroup) "group_" else "private_"
-        getAccountDir(accountId).listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
-            val rows = JSONArray(file.readText())
-            val kept = JSONArray()
-            for (index in 0 until rows.length()) {
-                val row = rows.getJSONObject(index)
-                if (row.optString("messageId") != messageId) kept.put(row)
-            }
-            file.writeText(kept.toString())
+    override fun confirmMessageId(accountId: String, ack: com.chatlite.proto.MessageProtos.AckMessage) {
+        core.MessageIdAliases.confirm(getAccountDir(accountId), accountId, ack)
+        val (target, group) = core.MessageIdAliases.target(accountId, ack.conversationId)
+        val history = journal(accountId, target, group)
+        history.read(ack.messageId)?.let { row ->
+            val node = JSONObject(row.body!!)
+            node.put("messageId", ack.serverMessageId); node.put("seqId", ack.seqId); node.put("conversationId", ack.conversationId); node.put("isSent", true); node.put("deliveryState", "ACCEPTED")
+            history.write(listOf(core.IndexedHistoryJournal.Row(ack.serverMessageId, row.timestamp, node.toString()),
+                core.IndexedHistoryJournal.Row(ack.messageId, 0, null)).filterIndexed { index, _ -> index == 0 || ack.messageId != ack.serverMessageId })
         }
+    }
+
+    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
+        java.io.File(getAccountDir(accountId), "indexed").listFiles { file ->
+            file.name.startsWith(if (isGroup) "group_" else "private_") && file.extension == "history"
+        }?.forEach { file -> core.IndexedHistoryJournal.open(file).write(listOf(core.IndexedHistoryJournal.Row(messageId, 0, null))) }
     }
 
     override fun restore(accountId: String): RestoredChatHistory {
@@ -87,48 +90,12 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun restorePage(accountId: String, page: Int, pageSize: Int): RestoredChatHistory {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return RestoredChatHistory()
-        }
-
-        val accountDir = getAccountDir(accountId)
-        if (!accountDir.exists()) {
-            return RestoredChatHistory()
-        }
-
-        // 加载所有私聊消息
-        val privateFiles = accountDir.listFiles { file -> file.name.startsWith("private_") } ?: emptyArray()
-        val allPrivateMessages = privateFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("private_"), false) }
-            .filterIsInstance<Message>()
-            .sortedByDescending { it.timestamp }
-
-        // 加载所有群聊消息
-        val groupFiles = accountDir.listFiles { file -> file.name.startsWith("group_") } ?: emptyArray()
-        val allGroupMessages = groupFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("group_"), true) }
-            .filterIsInstance<GroupMessage>()
-            .sortedByDescending { it.timestamp }
-
-        // 分页处理
-        val privateStart = page * pageSize
-        val privateEnd = minOf(privateStart + pageSize, allPrivateMessages.size)
-        val privatePage = if (privateStart < allPrivateMessages.size) {
-            allPrivateMessages.subList(privateStart, privateEnd).reversed()
-        } else {
-            emptyList()
-        }
-
-        val groupStart = page * pageSize
-        val groupEnd = minOf(groupStart + pageSize, allGroupMessages.size)
-        val groupPage = if (groupStart < allGroupMessages.size) {
-            allGroupMessages.subList(groupStart, groupEnd).reversed()
-        } else {
-            emptyList()
-        }
-
-        return RestoredChatHistory(
-            privateMessages = privatePage,
-            groupMessages = groupPage
-        )
+        if (accountId.isBlank() || !this::context.isInitialized) return RestoredChatHistory()
+        val privateRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
+            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), false) as Message }
+        val groupRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
+            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), true) as GroupMessage }
+        return RestoredChatHistory(privateRows, groupRows)
     }
 
     override fun getPrivateMessagesByTimeRange(accountId: String, userId: Int, startTime: Long, endTime: Long): List<Message> {
@@ -136,7 +103,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             return emptyList()
         }
 
-        return loadMessages(accountId, userId.toString(), false)
+        return loadMessages(accountId, userId.toString(), false, startTime, endTime)
             .filterIsInstance<Message>()
             .filter { it.timestamp in startTime..endTime }
             .sortedBy { it.timestamp }
@@ -147,48 +114,24 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             return emptyList()
         }
 
-        return loadMessages(accountId, groupId.toString(), true)
+        return loadMessages(accountId, groupId.toString(), true, startTime, endTime)
             .filterIsInstance<GroupMessage>()
             .filter { it.timestamp in startTime..endTime }
             .sortedBy { it.timestamp }
     }
 
     override fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int, pageSize: Int): List<Message> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return emptyList()
-        }
-
-        val allMessages = loadMessages(accountId, userId.toString(), false)
-            .filterIsInstance<Message>()
-            .sortedByDescending { it.timestamp }
-
-        val startIndex = page * pageSize
-        val endIndex = minOf(startIndex + pageSize, allMessages.size)
-
-        return if (startIndex < allMessages.size) {
-            allMessages.subList(startIndex, endIndex).reversed()
-        } else {
-            emptyList()
-        }
+        if (accountId.isBlank() || !this::context.isInitialized) return emptyList()
+        require(page >= 0 && pageSize in 1..10000)
+        return journal(accountId, userId.toString(), false).page(Math.multiplyExact(page, pageSize), pageSize)
+            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), false) as Message }
     }
 
     override fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int, pageSize: Int): List<GroupMessage> {
-        if (accountId.isBlank() || !this::context.isInitialized) {
-            return emptyList()
-        }
-
-        val allMessages = loadMessages(accountId, groupId.toString(), true)
-            .filterIsInstance<GroupMessage>()
-            .sortedByDescending { it.timestamp }
-
-        val startIndex = page * pageSize
-        val endIndex = minOf(startIndex + pageSize, allMessages.size)
-
-        return if (startIndex < allMessages.size) {
-            allMessages.subList(startIndex, endIndex).reversed()
-        } else {
-            emptyList()
-        }
+        if (accountId.isBlank() || !this::context.isInitialized) return emptyList()
+        require(page >= 0 && pageSize in 1..10000)
+        return journal(accountId, groupId.toString(), true).page(Math.multiplyExact(page, pageSize), pageSize)
+            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), true) as GroupMessage }
     }
 
     override fun clear(accountId: String): Boolean {
@@ -208,8 +151,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     override fun clearConversation(accountId: String, targetId: String, isGroup: Boolean): Boolean {
         if (accountId.isBlank() || !this::context.isInitialized) return false
         return runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            if (file.exists()) file.delete()
+            journal(accountId, targetId, isGroup).delete()
             true
         }.getOrDefault(false)
     }
@@ -225,22 +167,22 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(false)
     }
 
-    override fun saveConversationSeqIds(ids: Map<String, Long>) {
+    override fun saveConversationSeqIds(accountId: String, ids: Map<String, Long>) {
         if (!this::context.isInitialized) return
         runCatching {
-            val prefs = context.getSharedPreferences("conversation_seq_ids", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences("conversation_seq_ids_${accountId}", Context.MODE_PRIVATE)
             val json = JSONObject()
             ids.forEach { (key, value) -> json.put(key, value) }
-            prefs.edit().putString("seq_ids", json.toString()).apply()
+            check(prefs.edit().putString("seq_ids", json.toString()).commit()) { "Cursor persistence failed" }
         }.onFailure {
             timber.log.Timber.w(it, "操作失败")
-        }
+        }.getOrThrow()
     }
 
-    override fun restoreConversationSeqIds(): Map<String, Long> {
+    override fun restoreConversationSeqIds(accountId: String): Map<String, Long> {
         if (!this::context.isInitialized) return emptyMap()
         return runCatching {
-            val prefs = context.getSharedPreferences("conversation_seq_ids", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences("conversation_seq_ids_${accountId}", Context.MODE_PRIVATE)
             val jsonStr = prefs.getString("seq_ids", null) ?: return@runCatching emptyMap()
             val json = JSONObject(jsonStr)
             val result = mutableMapOf<String, Long>()
@@ -251,114 +193,22 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(emptyMap())
     }
 
-    override fun savePendingMessages(privatePending: List<Message>, groupPending: List<GroupMessage>) {
-        if (!this::context.isInitialized) return
-        runCatching {
-            val prefs = context.getSharedPreferences("pending_messages", Context.MODE_PRIVATE)
-            val editor = prefs.edit()
-            val privateArray = JSONArray()
-            privatePending.forEach { privateArray.put(messageToJson(it)) }
-            editor.putString("private_pending", privateArray.toString())
-            val groupArray = JSONArray()
-            groupPending.forEach { groupArray.put(groupMessageToJson(it)) }
-            editor.putString("group_pending", groupArray.toString())
-            editor.apply()
-        }.onFailure {
-            timber.log.Timber.w(it, "保存待发消息失败")
-        }
-    }
-
-    override fun restorePendingMessages(): Pair<List<Message>, List<GroupMessage>> {
-        if (!this::context.isInitialized) return Pair(emptyList(), emptyList())
-        return runCatching {
-            val prefs = context.getSharedPreferences("pending_messages", Context.MODE_PRIVATE)
-            val privateJson = prefs.getString("private_pending", null)
-            val groupJson = prefs.getString("group_pending", null)
-            val privateMessages = if (privateJson != null) {
-                val array = JSONArray(privateJson)
-                (0 until array.length()).mapNotNull { i ->
-                    array.optJSONObject(i)?.let { jsonToMessage(it, false) as? Message }
-                }
-            } else emptyList()
-            val groupMessages = if (groupJson != null) {
-                val array = JSONArray(groupJson)
-                (0 until array.length()).mapNotNull { i ->
-                    array.optJSONObject(i)?.let { jsonToMessage(it, true) as? GroupMessage }
-                }
-            } else emptyList()
-            Pair(privateMessages, groupMessages)
-        }.getOrElse {
-            timber.log.Timber.w(it, "恢复待发消息失败")
-            Pair(emptyList(), emptyList())
-        }
-    }
-
-    override fun clearPendingMessages() {
-        if (!this::context.isInitialized) return
-        runCatching {
-            val prefs = context.getSharedPreferences("pending_messages", Context.MODE_PRIVATE)
-            prefs.edit().clear().apply()
-        }.onFailure {
-            timber.log.Timber.w(it, "清除待发消息失败")
-        }
-    }
-
-    // 内部方法
-
-    @Synchronized
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
-        runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            val records = linkedMapOf<String, JSONObject>()
-            if (file.exists()) {
-                val existing = JSONArray(file.readText())
-                for (index in 0 until existing.length()) {
-                    val row = existing.getJSONObject(index)
-                    records[row.optString("messageId")] = row
-                }
-            }
-            messages.forEach { records[it.messageId] = messageToJson(it) }
-            val array = JSONArray()
-            records.values.sortedWith(compareBy<JSONObject> { it.optLong("timestamp") }
-                .thenBy { it.optString("messageId").toLongOrNull() ?: 0L }).forEach { array.put(it) }
-            file.writeText(array.toString())
-        }.onFailure {
-            timber.log.Timber.w(it, "操作失败")
+        val rows = messages.map { message ->
+            val alias = core.MessageIdAliases.resolve(getAccountDir(accountId), targetId, isGroup, message.messageId)
+            val canonical = if (alias == null) message else message.copy(messageId = alias.serverId,
+                seqId = alias.seq, conversationId = alias.conversation, isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+            core.IndexedHistoryJournal.Row(canonical.messageId, canonical.timestamp, messageToJson(canonical).toString())
         }
+        journal(accountId, targetId, isGroup).write(rows)
     }
 
-    private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean): List<Any> {
-        return runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            if (!file.exists()) return emptyList()
-            val text = file.readText()
-            if (text.isBlank()) return emptyList()
-            val array = JSONArray(text)
-            val records = mutableListOf<Any>()
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                records.add(jsonToMessage(item, isGroup))
-            }
-            records
-        }.getOrElse {
-            timber.log.Timber.w(it, "操作失败")
-            emptyList()
-        }
-    }
+    private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean,
+                             from: Long = Long.MIN_VALUE, through: Long = Long.MAX_VALUE): List<Any> =
+        journal(accountId, targetId, isGroup).range(from, through).map { row -> jsonToMessage(JSONObject(row.body!!), isGroup) }
 
-    private fun getHistoryFile(accountId: String, targetId: String, isGroup: Boolean): File {
-        val folder = File(context.filesDir, HISTORY_DIR_NAME)
-        if (!folder.exists()) {
-            folder.mkdirs()
-        }
-        val safeAccountId = accountId.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        val accountFolder = File(folder, safeAccountId)
-        if (!accountFolder.exists()) {
-            accountFolder.mkdirs()
-        }
-        val prefix = if (isGroup) "group" else "private"
-        return File(accountFolder, "${prefix}_${targetId}.json")
-    }
+    private fun journal(accountId: String, targetId: String, isGroup: Boolean): core.IndexedHistoryJournal =
+        core.IndexedHistoryJournal.open(core.IndexedHistoryJournal.conversation(getAccountDir(accountId), targetId, isGroup))
 
     private fun getAccountDir(accountId: String): File {
         val folder = File(context.filesDir, HISTORY_DIR_NAME)
@@ -377,6 +227,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("sender", message.sender)
             put("timestamp", message.timestamp)
             put("isSent", message.isSent)
+            put("deliveryState", message.deliveryState.name)
             put("messageId", message.messageId)
             put("replyToMessageId", message.replyToMessageId)
             put("replyToContent", message.replyToContent)
@@ -398,6 +249,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("content", message.text)
             put("timestamp", message.timestamp)
             put("isSent", message.isSent)
+            put("deliveryState", message.deliveryState.name)
             put("messageId", message.messageId)
             put("replyToMessageId", message.replyToMessageId)
             put("replyToContent", message.replyToContent)
@@ -412,11 +264,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     private fun jsonToMessage(json: JSONObject, isGroup: Boolean): Any {
-        val messageType = try {
-            MessageType.valueOf(json.optString("messageType", "TEXT"))
-        } catch (_: Exception) {
-            MessageType.TEXT
-        }
+        val messageType = MessageType.valueOf(json.getString("messageType"))
 
         return if (isGroup) {
             GroupMessage(
@@ -426,6 +274,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 senderId = json.optInt("senderId", 0),
                 timestamp = json.optLong("timestamp", System.currentTimeMillis()),
                 isSent = json.optBoolean("isSent", true),
+                deliveryState = model.MessageDeliveryState.valueOf(json.getString("deliveryState")),
                 messageId = json.optString("messageId", ""),
                 replyToMessageId = json.optString("replyToMessageId").takeIf { it.isNotEmpty() },
                 replyToContent = json.optString("replyToContent").takeIf { it.isNotEmpty() },
@@ -445,6 +294,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 sender = json.optBoolean("sender", false),
                 timestamp = json.optLong("timestamp", System.currentTimeMillis()),
                 isSent = json.optBoolean("isSent", true),
+                deliveryState = model.MessageDeliveryState.valueOf(json.getString("deliveryState")),
                 messageId = json.optString("messageId", ""),
                 replyToMessageId = json.optString("replyToMessageId").takeIf { it.isNotEmpty() },
                 replyToContent = json.optString("replyToContent").takeIf { it.isNotEmpty() },

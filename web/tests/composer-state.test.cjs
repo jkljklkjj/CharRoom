@@ -1,0 +1,23 @@
+const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path')
+const { loadTs } = require('./helpers.cjs')
+test('drafts isolate accounts and conversations; slow send cannot clear later edits', async () => {
+ const { exports: { ComposerDrafts } } = await loadTs(path.resolve(__dirname, '../src/services/composerDrafts.ts'))
+ const drafts = new ComposerDrafts()
+ drafts.edit('1:dm:2', 'first', { messageId: 'q', content: 'quote', sender: '2' })
+ const captured = drafts.snapshot('1:dm:2')
+ assert.equal(drafts.snapshot('1:dm:3').text, '')
+ assert.equal(drafts.snapshot('4:dm:2').reply, null)
+ drafts.edit('1:dm:2', 'later', null)
+ drafts.commit(captured)
+ assert.equal(drafts.snapshot('1:dm:2').text, 'later')
+ const newer = drafts.snapshot('1:dm:2'); drafts.commit(newer)
+ assert.equal(drafts.snapshot('1:dm:2').text, '')
+})
+test('failed persistence never queues or commits a draft', async () => {
+ const { exports: { submitDraft } } = await loadTs(path.resolve(__dirname, '../src/services/composerDrafts.ts'))
+ const calls = []
+ await assert.rejects(submitDraft(async () => { throw Error('disk full') }, async () => calls.push('queue'), () => calls.push('commit')))
+ assert.deepEqual(calls, [])
+ await submitDraft(async () => calls.push('disk'), async () => calls.push('queue'), () => calls.push('commit'))
+ assert.deepEqual(calls, ['disk', 'queue', 'commit'])
+})

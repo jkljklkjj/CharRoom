@@ -8,7 +8,7 @@ export const AGENT_USER_ID = 0
 /** 消息发送状态（与 chatSocket 的 pendingAcks 状态机对应） */
 export const MSG_STATUS = {
   SENDING: 'sending', // 已发送，等待服务端 ACK
-  SENT: 'sent',       // 服务端已确认送达
+  SENT: 'sent',       // 服务端已接收；不表示接收端送达
   FAILED: 'failed'    // 发送失败（重试次数用尽）
 } as const
 

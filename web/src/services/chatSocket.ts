@@ -1,9 +1,12 @@
+import { confirmMessageId as confirmStoredMessageId } from '../utils/messageDB'
+import { discoverGatewayOwner } from './gatewayOwner'
 import type { ChatTransport } from './transport/ChatTransport'
 import type { MessageWrapper, ChatMessage, GroupChatMessage } from '../proto/messages'
 import type { useStore } from '../store'
 interface SocketHandlers {
+  onAuthenticated?: () => void
   onopen?: () => void
-  onmessage?: (message: MessageWrapper) => void
+  onmessage?: (message: MessageWrapper) => void | Promise<void>
   onclose?: (event?: unknown) => void
   onerror?: (error: unknown) => void
   onAuthFailed?: (reason: string) => void
@@ -13,12 +16,14 @@ import { encodeMessage, decodeMessage } from '../proto'
 import DOMPurify from 'dompurify'
 import i18n from '../i18n'
 import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
-import { saveToQueue, getAllPending, removeMessage, incrementRetry, MAX_RETRIES } from './offlineQueue'
+import { saveToQueue, getPending, getDuePending, removeMessage, markAttempt, markFailed, retryMessage, MAX_RETRIES } from './offlineQueue'
+import type { QueueEntry } from './offlineQueue'
 import { getDeviceId, getDeviceType } from '../utils/device'
 import { MSG_TYPE, DEVICE_TYPE_NUM, PROTO_DEVICE_TYPE } from '../proto/constants'
 
 // ── 内部变量 ────────────────────────────────────
 
+let authenticated = false
 let connectionGeneration = 0
 let transport: ChatTransport | null = null          // ChatTransport 实例
 let handlers: SocketHandlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerror: () => {} }
@@ -42,7 +47,7 @@ const MESSAGE_TTL = 5 * 60 * 1000 // 5 分钟 TTL
 // 乐观 UI：待确认消息跟踪 Map<messageId, PendingAckInfo>
 interface PendingAckInfo {
   sendTime: number; warned: boolean; failed: boolean; retryCount: number
-  wrapperObj: MessageWrapper; buffer: ArrayBuffer
+  accountId: string; wrapperObj: MessageWrapper; buffer: ArrayBuffer
   streamType: string; conversationId: string
 }
 const pendingAcks = new Map<string, PendingAckInfo>()
@@ -70,21 +75,13 @@ function startTimers() {
   ackCheckTimer = setInterval(() => {
     if (!storeRef) return
     const now = Date.now()
+    if (authenticated) void flushOfflineQueue()
     for (const [msgId, info] of pendingAcks) {
       if (now - info.sendTime >= ACK_TIMEOUT_MS && !info.failed) {
-        if (info.retryCount < MAX_ACK_RETRIES) {
-          // ACK 超时：重发同一 messageId（服务端幂等去重，安全），并重置计时
-          info.retryCount++
-          info.sendTime = now
-          if (transport && transport.isConnected()) {
-            void Promise.resolve(
-              transport.send(info.buffer, { streamType: info.streamType as 'control' | 'chat', conversationId: info.conversationId })
-            ).catch(() => {})
-          }
-        } else {
-          info.failed = true
-          storeRef.updateMessageStatus(msgId, 'failed')
-        }
+        info.failed = true
+        void getPending(info.accountId, msgId).then(entry => {
+          if (entry && info.accountId === currentUserId) return sendQueued(entry)
+        }).catch(error => console.warn('Outbox retry failed:', error))
       }
     }
   }, 1000)
@@ -108,7 +105,7 @@ function stopTimers() {
 /**
  * 建立聊天连接。
  */
-export async function connect(hostname: string, port: number, token: string, userId: string, { onopen, onmessage, onclose, onerror, onAuthFailed, onFriendAccepted }: SocketHandlers = {}) {
+export async function connect(hostname: string, port: number, token: string, userId: string, { onopen, onmessage, onclose, onerror, onAuthFailed, onFriendAccepted, onAuthenticated }: SocketHandlers = {}) {
   console.debug('🔌 尝试建立连接:', { hostname, port, hasToken: !!token, userId })
 
   if (!token || typeof token !== 'string' || token.trim() === '') {
@@ -122,6 +119,7 @@ export async function connect(hostname: string, port: number, token: string, use
     throw new Error(i18n.global.t('error.webTransportNotSupported'))
   }
 
+  authenticated = false
   const generation = ++connectionGeneration
   stopReconnect = false
   currentUserId = userId
@@ -131,6 +129,7 @@ export async function connect(hostname: string, port: number, token: string, use
     onclose: onclose || handlers.onclose,
     onerror: onerror || handlers.onerror,
     onAuthFailed: onAuthFailed || (() => {}),
+    onAuthenticated,
     onFriendAccepted: onFriendAccepted || (() => {})
   }
 
@@ -154,12 +153,9 @@ export async function connect(hostname: string, port: number, token: string, use
     startTimers()
 
     // 发送登录消息
-    sendLogin(token)
+    sendLogin(String(storeRef?.state.token || token))
 
-    // 刷新 IndexedDB 离线队列
-    flushOfflineQueue()
-    // 启动心跳
-    startHeartbeat()
+    // Replay starts only after the server confirms this LOGIN.
     if (handlers.onopen) handlers.onopen()
   }
 
@@ -189,10 +185,13 @@ export async function connect(hostname: string, port: number, token: string, use
 
   // 建立连接
   try {
-    const finalUrl = buildWebTransportUrl(hostname, port)
+    const endpoint = await discoverGatewayOwner(String(storeRef?.state.token || token), hostname, port)
+    if (generation !== connectionGeneration) return null
+    const finalUrl = buildWebTransportUrl(endpoint.host, endpoint.port)
     await connection.connect(finalUrl, token)
     return generation === connectionGeneration ? connection : null
   } catch (e) {
+    if (generation === connectionGeneration && !stopReconnect) scheduleReconnect(hostname, port, token, userId)
     console.error('❌ 连接失败:', e)
     throw e
   }
@@ -219,66 +218,73 @@ async function sendLogin(token: string) {
  */
 export async function sendWrapper(wrapperObj: MessageWrapper) {
   const generation = connectionGeneration, connection = transport
-  if (!transport || !transport.isConnected()) {
-    // 未连接时：持久化到 IndexedDB 离线队列，重连后由 flushOfflineQueue 重发
-    if (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT) {
-      const buffer = await encodeMessage(wrapperObj)
-      if (generation !== connectionGeneration) return false
-      saveToQueue(wrapperObj, buffer, {}).catch(e =>
-        console.warn('[OfflineQueue] 保存到 IndexedDB 失败:', e)
-      )
-    }
-    return false
-  }
-
+  const isChat = wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT
+  const accountId = String(storeRef?.state.accountId || currentUserId || '')
   const buffer = await encodeMessage(wrapperObj)
-  if (generation !== connectionGeneration || !connection?.isConnected()) return false
-
-  // 消息去重检查
-  const msgId = wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId
-  if (msgId) {
-    if (messageCache.has(msgId)) return false
-    // 限制缓存大小
-    if (messageCache.size >= MAX_MESSAGE_CACHE) {
-      const firstKey = messageCache.keys().next().value
-      if (firstKey) messageCache.delete(firstKey)
-    }
-    messageCache.set(msgId, Date.now())
-  }
-
-  // 确定流类型和会话 ID
-  const streamType = getStreamType(wrapperObj)
-  const conversationId = resolveConversationId(wrapperObj)
-
-  // transport.send 返回真实 write 状态（Promise<boolean>），失败不会误判成功
-  const sent = await connection.send(buffer, { streamType, conversationId })
   if (generation !== connectionGeneration) return false
-
-  // 乐观 UI：跟踪待确认消息（私聊 + 群聊）
-  if (msgId && (wrapperObj.type === MSG_TYPE.CHAT || wrapperObj.type === MSG_TYPE.GROUP_CHAT)) {
-    if (sent) {
-      pendingAcks.set(msgId, {
-        sendTime: Date.now(), warned: false, failed: false, retryCount: 0,
-        wrapperObj, buffer, streamType, conversationId
-      })
-      // 发送成功，从 IndexedDB 离线队列中移除
-      removeMessage(msgId).catch(e => console.warn('[OfflineQueue] 移除消息失败:', e))
-    } else {
-      // 发送失败：重新入队，重连后由 flushOfflineQueue 重发，避免消息丢失
-      saveToQueue(wrapperObj, buffer as ArrayBuffer, { streamType, conversationId }).catch(e =>
-        console.warn('[OfflineQueue] 重新入队失败:', e)
-      )
-      if (storeRef) storeRef.updateMessageStatus(msgId, 'failed')
-    }
+  if (!isChat) {
+    if (!connection?.isConnected()) return false
+    return connection.send(buffer, { streamType: getStreamType(wrapperObj), conversationId: resolveConversationId(wrapperObj) })
   }
+  const opts = { streamType: getStreamType(wrapperObj), conversationId: resolveConversationId(wrapperObj) }
+  await saveToQueue(accountId, wrapperObj, buffer, opts)
+  if (generation !== connectionGeneration) return false
+  const entry = await getPending(accountId, String(wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId))
+  if (!entry) return false
+  if (entry.state === 'failed') { await retryMessage(accountId, entry.messageId); entry.state = 'pending'; entry.retryCount = 0 }
+  return sendQueued(entry)
+}
 
-  return sent
+/** Durable acceptance by the local outbox; transport success remains a separate result. */
+export async function enqueueWrapper(wrapper: MessageWrapper, owner: string): Promise<void> {
+  const generation = connectionGeneration
+  if (!owner || owner !== String(storeRef?.state.accountId || currentUserId || '')) throw new Error('Stale sending account')
+  const buffer = await encodeMessage(wrapper)
+  if (owner !== String(storeRef?.state.accountId || currentUserId || '') || generation !== connectionGeneration) throw new Error('Sending session changed')
+  if (buffer.byteLength > 65536) throw new Error('Message exceeds transport frame limit')
+  const opts = { streamType: getStreamType(wrapper), conversationId: resolveConversationId(wrapper) }
+  await saveToQueue(owner, wrapper, buffer, opts)
+  // The durable write is the commit point. A later read/transport failure must not retain
+  // the draft and encourage a new ID for an entry which is already queued.
+  void getPending(owner, String(wrapper.chat?.messageId || wrapper.groupChat?.messageId))
+    .then(entry => entry ? sendQueued(entry) : false)
+    .catch(() => { /* Durable entry is retained for retry. */ })
+}
+
+const outgoing = new Map<string, Promise<boolean>>()
+function sendQueued(entry: QueueEntry): Promise<boolean> {
+  const key = `${connectionGeneration}:${entry.accountId}:${entry.messageId}`, active = outgoing.get(key)
+  if (active) return active
+  const generation = connectionGeneration, connection = transport
+  const current = () => generation === connectionGeneration && authenticated && currentUserId === entry.accountId
+  const sending = Promise.resolve().then(async () => {
+    if (!current() || !connection?.isConnected()) return false
+    if (entry.retryCount >= MAX_RETRIES) {
+      await markFailed(entry.accountId, entry.messageId)
+      if (current()) storeRef?.updateMessageStatus(entry.messageId, 'failed')
+      return false
+    }
+    const updated = await markAttempt(entry.accountId, entry.messageId)
+    if (!updated || !current()) return false
+    const buffer = Uint8Array.from(entry.buffer).buffer
+    const streamType = entry.opts.streamType || getStreamType(entry.wrapperObj)
+    const conversationId = entry.opts.conversationId || resolveConversationId(entry.wrapperObj)
+    // Register before write: a fast server ACK may arrive before write() resolves.
+    pendingAcks.set(entry.messageId, { accountId: entry.accountId, sendTime: Date.now(), warned: false, failed: false,
+      retryCount: updated.retryCount, wrapperObj: entry.wrapperObj, buffer, streamType, conversationId })
+    storeRef?.updateMessageStatus(entry.messageId, 'sending')
+    try { return await connection.send(buffer, { streamType, conversationId }) }
+    catch { return false }
+    // A successful network write never removes the durable entry. Only its server ACK does.
+  }).finally(() => { if (outgoing.get(key) === sending) outgoing.delete(key) })
+  outgoing.set(key, sending)
+  return sending
 }
 
 /**
  * 根据消息类型确定流类型。
  */
-function getStreamType(wrapperObj: MessageWrapper) {
+function getStreamType(wrapperObj: MessageWrapper): 'control' | 'chat' {
   const type = wrapperObj.type
   if (type === MSG_TYPE.ACK || type === MSG_TYPE.HEARTBEAT || type === MSG_TYPE.LOGIN || type === MSG_TYPE.LOGOUT) {
     return 'control'
@@ -307,51 +313,21 @@ function resolveConversationId(wrapperObj: MessageWrapper) {
 /**
  * 刷新 IndexedDB 离线队列：网络恢复后自动重发离线消息。
  */
+let flushing: { generation: number; promise: Promise<void> } | null = null
 async function flushOfflineQueue() {
-  const generation = connectionGeneration
-  try {
-    const pending = await getAllPending()
-    if (generation !== connectionGeneration) return
-    if (pending.length === 0) return
-
-    console.debug(`[OfflineQueue] 发送离线队列中的 ${pending.length} 条消息`)
-    for (const entry of pending) {
-      if (generation !== connectionGeneration) return
-      // 超过最大重试次数直接丢弃，避免无限重发
-      if (entry.retryCount >= MAX_RETRIES) {
-        console.warn(`[OfflineQueue] 丢弃超出重试上限的消息: ${entry.messageId} (retryCount=${entry.retryCount})`)
-        await removeMessage(entry.messageId)
-        continue
-      }
-      try {
-        // 兼容旧版普通数组条目（迁移前 Array.from 存储）与新 Uint8Array 条目
-        const u8 = entry.buffer instanceof Uint8Array ? entry.buffer : new Uint8Array(entry.buffer)
-        const buffer = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)
-        const streamType = entry.opts?.streamType || getStreamType(entry.wrapperObj)
-        const conversationId = entry.opts?.conversationId || resolveConversationId(entry.wrapperObj)
-
-        if (transport && transport.isConnected()) {
-          const ok = await transport.send(buffer, { streamType, conversationId })
-          if (generation !== connectionGeneration) return
-          if (ok) {
-            await removeMessage(entry.messageId)
-          } else {
-            // write 失败：保留队列条目并计一次重试，待下次 flush 重发
-            await incrementRetry(entry.messageId)
-            break
-          }
-        } else {
-          break // 连接断开，停止发送
-        }
-      } catch (e) {
-        if (generation !== connectionGeneration) return
-        console.warn('[OfflineQueue] 发送失败:', entry.messageId, e)
-        await incrementRetry(entry.messageId)
-      }
+  if (flushing?.generation === connectionGeneration || !authenticated || !currentUserId) return
+  const accountId = currentUserId, generation = connectionGeneration
+  const flight = (async () => {
+    for (const entry of await getDuePending(accountId)) {
+      if (generation !== connectionGeneration || !authenticated) return
+      if (entry.state === 'failed') continue
+      const pending = pendingAcks.get(entry.messageId)
+      if (pending && Date.now() - pending.sendTime < ACK_TIMEOUT_MS) continue
+      await sendQueued(entry)
     }
-  } catch (e) {
-    console.warn('[OfflineQueue] flushOfflineQueue 异常:', e)
-  }
+  })().catch(error => console.warn('Outbox replay failed:', error)).finally(() => { if (flushing?.promise === flight) flushing = null })
+  flushing = { generation, promise: flight }
+  await flight
 }
 
 /**
@@ -369,6 +345,8 @@ export async function sendAck(messageId: string) {
  * 关闭连接。
  */
 export function close() {
+  authenticated = false
+  flushing = null
   connectionGeneration++
   messageCache.clear()
   stopReconnect = true
@@ -471,6 +449,12 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
   if (processedData && typeof processedData === 'object') {
     lastHeartbeatResponseTime = Date.now()
 
+    if (processedData.type === MSG_TYPE.RESPONSE && processedData.response &&
+      ['OWNER_REDIRECT', 'OWNER_UNAVAILABLE', 'SERVER_BUSY'].includes(processedData.response.message || '')) {
+    transport?.close()
+    return
+  }
+
     // 带 success 字段的响应（ResponseMessage / AckMessage）
     const isSuccess = processedData.response?.success
     if (isSuccess !== undefined) {
@@ -485,6 +469,14 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
       }
     }
 
+  if (processedData.type === MSG_TYPE.RESPONSE && processedData.response?.success &&
+        String(processedData.response.clientId) === currentUserId && !authenticated) {
+      authenticated = true
+      handlers.onAuthenticated?.()
+      startHeartbeat()
+      void flushOfflineQueue()
+      return
+    }
     // 心跳/ACK 响应
     if (processedData.type === MSG_TYPE.HEARTBEAT
         || (processedData.heartbeat && typeof processedData.heartbeat === 'object')) {
@@ -503,11 +495,23 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
       }
 
       const ackedMsgId = ack.messageId
-      if (ackedMsgId && pendingAcks.has(ackedMsgId)) {
+      const pending = ackedMsgId ? pendingAcks.get(ackedMsgId) : null
+      if (ackedMsgId && pending && pending.accountId === currentUserId && ack.conversationId && ack.seqId != null) {
+        if (ack.success !== true) await markFailed(pending.accountId, ackedMsgId)
+        else {
+          if (ack.serverMessageId) {
+            const localConversation = ack.conversationId.startsWith('group:') ? ack.conversationId
+              : ack.conversationId.replace(/^user:/, '').split(':').find(id => id !== pending.accountId) || pending.accountId
+            await confirmStoredMessageId(pending.accountId, localConversation, ackedMsgId, ack.serverMessageId, String(ack.seqId))
+          }
+          await removeMessage(pending.accountId, ackedMsgId)
+        }
+        if (generation !== connectionGeneration) return
         pendingAcks.delete(ackedMsgId)
-        if (storeRef) storeRef.updateMessageStatus(ackedMsgId, ack.success === false ? 'failed' : 'sent')
+        if (ack.success === true && ack.serverMessageId) storeRef?.confirmMessageId(ackedMsgId, ack.serverMessageId, String(ack.seqId))
+        else storeRef?.updateMessageStatus(ackedMsgId, ack.success !== true ? 'failed' : 'sent')
       }
-      if (ack.success !== false && ack.seqId != null && ack.conversationId) {
+      if (ack.success === true && ack.seqId != null && ack.conversationId) {
         handlers.onmessage?.({ type: MSG_TYPE.SYNC_HINT,
           ack: { clientId: ack.conversationId, message: String(ack.seqId) } })
       }
@@ -534,15 +538,17 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
       }
     }
 
-    // 新消息通知 + 立即回 ACK
-    // 后端 PendingMessageManager 未收到 ACK 时会 30s 间隔重发、最多 3 次，
-    // 不回 ACK 接收方会看到 3 份重复消息
-    if (processedData.type === MSG_TYPE.CHAT && processedData.chat) {
-      showNotification(processedData.chat)
-      if (processedData.chat.messageId) void sendAck(processedData.chat.messageId)
-    } else if (processedData.type === MSG_TYPE.GROUP_CHAT && processedData.groupChat) {
-      showNotification(processedData.groupChat)
-      if (processedData.groupChat.messageId) void sendAck(processedData.groupChat.messageId)
+    if ((processedData.type === MSG_TYPE.CHAT && processedData.chat) ||
+        (processedData.type === MSG_TYPE.GROUP_CHAT && processedData.groupChat)) {
+      if (!handlers.onmessage) return
+      try {
+        await handlers.onmessage(processedData)
+        if (generation !== connectionGeneration) return
+        const message = processedData.chat || processedData.groupChat!
+        showNotification(message)
+        if (message.messageId) await sendAck(message.messageId)
+      } catch (error) { console.warn('Incoming message was not committed:', error) }
+      return
     }
 
     // 同步响应
@@ -553,7 +559,8 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
 
   // 传给上层回调
   if (handlers.onmessage) {
-    handlers.onmessage(processedData)
+    try { await handlers.onmessage(processedData) }
+    catch (error) { console.warn('Message callback failed:',error) }
   }
 }
 
@@ -638,12 +645,13 @@ export default {
   connect,
   close,
   sendWrapper,
+  enqueueWrapper,
   sendAck,
   readyState,
   getAverageRtt,
   setStore,
   getOfflineQueueSize: async () => {
     const { getQueueSize } = await import('./offlineQueue')
-    return getQueueSize()
+    return getQueueSize(String(currentUserId || storeRef?.state.accountId || ''))
   }
 }

@@ -1,9 +1,33 @@
 import type { Id, User, Group, ConversationState, ConversationPatch } from '../types/chat'
+import {ConversationId} from '../utils/conversationId'
+import {sidebarUsers} from '../utils/contactDirectory'
 import { state } from './state'
 import { getConversationKey, sanitizeId } from './storage'
-import { getAllConversationMeta, getLastMessage, setConversationPreview } from '../utils/messageDB'
+import { getAllConversationMeta } from '../utils/messageDB'
 import { conversationPreviewText } from '../utils/format'
 import i18n from '../i18n'
+import {sessionEpoch} from '../services/sessionEpoch'
+
+/** Apply an authoritative membership snapshot while keeping live presence and stable row identities. */
+export function applyDirectorySnapshot(snapshot: import('../services/contactDirectorySync').DirectorySnapshot) {
+  const previous=new Map(state.users.map(user=>[String(user.id),user]))
+  const next=snapshot.users.map(user=>{
+    const existing=previous.get(String(user.id))
+    if(!existing)return {...user}
+    const changed=Object.entries(user).some(([key,value])=>value!==(existing as unknown as Record<string,unknown>)[key])
+    if(changed)Object.assign(existing,user)
+    return existing
+  })
+  if(next.length!==state.users.length || next.some((user,index)=>user!==state.users[index]))state.users=next
+  const previousGroups=new Map(state.groups.map(group=>[String(group.id),group]))
+  const groups=snapshot.groups.map(group=>{
+    const existing=previousGroups.get(String(group.id))
+    if(!existing)return {...group}
+    Object.assign(existing,group);return existing
+  })
+  if(groups.length!==state.groups.length || groups.some((group,index)=>group!==state.groups[index]))state.groups=groups
+  void rebuildConversationStates()
+}
 
 // ── 会话状态 ──────────────────────────────────
 
@@ -11,16 +35,17 @@ import i18n from '../i18n'
 // 数据源为 IndexedDB conversation_meta（localStorage 旧 key 在迁移后已无写入）
 interface ConversationPreviewEntry { time: number; preview: string }
 const previewCache = new Map<string, Map<string, ConversationPreviewEntry>>()
+export function clearConversationPreviewCache(){previewCache.clear()}
 
-/** 会话 key 统一约定：私聊 = 对方 id 字符串；群聊 = "group:<absId>" */
+/** Convert a typed UI key at the existing IndexedDB schema boundary. */
 function normalizeConversationId(conversationId: Id): string {
   const id = sanitizeId(conversationId)
   if (!id) return ''
-  return Number(id) < 0 ? `group:${Math.abs(Number(id))}` : id
+  return ConversationId.parse(id).historyKey
 }
 
 async function loadConversationMetaMap(accountId: Id, forceRefresh = false): Promise<Map<string, ConversationPreviewEntry>> {
-  const cacheKey = String(accountId)
+  const cacheKey = String(accountId),session=sessionEpoch.capture()
   if (!forceRefresh && previewCache.has(cacheKey)) {
     return previewCache.get(cacheKey)!
   }
@@ -34,37 +59,22 @@ async function loadConversationMetaMap(accountId: Id, forceRefresh = false): Pro
   } catch (_) {
     // IndexedDB 不可用时回退空 map（预览时间为 0，聊天本身不受影响）
   }
-  previewCache.set(cacheKey, map)
+  if(session.isCurrent() && String(state.accountId)===cacheKey)previewCache.set(cacheKey, map)
   return map
 }
 
-/**
- * 升级前写入的会话元数据没有预览文本：读该会话最新一条消息补上，只补一次。
- * 异步、失败静默；补写的文本同时回写 IndexedDB 与内存预览缓存。
- */
-function backfillMissingPreviews(accountId: Id, metaMap: Map<string, ConversationPreviewEntry>) {
-  const missing = [...metaMap.entries()]
-    .filter(([, entry]) => entry.time > 0 && !entry.preview)
-    .map(([convId]) => convId)
-  if (!missing.length) return
-  Promise.all(missing.map(async convId => {
-    const preview = conversationPreviewText(await getLastMessage(accountId, convId))
-    if (preview) await setConversationPreview(accountId, convId, preview)
-    return { convId, preview }
-  })).then(results => {
-    for (const { convId, preview } of results) {
-      const entry = metaMap.get(convId)
-      if (entry && !entry.preview) entry.preview = preview
-      // 私聊会话 key 即用户 id，直接回填到已写入的会话状态
-      const current = state.conversationStates[convId]
-      if (preview && current && !current.lastMessagePreview) {
-        state.conversationStates = {
-          ...state.conversationStates,
-          [convId]: { ...current, lastMessagePreview: preview }
-        }
-      }
-    }
-  }).catch(() => { /* 补写失败保持原样，下次 rebuild 再试 */ })
+/** Seed ordering before the cached directory becomes visible. */
+export async function hydrateDirectoryPreviews(accountId:string) {
+  const session=sessionEpoch.capture(),meta=await loadConversationMetaMap(accountId,true)
+  if(!session.isCurrent()||String(state.accountId)!==accountId)return
+  const next={...state.conversationStates}
+  for(const [conversation,value] of meta) {
+    const key=ConversationId.fromHistoryKey(conversation).key
+    const current=next[key]
+    next[key]={lastIncomingMessageTime:Math.max(value.time,current?.lastIncomingMessageTime||0),unreadCount:current?.unreadCount||0,
+      lastMessagePreview:(current?.lastIncomingMessageTime||0)>=value.time?current?.lastMessagePreview||value.preview:value.preview}
+  }
+  state.conversationStates=next
 }
 
 /**
@@ -77,18 +87,18 @@ export async function rebuildConversationStates(forceRefresh = false) {
     state.conversationStates = {}
     return
   }
-  const accountId = state.accountId
+  const accountId = state.accountId,session=sessionEpoch.capture()
   let metaMap = new Map<string, ConversationPreviewEntry>()
   try {
     metaMap = await loadConversationMetaMap(accountId, forceRefresh)
   } catch (_) { /* 保留空 map */ }
-  if (state.accountId !== accountId) return
+  if (state.accountId !== accountId || !session.isCurrent()) return
 
   // 从当前 state 起步，保留重建期间的新 patch（unreadCount / 更新的时间）
   const nextStates: Record<string, ConversationState> = { ...state.conversationStates }
-  state.users.forEach(user => {
+  sidebarUsers(state.users,state.groups).forEach(user => {
     if (!user || user.id == null) return
-    const key = String(user.id)
+    const key = ConversationId.forContact(user).key
     const convId = normalizeConversationId(key)
     const entry = convId ? metaMap.get(convId) : undefined
     const dbTime = entry?.time || 0
@@ -97,11 +107,10 @@ export async function rebuildConversationStates(forceRefresh = false) {
       lastIncomingMessageTime: Math.max(dbTime, current.lastIncomingMessageTime || 0),
       unreadCount: current.unreadCount || 0,
       // 重建期间新到达的消息（patch 已更新预览）优先于库里的旧预览
-      lastMessagePreview: (entry?.preview || '') || current.lastMessagePreview || undefined
+      lastMessagePreview: (current.lastIncomingMessageTime||0)>=dbTime ? current.lastMessagePreview||entry?.preview : entry?.preview||current.lastMessagePreview
     }
   })
   state.conversationStates = nextStates
-  backfillMissingPreviews(state.accountId, metaMap)
 }
 
 /**
@@ -185,39 +194,6 @@ export function mergeUsers(incoming: readonly User[]) {
   }
 }
 
-export function cacheUsers(users: readonly User[]) {
-  try {
-    if (state.accountId) {
-      const key = `charroom_users_${state.accountId}`
-      localStorage.setItem(key, JSON.stringify({
-        version: Date.now(),
-        users: users.map(u => ({
-          id: u.id,
-          username: u.username,
-          online: u.online,
-          status: u.status,
-          avatarUrl: u.avatarUrl,
-          avatarKey: u.avatarKey,  // 存储 avatarKey 用于缓存失效
-          signature: u.signature
-        }))
-      }))
-    }
-  } catch (_) { /* localStorage 满时静默失败 */ }
-}
-
-export function loadCachedUsers(): User[] {
-  try {
-    if (state.accountId) {
-      const raw = localStorage.getItem(`charroom_users_${state.accountId}`)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed && Array.isArray(parsed.users)) return parsed.users
-      }
-    }
-  } catch (_) { /* ignore */ }
-  return []
-}
-
 export function addUser(u: User) {
   if (!state.users.some(x => x.id === u.id)) {
     state.users.push(u)
@@ -229,13 +205,13 @@ export function addUser(u: User) {
 export function removeUser(id: Id) {
   if (!state.users.some(u => u.id === id)) return
   state.users = state.users.filter(u => u.id !== id)
-  delete state.conversationStates[id]
+  delete state.conversationStates[ConversationId.privateChat(id).key]
   state.messages = state.messages.filter(m => m.user !== id.toString())
-  if (state.selectedChatId === id) {
+  if (state.selectedChatId === ConversationId.privateChat(id).key) {
     state.selectedChatId = null
     state.messages = []
     state.groupMessages = []
-    clearConversationUnread(id)
+    clearConversationUnread(ConversationId.privateChat(id).key)
   }
 }
 

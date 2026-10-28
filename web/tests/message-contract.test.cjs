@@ -71,7 +71,8 @@ function viewHandler(context, store) {
   const start = view.lastIndexOf('\n', functionStart) + 1
   const end = view.indexOf('/** 登录后拉取所有会话的离线消息 */', start)
   assert.ok(start >= 0 && end > start)
-  Object.assign(context, { sessionEpoch: { capture: () => ({ isCurrent: () => true }) }, syncConversation: async () => {}, store, MSG_TYPE: types, AGENT_STREAM_TYPE: agentTypes,
+  vm.runInContext(transpile(fs.readFileSync(path.join(web,'src/services/agentStreamReducer.ts'),'utf8')).replace(/^import .*$/mg,'').replace('export class','class').replace('export {}','') + '\nglobalThis.agentStreams = new AgentStreamReducer()', Object.assign(context,{ TYPE: agentTypes }))
+  Object.assign(context, { pendingAgentRenders: new Map(), agentRenderFrame: 0, requestAnimationFrame: callback => { callback(); return 1 }, sessionEpoch: { capture: () => ({ isCurrent: () => true }) }, syncConversation: async () => {}, store, MSG_TYPE: types, AGENT_STREAM_TYPE: agentTypes,
     normalizeTimestamp: value => new Date(Number(value)).toISOString(),
     api: { getUserDetail: async id => ({ data: { id } }) },
     chatSocket: { sendAck: async () => true } })
@@ -85,7 +86,7 @@ test('server private/group messages and Agent chunks reach the view store', asyn
   const store = { state: { accountId: '42', users: [{ id: '41' }] },
     addUser() {}, setConversationSeqId() {},
     addMessage: msg => privateMessages.push(msg), addGroupMessage: msg => groups.push(msg),
-    upsertAgentStreamMessage: (...args) => chunks.push(args) }
+    upsertAgentStreamMessage: async (...args) => chunks.push(args) }
   const receive = viewHandler(context, store)
   const fixtures = [
     { type: types.CHAT, chat: { userId: '41', targetClientId: '42', content: 'private', messageId: 'private' } },
@@ -121,18 +122,21 @@ test('Worker uses the same numeric enum and int64 contract', async () => {
 test('real decoded CHAT reaches the UI and only a successful server ACK marks sent', async () => {
   const { context, codecModule, constantsModule } = await client()
   context.document = { visibilityState: 'visible' }
-  const statuses = [], received = [], cursorWrites = [], syncRequests = []
+  const statuses = [], received = [], cursorWrites = [], syncRequests = [], canonicalWrites = [], confirmedIds = []
   const store = { state: { accountId: '42', users: [{ id: '41' }] },
     addMessage: msg => received.push(msg), setConversationSeqId: (...args) => cursorWrites.push(args),
-    updateMessageStatus: (...args) => statuses.push(args) }
+    updateMessageStatus: (...args) => statuses.push(args),
+    confirmMessageId: (...args) => confirmedIds.push(args) }
   const receive = viewHandler(context, store)
   context.syncConversation = (...args) => syncRequests.push(args)
   let transport
+  const queued = new Map()
   const exportsModule = entries => new vm.SyntheticModule(Object.keys(entries), function () {
     for (const [name, value] of Object.entries(entries)) this.setExport(name, value)
   }, { context })
   const dependencies = {
     '../proto': codecModule,
+    './gatewayOwner': exportsModule({ discoverGatewayOwner: async (_token, host, port) => ({ host, port }) }),
     '../proto/constants': constantsModule,
     'dompurify': exportsModule({ default: { sanitize: text => text } }),
     '../i18n': exportsModule({ default: { global: { t: key => key } } }),
@@ -144,8 +148,9 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
         close() { this.connected = false }
       })
     }),
-    './offlineQueue': exportsModule({ saveToQueue: async () => {}, getAllPending: async () => [],
-      removeMessage: async () => {}, incrementRetry: async () => {}, MAX_RETRIES: 3 }),
+    './offlineQueue': exportsModule({ saveToQueue: async (_owner, wrapper, buffer, opts) => { queued.set(wrapper.chat.messageId,{ accountId:'42',messageId:wrapper.chat.messageId,wrapperObj:wrapper,buffer:new Uint8Array(buffer),opts,retryCount:0,state:'pending' }) }, getPending: async (_, id) => queued.get(id), getDuePending: async () => [...queued.values()],
+      removeMessage: async (_,id) => queued.delete(id), markAttempt: async (_,id) => { const entry=queued.get(id); if(entry)entry.retryCount++; return entry }, markFailed: async () => {}, retryMessage: async () => {}, MAX_RETRIES: 3 }),
+    '../utils/messageDB': exportsModule({ confirmMessageId: async (...args) => canonicalWrites.push(args) }),
     '../utils/device': exportsModule({ getDeviceId: () => 'fixture', getDeviceType: () => 'web' })
   }
   const socketModule = new vm.SourceTextModule(readTs(path.join(web, 'src/services/chatSocket.ts')), { context })
@@ -160,6 +165,7 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
   }
   try {
     await socket.connect('fixture.invalid', 443, 'fixture-token', '42', { onmessage: receive })
+    transport.onmessage(wire({ type: types.RESPONSE, response: { success: true, clientId: '42', message: '登录成功' } }))
     transport.onmessage(wire({ type: types.CHAT,
       chat: { userId: '41', targetClientId: '42', content: 'received fixture', messageId: 'incoming' } }))
     await until(() => received.length === 1)
@@ -169,6 +175,13 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
       transport.onmessage(wire({ type: types.ACK, ack: { messageId, success, seqId: '9007199254740993', conversationId: 'user:41:42' } }))
       await until(() => statuses.some(([id]) => id === messageId))
     }
+    await socket.sendWrapper({ type: types.CHAT, chat: { targetClientId: '41', content: 'fixture', messageId: 'local_canonical' } })
+    transport.onmessage(wire({ type: types.ACK, ack: { messageId: 'local_canonical', success: true, serverMessageId: '9007199254740999',
+      seqId: '17', conversationId: 'user:41:42' } }))
+    await until(() => confirmedIds.length === 1)
+    assert.deepEqual(canonicalWrites[0], ['42', '41', 'local_canonical', '9007199254740999', '17'])
+    assert.deepEqual(confirmedIds[0], ['local_canonical', '9007199254740999', '17'])
+    assert.equal(queued.has('local_canonical'), false)
     transport.onmessage(wire({ type: types.SYNC_HINT, ack: { clientId: 'user:41:42', message: '9007199254740995' } }))
     await until(() => syncRequests.some(([, seq]) => seq === '9007199254740995'))
     assert.equal(syncRequests.filter(([, seq]) => seq === '9007199254740995').length, 1, 'hint dispatches once')
@@ -195,4 +208,29 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
     await socket.connect('fixture.invalid', 443, 'another-fixture-token', '42', { onmessage: receive })
     assert.equal(await abandoned, false, 'old asynchronous encoding must not send on a new connection')
   } finally { socket.close() }
+})
+
+
+test('ACK retains the client request ID and decodes an optional canonical server ID', async () => {
+  const { codec } = await client()
+  const result = await codec.decodeMessage(wire({ type: types.ACK, ack: {
+    messageId: 'local_fixture', serverMessageId: '9007199254740999',
+    seqId: '9007199254740995', conversationId: 'user:41:42'
+  } }))
+  assert.equal(result.ack.messageId, 'local_fixture')
+  assert.equal(result.ack.serverMessageId, '9007199254740999')
+  assert.equal(result.ack.seqId, '9007199254740995')
+})
+
+
+test('an older protobuf reader ignores the new ACK field without losing request correlation', () => {
+  const schema = fs.readFileSync(backend, 'utf8').replace(/^.*optional string serverMessageId = 9;.*$/m, '')
+  const oldRoot = protobuf.parse(schema).root
+  oldRoot.loadSync(path.join(web, 'src/proto/agent_stream.proto'))
+  const oldType = oldRoot.lookupType('com.chatlite.proto.MessageWrapper')
+  const ack = oldType.decode(new Uint8Array(wire({ type: types.ACK, ack: {
+    messageId: 'local_legacy', serverMessageId: '9007199254740999', seqId: '17', conversationId: '1:42'
+  } }))).ack
+  assert.equal(ack.messageId, 'local_legacy')
+  assert.equal(ack.seqId.toString(), '17')
 })

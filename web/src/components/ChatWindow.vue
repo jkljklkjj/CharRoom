@@ -2,9 +2,9 @@
   <div class="chat-wrap">
     <!-- 聊天顶部：显示当前选中好友名称（移动端隐藏，由外层提供顶部栏） -->
     <header class="chat-top" v-if="!isMobile && currentChatId !== null">
-      <span class="chat-top-title">{{ currentChatTitle }}</span>
+      <div class="chat-identity"><img v-if="currentChatUser?.avatarUrl" :src="currentChatUser.avatarUrl" alt="" class="paper-avatar" /><span v-else class="paper-avatar">{{ initials(currentChatTitle) }}</span><div><span class="chat-top-title">{{ currentChatTitle }}</span><small :class="{online:currentChatUser?.online}">{{ $t(currentChatUser?.online ? 'product.chatPresence' : 'product.chatQuiet') }}</small></div></div>
       <div class="chat-top-actions" v-if="!isGroupChat">
-        <button class="chat-top-btn" @click.stop="toggleFriendMenu" title="好友操作">⋯</button>
+        <button class="chat-top-btn" @click.stop="toggleFriendMenu" :title="$t('product.conversationOptions')" :aria-label="$t('product.conversationOptions')">⋯</button>
         <div v-if="showFriendMenu" class="friend-dropdown" @click.stop>
           <div class="dropdown-item" @click="showFriendInfo">{{ $t('chat.info') }}</div>
           <div class="dropdown-item danger" @click="confirmDeleteFriend">{{ $t('chat.deleteFriend') }}</div>
@@ -16,7 +16,7 @@
     <div v-if="showInfoModal" class="modal-overlay" @click="showInfoModal = false">
       <div ref="infoDialog" class="modal-content" role="dialog" aria-modal="true" :aria-label="$t('chat.info')" tabindex="-1" @click.stop>
         <button class="modal-close" @click="showInfoModal = false">✕</button>
-        <SocialProfileCard v-if="currentChatId !== null" :user-id="String(currentChatId)" @chat="showInfoModal = false" @blocked="showInfoModal = false" />
+        <SocialProfileCard v-if="currentChatUser && !isGroupChat" :user-id="String(currentChatUser.id)" @chat="showInfoModal = false" @blocked="showInfoModal = false" />
       </div>
     </div>
 
@@ -32,7 +32,7 @@
     </div>
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
-    <VirtualMessageList class="messages" ref="virtualList" v-if="currentChatId !== null" :items="currentMessages" @scroll="onMessageScroll" v-slot="{ item: m }">
+    <VirtualMessageList :key="readingKey" class="messages" ref="virtualList" v-if="currentChatId !== null" :items="currentMessages" @scroll="onMessageScroll" v-slot="{ item: m }">
       <div>
         <!-- 系统消息（加入群聊/退出群聊等） -->
         <div v-if="isSystemMessage(m)" class="system-message">
@@ -44,38 +44,41 @@
           <div class="row">
             <div class="avatar-col">
               <img v-if="getAvatar(m.user)" :src="getAvatar(m.user)" class="msg-avatar" />
-              <div v-else class="avatar-placeholder">{{ initials('' + m.user) }}</div>
+              <div v-else class="avatar-placeholder">{{ initials(senderName(m.user)) }}</div>
             </div>
-            <div class="bubble-col">
+            <div class="bubble-col paper-bubble" :class="{mine:m.user===SELF_USER}">
               <div class="meta">
-                <span class="sender">{{ m.user === SELF_USER ? $t('chat.myself') : (currentChatUser ? (currentChatUser.name || currentChatUser.username) : $t('chat.groupChat')) }}</span>
+                <span class="sender">{{ senderName(m.user) }}</span>
                 <span class="time">{{ formatRelativeTime(m.time) }}</span>
-                <span v-if="m.user === SELF_USER && m.isSent === MSG_STATUS.SENDING" class="status sending" title="发送中">⏳</span>
-                <span v-else-if="m.user === SELF_USER && m.isSent === MSG_STATUS.SENT" class="status sent" title="已送达">✓</span>
-                <span v-else-if="m.user === SELF_USER && m.isSent === MSG_STATUS.FAILED" class="status failed" title="点击重试" @click.stop="retryMessage(m)">⚠</span>
               </div>
             <!-- 图片消息 -->
-            <div v-if="isImageMessage(m.text)" class="image-message">
-              <img :src="extractImageUrl(m.text)" :alt="extractImageAlt(m.text)" @click="openImagePreview(extractImageUrl(m.text))" />
+            <div v-if="m.messageType === 1 && m.fileUrl" class="image-message">
+              <img :src="safeAttachmentUrl(m.fileUrl)" :alt="m.fileName || $t('chat.imageAlt')" @click="openImagePreview(m.fileUrl)" />
             </div>
             <!-- 文件消息 -->
-            <div v-else-if="isFileMessage(m.text)" class="file-message">
-              <div class="file-icon">{{ getFileIcon(extractFileName(m.text)) }}</div>
+            <div v-else-if="m.messageType === 2 && m.fileUrl" class="file-message">
+              <div class="file-icon">{{ getFileIcon(m.fileName || '') }}</div>
               <div class="file-info">
-                <div class="file-name">{{ extractFileName(m.text) }}</div>
-                <div class="file-size">{{ extractFileSize(m.text) }}</div>
+                <div class="file-name"><a :href="safeAttachmentUrl(m.fileUrl)" target="_blank" rel="noopener noreferrer">{{ m.fileName || $t('chat.unknownFile') }}</a></div>
+                <div class="file-size">{{ ((m.fileSize || 0) / 1024).toFixed(1) }} KB</div>
               </div>
             </div>
             <!-- 普通文本消息 — 安全：text 已在 store 中通过 DOMPurify.sanitize 预清洗 -->
             <div v-else class="text-content" v-html="formatText(m.text)"></div>
             </div>
+            <MessageSendIndicator v-if="m.user===SELF_USER" :status="m.isSent" :started-at="m.sendStartedAt ?? normalizeTimeValue(m.time ?? m.timestamp)" @retry="retryMessage(m)" />
           </div>
         </div>
       </div>
     </VirtualMessageList>
 
+    <div v-if="(store.state.historyLoading || store.state.historySyncing) && !currentMessages.length" class="history-feedback" role="status">{{ $t(store.state.historyLoading ? 'sync.historyLoading' : 'sync.historySyncing') }}</div>
+    <button v-else-if="store.state.historyError" class="history-feedback" @click="store.setSelectedChat(currentChatId)">{{ $t('sync.historyFailed') }}</button>
+    <div v-else-if="currentChatId !== null && !currentMessages.length" class="history-feedback" role="status">{{ $t('sync.historyEmpty') }}</div>
+    <button v-if="store.state.historySyncError" class="history-sync-feedback" @click="emit('retry-history')">{{ $t('sync.historySyncFailed') }}</button>
+    <span v-else-if="store.state.historySyncing && currentMessages.length" class="history-sync-feedback" role="status">{{ $t('sync.refreshing') }}</span>
     <!-- 消息上下文菜单 -->
-    <button v-if="newMessageCount" class="jump-latest" @click="scrollToBottom(true)">{{ $t('polish.newMessages', { count: newMessageCount }) }} ↓</button>
+    <button v-if="newMessageCount || store.state.historyHasNewer" class="jump-latest" @click="jumpLatest">{{ store.state.historyHasNewer ? $t('polish.latestMessages') : $t('polish.newMessages', { count: newMessageCount }) }} ↓</button>
     <div v-if="showContextMenu" class="context-menu" :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }">
       <div class="menu-item" @click="copyMessage">{{ $t('chat.context.copy') }}</div>
       <div class="menu-item" @click="shareMessage" v-if="canShare">{{ $t('chat.context.share') }}</div>
@@ -109,9 +112,9 @@
 
     <!-- 未选中好友时的占位 -->
     <div class="empty-placeholder" v-if="currentChatId === null">
-      <div class="placeholder-illustration">💬</div>
-      <div class="placeholder-title">{{ $t('chat.selectContact') }}</div>
-      <div class="placeholder-hint">{{ $t('chat.selectContactHint') }}</div>
+      <div class="placeholder-illustration" aria-hidden="true"><span>· · ·</span></div>
+      <div class="placeholder-title">{{ $t('product.emptyTitle') }}</div>
+      <div class="placeholder-hint">{{ $t('product.emptyHint') }}</div>
     </div>
 
     <!-- 输入框：只要选中会话就显示 -->
@@ -138,6 +141,7 @@
         <button class="reply-cancel" @click="cancelReply" title="取消回复">×</button>
       </div>
 
+      <button v-if="uploading" type="button" @click="cancelUpload">{{ $t('composer.cancelUpload') }}</button>
       <form class="composer" @submit.prevent="send">
         <textarea
           v-model="text"
@@ -149,20 +153,28 @@
           @input="autoResize"
           @focus="onInputFocus"
         ></textarea>
-        <button class="send" type="submit" :disabled="!text.trim()">{{ $t('chat.send') }}</button>
+        <button class="send" type="submit" :disabled="!text.trim() || sendingCurrent">{{ $t('chat.send') }}</button>
       </form>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+const emit=defineEmits<{ 'retry-history': [] }>()
+import {ConversationId} from '../utils/conversationId'
 import { chatTargetId, sidebarUsers } from '../utils/contactDirectory'
 import SocialProfileCard from './SocialProfileCard.vue'
 import VirtualMessageList from './VirtualMessageList.vue'
+import MessageSendIndicator from './MessageSendIndicator.vue'
+import {normalizeTimeValue} from '../store/storage'
+import { drafts, composerSubmissions } from '../composables/useComposerDrafts'
+import { submitDraft } from '../services/composerDrafts'
+import { sessionEpoch } from '../services/sessionEpoch'
+import { uploadAttachment } from '../api/attachments'
 import { composerEnter } from '../utils/composer'
 import { useDialog } from '../composables/useDialog'
 import type { Id, TimeValue, ChatMessage, User } from '../types/chat'
-import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
+import { onBeforeUnmount, ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import chatSocket from '../services/chatSocket'
@@ -181,7 +193,18 @@ const now = ref(Date.now())
 let relTimeTimer: ReturnType<typeof setTimeout> | undefined
 
 const { t } = useI18n()
-const text = ref('')
+const draftVersion = ref(0)
+const draftKey = () => `${store.state.accountId}:${currentChatId.value}`
+const text = computed({
+  get: () => { draftVersion.value; return drafts.snapshot(draftKey()).text },
+  set: value => { const draft = drafts.snapshot(draftKey()); drafts.edit(draft.key, value, draft.reply); draftVersion.value++ }
+})
+const submitting = ref(composerSubmissions)
+const sendingCurrent = computed(() => submitting.value.has(draftKey()))
+const uploads = new Map<string, AbortController>()
+const uploading = ref(false)
+function cancelUpload() { uploads.get(draftKey())?.abort() }
+
 const virtualList = ref<InstanceType<typeof VirtualMessageList> | null>(null)
 const msgList = computed(() => virtualList.value?.element ?? null)
 const messageInput = ref<HTMLTextAreaElement | null>(null)
@@ -210,6 +233,7 @@ onMounted(() => {
 })
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  uploads.forEach(controller => controller.abort())
   window.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleClickOutside)
   if (relTimeTimer) clearInterval(relTimeTimer)
@@ -224,12 +248,12 @@ const currentChatId = computed(() => {
 // 当前选中的聊天用户
 const currentChatUser = computed(() => {
   if (currentChatId.value == null) return null
-  return sidebarUsers(store.state.users, store.state.groups).find(u => String(u.id) === String(currentChatId.value)) || null
+  return sidebarUsers(store.state.users, store.state.groups).find(u => ConversationId.forContact(u).key === currentChatId.value) || null
 })
 
 // 是否为群聊
 const isGroupChat = computed(() => {
-  return currentChatId.value != null && Number(currentChatId.value) < 0
+  return currentChatId.value != null && ConversationId.parse(currentChatId.value).isGroup
 })
 
 // 好友操作
@@ -302,17 +326,35 @@ function scrollToBottom(animate = false) {
   })
 }
 
-// 首次进入：直接定位到底部，无动画
-watch(currentChatId, () => {
-  _scrollInit = false
-  scrollToBottom(false)
-}, { immediate: true })
+const readingKey=computed(()=>`${store.state.accountId}:${currentChatId.value ?? ''}`)
+let restoringReading=false,readingGeneration=0
+function saveReading(key:string) {
+  const position=virtualList.value?.captureReading()
+  if(position)conversationViews.savePosition(key,position)
+}
+watch(readingKey,async (key,previous)=>{
+  if(previous)saveReading(previous)
+  const generation=++readingGeneration
+  restoringReading=true;_scrollInit=false;newMessageCount.value=0
+  uploading.value=uploads.has(draftKey())
+  await nextTick()
+  if(generation!==readingGeneration)return
+  const saved=conversationViews.position(key)
+  if(saved && currentMessages.value.length) {
+    await virtualList.value?.restoreReading(saved);_scrollInit=true
+  } else if(currentMessages.value.length) {scrollToBottom(false);_scrollInit=true}
+  restoringReading=false
+},{immediate:true})
+onBeforeUnmount(()=>saveReading(readingKey.value))
+
+async function jumpLatest(){try{if(store.state.historyHasNewer)await store.loadLatestMessages();await nextTick();scrollToBottom(true)}catch{toast.error(t('social.failed'))}}
 
 // 向上滚动加载更多历史消息
 let _loadingOlder = false
 async function onMessageScroll() {
   const el = msgList.value
   if (!el || _loadingOlder) return
+  store.setHistoryFollowingLatest(el.scrollHeight-el.scrollTop-el.clientHeight<200 && !store.state.historyHasNewer)
   if (el.scrollHeight - el.scrollTop - el.clientHeight < 64) newMessageCount.value = 0
   // 距顶部 100px 时触发加载
   if (el.scrollTop < 100) {
@@ -320,10 +362,14 @@ async function onMessageScroll() {
     if (!hasMore) return
     _loadingOlder = true
     const prevHeight = el.scrollHeight, prevTop = el.scrollTop, conversation = currentChatId.value
+    const savedReading=virtualList.value?.captureReading()
     try {
       const loaded = await store.loadOlderMessages()
       await nextTick()
-      if (loaded && conversation === currentChatId.value && el === msgList.value) el.scrollTop = prevTop + el.scrollHeight - prevHeight
+      if (loaded && conversation === currentChatId.value && el === msgList.value) {
+        if(savedReading)await virtualList.value?.restoreReading(savedReading)
+        else el.scrollTop = prevTop + el.scrollHeight - prevHeight
+      }
     } catch { toast.error(t('social.failed')) }
     finally { _loadingOlder = false }
   }
@@ -332,6 +378,7 @@ async function onMessageScroll() {
 // 新消息到达：仅在接近底部时跟随（无动画）
 // 通过监听数组长度变化触发，因为 .push() 不改变引用
 watch(() => [currentMessages.value.at(-1)?.messageId || currentMessages.value.at(-1)?.time, currentMessages.value.length] as const, ([last, count], [previousLast, previous]) => {
+  if(restoringReading)return
   // Prepending history keeps the same last message. It must not act like a new arrival.
   if (!last || last === previousLast) return
   const el = msgList.value
@@ -384,6 +431,10 @@ const avatarMap = computed(() => {
   }
   return map
 })
+const senderNames=computed(()=>new Map(store.state.users.map(user=>[String(user.id),user.name || user.username || String(user.id)])))
+function senderName(userId:Id) {
+  return userId===SELF_USER?t('chat.myself'):senderNames.value.get(String(userId)) || t('chat.userPrefix',{id:userId})
+}
 
 function getAvatar(userId: Id) {
   if (!userId) return null
@@ -391,45 +442,19 @@ function getAvatar(userId: Id) {
 }
 
 import { avatarSrc } from '../utils/format'
-import { AGENT_USER_ID, MSG_STATUS, SELF_USER } from '../constants'
+import { AGENT_USER_ID, SELF_USER } from '../constants'
+import { conversationViews } from '../services/conversationViews'
 import { toast } from '../utils/toast'
 
 import { initials } from '../utils/format'
 
-// 图片消息检测与解析
-function isImageMessage(text: string) {
-  if (!text) return false
-  return text.startsWith('![') && text.includes('](data:image/')
+function safeAttachmentUrl(value: string): string {
+  try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : '' }
+  catch { return '' }
 }
-
-function extractImageUrl(text: string) {
-  const match = text.match(/!\[(.*?)\]\((.*)\)/)
-  return match ? match[2] : ''
-}
-
-function extractImageAlt(text: string) {
-  const match = text.match(/!\[(.*?)\]\((.*)\)/)
-  return match ? match[1] : t('chat.imageAlt')
-}
-
-function openImagePreview(url: string) {
-  window.open(url, '_blank', 'noopener,noreferrer')
-}
-
-// 文件消息检测与解析
-function isFileMessage(text: string) {
-  if (!text) return false
-  return text.startsWith('📎 ') && text.includes('(') && text.endsWith('KB)')
-}
-
-function extractFileName(text: string) {
-  const match = text.match(/📎 (.*?) \(/)
-  return match ? match[1] : t('chat.unknownFile')
-}
-
-function extractFileSize(text: string) {
-  const match = text.match(/\(([\d.]+KB)\)/)
-  return match ? match[1] : ''
+function openImagePreview(value: string) {
+  const url = safeAttachmentUrl(value)
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function getFileIcon(filename: string) {
@@ -458,7 +483,6 @@ function formatText(text: string) {
 
 // textarea 自动高度
 function autoResize() {
-  unlockSend() // 用户重新输入 → 解锁发送按钮
   const el = messageInput.value
   if (!el) return
   el.style.height = 'auto'
@@ -477,63 +501,33 @@ function onInputFocus() {
   }, 300)
 }
 
-let _sendLock = { private: false, group: false }
-/** 用户重新输入时解锁发送按钮（代替 setTimeout，更自然） */
-function unlockSend() {
-  const key = isGroupChat.value ? 'group' : 'private'
-  _sendLock[key] = false
-}
-function send(){
-  const key = isGroupChat.value ? 'group' : 'private'
-  if(!text.value.trim() || currentChatId.value == null || _sendLock[key]) return
-  _sendLock[key] = true
-  const m: ChatMessage = {
-    user: 'you',
-    text: text.value,
-    time: new Date().toISOString(),
-    targetId: currentChatId.value // 添加目标用户ID，用于区分会话
-  }
-
-  const localMessageId = 'local_' + Date.now()
-  m.messageId = localMessageId
-  m.isSent = 'sending' // 立即显示发送中状态
-
-  const to = currentChatId.value
-  const reply = replyTo.value
-  const replyFields = reply && reply.messageId
-    ? { replyToMessageId: reply.messageId, replyToContent: reply.content, replyToSender: reply.sender }
-    : {}
-
-  // 判断是否为 AI 助手（AGENT_USER_ID = 0）
-  const isAgent = !isGroupChat.value && Number(to) === AGENT_USER_ID
-
-  const wrapper = isGroupChat.value
-    ? {
-        type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: chatTargetId(to!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
-      }
-    : isAgent
-      ? {
-          // 发给 AI 助手：AGENT_CHAT 类型触发后端 AI 处理
-          type: MSG_TYPE.AGENT_CHAT,
-          chat: { targetClientId: Number(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
-        }
-      : {
-          type: MSG_TYPE.CHAT,
-          chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId, ...replyFields }
-        }
-
-  if (isGroupChat.value) {
-    store.addGroupMessage({ ...m, groupId: chatTargetId(to!) })
-  } else {
-    store.addMessage(m)
-  }
-
-  chatSocket.sendWrapper(wrapper).catch(e => console.warn("send failed:", e instanceof Error ? e.message : String(e)))
-  text.value = ''
-  cancelReply()
-  // 滚动到底部
-  scrollToBottom()
+async function send() {
+  const snapshot = drafts.snapshot(draftKey()), target = currentChatId.value
+  if (!snapshot.text.trim() || target == null || submitting.value.has(snapshot.key)) return
+  const owner = String(store.state.accountId || ''), group = isGroupChat.value, session = sessionEpoch.capture()
+  submitting.value.add(snapshot.key)
+  const localId = 'local_' + globalThis.crypto.randomUUID(), timestamp = Date.now()
+  const message: ChatMessage = { user: 'you', text: snapshot.text, time: timestamp, targetId: chatTargetId(target),
+    messageId: localId, isSent: 'sending', replyTo: snapshot.reply || undefined }
+  const fields = { targetClientId: chatTargetId(target), content: message.text,
+    timestamp, messageId: localId, ...(snapshot.reply?.messageId ? { replyToMessageId: snapshot.reply.messageId,
+      replyToContent: snapshot.reply.content, replyToSender: snapshot.reply.sender } : {}) }
+  const agent = !group && Number(chatTargetId(target)) === AGENT_USER_ID
+  const wrapper = group ? { type: MSG_TYPE.GROUP_CHAT, groupChat: fields }
+    : { type: agent ? MSG_TYPE.AGENT_CHAT : MSG_TYPE.CHAT, chat: fields }
+  try {
+    await submitDraft(
+      () => group ? store.addGroupMessage({ ...message, groupId: chatTargetId(target) }) : store.addMessage(message),
+      async () => {
+        if (!session.isCurrent() || owner !== String(store.state.accountId)) throw new Error('Stale account')
+        if (agent) { if (!await chatSocket.sendWrapper(wrapper)) throw new Error('Agent transport unavailable') }
+        else await chatSocket.enqueueWrapper(wrapper, owner)
+      },
+      () => { drafts.commit(snapshot); draftVersion.value++ })
+    if (session.isCurrent() && currentChatId.value === target) scrollToBottom()
+  } catch {
+    if (session.isCurrent()) { store.updateMessageStatus(localId, 'failed'); toast.error(t('composer.persistFailed')) }
+  } finally { submitting.value.delete(snapshot.key) }
 }
 
 /**
@@ -541,30 +535,35 @@ function send(){
  */
 async function retryMessage(m: ChatMessage) {
   if (!m.text || !m.messageId) return
-  const to = currentChatId.value
+  const group = m.groupId != null || isGroupChat.value
+  const to = m.groupId != null ? ConversationId.group(m.groupId).key : m.targetId != null ? ConversationId.privateChat(m.targetId).key : currentChatId.value
   if (!to) return
 
-  // 生成新的 messageId
-  const newMessageId = 'local_' + Date.now()
-  const isAgent = !isGroupChat.value && Number(to) === AGENT_USER_ID
-  const wrapper = isGroupChat.value
+  // 重试复用原 ID，防止 ACK 丢失后把同一条消息再次持久化。
+  const newMessageId = m.messageId
+  const replyFields = m.replyTo?.messageId ? {
+    replyToMessageId: m.replyTo.messageId, replyToContent: m.replyTo.content, replyToSender: m.replyTo.sender
+  } : {}
+  const messageType = m.messageType ?? 0
+  const metadata = { messageType, fileUrl: m.fileUrl, fileName: m.fileName, fileSize: m.fileSize }
+  const isAgent = !group && Number(chatTargetId(to)) === AGENT_USER_ID
+  const wrapper = group
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: chatTargetId(to!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
+        groupChat: { targetClientId: chatTargetId(to!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId, ...replyFields, ...metadata }
       }
     : isAgent
       ? {
           type: MSG_TYPE.AGENT_CHAT,
-          chat: { targetClientId: Number(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
+          chat: { targetClientId: chatTargetId(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId, ...replyFields, ...metadata }
         }
       : {
           type: MSG_TYPE.CHAT,
-          chat: { targetClientId: String(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId }
+          chat: { targetClientId: chatTargetId(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId, ...replyFields, ...metadata }
         }
 
   // 更新状态为发送中
-  store.updateMessageStatus(m.messageId, 'sending')
-  m.messageId = newMessageId
+  store.updateMessageStatus(m.messageId, 'sending', Date.now())
 
   try {
     await chatSocket.sendWrapper(wrapper)
@@ -627,103 +626,48 @@ function handleDrop(e: DragEvent) {
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const MAX_IMAGE_DIM = 1920 // 图片最长边
 
-/**
- * 压缩图片到指定尺寸，输出 WebP base64。
- */
-function compressImage(file: File): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      let { width, height } = img
-      if (width > MAX_IMAGE_DIM || height > MAX_IMAGE_DIM) {
-        const ratio = Math.min(MAX_IMAGE_DIM / width, MAX_IMAGE_DIM / height)
-        width = Math.round(width * ratio)
-        height = Math.round(height * ratio)
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) { reject(new Error('Canvas unavailable')); return }
-      ctx.drawImage(img, 0, 0, width, height)
-      canvas.toBlob(blob => {
-        if (!blob) { reject(new Error('图片压缩失败')); return }
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result || ''))
-        reader.readAsDataURL(blob)
-      }, 'image/webp', 0.85)
-    }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')) }
-    img.src = url
-  })
-}
-
-/**
- * 发送文件消息（图片压缩后 base64 / 非图片仅传文件名）。
- */
+/** Upload the object first, then enqueue its URL and metadata for the captured conversation. */
 async function handleFileUpload(file: File) {
-  if (currentChatId.value === null) return
-  const targetId = currentChatId.value
-  // 文件大小校验
-  if (file.size > MAX_FILE_SIZE) {
-    toast.error(t('chat.fileTooLarge', { size: (file.size / 1024 / 1024).toFixed(1) }))
-    return
-  }
-
-  let content
-  if (file.type.startsWith('image/')) {
-    // 压缩图片
-    try {
-      content = await compressImage(file)
-    } catch (e) {
-      console.warn('图片压缩失败，使用原图:', e)
-      content = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader()
-        r.onload = () => resolve(String(r.result || ''))
-        r.onerror = reject
-        r.readAsDataURL(file)
-      })
+  const target = currentChatId.value, group = isGroupChat.value, owner = String(store.state.accountId || '')
+  const key = draftKey(), session = sessionEpoch.capture()
+  if (target == null || !owner || uploads.has(key)) return
+  if (file.size > MAX_FILE_SIZE) { toast.error(t('chat.fileTooLarge', { size: (file.size / 1024 / 1024).toFixed(1) })); return }
+  const controller = new AbortController()
+  const onLogout = () => controller.abort()
+  session.signal.addEventListener('abort', onLogout, { once: true })
+  uploads.set(key, controller); uploading.value = true
+  const localId = 'local_' + globalThis.crypto.randomUUID()
+  try {
+    // Upload bytes once; realtime packets contain only the URL and attachment metadata.
+    const url = await uploadAttachment(file, controller.signal)
+    if (!session.isCurrent() || controller.signal.aborted || owner !== String(store.state.accountId)) return
+    const image = file.type.startsWith('image/'), timestamp = Date.now()
+    const message: ChatMessage = { user: SELF_USER, text: image ? `![${file.name}](${url})` : `${file.name}: ${url}`,
+      time: timestamp, targetId: chatTargetId(target), messageId: localId, isSent: 'sending',
+      messageType: image ? 1 : 2, fileUrl: url, fileName: file.name, fileSize: file.size }
+    const fields = { targetClientId: chatTargetId(target), content: message.text,
+      timestamp, messageId: localId, messageType: image ? 1 as const : 2 as const, fileUrl: url, fileName: file.name, fileSize: file.size }
+    const agent = !group && Number(chatTargetId(target)) === AGENT_USER_ID
+    const wrapper = group ? { type: MSG_TYPE.GROUP_CHAT, groupChat: fields }
+      : { type: agent ? MSG_TYPE.AGENT_CHAT : MSG_TYPE.CHAT, chat: fields }
+    await submitDraft(
+      () => group ? store.addGroupMessage({ ...message, groupId: chatTargetId(target) }) : store.addMessage(message),
+      async () => {
+        if (!session.isCurrent() || controller.signal.aborted) throw new Error('Upload cancelled')
+        if (agent) { if (!await chatSocket.sendWrapper(wrapper)) throw new Error('Agent unavailable') }
+        else await chatSocket.enqueueWrapper(wrapper, owner)
+      }, () => {})
+    if (currentChatId.value === target) scrollToBottom()
+  } catch (error) {
+    if (session.isCurrent() && !controller.signal.aborted) {
+      store.updateMessageStatus(localId, 'failed')
+      toast.error(t((error as { code?: number })?.code === 5002 ? 'composer.dailyUploadLimit' : 'composer.uploadFailed'))
     }
-  } else {
-    // 非图片文件：仅在消息中显示文件名
-    content = `📎 ${file.name} (${(file.size / 1024).toFixed(1)}KB)`
+  } finally {
+    session.signal.removeEventListener('abort', onLogout)
+    if (uploads.get(key) === controller) uploads.delete(key)
+    uploading.value = uploads.has(draftKey())
   }
-
-  const localMessageId = 'local_' + Date.now()
-  const m: ChatMessage = {
-    user: SELF_USER,
-    text: file.type.startsWith('image/') ? `![${file.name}](${content})` : content,
-    time: new Date().toISOString(),
-    targetId,
-    messageId: localMessageId
-  }
-
-  const isAgentFile = !isGroupChat.value && Number(currentChatId.value) === AGENT_USER_ID
-  const wrapper = isGroupChat.value
-    ? {
-        type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: chatTargetId(currentChatId.value!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
-      }
-    : isAgentFile
-      ? {
-          type: MSG_TYPE.AGENT_CHAT,
-          chat: { targetClientId: Number(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
-        }
-      : {
-          type: MSG_TYPE.CHAT,
-          chat: { targetClientId: String(currentChatId.value), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: localMessageId }
-      }
-
-  if (isGroupChat.value) {
-    store.addGroupMessage({ ...m, groupId: chatTargetId(targetId) })
-  } else {
-    store.addMessage(m)
-  }
-
-  await chatSocket.sendWrapper(wrapper).catch(e => console.warn('消息发送失败:', e))
-  scrollToBottom()
 }
 
 // 显示消息上下文菜单
@@ -767,7 +711,10 @@ async function shareMessage() {
 }
 
 // 回复预览：选中消息后输入框上方显示引用条，发送时携带 replyTo 字段
-const replyTo = ref<{ sender: string; content: string; messageId?: string } | null>(null) // { messageId, content, sender }
+const replyTo = computed({
+  get: () => { draftVersion.value; return drafts.snapshot(draftKey()).reply },
+  set: value => { const draft = drafts.snapshot(draftKey()); drafts.edit(draft.key, draft.text, value); draftVersion.value++ }
+}) // { messageId, content, sender }
 
 // 回复消息（进入预览模式，不再把引用文本塞进输入框）
 function replyMessage() {
@@ -807,7 +754,7 @@ async function doForward(target: User) {
   const content = selectedMessage.value?.text
   forwardDialogOpen.value = false
   if (!content) return
-  const localMessageId = 'local_' + Date.now()
+  const localMessageId = 'local_' + globalThis.crypto.randomUUID()
   try {
     await chatSocket.sendWrapper({
       type: MSG_TYPE.CHAT,
@@ -844,41 +791,19 @@ function handleKeydown(e: KeyboardEvent) {
 <style scoped>
 .chat-wrap{display:flex;flex-direction:column;height:100%}
 .chat-top{padding:12px 16px;border-bottom:1px solid var(--surface-border);font-weight:600}
-.messages{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scroll-behavior:auto;padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:12px}
+.messages{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scroll-behavior:auto;padding:24px;background:var(--bg);display:flex;flex-direction:column;gap:12px}
 .msg{display:flex;width:100%}
-.msg .row{display:flex;align-items:flex-start;gap:8px}
+.msg .row{display:flex;align-items:flex-start;gap:8px;width:100%;max-width:760px;min-width:0}
 .msg .avatar-col{width:44px;display:flex;align-items:flex-start;justify-content:center;flex-shrink:0}
-.msg .msg-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover}
-.msg .avatar-placeholder{width:36px;height:36px;border-radius:50%;background:linear-gradient(180deg,var(--accent-1),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+.msg .msg-avatar{width:36px;height:36px;border-radius:12px;object-fit:cover}
+.msg .avatar-placeholder{width:36px;height:36px;border-radius:12px;background:var(--apricot);display:flex;align-items:center;justify-content:center;color:var(--on-apricot);font-weight:600}
 .msg .bubble-col{
   max-width: 70%; /* 限制最大宽度为容器的 70% */
   word-wrap: break-word;
   white-space: pre-wrap;
   width: fit-content; /* 宽度随内容自适应 */
-  border-radius: 18px;
-  padding: 10px 14px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s ease, opacity 0.2s ease;
-  animation: messageSlideIn 0.3s ease-out;
+  padding: 11px 15px;
 }
-
-@keyframes messageSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 消息状态图标 */
-.status { font-size: 12px; margin-left: 4px; }
-.status.sending { opacity: 0.5; animation: pulse 1.5s infinite; }
-.status.sent { color: #2ecc71; }
-.status.failed { color: #e74c3c; cursor: pointer; }
-.status.failed:hover { text-decoration: underline; }
 
 /* 系统消息（加入群聊/退出群聊等） */
 .system-message {
@@ -913,11 +838,6 @@ function handleKeydown(e: KeyboardEvent) {
   color: #666;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
 /* 自己发的消息：在右边，橙色气泡，头像在右侧 */
 .msg.me{
   justify-content: flex-end;
@@ -925,24 +845,13 @@ function handleKeydown(e: KeyboardEvent) {
 .msg.me .row{
   flex-direction: row-reverse;
 }
-.msg.me .bubble-col{
-  background: linear-gradient(135deg, #ff9a66, #ff7a33);
-  color: white;
-  border-radius: 18px 18px 4px 18px;
-  padding: 10px 14px;
-}
 .msg.me .meta{
-  color: rgba(255,255,255,0.85);
+  color: var(--on-message-self);
 }
 
 /* 对方发的消息：在左边，灰色气泡，头像在左侧 */
 .msg:not(.me){
   justify-content: flex-start;
-}
-.msg:not(.me) .bubble-col{
-  background: var(--bubble-bg);
-  border-radius: 18px 18px 18px 4px;
-  padding: 10px 14px;
 }
 
 /* 消息元信息（发送者 + 时间） */
@@ -966,8 +875,8 @@ function handleKeydown(e: KeyboardEvent) {
 .text-content {
   word-wrap: break-word;
   white-space: pre-wrap;
-  line-height: 1.5;
-  font-size: 14px;
+  line-height: 1.7;
+  font-size: 15px;
 }
 
 /* 图片消息 */
@@ -1097,8 +1006,8 @@ function handleKeydown(e: KeyboardEvent) {
   justify-content: center;
   font-size: 13px;
   font-weight: 600;
-  background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
-  color: #fff;
+  background: var(--apricot);
+  color: var(--on-apricot);
 }
 .forward-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .forward-name { font-size: 14px; }
@@ -1136,8 +1045,8 @@ function handleKeydown(e: KeyboardEvent) {
   box-shadow: 0 0 0 3px rgba(255, 122, 51, 0.1);
 }
 .composer .send{
-  background:linear-gradient(180deg,var(--accent-1),var(--accent-2));
-  color:#fff;
+  background:var(--action);
+  color:var(--on-action);
   border:0;
   padding:10px 20px;
   border-radius:12px;
@@ -1154,9 +1063,9 @@ function handleKeydown(e: KeyboardEvent) {
 
 /* 空状态样式 */
 .empty-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);gap:8px;padding:24px;text-align:center}
-.placeholder-illustration{font-size:48px;line-height:1}
-.placeholder-title{font-size:16px;font-weight:600;color:var(--text-primary)}
-.placeholder-hint{font-size:13px;color:var(--muted)}
+.placeholder-illustration{position:relative;width:90px;height:65px;margin-bottom:24px}.placeholder-illustration span:first-child{display:grid;place-items:center;width:90px;height:65px;border:1px solid var(--surface-border-strong);border-radius:26px 26px 26px 5px;background:var(--panel);color:var(--on-apricot);font-size:32px;transform:rotate(-7deg)}
+.placeholder-title{font-size:22px;line-height:1.5;font-weight:600;color:var(--text-primary)}
+.placeholder-hint{font-size:13px;color:var(--muted);line-height:1.8;max-width:360px}
 .placeholder-text{color:var(--muted, #999);font-size:16px}
 
 /* 上下文菜单样式 */
@@ -1195,11 +1104,12 @@ function handleKeydown(e: KeyboardEvent) {
   border-bottom: 1px solid var(--surface-border);
   font-weight: 600;
 }
+.chat-identity{flex:1;display:flex;align-items:center;gap:12px;min-width:0}.chat-identity>div{min-width:0}.chat-identity small{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:4px}.chat-identity small.online{color:var(--sage-ink)}.chat-identity .paper-avatar{width:38px;height:38px;object-fit:cover}
 .chat-top-title {
-  flex: 1;
+  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .chat-top-actions {
-  position: relative;
+  flex:none;position: relative;
 }
 .chat-top-btn {
   background: none;
@@ -1317,4 +1227,14 @@ function handleKeydown(e: KeyboardEvent) {
   color: #fff;
   border-color: #ff4757;
 }
+</style>
+
+<style scoped>
+.history-feedback{position:absolute;inset:80px 16px auto;text-align:center;color:var(--text-secondary);font-size:13px;background:transparent;border:0;padding:24px;z-index:1}
+.chat-wrap{position:relative}
+</style>
+
+<style scoped>
+.history-sync-feedback{position:absolute;right:12px;top:58px;color:var(--text-secondary);background:var(--panel);border:0;border-radius:8px;padding:3px 6px;font-size:11px;z-index:2}
+@media(max-width:767px){.history-sync-feedback{top:6px}}
 </style>

@@ -11,14 +11,20 @@ export interface ChatMessage {
   time?: TimeValue
   timestamp?: TimeValue
   messageId?: string
+  messageType?: 0 | 1 | 2
+  fileUrl?: string
+  fileName?: string
+  fileSize?: number
   seqId?: Id
   isSent?: MessageStatus
+  sendStartedAt?: number
   done?: boolean
   replyTo?: { sender: string; content: string; messageId?: string }
 }
 
 export interface User {
   id: Id
+  conversationKind?: 'private' | 'group'
   username?: string
   name?: string
   account?: string
@@ -44,6 +50,13 @@ export interface ConversationState {
 export type ConversationPatch = Partial<ConversationState> & { unreadDelta?: number }
 export interface PendingRegister { email: string; password: string; username?: string }
 export interface ChatState {
+  directoryPhase: import('../services/contactDirectorySync').DirectoryPhase
+  historyHasNewer: boolean
+  historyFollowingLatest: boolean
+  historyLoading: boolean
+  historyError: boolean
+  historySyncing: boolean
+  historySyncError: boolean
   users: User[]
   groups: Group[]
   messages: ChatMessage[]
@@ -54,7 +67,7 @@ export interface ChatState {
   refreshToken: string
   accountId: string
   pendingRegister: PendingRegister | null
-  selectedChatId: Id | null
+  selectedChatId: import('../utils/conversationId').ConversationKey | null
   loginValid: boolean
   hasMoreMessages: boolean
   hasMoreGroupMessages: boolean

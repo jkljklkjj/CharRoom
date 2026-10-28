@@ -5,9 +5,9 @@ import java.io.File
 /**
  * CLI 平台文件操作实现
  */
-class CliFileProvider : FileProvider {
+class CliFileProvider(private val directory: File) : FileProvider {
     override fun getAppDataDir(): String {
-        return File(System.getProperty("user.home"), ".qingliao").absolutePath
+        return directory.absolutePath
     }
 
     override fun readFile(path: String): ByteArray? {
@@ -19,7 +19,7 @@ class CliFileProvider : FileProvider {
     override fun writeFile(path: String, data: ByteArray) {
         val file = File(path)
         file.parentFile?.mkdirs()
-        file.writeBytes(data)
+        core.AtomicHistoryFile.write(file) { it.write(data) }
     }
 
     override fun fileExists(path: String): Boolean {

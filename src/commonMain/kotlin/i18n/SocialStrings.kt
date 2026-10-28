@@ -1,6 +1,7 @@
 package com.chatlite.i18n
 
 internal val socialZh = mapOf(
+    "social.retry" to "重新加载",
     "social.blockedList" to "我屏蔽的人",
     "social.unblock" to "解除屏蔽",
     "social.discover" to "发现与遇见",
@@ -116,6 +117,7 @@ internal val socialZh = mapOf(
 )
 
 internal val socialEn = mapOf(
+    "social.retry" to "Reload",
     "social.blockedList" to "Blocked users",
     "social.unblock" to "Unblock",
     "social.discover" to "Discover & meet",
@@ -231,6 +233,7 @@ internal val socialEn = mapOf(
 )
 
 internal val socialJa = mapOf(
+    "social.retry" to "再読み込み",
     "social.blockedList" to "ブロックしたユーザー",
     "social.unblock" to "ブロック解除",
     "social.discover" to "見つける・出会う",

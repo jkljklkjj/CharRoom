@@ -1,0 +1,11 @@
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path')
+const {IDBFactory}=require('fake-indexeddb'),{loadTs}=require('./helpers.cjs')
+test('directory membership and version are stored as one account-owned snapshot',async()=>{
+ const {exports:db}=await loadTs(path.resolve(__dirname,'../src/utils/contactDirectoryDB.ts'),{indexedDB:new IDBFactory()})
+ await db.saveDirectory('A',{version:'1',users:[{id:1}],groups:[{id:9}]})
+ await db.saveDirectory('B',{version:'2',users:[{id:2}],groups:[]})
+ await db.saveDirectory('A',{version:'3',users:[],groups:[]})
+ assert.equal((await db.loadDirectory('A')).users.length,0)
+ assert.equal((await db.loadDirectory('A')).version,'3')
+ assert.equal((await db.loadDirectory('B')).users[0].id,2)
+})

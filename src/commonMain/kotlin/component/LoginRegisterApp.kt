@@ -51,6 +51,7 @@ fun LoginRegisterApp(
     navigationRequest: model.ChatNavigationRequest? = null,
     onNavigationHandled: () -> Unit = {}
 ) {
+    component.update.UpdateHost()
     var isLogin by remember { mutableStateOf(true) }
     var username by remember { mutableStateOf("") } // 注册模式下用户名
     var password by remember { mutableStateOf("") }

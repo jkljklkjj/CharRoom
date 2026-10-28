@@ -1,7 +1,6 @@
 package core
 
 import com.chatlite.i18n.currentStrings
-import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import model.GroupMessage
@@ -13,9 +12,13 @@ import androidx.compose.runtime.mutableStateOf
 /**
  * 桌面端本地聊天历史存储实现
  */
-object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
+object DesktopLocalChatHistoryStore : FileLocalChatHistoryStore({ File(System.getProperty("user.home"), ".qingliao/history") })
+
+/** Same journal implementation, with an explicit root for server-isolated CLI sessions. */
+open class FileLocalChatHistoryStore(private val directory: () -> File) : LocalChatHistoryStoreProvider {
+    constructor(root: File) : this({ root })
+    private val historyRoot: File get() = directory()
     private val logger = io.github.oshai.kotlinlogging.KotlinLogging.logger {}
-    private const val HISTORY_DIR_NAME = ".qingliao/history"
     private val objectMapper = jacksonObjectMapper()
 
     override fun save(accountId: String, privateMessages: List<Message>, groupMessages: List<GroupMessage>) {
@@ -35,7 +38,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                         senderId = groupMsg.senderId,
                         message = groupMsg.text,
                         sender = false,
-                        receiverId = -groupId, // 使用负的groupId表示群聊
+                        receiverId = groupId,
                         timestamp = groupMsg.timestamp,
                         isSent = groupMsg.isSent,
                         messageId = groupMsg.messageId,
@@ -47,21 +50,29 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                         fileName = groupMsg.fileName,
                         fileSize = groupMsg.fileSize,
                         seqId = groupMsg.seqId,
-                        conversationId = groupMsg.conversationId
+                        conversationId = groupMsg.conversationId,
+                        deliveryState = groupMsg.deliveryState
                     )
                 })
             }
     }
 
-    @Synchronized
-    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
-        val prefix = if (isGroup) "group_" else "private_"
-        getAccountDir(accountId).listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
-            val rows = objectMapper.readTree(file) as? ArrayNode ?: return@forEach
-            val kept = objectMapper.createArrayNode()
-            rows.filter { it.path("messageId").asText() != messageId }.forEach { kept.add(it) }
-            AtomicHistoryFile.write(file, objectMapper.writeValueAsString(kept))
+    override fun confirmMessageId(accountId: String, ack: com.chatlite.proto.MessageProtos.AckMessage) {
+        core.MessageIdAliases.confirm(getAccountDir(accountId), accountId, ack)
+        val (target, group) = core.MessageIdAliases.target(accountId, ack.conversationId)
+        val history = journal(accountId, target, group)
+        history.read(ack.messageId)?.let { row ->
+            val node = objectMapper.readTree(row.body) as ObjectNode
+            node.put("messageId", ack.serverMessageId); node.put("seqId", ack.seqId); node.put("conversationId", ack.conversationId); node.put("isSent", true); node.put("deliveryState", "ACCEPTED")
+            history.write(listOf(core.IndexedHistoryJournal.Row(ack.serverMessageId, row.timestamp, objectMapper.writeValueAsString(node)),
+                core.IndexedHistoryJournal.Row(ack.messageId, 0, null)).filterIndexed { index, _ -> index == 0 || ack.messageId != ack.serverMessageId })
         }
+    }
+
+    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
+        java.io.File(getAccountDir(accountId), "indexed").listFiles { file ->
+            file.name.startsWith(if (isGroup) "group_" else "private_") && file.extension == "history"
+        }?.forEach { file -> core.IndexedHistoryJournal.open(file).write(listOf(core.IndexedHistoryJournal.Row(messageId, 0, null))) }
     }
 
     override fun restore(accountId: String): RestoredChatHistory {
@@ -69,48 +80,12 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     override fun restorePage(accountId: String, page: Int, pageSize: Int): RestoredChatHistory {
-        if (accountId.isBlank()) {
-            return RestoredChatHistory()
-        }
-
-        val accountDir = getAccountDir(accountId)
-        if (!accountDir.exists()) {
-            return RestoredChatHistory()
-        }
-
-        // 加载所有私聊消息
-        val privateFiles = accountDir.listFiles { file -> file.name.startsWith("private_") } ?: emptyArray()
-        val allPrivateMessages = privateFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("private_"), false) }
-            .filterIsInstance<Message>()
-            .sortedByDescending { it.timestamp }
-
-        // 加载所有群聊消息
-        val groupFiles = accountDir.listFiles { file -> file.name.startsWith("group_") } ?: emptyArray()
-        val allGroupMessages = groupFiles.flatMap { loadMessages(accountId, it.nameWithoutExtension.removePrefix("group_"), true) }
-            .filterIsInstance<GroupMessage>()
-            .sortedByDescending { it.timestamp }
-
-        // 分页处理
-        val privateStart = page * pageSize
-        val privateEnd = minOf(privateStart + pageSize, allPrivateMessages.size)
-        val privatePage = if (privateStart < allPrivateMessages.size) {
-            allPrivateMessages.subList(privateStart, privateEnd).reversed()
-        } else {
-            emptyList()
-        }
-
-        val groupStart = page * pageSize
-        val groupEnd = minOf(groupStart + pageSize, allGroupMessages.size)
-        val groupPage = if (groupStart < allGroupMessages.size) {
-            allGroupMessages.subList(groupStart, groupEnd).reversed()
-        } else {
-            emptyList()
-        }
-
-        return RestoredChatHistory(
-            privateMessages = privatePage,
-            groupMessages = groupPage
-        )
+        if (accountId.isBlank()) return RestoredChatHistory()
+        val privateRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
+            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, false) as Message }
+        val groupRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
+            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, true) as GroupMessage }
+        return RestoredChatHistory(privateRows, groupRows)
     }
 
     override fun getPrivateMessagesByTimeRange(accountId: String, userId: Int, startTime: Long, endTime: Long): List<Message> {
@@ -118,7 +93,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             return emptyList()
         }
 
-        return loadMessages(accountId, userId.toString(), false)
+        return loadMessages(accountId, userId.toString(), false, startTime, endTime)
             .filterIsInstance<Message>()
             .filter { it.timestamp in startTime..endTime }
             .sortedBy { it.timestamp }
@@ -129,48 +104,24 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             return emptyList()
         }
 
-        return loadMessages(accountId, groupId.toString(), true)
+        return loadMessages(accountId, groupId.toString(), true, startTime, endTime)
             .filterIsInstance<GroupMessage>()
             .filter { it.timestamp in startTime..endTime }
             .sortedBy { it.timestamp }
     }
 
     override fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int, pageSize: Int): List<Message> {
-        if (accountId.isBlank()) {
-            return emptyList()
-        }
-
-        val allMessages = loadMessages(accountId, userId.toString(), false)
-            .filterIsInstance<Message>()
-            .sortedByDescending { it.timestamp }
-
-        val startIndex = page * pageSize
-        val endIndex = minOf(startIndex + pageSize, allMessages.size)
-
-        return if (startIndex < allMessages.size) {
-            allMessages.subList(startIndex, endIndex).reversed()
-        } else {
-            emptyList()
-        }
+        if (accountId.isBlank()) return emptyList()
+        require(page >= 0 && pageSize in 1..10000)
+        return journal(accountId, userId.toString(), false).page(Math.multiplyExact(page, pageSize), pageSize)
+            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, false) as Message }
     }
 
     override fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int, pageSize: Int): List<GroupMessage> {
-        if (accountId.isBlank()) {
-            return emptyList()
-        }
-
-        val allMessages = loadMessages(accountId, groupId.toString(), true)
-            .filterIsInstance<GroupMessage>()
-            .sortedByDescending { it.timestamp }
-
-        val startIndex = page * pageSize
-        val endIndex = minOf(startIndex + pageSize, allMessages.size)
-
-        return if (startIndex < allMessages.size) {
-            allMessages.subList(startIndex, endIndex).reversed()
-        } else {
-            emptyList()
-        }
+        if (accountId.isBlank()) return emptyList()
+        require(page >= 0 && pageSize in 1..10000)
+        return journal(accountId, groupId.toString(), true).page(Math.multiplyExact(page, pageSize), pageSize)
+            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, true) as GroupMessage }
     }
 
     override fun clear(accountId: String): Boolean {
@@ -190,16 +141,14 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     override fun clearConversation(accountId: String, targetId: String, isGroup: Boolean): Boolean {
         if (accountId.isBlank()) return false
         return runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            if (file.exists()) file.delete()
+            journal(accountId, targetId, isGroup).delete()
             true
         }.getOrDefault(false)
     }
 
     override fun clearAll(): Boolean {
         return runCatching {
-            val userHome = System.getProperty("user.home")
-            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            val folder = historyRoot
             if (folder.exists()) {
                 folder.deleteRecursively()
             }
@@ -207,22 +156,22 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(false)
     }
 
-    override fun saveConversationSeqIds(ids: Map<String, Long>) {
+    override fun saveConversationSeqIds(accountId: String, ids: Map<String, Long>) {
         runCatching {
             val userHome = System.getProperty("user.home")
-            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            val folder = getAccountDir(accountId)
             if (!folder.exists()) folder.mkdirs()
             val file = java.io.File(folder, "seq_ids.json")
             AtomicHistoryFile.write(file, objectMapper.writeValueAsString(ids))
         }.onFailure {
             logger.warn(it) { "LocalChatHistoryStore operation failed" }
-        }
+        }.getOrThrow()
     }
 
-    override fun restoreConversationSeqIds(): Map<String, Long> {
+    override fun restoreConversationSeqIds(accountId: String): Map<String, Long> {
         return runCatching<Map<String, Long>> {
             val userHome = System.getProperty("user.home")
-            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
+            val folder = getAccountDir(accountId)
             val file = java.io.File(folder, "seq_ids.json")
             if (!file.exists()) return@runCatching emptyMap<String, Long>()
             val text = file.readText()
@@ -233,138 +182,25 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }.getOrDefault(emptyMap())
     }
 
-    override fun savePendingMessages(privatePending: List<Message>, groupPending: List<GroupMessage>) {
-        runCatching {
-            val userHome = System.getProperty("user.home")
-            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
-            if (!folder.exists()) folder.mkdirs()
-            val file = java.io.File(folder, "pending_messages.json")
-            val node = objectMapper.createObjectNode()
-            val privateArray = objectMapper.createArrayNode()
-            privatePending.forEach { privateArray.add(messageToJson(it)) }
-            node.set<ArrayNode>("private", privateArray)
-            val groupArray = objectMapper.createArrayNode()
-            groupPending.forEach { groupMsg ->
-                groupArray.add(objectMapper.createObjectNode().apply {
-                    put("groupId", groupMsg.groupId)
-                    put("senderName", groupMsg.senderName)
-                    put("text", groupMsg.text)
-                    put("senderId", groupMsg.senderId)
-                    put("timestamp", groupMsg.timestamp)
-                    put("isSent", groupMsg.isSent)
-                    put("messageId", groupMsg.messageId)
-                })
-            }
-            node.set<ArrayNode>("group", groupArray)
-            AtomicHistoryFile.write(file, objectMapper.writeValueAsString(node))
-        }.onFailure {
-            logger.warn(it) { "savePendingMessages failed" }
-        }
-    }
-
-    override fun restorePendingMessages(): Pair<List<Message>, List<GroupMessage>> {
-        return runCatching {
-            val userHome = System.getProperty("user.home")
-            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
-            val file = java.io.File(folder, "pending_messages.json")
-            if (!file.exists()) return@runCatching Pair(emptyList<Message>(), emptyList<GroupMessage>())
-            val text = file.readText()
-            if (text.isBlank()) return@runCatching Pair(emptyList<Message>(), emptyList<GroupMessage>())
-            val node = objectMapper.readTree(text) as? ObjectNode
-                ?: return@runCatching Pair(emptyList<Message>(), emptyList<GroupMessage>())
-
-            val privateList = (node.get("private") as? ArrayNode)?.mapNotNull { item ->
-                (item as? ObjectNode)?.let { jsonToMessage(it, false) as? Message }
-            } ?: emptyList()
-
-            val groupList = (node.get("group") as? ArrayNode)?.mapNotNull { item ->
-                (item as? ObjectNode)?.let { json ->
-                    GroupMessage(
-                        groupId = json.path("groupId").asInt(0),
-                        senderName = json.path("senderName").asText(""),
-                        text = json.path("text").asText(""),
-                        senderId = json.path("senderId").asInt(0),
-                        timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
-                        isSent = json.path("isSent").asBoolean(true),
-                        messageId = json.path("messageId").asText("")
-                    )
-                }
-            } ?: emptyList()
-
-            Pair(privateList, groupList)
-        }.getOrDefault(Pair(emptyList(), emptyList()))
-    }
-
-    override fun clearPendingMessages() {
-        runCatching {
-            val userHome = System.getProperty("user.home")
-            val folder = java.io.File(userHome, HISTORY_DIR_NAME)
-            val file = java.io.File(folder, "pending_messages.json")
-            if (file.exists()) file.delete()
-        }
-    }
-
-    // 内部方法
-
-    @Synchronized
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
-        runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            // Merge pages with disk history: an in-memory LRU snapshot is not the full conversation.
-            val records = linkedMapOf<String, ObjectNode>()
-            if (file.exists()) {
-                val existing = objectMapper.readTree(file) as? ArrayNode
-                existing?.forEach { row ->
-                    if (row is ObjectNode) records[row.path("messageId").asText()] = row
-                }
-            }
-            messages.forEach { records[it.messageId] = messageToJson(it) }
-            val array = objectMapper.createArrayNode()
-            records.values.sortedWith(compareBy<ObjectNode> { it.path("timestamp").asLong() }
-                .thenBy { it.path("messageId").asText().toLongOrNull() ?: 0L }).forEach { array.add(it) }
-            AtomicHistoryFile.write(file, objectMapper.writeValueAsString(array))
-        }.onFailure {
-            logger.warn(it) { "LocalChatHistoryStore operation failed" }
+        val rows = messages.map { message ->
+            val alias = core.MessageIdAliases.resolve(getAccountDir(accountId), targetId, isGroup, message.messageId)
+            val canonical = if (alias == null) message else message.copy(messageId = alias.serverId,
+                seqId = alias.seq, conversationId = alias.conversation, isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+            core.IndexedHistoryJournal.Row(canonical.messageId, canonical.timestamp, objectMapper.writeValueAsString(messageToJson(canonical)))
         }
+        journal(accountId, targetId, isGroup).write(rows)
     }
 
-    private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean): List<Any> {
-        return runCatching {
-            val file = getHistoryFile(accountId, targetId, isGroup)
-            if (!file.exists()) return emptyList()
-            val text = file.readText()
-            if (text.isBlank()) return emptyList()
-            val array = objectMapper.readTree(text) as? ArrayNode ?: return emptyList()
-            val records = mutableListOf<Any>()
-            for (index in 0 until array.size()) {
-                val item = array.get(index) as? ObjectNode ?: continue
-                records.add(jsonToMessage(item, isGroup))
-            }
-            records
-        }.getOrElse {
-            logger.warn(it) { "LocalChatHistoryStore operation failed" }
-            emptyList()
-        }
-    }
+    private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean,
+                             from: Long = Long.MIN_VALUE, through: Long = Long.MAX_VALUE): List<Any> =
+        journal(accountId, targetId, isGroup).range(from, through).map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, isGroup) }
 
-    private fun getHistoryFile(accountId: String, targetId: String, isGroup: Boolean): File {
-        val userHome = System.getProperty("user.home")
-        val folder = File(userHome, HISTORY_DIR_NAME)
-        if (!folder.exists()) {
-            folder.mkdirs()
-        }
-        val safeAccountId = accountId.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        val accountFolder = File(folder, safeAccountId)
-        if (!accountFolder.exists()) {
-            accountFolder.mkdirs()
-        }
-        val prefix = if (isGroup) "group" else "private"
-        return File(accountFolder, "${prefix}_${targetId}.json")
-    }
+    private fun journal(accountId: String, targetId: String, isGroup: Boolean): core.IndexedHistoryJournal =
+        core.IndexedHistoryJournal.open(core.IndexedHistoryJournal.conversation(getAccountDir(accountId), targetId, isGroup))
 
     private fun getAccountDir(accountId: String): File {
-        val userHome = System.getProperty("user.home")
-        val folder = File(userHome, HISTORY_DIR_NAME)
+        val folder = historyRoot
         if (!folder.exists()) {
             folder.mkdirs()
         }
@@ -380,6 +216,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("sender", message.sender)
             put("timestamp", message.timestamp)
             put("isSent", message.isSent)
+            put("deliveryState", message.deliveryState.name)
             put("messageId", message.messageId)
             put("replyToMessageId", message.replyToMessageId)
             put("replyToContent", message.replyToContent)
@@ -394,11 +231,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     private fun jsonToMessage(json: ObjectNode, isGroup: Boolean): Any {
-        val messageType = try {
-            MessageType.valueOf(json.path("messageType").asText("TEXT"))
-        } catch (_: Exception) {
-            MessageType.TEXT
-        }
+        val messageType = MessageType.valueOf(json.required("messageType").asText())
 
         return if (isGroup) {
             GroupMessage(
@@ -408,6 +241,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 senderId = json.path("senderId").asInt(0),
                 timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
                 isSent = json.path("isSent").asBoolean(true),
+                deliveryState = model.MessageDeliveryState.valueOf(json.required("deliveryState").asText()),
                 messageId = json.path("messageId").asText(""),
                 replyToMessageId = json.path("replyToMessageId").asText(null),
                 replyToContent = json.path("replyToContent").asText(null),
@@ -427,6 +261,7 @@ object DesktopLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 sender = json.path("sender").asBoolean(false),
                 timestamp = json.path("timestamp").asLong(System.currentTimeMillis()),
                 isSent = json.path("isSent").asBoolean(true),
+                deliveryState = model.MessageDeliveryState.valueOf(json.required("deliveryState").asText()),
                 messageId = json.path("messageId").asText(""),
                 replyToMessageId = json.path("replyToMessageId").asText(null),
                 replyToContent = json.path("replyToContent").asText(null),

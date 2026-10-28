@@ -44,3 +44,14 @@ test('cache rejects corrupt data, foreign profiles and other versions', async ()
   assert.equal(cache.loadOwnProfileCache('7'), null)
   assert.equal(cache.loadOwnProfileCache(''), null)
 })
+
+test('foreign writes cannot replace the owner snapshot and snapshots expire after one day',async()=>{
+  const store=localStorageStub()
+  let now=100000
+  const {exports:cache}=await loadTs(path.resolve(__dirname,'../src/utils/socialProfileCache.ts'),{localStorage:store,Date:{now:()=>now}})
+  cache.saveOwnProfileCache('7',{id:'7',username:'mine',relation:'SELF'})
+  cache.saveOwnProfileCache('7',{id:'9',username:'foreign',relation:'SELF'})
+  assert.equal(cache.loadOwnProfileCache('7').username,'mine')
+  now+=24*60*60*1000
+  assert.equal(cache.loadOwnProfileCache('7'),null)
+})

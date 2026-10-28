@@ -5,7 +5,7 @@ import java.io.IOException
 import java.io.InputStream
 
 data class NotificationDestination private constructor(val type: String, val targetId: Int, val accountId: Int) {
-    val chatId: Int get() = if (type == "group") -targetId else targetId
+    val conversation: model.ConversationKey get() = if (type == "group") model.ConversationKey.group(targetId) else model.ConversationKey.privateChat(targetId)
     val tag: String get() = "messages:$accountId:$type:$targetId"
     fun belongsTo(account: Int?) = account == accountId
     companion object {

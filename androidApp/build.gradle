@@ -54,6 +54,7 @@ def buildQuicNative = tasks.register('buildQuicNative') {
     }
 }
 tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn(buildQuicNative) }
+tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn(rootProject.tasks.named('generateReleaseVersion')) }
 
 // Keep the Android block as before
 android {
@@ -65,8 +66,8 @@ android {
         applicationId 'com.chatlite'
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName '1.0'
+        versionCode rootProject.property('appVersionCode').toInteger()
+        versionName rootProject.property('appVersion')
         ndk { abiFilters.addAll(quicAbis) }
     }
 
@@ -101,6 +102,7 @@ android {
     sourceSets {
         main {
             java.srcDirs += project.file('../src/commonMain/kotlin')
+            java.srcDirs += rootProject.layout.buildDirectory.dir('generated/releaseVersion').get().asFile
             java.srcDirs += project.file('../src/androidMain/kotlin')
             resources.srcDirs += project.file('../src/commonMain/resources')
             jniLibs.srcDirs += quicJniDirectory

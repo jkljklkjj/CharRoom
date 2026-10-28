@@ -1,6 +1,7 @@
 <template>
   <div class="verify-wrap">
     <div class="panel">
+      <router-link to="/" class="verify-brand"><BrandMark /></router-link>
       <h3>{{ $t('verify.title') }}</h3>
       <i18n-t v-if="email" keypath="verify.sentTo" tag="p">
         <template #email>
@@ -8,7 +9,7 @@
         </template>
       </i18n-t>
       <p v-else>{{ $t('verify.noPending') }}</p>
-      <input v-model="code" :placeholder="$t('verify.placeholder')" />
+      <input v-model="code" autocomplete="one-time-code" inputmode="numeric" :aria-label="$t('verify.placeholder')" :placeholder="$t('verify.placeholder')" />
 
       <div class="actions">
         <button class="primary" :disabled="submitting" @click="submit">
@@ -25,6 +26,7 @@
 
 <script setup lang="ts">
 import { toast } from '../utils/toast'
+import BrandMark from '../components/BrandMark.vue'
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -111,11 +113,11 @@ function startCooldown(seconds: number) {
 </script>
 
 <style scoped>
-.verify-wrap{display:flex;align-items:center;justify-content:center;height:100%}
-.panel{width:420px;background:#fff;padding:22px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.06)}
+.verify-wrap{display:flex;align-items:center;justify-content:center;min-height:100%;box-sizing:border-box;padding:24px;background:var(--bg)}.verify-brand{display:block;text-decoration:none;margin-bottom:28px}
+.panel{width:min(420px,100%);box-sizing:border-box;background:var(--panel);padding:28px;border-radius:24px;border:1px solid var(--surface-border);color:var(--text-primary)}.panel p{color:var(--muted);font-size:14px;line-height:1.8;overflow-wrap:anywhere}
 .panel h3{margin:0 0 12px}
-.panel input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #eee;margin-top:10px;box-sizing:border-box}
+.panel input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--input-border);margin-top:10px;box-sizing:border-box;background:var(--input-bg);color:var(--text-primary);font-size:16px}
 .actions{margin-top:18px;display:flex;flex-direction:column;gap:8px}
-.primary{background:linear-gradient(180deg,var(--accent-1),var(--accent-2));color:#fff;border:0;padding:12px;border-radius:10px;font-weight:700}
+.primary{background:var(--action);color:var(--on-action);border:0;padding:12px;border-radius:10px;font-weight:700}
 .toggle-mode{background:transparent;border:0;color:var(--accent-2);text-align:center;padding:6px 0;font-weight:600;cursor:pointer}
 </style>

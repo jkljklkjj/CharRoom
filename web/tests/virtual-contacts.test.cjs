@@ -1,0 +1,12 @@
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path')
+const {loadTs}=require('./helpers.cjs')
+test('large directories keep stable user identity, section headings and bounded render range',async()=>{
+ const {exports:{contactRows,contactRowHeight}}=await loadTs(path.resolve(__dirname,'../src/utils/virtualContacts.ts'))
+ const {exports:{virtualLayout}}=await loadTs(path.resolve(__dirname,'../src/utils/virtualLayout.ts'))
+ const users=Array.from({length:5000},(_,i)=>({id:i,name:`User ${i}`}))
+ const rows=contactRows([{key:'friends',label:'Friends',users},{key:'empty',label:'Empty',users:[]}])
+ assert.equal(rows.length,5001);assert.equal(rows[0].count,5000);assert.equal(rows[4001].user,users[4000])
+ const layout=virtualLayout(rows.map(row=>row.key),new Map(rows.map(row=>[row.key,contactRowHeight(row)])))
+ const range=layout.range(layout.offsets[4000],700,300)
+ assert.ok(range.end-range.start<25);assert.ok(range.start<=4000&&range.end>4000)
+})

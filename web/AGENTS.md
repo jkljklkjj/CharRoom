@@ -5,15 +5,23 @@
 ## 查找入口
 
 - 应用与路由：`src/main.ts`、`src/App.vue`、`src/router/index.ts`。
+- 版本管理后台：`/admin` → `views/AdminConsole.vue` → `api/admin.ts`，独立管理会话；权限必须由后端名单裁决，启用步骤见 [后台说明](../../chat-room/docs/development/ADMIN-CONSOLE.md)。
+- 发布须填写安装包类型、架构、字节数、SHA-256 和 Android versionCode；同步契约与校验边界见 [可靠更新](../docs/development/RELIABLE-UPDATES.md)。
 - 产品介绍页：`src/views/Home.vue` 等；聊天入口：`src/views/WebApp.vue`。
+- Web 纸感品牌在 `styles.css`，与原生 `QingliaoPalette` 对齐；`BrandMark.vue` / `ConversationPreview.vue` 共享首页和登录的视觉元素。产品范围与跨页验证见 [Web 产品设计](../docs/design/WEB-PAPER-PRODUCT.md)。
 - 聊天 UI：`src/components/ChatWindow.vue`、`SidebarUsers.vue`、`LoginRegister.vue`。
 - REST：`src/api/index.ts`（请求与刷新在 `http.ts`）；状态：`src/store/{state,auth,users,messages,storage}.ts`。
 - 实时：`src/services/chatSocket.ts` → `src/services/transport/TransportFactory.ts` / `WebTransport.ts`。文件名 chatSocket 不代表 WebSocket。
+- 草稿：`services/composerDrafts.ts` 定义按账号/会话的版本状态，`composables/useComposerDrafts.ts` 跨布局共享；附件经 `api/attachments.ts` 上传，发送前捕获账号与目标。
 - 本地存储：`src/utils/messageDB.ts`；待发消息：`src/services/offlineQueue.ts`。新设备七天历史入口与 IndexedDB 合并规则见 [历史恢复](../docs/development/RECENT-HISTORY.md)。
-- 增量补拉：`src/services/conversationSync.ts`；登录生命周期：`sessionEpoch.ts` / `sessionBootstrap.ts`（同目录）；消息虚拟列表：`src/components/VirtualMessageList.vue`。游标落库边界、IndexedDB v6 和验证命令见 [客户端优化](../docs/development/CLIENT-SYNC-AND-PERFORMANCE.md)。
+- 联系人和群组由 `store/contactDirectory.ts` 统一同步，先读账号快照再校验版本；组件不直接拉取完整列表。`services/conversationViews.ts` 保存有上限的会话页面与阅读位置。消息库 v7 将增量消息和游标同事务提交，详见 [本地优先加载](../docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)。
+- 发现页短时缓存由 `services/socialViewCache.ts` 按登录代次管理；资料、关系与回答修改后失效，不将他人资料落盘。本人名片与今日一问草稿分别在 `utils/socialProfileCache.ts` / `dailyAnswerDraft.ts`，账号切换、退出和异步完成必须核对所有者。
+- `services/gatewayOwner.ts` 在每次实时连接前解析 `/cluster/owner`；outbox v3 按账号和重试时间索引分批读取，发送成功只能由匹配的服务端 ACK 确认。
+- 增量补拉：`src/services/conversationSync.ts`；登录生命周期：`sessionEpoch.ts` / `sessionBootstrap.ts`（同目录）；消息虚拟列表：`src/components/VirtualMessageList.vue`。游标落库边界、IndexedDB v7 见 [本地优先加载](../docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)，其他验证命令见 [客户端优化](../docs/development/CLIENT-SYNC-AND-PERFORMANCE.md)。
 - protobuf：`src/proto/index.ts` / `worker.ts`（通过共享 `codec.ts` 编解码），运行时 URL `/proto/message.proto`；公共资源在 `public/proto/`。
 - 协议常量：`src/proto/constants.ts`，由 `scripts/generate-protocol-constants.cjs` 生成；组件从这里导入，不再从 chatSocket 服务导入类型常量。业务常量仍在 `src/constants.ts`；wire 接口 `src/proto/messages.ts` 同时生成，store/UI 类型放 `src/types/`。
 - PWA/构建：`vite.config.ts`、`scripts/generate-static-site-files.cjs`；文案在 `src/locales/` 三份语言文件。
+- SEO 路由与索引范围在 `site.routes.json`，运行时由 `services/pageSeo.ts` 同步；正式 SEO 产物用 `npm run build:seo`（需 `CHROME_BIN`），部署与验证见 [Web SEO](../docs/development/WEB-SEO.md)。私有入口保持 noindex，不能重新放入 sitemap。
 
 ## 开发命令（工作目录：CharRoom/web）
 
@@ -36,10 +44,16 @@ REST 支持 `VITE_API_BASE`，默认指向线上；QUIC 目标还要单独检查
 
 ## 修改约定
 
+- 活跃历史窗口受 `historyWindow.ts` 约束，补拉直接合并已提交批次，最旧边界用消息索引查询；截断窗口必须保留“查看最新消息”及阅读锚点。轻遇轮询遵守可见性、联网和退避策略，见 [第二轮性能改进](../docs/development/CLIENT-PERFORMANCE-SECOND-PASS.md)。
+- 历史删除使用精确索引和 key cursor，清空会话时消息与摘要同事务；不要重新引入全会话正文扫描或两阶段清理，见 [历史存储优化](../docs/development/HISTORY-STORAGE-PERFORMANCE.md)。
+- 会话选择、预览和 UI key 使用 `ConversationId` 生成的 `user:<id>` / `group:<id>`；联系人 ID 保留原值，存储与协议显式转换。禁止用正负号或 `Math.abs` 判断会话类型，见 [会话标识](../docs/development/CONVERSATION-IDENTITY.md)。
+- 联系人虚拟列表使用 `utils/virtualContacts.ts` 的固定行高，修改行样式须同步行高并验证键盘导航；消息测量复用 `IncrementalVirtualLayout`。跨端边界与验证见 [性能改进](../docs/development/CLIENT-PERFORMANCE-2026-10-28.md)。
+- 每次修改 Web 都要评估桌面、CLI、Android 的对应行为是否需要同步；原生端修改也须反向检查 Web。按 [跨端修改评估](../AGENTS.md#跨端修改评估) 执行，并在交付中说明同步结论与理由。
 - 组件负责交互与渲染，传输、持久化、重试放 service/store；先核对调用方和导出签名，防止只完成一半重构。
 - import 的类名不得遮蔽浏览器能力探测；探测原生 API 使用 `globalThis`。
 - 协议不能只改 `public/proto/`：构建脚本会从 `src/proto/` 复制 message.proto 和 agent_stream.proto。两个 proto 均须对齐后端主定义；信封和嵌套枚举在 Web 内统一用数字，int64 解码为十进制字符串以保留精度。
 - Worker 使用可由构建系统解析的入口，必须处理加载失败、请求失败和超时；transferable buffer 转移后不能假定主线程仍可读取。
+- ACK 的 `messageId` 匹配待发请求，可选 `serverMessageId` 是历史主键；先在 IndexedDB 单事务中归并两种 ID，再删除对应账号的 outbox。
 - 发消息区分已入本地队列、写入传输层、服务端 ACK、对端送达、已读。只在匹配的服务端确认后移除待发项；重试保持 messageId，登录完成后才恢复队列。
 - IndexedDB、PWA Cache 与内存状态按账号隔离。退出登录捕获原账号再异步清理，防止切换账号后读错或删除错数据；不要缓存认证后的 REST 响应到共享缓存。
 - 消息文本保持净化与转义，token/密码不进日志，不记录完整聊天正文。

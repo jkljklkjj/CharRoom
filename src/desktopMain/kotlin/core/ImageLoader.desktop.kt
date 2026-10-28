@@ -16,7 +16,7 @@ import javax.imageio.ImageIO
  */
 object DesktopImageLoader : ImageLoaderProvider {
     // JVM / Desktop implementation: download bytes, optionally cache to local disk by cacheKey, and decode via Skia
-    override suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?): ImageBitmap? = withContext(Dispatchers.IO) {
+    override suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?, targetSize: Int?): ImageBitmap? = withContext(Dispatchers.IO) {
     try {
         var cacheFile: File? = null
         if (!cacheKey.isNullOrBlank()) {
@@ -36,7 +36,7 @@ object DesktopImageLoader : ImageLoaderProvider {
         // 先读缓存
         if (cacheFile != null && cacheFile.exists()) {
             try {
-                val bufferedImage = ImageIO.read(cacheFile)
+                val bufferedImage = ImageIO.createImageInputStream(cacheFile)?.use { decode(it, targetSize) }
                 if (bufferedImage != null) {
                     return@withContext bufferedImage.toComposeImageBitmap()
                 }
@@ -58,19 +58,44 @@ object DesktopImageLoader : ImageLoaderProvider {
             conn.setRequestProperty("Authorization", "Bearer ${GlobalAppState.currentToken.orEmpty()}")
         }
 
-        conn.inputStream.use { ins ->
+        try { conn.inputStream.use { ins ->
             val bytes = ins.readBytes()
             // 写入缓存
             if (cacheFile != null) {
-                try { cacheFile.writeBytes(bytes) } catch (_: Exception) {}
+                try { AtomicHistoryFile.write(cacheFile) { it.write(bytes) } } catch (_: Exception) {}
             }
             // 转换为ImageBitmap
-            val bufferedImage = ImageIO.read(ByteArrayInputStream(bytes))
+            val bufferedImage = ImageIO.createImageInputStream(ByteArrayInputStream(bytes))?.use { decode(it, targetSize) }
             return@withContext bufferedImage?.toComposeImageBitmap()
-        }
+        } } finally { conn.disconnect() }
     } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
         AppLogger.w("Image load error: $url, ${e.message}")
         null
     }
 }
+
+    internal fun decode(input: javax.imageio.stream.ImageInputStream, targetSize: Int?): BufferedImage? {
+        val readers = ImageIO.getImageReaders(input)
+        if (!readers.hasNext()) return null
+        val reader = readers.next()
+        try {
+            reader.input = input
+            val options = reader.defaultReadParam
+            if (targetSize != null) {
+                val sample = (maxOf(reader.getWidth(0), reader.getHeight(0)) / targetSize).coerceAtLeast(1)
+                options.setSourceSubsampling(sample, sample, 0, 0)
+            }
+            val image = reader.read(0, options)
+            if (targetSize == null || maxOf(image.width, image.height) <= targetSize) return image
+            val scale = targetSize.toDouble() / maxOf(image.width, image.height)
+            return BufferedImage((image.width * scale).toInt().coerceAtLeast(1), (image.height * scale).toInt().coerceAtLeast(1), BufferedImage.TYPE_INT_ARGB).also { resized ->
+                val graphics = resized.createGraphics()
+                try {
+                    graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                    graphics.drawImage(image, 0, 0, resized.width, resized.height, null)
+                } finally { graphics.dispose(); image.flush() }
+            }
+        } finally { reader.dispose() }
+    }
 }

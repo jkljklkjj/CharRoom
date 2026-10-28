@@ -22,7 +22,22 @@ plugins {
 }
 
 group = "com.chatlite"
-version = "1.0-SNAPSHOT"
+val releaseVersion = providers.gradleProperty("appVersion").get()
+val releaseVersionCode = providers.gradleProperty("appVersionCode").get().toInt()
+require(releaseVersion.matches(Regex("[1-9][0-9]*\\.[0-9]+\\.[0-9]+")) && releaseVersionCode > 0)
+version = releaseVersion
+val releaseSources = layout.buildDirectory.dir("generated/releaseVersion")
+val generateReleaseVersion = tasks.register("generateReleaseVersion") {
+    inputs.property("name", releaseVersion)
+    inputs.property("code", releaseVersionCode)
+    outputs.dir(releaseSources)
+    doLast {
+        releaseSources.get().file("core/BuildReleaseVersion.kt").asFile.apply {
+            parentFile.mkdirs()
+            writeText("package core\nobject BuildReleaseVersion { const val NAME = \"$releaseVersion\"; const val CODE = $releaseVersionCode }\n")
+        }
+    }
+}
 
 repositories {
     mavenCentral()
@@ -100,6 +115,7 @@ dependencies {
 sourceSets {
     main {
         kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin", "src/cliMain/kotlin")
+        kotlin.srcDir(generateReleaseVersion)
         resources.srcDirs("src/commonMain/resources", "src/desktopMain/resources")
         // 排除 Android 特定文件和 WebRTC call（包名不匹配）
         kotlin.exclude("**/*.android.kt", "**/call/**")
@@ -157,7 +173,7 @@ compose.desktop {
                 "jdk.unsupported"
             )
             packageName = "chatlite"
-            packageVersion = "1.0.0"
+            packageVersion = releaseVersion
             vendor = "QingLiao"
             description = "CharRoom - lightweight secure cross-platform chat"
             copyright = "Copyright 2026 QingLiao"
@@ -240,7 +256,7 @@ tasks.register("stageReleaseArtifacts") {
 tasks.register<Jar>("customJar") {
     description = "桌面端jar打包"
     archiveBaseName.set("在线聊天App")
-    archiveVersion.set("1.0.0")
+    archiveVersion.set(releaseVersion)
 
     from(kotlin.sourceSets["main"].kotlin.srcDirs)
     from("src/desktopMain/java") { into("") }
@@ -334,10 +350,9 @@ tasks.register<Jar>("cliJar") {
     description = "Build CLI chat client executable fat JAR"
     group = "cli"
     archiveBaseName.set("chatlite-cli")
-    archiveVersion.set("1.0.0")
+    archiveVersion.set(releaseVersion)
 
     from(sourceSets.main.get().output)
-    from(sourceSets.main.get().allSource)
 
     // 打包全部运行时依赖
     from({

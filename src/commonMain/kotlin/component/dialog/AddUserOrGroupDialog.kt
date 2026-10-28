@@ -185,7 +185,7 @@ fun AddUserOrGroupDialog(
                                 val detailUser = withContext(Dispatchers.IO) { ApiService.getUserDetail(account) }
                                 detailUser?.let { u ->
                                     val currentUsers = chatViewModel.usersFlow.value
-                                    if (currentUsers.none { it.id == u.id }) {
+                                    if (currentUsers.none { it.conversationKey == u.conversationKey }) {
                                         chatViewModel.updateUsers(currentUsers + u)
                                     }
                                 }
@@ -198,9 +198,9 @@ fun AddUserOrGroupDialog(
                                     responseMessage = s["dialog.add.group.success"]
                                     val detailGroup = withContext(Dispatchers.IO) { ApiService.getGroupDetail(account) }
                                     detailGroup?.let { g ->
-                                        val adjusted = g.copy(id = -g.id)
+                                        val adjusted = g.copy(conversationKind = model.ConversationKind.GROUP)
                                         val currentUsers = chatViewModel.usersFlow.value
-                                        if (currentUsers.none { it.id == adjusted.id }) {
+                                        if (currentUsers.none { it.conversationKey == adjusted.conversationKey }) {
                                             chatViewModel.updateUsers(currentUsers + adjusted)
                                         }
                                     }

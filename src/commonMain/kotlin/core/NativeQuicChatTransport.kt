@@ -12,7 +12,9 @@ class NativeQuicChatTransport(
     private val identity: () -> QuicIdentity,
     private val onAuthenticated: (Int) -> Unit = {},
     private val onFailure: (Exception) -> Unit = {},
-    private val timing: QuicTransportTiming = QuicTransportTiming()
+    private val timing: QuicTransportTiming = QuicTransportTiming(),
+    private val persistIncoming: (Int, MessageProtos.MessageWrapper) -> Unit = { _, _ -> },
+    private val endpointResolver: (QuicIdentity, String, Int) -> Pair<String, Int> = { _, host, port -> host to port }
 ) : ChatTransport {
     private class AuthenticationFailure(message: String) : IOException(message)
     private data class Outgoing(val payload: ByteArray, val type: MsgType, val target: String,
@@ -159,7 +161,13 @@ class NativeQuicChatTransport(
         private val dispatcher = ProtobufMessageDispatcher(
             listeners = { if (active(run)) listeners.toList() else emptyList() },
             agentHandler = { if (active(run)) agentStreamHandler else null },
-            onAcknowledgement = { ack, bytes -> acks.acknowledge(ack, bytes) }, onFailure = onFailure
+            onAcknowledgement = { ack, bytes -> acks.acknowledge(ack, bytes) }, onFailure = onFailure,
+            accountId = { run.account ?: 0 },
+            persistIncoming = { wrapper ->
+                check(active(run) && run.account == identity().userId) { "Stale receiving session" }
+                persistIncoming(run.account ?: error("Missing authenticated account"), wrapper)
+                check(active(run) && run.account == identity().userId) { "Receiving session changed during persistence" }
+            }
         )
         private fun schedule(delay: Long, action: () -> Unit): () -> Unit {
             val cancelled = AtomicBoolean(false)
@@ -169,7 +177,8 @@ class NativeQuicChatTransport(
         fun execute() {
             val cancelHandshake = schedule(timing.handshakeMillis) { throw IOException("QUIC handshake timed out") }
             try {
-                driver.connect(run.host, run.port)
+                val endpoint = endpointResolver(credentials, run.host, run.port)
+                driver.connect(endpoint.first, endpoint.second)
                 while (active(run)) {
                     val due = timers.filter { it.deadline <= now() && !it.cancelled.get() }
                     timers.removeAll { it.deadline <= now() || it.cancelled.get() }
@@ -226,6 +235,7 @@ class NativeQuicChatTransport(
             if (!run.online) {
                 if (!handshaken || stream != 0L || wrapper.type != MsgType.RESPONSE || !wrapper.hasResponse()) return
                 val response = wrapper.response
+                if (isTransientGatewayResponse(response.message)) throw IOException("Gateway temporarily unavailable: ${response.message}")
                 val id = response.clientId.toIntOrNull()
                 if (!response.success || id == null || id <= 0 || (credentials.userId != null && id != credentials.userId)) {
                     throw AuthenticationFailure("QUIC login rejected")

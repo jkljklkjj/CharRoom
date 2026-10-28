@@ -2,12 +2,12 @@ import { readonly } from 'vue'
 import { state } from './state'
 import { setToken, setRefreshToken, setAccountId, setPendingRegister,
          clearPendingRegister, setLoginValid, clearAll } from './auth'
-import { setUsers, setGroups, mergeUsers, cacheUsers, loadCachedUsers,
+import { setUsers, setGroups, mergeUsers,
          addUser, removeUser, updateUserOnlineStatus,
          rebuildConversationStates, updateConversationState, clearConversationUnread } from './users'
-import { restoreHistoryPage, addMessage, addGroupMessage, upsertAgentStreamMessage,
-         updateMessageStatus, setSelectedChat,
-         loadOlderMessages, trimMessages, trimGroupMessages,
+import { beginHistorySync, restoreAppliedCursors, restoreHistoryPage, addMessage, addGroupMessage, upsertAgentStreamMessage,
+         updateMessageStatus, confirmMessageId, setSelectedChat,
+         loadLatestMessages, setHistoryFollowingLatest, loadOlderMessages, trimMessages, trimGroupMessages,
          deleteMessage, getConversationSeqId, setConversationSeqId } from './messages'
 
 export function useStore() {
@@ -21,10 +21,13 @@ export function useStore() {
     addUser,
     removeUser,
     restoreHistoryPage,
+    restoreAppliedCursors,
+    beginHistorySync,
     addMessage,
     addGroupMessage,
     upsertAgentStreamMessage,
     updateMessageStatus,
+    confirmMessageId,
     setSelectedChat,
     clearAll,
     setPendingRegister,
@@ -37,12 +40,10 @@ export function useStore() {
     getConversationSeqId,
     setConversationSeqId,
     mergeUsers,
-    cacheUsers,
-    loadCachedUsers,
     trimMessages,
     trimGroupMessages,
     deleteMessage,
-    loadOlderMessages
+    loadOlderMessages,loadLatestMessages,setHistoryFollowingLatest
   }
 }
 

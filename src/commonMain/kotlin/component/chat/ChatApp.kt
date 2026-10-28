@@ -74,6 +74,11 @@ fun ChatApp(
     val s = LocalStrings.current
     // 使用 Koin 注入 ChatViewModel
     val chatViewModel: ChatViewModel = koinInject()
+    androidx.compose.runtime.DisposableEffect(chatViewModel, token) {
+        val owner = Any()
+        core.update.UpdatePreparation.register(owner) { chatViewModel.flushLocalHistory() }
+        onDispose { core.update.UpdatePreparation.remove(owner) }
+    }
 
     // 观察状态
     val selectedChatTarget by chatViewModel.selectedChatTargetFlow.collectAsState()
@@ -102,7 +107,7 @@ fun ChatApp(
     LaunchedEffect(navigationRequest?.requestId) {
         val request = navigationRequest ?: return@LaunchedEffect
         val user = kotlinx.coroutines.withTimeoutOrNull(15_000) {
-            chatViewModel.usersFlow.first { list -> list.any { it.id == request.chatId } }.first { it.id == request.chatId }
+            chatViewModel.usersFlow.first { list -> list.any { it.conversationKey == request.conversation } }.first { it.conversationKey == request.conversation }
         }
         if (user != null) {
             showSocial = false; showSettingsScreen = false; showProfileScreen = false; showQuotaScreen = false
@@ -119,11 +124,23 @@ fun ChatApp(
             return@LaunchedEffect
         }
         if (!Chat.isConnected()) {
-            Chat.start() // 启动QUIC连接，触发握手流程，此时header会携带token
+            kotlinx.coroutines.withContext(Dispatchers.IO) { Chat.start() }
         }
 
         // 注册全局消息接收监听器
         val receiver = object : MessageReceiveListener {
+            override fun onMessageIdConfirmed(clientId: String, serverId: String, seqId: Long, conversationId: String) {
+                chatViewModel.confirmMessageId(clientId, serverId, seqId, conversationId)
+            }
+            override fun onPrivateEnvelope(message: Message) {
+                chatViewModel.addMessage(message)
+                if (!message.sender) core.PlatformMessageNotifications.privateMessage(message.senderId, message.message)
+            }
+            override fun onGroupEnvelope(message: model.GroupMessage) {
+                chatViewModel.addGroupMessage(message)
+                if (message.senderId != GlobalAppState.currentUserId) core.PlatformMessageNotifications.groupMessage(
+                    message.groupId, message.senderId, message.senderName, message.text)
+            }
             override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
                                                   seqId: Long, conversationId: String) {
                 // 构建消息对象并添加到聊天状态
@@ -176,8 +193,8 @@ fun ChatApp(
         }
 
         // Agent 流式消息：独立回调，不走 listener 遍历
-        val agentHandler = AgentStreamHandler { messageId, fullContent, done, _ ->
-            chatViewModel.upsertAgentStreamMessage(messageId, fullContent)
+        val agentHandler = AgentStreamHandler { messageId, fullContent, done, error ->
+            chatViewModel.upsertAgentStreamMessage(messageId, fullContent, done, error)
         }
 
         Chat.addMessageReceiveListener(receiver)
@@ -197,6 +214,10 @@ fun ChatApp(
         chatViewModel.fetchRequests()
         kotlinx.coroutines.awaitCancellation()
         } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                try { chatViewModel.flushLocalHistory() }
+                catch (error: Exception) { core.AppLogger.d("Local history flush failed: ${error.message}") }
+            }
             Chat.removeMessageReceiveListener(receiver)
             if (Chat.agentStreamHandler === agentHandler) Chat.agentStreamHandler = null
         }
@@ -289,13 +310,13 @@ fun ChatApp(
                                     slideOutHorizontally(tween(250)) { it } + fadeOut(tween(150))
                             }
                         },
-                        contentKey = { it?.id?.let { id -> "chat:$id" } ?: "list" }
+                        contentKey = { it?.conversationKey?.value ?: "list" }
                     ) { chatTarget ->
                         if (chatTarget == null) {
                             UserList(
                                 selectedTab = sidebarTab, onTabSelected = { sidebarTab = it },
                                 searchQuery = sidebarQuery, onSearchQueryChange = updateSidebarQuery,
-                                selectedUserId = null,
+                                selectedConversation = null,
                                 onOpenSearch = { showAddUserDialog = true },
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
@@ -310,7 +331,7 @@ fun ChatApp(
                                 chatViewModel = chatViewModel
                             )
                         } else {
-                            key(chatTarget.id) {
+                            key(chatTarget.conversationKey.value) {
                                 ContactChatScreen(
                                     token = token,
                                     chatViewModel = chatViewModel,
@@ -333,7 +354,7 @@ fun ChatApp(
                             UserList(
                                 selectedTab = sidebarTab, onTabSelected = { sidebarTab = it },
                                 searchQuery = sidebarQuery, onSearchQueryChange = updateSidebarQuery,
-                                selectedUserId = selectedChatTarget?.id,
+                                selectedConversation = selectedChatTarget?.conversationKey,
                                 onOpenSearch = { showAddUserDialog = true },
                                 onOpenSettings = { showSettingsScreen = true },
                                 onOpenApplications = { showApplicationDialog = true },
@@ -356,7 +377,7 @@ fun ChatApp(
 
                         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                             if (selectedChatTarget != null) {
-                                key(selectedChatTarget!!.id) {
+                                key(selectedChatTarget!!.conversationKey.value) {
                                     ContactChatScreen(
                                         token = token,
                                         chatViewModel = chatViewModel,
@@ -389,7 +410,7 @@ fun ChatApp(
                 SocialScreen(token, GlobalAppState.currentUserId?.toString().orEmpty(),
                     onBack = { showSocial = false },
                     onChat = { user ->
-                        chatViewModel.updateUsers((chatViewModel.usersFlow.value + user).distinctBy { it.id })
+                        chatViewModel.updateUsers((chatViewModel.usersFlow.value + user).distinctBy { it.conversationKey })
                         chatViewModel.selectedUser = user
                         showSocial = false
                     })
@@ -491,7 +512,7 @@ fun ChatApp(
                         },
                         onChat = { user ->
                             showUserDetailScreen = false
-                            chatViewModel.updateUsers((chatViewModel.usersFlow.value + user).distinctBy { it.id })
+                            chatViewModel.updateUsers((chatViewModel.usersFlow.value + user).distinctBy { it.conversationKey })
                             chatViewModel.selectedUser = user
                             selectedDetailUserId = null
                         }

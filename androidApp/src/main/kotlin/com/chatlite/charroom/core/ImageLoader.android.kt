@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -23,17 +24,6 @@ import core.ImageLoaderProvider
  */
 object AndroidImageLoader : ImageLoaderProvider {
     private lateinit var context: Context
-
-    // 内存缓存：最多使用应用最大可用内存的1/8
-    private val memoryCache by lazy {
-        val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
-        val cacheSize = maxMemory / 8
-        object : android.util.LruCache<String, ImageBitmap>(cacheSize) {
-            override fun sizeOf(key: String, value: ImageBitmap): Int {
-                return value.width * value.height * 4 / 1024 // 每个像素占4字节
-            }
-        }
-    }
 
     // 磁盘缓存目录
     private val diskCacheDir by lazy {
@@ -54,64 +44,60 @@ object AndroidImageLoader : ImageLoaderProvider {
     fun init(context: Context) {
         this.context = context.applicationContext
         // 初始化时清理过期的磁盘缓存
-        cleanupDiskCache()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch { diskCacheLock.write { cleanupDiskCache() } }
     }
 
     /**
      * Android implementation: load image from URL and convert to ImageBitmap
      * 支持两级缓存：内存缓存 -> 磁盘缓存 -> 网络下载
      */
-    override suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?): ImageBitmap? = withContext(Dispatchers.IO) {
-        if (!::context.isInitialized) {
-            return@withContext null
-        }
-
-        val key = cacheKey ?: url.md5()
-
-        // 1. 先查内存缓存
-        memoryCache.get(key)?.let {
-            return@withContext it
-        }
-
-        // 2. 再查磁盘缓存
-        loadFromDiskCache(key)?.let { bitmap ->
-            // 存入内存缓存
-            memoryCache.put(key, bitmap)
-            return@withContext bitmap
-        }
-
-        // 3. 网络下载
+    override suspend fun loadImageBitmapFromUrl(url: String, cacheKey: String?, targetSize: Int?): ImageBitmap? = withContext(Dispatchers.IO) {
+        check(::context.isInitialized)
+        // Shared cache owns decoded bitmaps and concurrent requests; disk keys include decode size.
+        val key = "${cacheKey ?: url}#${targetSize ?: "original"}".md5()
+        loadFromDiskCache(key, targetSize)?.let { return@withContext it }
+        val connection = URL(url).openConnection() as HttpURLConnection
         try {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.doInput = true
-            connection.connect()
-            val inputStream: InputStream = connection.inputStream
-            val bitmap: Bitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream.close()
-            connection.disconnect()
-
-            val imageBitmap = bitmap.asImageBitmap()
-
-            // 存入缓存
-            memoryCache.put(key, imageBitmap)
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+            val bytes = connection.inputStream.use { it.readBytes() }
+            val options = BitmapFactory.Options()
+            if (targetSize != null) {
+                options.inJustDecodeBounds = true
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                var sample = 1
+                while (maxOf(options.outWidth, options.outHeight) / (sample * 2) >= targetSize) sample *= 2
+                options.inJustDecodeBounds = false
+                options.inSampleSize = sample
+            }
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return@withContext null
+            val bitmap = resize(decoded, targetSize)
             saveToDiskCache(key, bitmap)
-
-            imageBitmap
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "图片加载失败")
+            bitmap.asImageBitmap()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            timber.log.Timber.e(failure, "图片加载失败")
             null
-        }
+        } finally { connection.disconnect() }
+    }
+
+    private fun resize(bitmap: Bitmap, targetSize: Int?): Bitmap {
+        if (targetSize == null || maxOf(bitmap.width, bitmap.height) <= targetSize) return bitmap
+        val scale = targetSize.toDouble() / maxOf(bitmap.width, bitmap.height)
+        return Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt().coerceAtLeast(1), (bitmap.height * scale).toInt().coerceAtLeast(1), true)
+            .also { if (it !== bitmap) bitmap.recycle() }
     }
 
     /**
      * 从磁盘缓存加载图片
      */
-    private fun loadFromDiskCache(key: String): ImageBitmap? {
+    private fun loadFromDiskCache(key: String, targetSize: Int?): ImageBitmap? {
         return diskCacheLock.read {
             try {
                 val file = File(diskCacheDir, key)
                 if (file.exists() && file.length() > 0) {
-                    BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap()
+                    BitmapFactory.decodeFile(file.absolutePath)?.let { resize(it, targetSize).asImageBitmap() }
                 } else {
                     null
                 }

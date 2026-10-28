@@ -28,14 +28,14 @@
             <button class="back-btn" @click="backToList">{{ $t('app.back') }}</button>
             <div class="chat-title">{{ currentChatName }}</div>
           </div>
-          <ChatWindow class="chat" />
+          <ChatWindow class="chat" @retry-history="syncAllConversations" />
         </div>
       </template>
 
       <!-- 桌面端视图 -->
       <template v-else>
         <SidebarUsers v-model:tab="sidebarTab" v-model:query="sidebarQueries[sidebarTab]" class="sidebar" @open-settings="showSettings = true" @open-discovery="showSocial = true" />
-        <ChatWindow class="chat" />
+        <ChatWindow class="chat" @retry-history="syncAllConversations" />
       </template>
     </div>
 
@@ -46,12 +46,6 @@
           <button class="close-settings" :aria-label="$t('social.close')" @click="closeSettings">×</button>
         </div>
         <div class="settings-body">
-          <div class="settings-item">
-            <div class="transport-info">
-              <label>{{ $t('app.settings.transportLabel') }}</label>
-              <div class="transport-badge wt">{{ $t('app.settings.transportValue') }}</div>
-            </div>
-          </div>
           <div class="settings-item">
             <label>{{ $t('app.settings.themeLabel') }}</label>
             <div class="theme-options">
@@ -125,10 +119,13 @@ import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, AGENT_STREAM_TYPE } from '../proto/constants'
 import siteConfig from '../siteConfig'
 import api from '../api'
+import { AgentStreamReducer } from '../services/agentStreamReducer'
 import { ConversationSync } from '../services/conversationSync'
+import { refreshContacts, invalidateContacts } from '../store/contactDirectory'
 import { bootstrapSession } from '../services/sessionBootstrap'
 import { sessionEpoch } from '../services/sessionEpoch'
 import { historyMessages } from '../utils/historyMessages'
+import {ConversationId} from '../utils/conversationId'
 import { AGENT_USER_ID } from '../constants'
 // 主题设置（统一由 utils/theme.ts 管理，App.vue 已在全局初始化）
 import { theme, setTheme, initTheme } from '../utils/theme'
@@ -164,7 +161,7 @@ const socialInitialTab = ref<'people' | 'me'>('people')
 function onSocialChat(profile: SocialProfile) {
   if (profile.relation !== 'FRIEND') return
   const user = { id: profile.id, username: profile.username, name: profile.username, avatarUrl: profile.avatarUrl, signature: profile.signature }
-  store.mergeUsers([user]); store.setSelectedChat(profile.id); showSocial.value = false; socialInitialTab.value = 'people'; onUserSelected(user)
+  store.mergeUsers([user]); store.setSelectedChat(ConversationId.privateChat(profile.id).key); showSocial.value = false; socialInitialTab.value = 'people'; onUserSelected(user)
 }
 const showQuota = ref(false)
 const showLogoutConfirm = ref(false)
@@ -194,12 +191,21 @@ function handleResize() {
   }
 }
 
+const agentStreams = new AgentStreamReducer()
+const pendingAgentRenders = new Map<string, string>()
+let agentRenderFrame = 0
+function clearAgentStreams() {
+  cancelAnimationFrame(agentRenderFrame); agentRenderFrame = 0
+  pendingAgentRenders.clear(); agentStreams.clear()
+}
+
 /** 处理 QUIC/WebTransport 收到的消息 */
 async function handleIncomingMessage(msg: MessageWrapper) {
   const session = sessionEpoch.capture()
   try {
     if (msg.type === MSG_TYPE.CHAT && msg.chat) {
-      const senderId = String(msg.chat.userId || 'unknown')
+      const rawSender = String(msg.chat.userId || 'unknown')
+      const senderId = rawSender === String(store.state.accountId) ? 'you' : rawSender
 
       // 检查发送者是否在好友列表中，不在则同步更新
       if (senderId !== 'you' && senderId !== String(store.state.accountId)) {
@@ -252,39 +258,22 @@ async function handleIncomingMessage(msg: MessageWrapper) {
         void syncConversation(msg.groupChat.conversationId, msg.groupChat.seqId)
       }
     } else if (msg.type === MSG_TYPE.AGENT_CHAT_STREAM && msg.agentStream) {
-      // Agent 流式消息（AgentStreamChunk 协议）
-      const stream = msg.agentStream
-      const requestId = String(stream.requestId || '')
-      if (!requestId) return
-
-      const streamType = stream.type
-      // 0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
-      if (streamType === AGENT_STREAM_TYPE.STREAM_TEXT && stream.text !== undefined) {
-        // 文本片段：增量拼接
-        store.upsertAgentStreamMessage(requestId, stream.text, false)
-      } else if (streamType === AGENT_STREAM_TYPE.STREAM_TOOL_CALL && stream.toolCall) {
-        // 工具调用：显示工具名称和参数
-        const tc = stream.toolCall
-        const toolInfo = `\n\n🔧 调用工具: ${tc.name}`
-        store.upsertAgentStreamMessage(requestId, toolInfo, false)
-      } else if (streamType === AGENT_STREAM_TYPE.STREAM_TOOL_RESULT && stream.toolResult) {
-        // 工具结果：显示执行结果
-        const tr = stream.toolResult
-        const status = tr.success ? '✅' : '❌'
-        const resultText = `\n${status} 结果: ${tr.result || '(空)'}`
-        store.upsertAgentStreamMessage(requestId, resultText, false)
-      } else if (streamType === AGENT_STREAM_TYPE.STREAM_USAGE && stream.usage) {
-        // Token 用量：显示统计
-        const u = stream.usage
-        const usageText = `\n\n📊 Token: ${u.inputTokens} 输入 / ${u.outputTokens} 输出`
-        store.upsertAgentStreamMessage(requestId, usageText, false)
-      } else if (streamType === AGENT_STREAM_TYPE.STREAM_DONE) {
-        // 流结束
-        store.upsertAgentStreamMessage(requestId, '', true)
-      } else if (streamType === AGENT_STREAM_TYPE.STREAM_ERROR && stream.error) {
-        // 错误
-        const errorMsg = stream.error.message || 'Agent 处理失败'
-        store.upsertAgentStreamMessage(requestId, `\n\n❌ ${errorMsg}`, true)
+      const stream = msg.agentStream, id = String(stream.requestId || '')
+      const state = agentStreams.accept(stream)
+      if (state) {
+        if (state.done) {
+          pendingAgentRenders.delete(id)
+          await store.upsertAgentStreamMessage(id, state.text, true)
+          if (session.isCurrent()) await chatSocket.sendAck(id)
+        } else {
+          pendingAgentRenders.set(id, state.text)
+          if (!agentRenderFrame) agentRenderFrame = requestAnimationFrame(() => {
+            agentRenderFrame = 0
+            if (!session.isCurrent()) return
+            for (const [key, text] of pendingAgentRenders) void store.upsertAgentStreamMessage(key, text).catch(error => console.warn('Agent render failed:', error))
+            pendingAgentRenders.clear()
+          })
+        }
       }
     } else if (msg.type === MSG_TYPE.SYNC_HINT) {
       // sync_hint：服务端推送的增量同步提示
@@ -302,6 +291,7 @@ async function handleIncomingMessage(msg: MessageWrapper) {
     }
   } catch (e) {
     console.error('处理消息失败', e)
+    throw e
   }
 }
 
@@ -318,22 +308,26 @@ const incrementalSync = new ConversationSync({
   },
   cursor: conversation => store.getConversationSeqId(conversation),
   fetch: (conversation, after) => api.syncMessages(conversation, after, 50),
-  apply: async (_, rows) => {
+  apply: async (conversation, rows) => {
     const owner = String(store.state.accountId)
-    await store.restoreHistoryPage(owner, historyMessages(rows, owner))
+    await store.restoreHistoryPage(owner, historyMessages(rows, owner),{conversationId:conversation,seqId:rows.at(-1)!.seqId!})
   },
   commit: (conversation, cursor) => store.setConversationSeqId(conversation, cursor)
 })
 
 async function syncConversation(conversationId: string, serverSeqId: Id) {
+  const done=store.beginHistorySync()
+  let failed=false
   try { await incrementalSync.run(conversationId, serverSeqId) }
-  catch (error) { console.warn('Incremental synchronization failed:', conversationId, error) }
+  catch (error) { failed=true;console.warn('Incremental synchronization failed:', conversationId, error) }
+  finally {done(failed)}
 }
 
 async function syncAllConversations() {
   const accountId = String(store.state.accountId)
   if (!accountId) return
-  const session = sessionEpoch.capture()
+  const session = sessionEpoch.capture(),done=store.beginHistorySync()
+  let failed=false
   let request: import('../types/api').RecentHistoryRequest = { limit: 100 }
   try {
     while (session.isCurrent() && String(store.state.accountId) === accountId) {
@@ -351,8 +345,9 @@ async function syncAllConversations() {
       request = { windowEnd: page.windowEnd, afterTimestamp: page.nextTimestamp, afterId: page.nextId, limit: 100 }
     }
   } catch (error) {
+    failed=true
     console.warn('Recent history synchronization failed:', error)
-  }
+  } finally {done(failed)}
 }
 
 /** 建立 WebTransport 连接 */
@@ -363,7 +358,8 @@ function connectChat(token: string, accountId: Id) {
   const host = 'quic.chatlite.xin'
   const port = transportConfig.port || 8080
   return chatSocket.connect(host, port, token, String(accountId), {
-    onmessage: msg => { if (isCurrent()) void handleIncomingMessage(msg) },
+    onAuthenticated:()=>{if(isCurrent())void refreshContacts()},
+    onmessage: async msg => { if (isCurrent()) await handleIncomingMessage(msg) },
     onAuthFailed: () => { if (isCurrent()) void logout() },
     onFriendAccepted: async (accepterId) => {
       if (!isCurrent()) return
@@ -373,6 +369,7 @@ function connectChat(token: string, accountId: Id) {
         if (!isCurrent()) return
         if (friend) {
           store.addUser(friend)
+          invalidateContacts()
           toast.success(t('chat.friendAccepted') || '好友已添加')
 
           // 自动发送欢迎消息给新好友
@@ -384,7 +381,7 @@ function connectChat(token: string, accountId: Id) {
                 targetClientId: Number(accepterId),
                 content: welcomeText,
                 timestamp: Date.now(),
-                messageId: 'local_' + Date.now()
+                messageId: 'local_' + globalThis.crypto.randomUUID()
               }
             })
           } catch (e) {
@@ -400,6 +397,7 @@ function connectChat(token: string, accountId: Id) {
 
 /** 清除本地登录状态 */
 function clearAuth() {
+  clearAgentStreams()
   stopFriendRequestPolling()
   chatSocket.close()
   sidebarTab.value = 'messages'
@@ -448,6 +446,7 @@ function persistTokens(accessToken: string, refreshToken: string) {
 
 /** 获取当前用户信息并标记登录有效 */
 async function initUserSession(accessToken: string, refreshToken: string) {
+  clearAgentStreams()
   sessionEpoch.renew()
   chatSocket.close()
   stopFriendRequestPolling()
@@ -464,26 +463,18 @@ async function initUserSession(accessToken: string, refreshToken: string) {
   store.setLoginValid(true)
   persistTokens(store.state.token, store.state.refreshToken)
   localStorage.setItem('charroom_accountId', owner)
-  const cached = store.loadCachedUsers()
-  if (cached.length) store.mergeUsers(cached)
 
   // Each task owns its post-await checks. Contacts/groups must not delay history or transport.
   void bootstrapSession(() => connectChat(store.state.token, userRes.id), {
-    history: syncAllConversations,
+    history: async ()=>{await store.restoreAppliedCursors();if(isCurrent())await syncAllConversations()},
     contacts: async () => {
-      const friends = await api.getFriends()
-      if (!isCurrent()) return
-      store.mergeUsers(friends || [])
-      store.cacheUsers(friends || [])
-      const ids = (friends || []).map(friend => friend.id).filter(id => id && id !== AGENT_USER_ID)
-      if (!ids.length) return
-      const statuses = await api.getOnlineStatus(ids)
-      if (!isCurrent()) return
-      for (const [id, online] of Object.entries(statuses)) store.updateUserOnlineStatus(id, online)
-    },
-    groups: async () => {
-      const groups = await api.getMyGroups()
-      if (isCurrent()) store.setGroups(groups || [])
+      await refreshContacts()
+      if(!isCurrent())return
+      const ids=store.state.users.map(friend=>friend.id).filter(id=>id&&id!==AGENT_USER_ID)
+      if(!ids.length)return
+      const statuses=await api.getOnlineStatus(ids)
+      if(!isCurrent())return
+      for(const [id,online] of Object.entries(statuses))store.updateUserOnlineStatus(id,online)
     },
     notifications: async () => {
       const notifications = await api.getFriendNotifications()
@@ -493,7 +484,7 @@ async function initUserSession(accessToken: string, refreshToken: string) {
         if (!isCurrent()) return
         if (friend) store.addUser(friend)
       }
-      if (isCurrent()) await api.markFriendNotificationsRead()
+      if (isCurrent()) { invalidateContacts(); await api.markFriendNotificationsRead() }
     }
   }, isCurrent, (name, error) => console.warn('Session initialization task failed:', name, error))
   startFriendRequestPolling()
@@ -526,7 +517,16 @@ function closeSettings() {
 }
 
 // 页面加载时恢复登录状态
+function revalidateContacts() { if(store.state.loginValid)void refreshContacts() }
+function onBusinessResume(){revalidateContacts();void refreshFriendRequests?.()}
+function onDirectoryVisibility() { if(document.visibilityState==='visible')onBusinessResume() }
+let directoryTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
+  window.addEventListener('contacts-changed',invalidateContacts)
+  window.addEventListener('online',onBusinessResume)
+  window.addEventListener('focus',onBusinessResume)
+  document.addEventListener('visibilitychange',onDirectoryVisibility)
+  directoryTimer=setInterval(()=>{if(document.visibilityState==='visible')revalidateContacts()},60000)
   window.addEventListener('resize', handleResize)
 
   // 应用视图锁定文档滚动：保留顶部安全区留白，但页面整体不参与拖拽/橡皮筋
@@ -620,13 +620,16 @@ const handleBeforeUnload = () => {
 // 好友请求轮询定时器
 let friendRequestPollTimer: ReturnType<typeof setInterval> | null = null
 const FRIEND_REQUEST_POLL_INTERVAL = 2 * 60 * 1000 // 2分钟
+let friendRequestPollBusy=false
+let refreshFriendRequests:(()=>Promise<void>)|undefined
 
 /** 启动好友请求轮询 */
 function startFriendRequestPolling() {
   stopFriendRequestPolling()
   const session = sessionEpoch.capture()
-  friendRequestPollTimer = setInterval(async () => {
-    if (!store.state.token || !store.state.loginValid) return
+  refreshFriendRequests = async () => {
+    if (!store.state.token || !store.state.loginValid || document.visibilityState==='hidden' || !navigator.onLine || friendRequestPollBusy) return
+    friendRequestPollBusy=true
     try {
       const requests = await api.getFriendRequests()
       if (!session.isCurrent()) return
@@ -634,12 +637,14 @@ function startFriendRequestPolling() {
       window.dispatchEvent(new CustomEvent('friend-requests-updated', { detail: requests }))
     } catch (e) {
       console.debug('轮询好友请求失败:', e)
-    }
-  }, FRIEND_REQUEST_POLL_INTERVAL)
+    } finally {friendRequestPollBusy=false}
+  }
+  friendRequestPollTimer=setInterval(refreshFriendRequests,FRIEND_REQUEST_POLL_INTERVAL)
 }
 
 /** 停止好友请求轮询 */
 function stopFriendRequestPolling() {
+  refreshFriendRequests=undefined
   if (friendRequestPollTimer) {
     clearInterval(friendRequestPollTimer)
     friendRequestPollTimer = null
@@ -651,6 +656,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearInterval(directoryTimer)
+  window.removeEventListener('contacts-changed',invalidateContacts)
+  window.removeEventListener('online',onBusinessResume)
+  window.removeEventListener('focus',onBusinessResume)
+  document.removeEventListener('visibilitychange',onDirectoryVisibility)
+  clearAgentStreams()
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('beforeunload', handleBeforeUnload)
   stopFriendRequestPolling()
@@ -667,14 +678,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: #f8f9fa;
+  background: var(--bg);
 }
 
 .loading-spinner {
   width: 40px;
   height: 40px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff7a33;
+  border-top: 4px solid var(--action);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -686,14 +697,14 @@ onUnmounted(() => {
 
 .loading-wrap p {
   margin-top: 16px;
-  color: #666;
+  color: var(--muted);
   font-size: 14px;
 }
 
 /* 高度跟随 body 内容盒（已扣掉顶部/底部安全区留白），避免多出可拖拽的溢出区域 */
 .app-wrap{height:100%;display:flex;flex-direction:column}
 .app-main{display:flex;flex:1;min-height:0}
-.sidebar{width:260px;border-right:1px solid rgba(0,0,0,0.04);background:var(--bg)}
+.sidebar{width:300px;flex-shrink:0;border-right:1px solid var(--surface-border);background:var(--bg)}
 .chat{flex:1;display:flex;flex-direction:column;min-width:0}
 
 /* 移动端适配 */
@@ -731,12 +742,13 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     padding: 12px 16px;
-    border-bottom: 1px solid rgba(0,0,0,0.04);
+    border-bottom: 1px solid var(--surface-border);
     background: var(--bg);
   }
 
   .back-btn {
     background: transparent;
+    color:var(--text-primary);
     border: none;
     font-size: 18px;
     padding: 4px 8px;
@@ -855,24 +867,6 @@ onUnmounted(() => {
 
 .logout-btn:hover {
   background: #e04747;
-}
-
-/* 传输层 UI */
-.transport-info label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.transport-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  background: #d1fae5;
-  color: #065f46;
 }
 
 /* 主题设置样式 */

@@ -6,6 +6,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PendingMessageAcksTest {
+    @Test
+    fun acknowledgementWithoutExplicitSuccessDoesNotConfirmSending() {
+        var result: Boolean? = null
+        val pending = PendingMessageAcks({ _, _ -> {} })
+        pending.await("request") { success, _ -> result = success }
+        pending.acknowledge(MessageProtos.AckMessage.newBuilder().setMessageId("request").build(), byteArrayOf())
+        assertEquals(false, result)
+    }
     private class Clock {
         val expirations = mutableListOf<() -> Unit>()
         fun schedule(delay: Long, action: () -> Unit): () -> Unit {

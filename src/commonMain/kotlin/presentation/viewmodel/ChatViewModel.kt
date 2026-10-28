@@ -50,11 +50,9 @@ private val AGENT_ASSISTANT_ID = core.ServerConfig.AGENT_ASSISTANT_ID
 private val logger = KotlinLogging.logger {}
 
 // ── 本地历史写盘 debounce ────────────────────────────────
-// 合并高频写（AI 流式 chunk / 批量消息/状态更新），静默 1s 后一次性全量保存，
-// 避免每条消息都触发 DesktopLocalChatHistoryStore 全量重写历史文件
+// 合并高频消息变更；写入队列仅持有尚未提交的最新修订，成功后释放正文。
 private const val SAVE_HISTORY_DEBOUNCE_MS = 1000L
-private var historyDirty = false
-private var historySaveJob: Job? = null
+
 
 open class ChatViewModel(
     protected val chatRepository: ChatRepository,
@@ -79,7 +77,7 @@ open class ChatViewModel(
     val selectedChatTargetFlow: StateFlow<User?> = chatState.selectedChatTarget
 
     // 会话预览状态Flow（最近消息时间、未读数）
-    val conversationStatesFlow: StateFlow<Map<Int, ConversationPreviewState>> = chatState.conversationStates
+    val conversationStatesFlow: StateFlow<Map<model.ConversationKey, ConversationPreviewState>> = chatState.conversationStates
 
     // 加载更多历史消息的状态Flow
     val isLoadingMoreFlow: StateFlow<Boolean> = chatState.isLoadingMore
@@ -90,6 +88,16 @@ open class ChatViewModel(
             AppLogger.d(" Setting selectedUser: ${value?.id} - ${value?.username}")
             sessionScope.launch {
                 chatState.selectChatTarget(value)
+                val owner=GlobalAppState.currentUserId?.toString() ?: return@launch
+                if(value!=null) {
+                    if(value.isGroup && chatState.groupMessagesFor(value.id).value.isEmpty()) {
+                        val rows=withContext(Dispatchers.IO) { LocalChatHistoryStore.getGroupMessagesPage(owner,value.id,0,50) }
+                        chatState.prependGroupMessages(rows)
+                    } else if(!value.isGroup && chatState.messagesFor(value.id).value.isEmpty()) {
+                        val rows=withContext(Dispatchers.IO) { LocalChatHistoryStore.getPrivateMessagesPage(owner,value.id,0,50) }
+                        chatState.prependMessages(rows)
+                    }
+                }
             }
         }
 
@@ -122,10 +130,9 @@ open class ChatViewModel(
     fun prependMessages(newMessages: List<Message>) {
         sessionScope.launch {
             chatState.prependMessages(newMessages)
+            chatState.queueHistoryChanges(newMessages,emptyList())
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -135,10 +142,9 @@ open class ChatViewModel(
     fun prependGroupMessages(newMessages: List<GroupMessage>) {
         sessionScope.launch {
             chatState.prependGroupMessages(newMessages)
+            chatState.queueHistoryChanges(emptyList(),newMessages)
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -157,7 +163,7 @@ open class ChatViewModel(
             // 收到陌生人的第一条私聊消息时，先补进联系人列表，避免必须重启才能看到
             if (!message.sender && message.senderId != (GlobalAppState.currentUserId ?: -1) && message.senderId != AGENT_ASSISTANT_ID) {
                 val currentUsers = chatState.users.value
-                if (currentUsers.none { it.id == message.senderId }) {
+                if (currentUsers.none { !it.isGroup && it.id == message.senderId }) {
                     val senderUser = runCatching {
                         chatRepository.getUserDetail(message.senderId.toString())
                     }.getOrNull() ?: User(
@@ -171,9 +177,7 @@ open class ChatViewModel(
 
             chatState.addMessage(message)
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -184,22 +188,26 @@ open class ChatViewModel(
         sessionScope.launch {
             chatState.addGroupMessage(message)
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
     /**
      * 更新私聊消息发送状态
      */
+    private fun updateDeliveryState(id: String, state: model.MessageDeliveryState) {
+        sessionScope.launch { chatState.updateDeliveryState(id, state); saveChatHistoryToLocal() }
+    }
+
+    fun confirmMessageId(clientId: String, serverId: String, seq: Long, conversation: String) {
+        sessionScope.launch { chatState.confirmMessageId(clientId, serverId, seq, conversation) }
+    }
+
     fun updateMessageSentStatus(messageId: String, isSent: Boolean) {
         sessionScope.launch {
             chatState.updateMessageSentStatus(messageId, isSent)
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -207,9 +215,12 @@ open class ChatViewModel(
      * 重试发送失败的消息
      */
     fun retryMessage(message: Message) {
+        if (message.deliveryState != model.MessageDeliveryState.FAILED) return
+        val owner = GlobalAppState.currentUserId
+        val sendingSession = sessionJob
         sessionScope.launch {
             val targetId = if (message.sender) message.receiverId else message.senderId
-            val user = chatState.users.value.find { it.id == targetId }
+            val user = chatState.users.value.find { !it.isGroup && it.id == targetId }
             if (user == null) {
                 logger.warn { "retryMessage: 找不到用户 $targetId" }
                 return@launch
@@ -232,16 +243,33 @@ open class ChatViewModel(
                 messageId = messageId
             )
 
+            updateDeliveryState(messageId, model.MessageDeliveryState.SENDING)
             Chat.send(
                 payload = payload,
                 type = MsgType.CHAT,
                 targetClientId = user.id.toString(),
                 expectedResponses = 1
             ) { success, _ ->
-                sessionScope.launch {
+                if (owner == GlobalAppState.currentUserId && sendingSession === sessionJob) sessionScope.launch {
                     updateMessageSentStatus(messageId, success)
                 }
             }
+        }
+    }
+
+    fun retryGroupMessage(message: GroupMessage) {
+        if (message.deliveryState != model.MessageDeliveryState.FAILED) return
+        val owner = GlobalAppState.currentUserId
+        val sendingSession = sessionJob
+        val payload = buildGroupChatPayload(message.groupId.toString(), message.text,
+            replyToMessageId = message.replyToMessageId, replyToContent = message.replyToContent,
+            replyToSender = message.replyToSender, messageType = message.messageType.ordinal,
+            fileUrl = message.fileUrl, fileName = message.fileName, fileSize = message.fileSize,
+            messageId = message.messageId, timestamp = message.timestamp)
+        updateDeliveryState(message.messageId, model.MessageDeliveryState.SENDING)
+        Chat.send(payload, MsgType.GROUP_CHAT, message.groupId.toString(), 1) { success, _ ->
+            if (owner == GlobalAppState.currentUserId && sendingSession === sessionJob)
+                updateGroupMessageSentStatus(message.messageId, success)
         }
     }
 
@@ -252,9 +280,7 @@ open class ChatViewModel(
         sessionScope.launch {
             chatState.updateMessage(updatedMessage)
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -263,38 +289,18 @@ open class ChatViewModel(
      * 1) 首块创建消息
      * 2) 后续块原位更新，不走删除+新增
      */
-    fun upsertAgentStreamMessage(messageId: String, fullContent: String) {
-        sessionScope.launch {
-            val currentUserId = GlobalAppState.currentUserId ?: return@launch
-            val existingMessage = chatState.messages.value.find {
-                it.messageId == messageId && it.senderId == AGENT_ASSISTANT_ID
-            }
-
-            if (existingMessage == null) {
-                val agentMessage = Message(
-                    senderId = AGENT_ASSISTANT_ID,
-                    message = fullContent,
-                    sender = false,
-                    receiverId = currentUserId,
-                    timestamp = System.currentTimeMillis(),
-                    isSent = true,
-                    messageId = messageId
-                )
-                chatState.addMessage(agentMessage)
-            } else {
-                // 追加 chunk 到已有内容（服务端每次只发一个片段）
-                val appended = existingMessage.message + fullContent
-                if (appended != existingMessage.message) {
-                    chatState.updateMessage(existingMessage.copy(message = appended))
-                } else {
-                    return@launch
-                }
-            }
-
-            launch(Dispatchers.IO) {
+    private var streamUpdates:core.ConflatedStreamUpdates?=null
+    private var streamSession:Job?=null
+    fun upsertAgentStreamMessage(messageId:String,fullContent:String,done:Boolean=false,error:Boolean=false) {
+        if(streamSession!==sessionJob) {
+            streamUpdates?.clear();streamSession=sessionJob
+            streamUpdates=core.ConflatedStreamUpdates(sessionScope) { snapshot ->
+                val owner=GlobalAppState.currentUserId ?: return@ConflatedStreamUpdates
+                chatState.applyAgentSnapshot(owner,snapshot)
                 saveChatHistoryToLocal()
             }
         }
+        streamUpdates!!.submit(core.AgentSnapshot(messageId,fullContent,done||error))
     }
 
     /**
@@ -304,9 +310,7 @@ open class ChatViewModel(
         sessionScope.launch {
             chatState.updateGroupMessageSentStatus(messageId, isSent)
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -337,7 +341,7 @@ open class ChatViewModel(
                 val token = GlobalAppState.currentToken
                 if (token != null) {
                     try {
-                        val ids = contacts.map { it.id }.filter { it > 0 && it != AGENT_ASSISTANT_ID }
+                        val ids = contacts.filterNot { it.isGroup }.map { it.id }.filter { it > 0 && it != AGENT_ASSISTANT_ID }
                         if (ids.isNotEmpty()) batchOnlineStatus(token, ids).forEach { (id, online) ->
                             id.toIntOrNull()?.let { chatState.updateUserOnlineStatus(it, online) }
                         }
@@ -404,7 +408,7 @@ open class ChatViewModel(
             if (success) {
                 loadContacts()
                 // 如果当前选中的就是这个好友，取消选中
-                if (_selectedUser.value?.id == friendId) {
+                if (_selectedUser.value?.conversationKey == model.ConversationKey.privateChat(friendId)) {
                     _selectedUser.value = null
                 }
             }
@@ -479,6 +483,7 @@ open class ChatViewModel(
 
             // 分页拉取的离线消息本身就是按时间从旧到新排序的，直接批量前置插入
             chatState.prependMessages(messages.sortedBy { it.timestamp }, markAsUnread = true)
+            chatState.queueHistoryChanges(messages,emptyList())
             AppLogger.d(" 成功拉取离线消息 ${messages.size} 条，页码: $page，批量插入完成")
 
             // 递归拉取下一页
@@ -540,12 +545,11 @@ open class ChatViewModel(
     fun deleteMessage(messageId: String) {
         sessionScope.launch {
             val owner = GlobalAppState.currentUserId ?: return@launch
+            flushLocalHistory()
             chatState.deleteMessage(messageId)
             withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), messageId, false) }
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -555,12 +559,11 @@ open class ChatViewModel(
     fun deleteGroupMessage(messageId: String) {
         sessionScope.launch {
             val owner = GlobalAppState.currentUserId ?: return@launch
+            flushLocalHistory()
             chatState.deleteGroupMessage(messageId)
             withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), messageId, true) }
             // 异步保存到本地存储
-            launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
-            }
+            saveChatHistoryToLocal()
         }
     }
 
@@ -588,6 +591,7 @@ open class ChatViewModel(
         val currentUserId = GlobalAppState.currentUserId
         AppLogger.d(" 准备发送私聊消息，currentUserId: $currentUserId, 接收者: ${user.id}")
 
+        val sendingSession = sessionJob
         val senderId = currentUserId ?: 0 // 0=未知，服务端从连接推导
 
         try {
@@ -601,7 +605,8 @@ open class ChatViewModel(
                 sender = true,
                 receiverId = user.id,
                 timestamp = timestamp,
-                isSent = true, // 先乐观显示为已发送，失败时再回退
+                isSent = false,
+                deliveryState = model.MessageDeliveryState.QUEUED,
                 messageId = messageId,
                 replyToMessageId = replyToMessageId,
                 replyToContent = replyToContent,
@@ -636,28 +641,31 @@ open class ChatViewModel(
                 messageId = messageId
             )
 
+            updateDeliveryState(messageId, model.MessageDeliveryState.SENDING)
             // 通过QUIC发送消息
             Chat.send(
                 payload = payload,
                 type = MsgType.CHAT,
                 targetClientId = user.id.toString(),
                 expectedResponses = 1
-            ) { success, responses ->
+            ) callback@{ success, responses ->
+                if (GlobalAppState.currentUserId != senderId || sessionJob !== sendingSession) return@callback
                 AppLogger.d(" QUIC消息发送结果: $success, messageId: $messageId")
                 sessionScope.launch {
                     if (success) {
                         updateMessageSentStatus(messageId, true)
                         AppLogger.d(" 消息状态已更新，success: $success, messageId: $messageId")
-                        onDone()
                     } else {
-                        onDone()
+                        updateDeliveryState(messageId, model.MessageDeliveryState.QUEUED)
                         delay(1500)
+                        updateDeliveryState(messageId, model.MessageDeliveryState.SENDING)
                         Chat.send(
                             payload = payload,
                             type = MsgType.CHAT,
                             targetClientId = user.id.toString(),
                             expectedResponses = 1
-                        ) { retrySuccess, _ ->
+                        ) retry@{ retrySuccess, _ ->
+                            if (GlobalAppState.currentUserId != senderId || sessionJob !== sendingSession) return@retry
                             sessionScope.launch {
                                 updateMessageSentStatus(messageId, retrySuccess)
                                 AppLogger.d(" 消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
@@ -666,6 +674,7 @@ open class ChatViewModel(
                     }
                 }
             }
+            onDone() // Input submission is complete; server confirmation updates only message state.
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             AppLogger.d(" 发送消息流程异常: ${e.message}")
@@ -699,9 +708,10 @@ open class ChatViewModel(
         val currentUserId = GlobalAppState.currentUserId
         AppLogger.d(" 准备发送群聊消息，currentUserId: $currentUserId, 群组: ${group.id}")
 
+        val sendingSession = sessionJob
         val senderId = currentUserId ?: 0
         val senderName = if (currentUserId != null) {
-            chatState.users.value.find { it.id == currentUserId }?.username ?: "我"
+            chatState.users.value.find { !it.isGroup && it.id == currentUserId }?.username ?: "我"
         } else {
             "我"
         }
@@ -717,7 +727,8 @@ open class ChatViewModel(
                 text = messageText,
                 senderId = senderId,
                 timestamp = timestamp,
-                isSent = true, // 先乐观显示为已发送，失败时再回退
+                isSent = false,
+                deliveryState = model.MessageDeliveryState.QUEUED,
                 messageId = messageId,
                 replyToMessageId = replyToMessageId,
                 replyToContent = replyToContent,
@@ -747,28 +758,31 @@ open class ChatViewModel(
                 timestamp = timestamp
             )
 
+            updateDeliveryState(messageId, model.MessageDeliveryState.SENDING)
             // 通过QUIC发送群聊消息
             Chat.send(
                 payload = payload,
                 type = MsgType.GROUP_CHAT,
                 targetClientId = group.id.toString(),
                 expectedResponses = 1
-            ) { success, responses ->
+            ) callback@{ success, responses ->
+                if (GlobalAppState.currentUserId != senderId || sessionJob !== sendingSession) return@callback
                 AppLogger.d(" QUIC群消息发送结果: $success, messageId: $messageId")
                 sessionScope.launch {
                     if (success) {
                         updateGroupMessageSentStatus(messageId, true)
                         AppLogger.d(" 群消息状态已更新，success: $success, messageId: $messageId")
-                        onDone()
                     } else {
-                        onDone()
+                        updateDeliveryState(messageId, model.MessageDeliveryState.QUEUED)
                         delay(1500)
+                        updateDeliveryState(messageId, model.MessageDeliveryState.SENDING)
                         Chat.send(
                             payload = payload,
                             type = MsgType.GROUP_CHAT,
                             targetClientId = group.id.toString(),
                             expectedResponses = 1
-                        ) { retrySuccess, _ ->
+                        ) retry@{ retrySuccess, _ ->
+                            if (GlobalAppState.currentUserId != senderId || sessionJob !== sendingSession) return@retry
                             sessionScope.launch {
                                 updateGroupMessageSentStatus(messageId, retrySuccess)
                                 AppLogger.d(" 群消息状态已更新，retrySuccess: $retrySuccess, messageId: $messageId")
@@ -777,6 +791,7 @@ open class ChatViewModel(
                     }
                 }
             }
+            onDone() // Input submission is complete; server confirmation updates only message state.
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             AppLogger.d(" 发送群消息流程异常: ${e.message}")
@@ -793,6 +808,9 @@ open class ChatViewModel(
      */
     open fun clear() {
         saveConversationSeqIds()
+        streamUpdates?.clear();streamUpdates=null;streamSession=null
+        historyWriter?.close(); historyWriter = null; historyOwner = null
+        val clearingOwner = GlobalAppState.currentUserId?.toString()
         // 重置内部状态
         isFetchingOfflineMessages = false
         pendingMessages.clear()
@@ -807,9 +825,7 @@ open class ChatViewModel(
         // 清除聊天数据
         sessionScope.launch(Dispatchers.IO) {
             chatState.clear()
-            val userId = GlobalAppState.currentUserId ?: return@launch
-            val accountId = userId.toString()
-            LocalChatHistoryStore.clear(accountId)
+            if (clearingOwner != null) LocalChatHistoryStore.clear(clearingOwner)
         }
     }
 
@@ -828,15 +844,7 @@ open class ChatViewModel(
     private fun saveConversationSeqIds() {
         val userId = GlobalAppState.currentUserId ?: return
         val accountId = userId.toString()
-        try {
-            val seqIds = chatState.conversationSeqIds.value
-            if (seqIds.isEmpty()) return
-            val file = java.io.File(System.getProperty("user.home"), ".qingliao/seqids.enc")
-            file.parentFile?.mkdirs()
-            file.writeBytes(data.datasource.local.CryptoUtil.encrypt(
-                json.encodeToString(seqIds).encodeToByteArray()
-            ))
-        } catch (_: Exception) {}
+        LocalChatHistoryStore.saveConversationSeqIds(accountId, chatState.conversationSeqIds.value)
     }
 
     /**
@@ -845,53 +853,42 @@ open class ChatViewModel(
     private fun loadConversationSeqIds() {
         val userId = GlobalAppState.currentUserId ?: return
         val accountId = userId.toString()
-        try {
-            val file = java.io.File(System.getProperty("user.home"), ".qingliao/seqids.enc")
-            if (!file.exists()) return
-            val decrypted = data.datasource.local.CryptoUtil.decrypt(file.readBytes())
-            val restored: Map<String, Long> = json.decodeFromString(String(decrypted))
-            sessionScope.launch {
-                restored.forEach { (convId, seqId) ->
-                    chatState.updateConversationSeqId(convId, seqId)
-                }
-            }
-        } catch (_: Exception) {}
+        val restored = LocalChatHistoryStore.restoreConversationSeqIds(accountId)
+        val ownerSession = sessionJob
+        sessionScope.launch {
+            if (GlobalAppState.currentUserId != userId || sessionJob !== ownerSession) return@launch
+            restored.forEach { (conversation, seq) -> chatState.updateConversationSeqId(conversation, seq) }
+        }
     }
 
     /**
      * 保存聊天历史到本地（debounce 合并：高频调用只触发一次落盘）。
      * 所有状态访问收敛到 sessionScope(Main) 上，避免 IO 线程并发访问。
      */
+    private data class HistoryBatch(val owner: String, val privateRows: MutableMap<String,Message>, val groupRows: MutableMap<String,GroupMessage>)
+    private var historyWriter: core.HistoryWriteQueue<HistoryBatch>? = null
+    private var historyOwner: String? = null
     private fun saveChatHistoryToLocal() {
         sessionScope.launch {
-            historyDirty = true
-            if (historySaveJob?.isActive == true) return@launch
-            historySaveJob = launch {
-                delay(SAVE_HISTORY_DEBOUNCE_MS)
-                if (historyDirty) {
-                    historyDirty = false
-                    withContext(Dispatchers.IO) {
-                        persistChatHistoryNow()
-                    }
-                }
+            val owner = GlobalAppState.currentUserId?.toString() ?: return@launch
+            if (historyOwner != owner) { historyWriter?.close(); historyWriter = null; historyOwner = owner }
+            if (historyWriter == null) {
+                historyWriter = core.HistoryWriteQueue(sessionScope, SAVE_HISTORY_DEBOUNCE_MS,
+                    merge = { older,newer ->
+                        check(older.owner==newer.owner)
+                        older.apply { privateRows.putAll(newer.privateRows);groupRows.putAll(newer.groupRows) }
+                    },failed={error -> logger.error(error){"Local history persistence failed"}},
+                    persist={batch -> LocalChatHistoryStore.save(batch.owner,batch.privateRows.values.toList(),batch.groupRows.values.toList())})
             }
+            val changed=chatState.drainHistoryChanges()
+            if(changed.privateRows.isNotEmpty()||changed.groupRows.isNotEmpty())
+                historyWriter!!.request(HistoryBatch(owner,changed.privateRows.associateBy { it.messageId }.toMutableMap(),changed.groupRows.associateBy { it.messageId }.toMutableMap()))
         }
     }
 
-    /** 立即全量保存聊天历史（debounce 的底层实现） */
-    private suspend fun persistChatHistoryNow() {
-        val userId = GlobalAppState.currentUserId ?: return
-        val accountId = userId.toString()
-        try {
-            val privateMessages = chatState.messages.value
-            val groupMessages = chatState.groupMessages.value
-            LocalChatHistoryStore.save(accountId, privateMessages, groupMessages)
-//            AppLogger.d(" 聊天历史已保存到本地，私聊消息: ${privateMessages.size}条, 群聊消息: ${groupMessages.size}条")
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            AppLogger.d(" 保存聊天历史到本地失败: ${e.message}")
-            logger.error(e) { "ChatViewModel error" }
-        }
+    suspend fun flushLocalHistory() {
+        val writer = withContext(Dispatchers.Main.immediate) { saveChatHistoryToLocal(); historyWriter }
+        writer?.flush()
     }
 
     /**
@@ -906,8 +903,8 @@ open class ChatViewModel(
                 if (GlobalAppState.currentUserId != userId) return@launch
                 if (history.privateMessages.isNotEmpty() || history.groupMessages.isNotEmpty()) {
                     // 加载到聊天状态
-                    chatState.prependMessages(history.privateMessages, markAsUnread = false)
-                    chatState.prependGroupMessages(history.groupMessages, markAsUnread = false)
+                    chatState.prependMessages(history.privateMessages.map { it.copy(deliveryState = it.deliveryState.afterRestart()) }, markAsUnread = false)
+                    chatState.prependGroupMessages(history.groupMessages.map { it.copy(deliveryState = it.deliveryState.afterRestart()) }, markAsUnread = false)
                     AppLogger.d(" 从本地加载聊天历史，私聊消息: ${history.privateMessages.size}条, 群聊消息: ${history.groupMessages.size}条")
                 }
             } catch (e: Exception) {

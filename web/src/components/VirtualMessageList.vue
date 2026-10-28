@@ -2,7 +2,7 @@
   <div ref="element" class="virtual-message-list" :data-message-count="items.length" @scroll="scrolled">
     <div class="virtual-message-space" :style="{ height: `${layout.total}px` }">
       <div v-for="row in visible" :key="row.key" :ref="node => observe(node, row.key)"
-        class="virtual-message-row" :data-message-key="row.key" :style="{ top: `${layout.offsets[row.index]}px` }">
+        class="virtual-message-row" :data-message-key="row.key" :style="{ top: `${layout.offsetAt(row.index)}px` }">
         <slot :item="row.item" :index="row.index" />
       </div>
     </div>
@@ -13,7 +13,8 @@
 import { computed, ref, shallowRef, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { ChatMessage } from '../types/chat'
-import { virtualLayout } from '../utils/virtualLayout'
+import type {ReadingPosition} from '../services/conversationViews'
+import { IncrementalVirtualLayout } from '../utils/virtualLayout'
 
 const props = defineProps<{ items: readonly ChatMessage[] }>()
 const emit = defineEmits<{ scroll: [event: Event] }>()
@@ -29,17 +30,21 @@ const keys = computed(() => {
     return `${base}:${occurrence}`
   })
 })
-const layout = computed(() => { revision.value; return virtualLayout(keys.value, heights) })
+const heightIndex=new IncrementalVirtualLayout()
+const layout = computed(() => { revision.value; return {
+  total:heightIndex.total,offsetAt:(index:number)=>heightIndex.offsetAt(index),
+  range:(top:number,height:number)=>heightIndex.range(top,height),indexAt:(top:number)=>heightIndex.indexAt(top)
+} })
 const visible = computed(() => {
   const { start, end } = layout.value.range(top.value, viewport.value)
   return props.items.slice(start, end).map((item, offset) => ({ item, index: start + offset, key: keys.value[start + offset] }))
 })
 
 function anchor(oldKeys = keys.value) {
-  const el = element.value, before = virtualLayout(oldKeys, heights)
+  const el = element.value, before = layout.value
   if (!el || !oldKeys.length) return null
   const index = before.indexAt(el.scrollTop)
-  return { key: oldKeys[index], delta: el.scrollTop - before.offsets[index],
+  return { key: oldKeys[index], delta: el.scrollTop - before.offsetAt(index),
     bottom: el.scrollHeight - el.scrollTop - el.clientHeight <= 2 }
 }
 function restore(saved: ReturnType<typeof anchor>, followBottom = false) {
@@ -47,16 +52,18 @@ function restore(saved: ReturnType<typeof anchor>, followBottom = false) {
   if (!el || !saved) return
   const index = keys.value.indexOf(saved.key)
   if (followBottom && saved.bottom) el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
-  else if (index >= 0) el.scrollTop = layout.value.offsets[index] + saved.delta
+  else if (index >= 0) el.scrollTop = layout.value.offsetAt(index) + saved.delta
   top.value = el.scrollTop
 }
 watch(keys, async (next, previous) => {
-  const saved = anchor(previous)
+  if(previous && next.length===previous.length && next.every((key,index)=>key===previous[index]))return
+  const saved = previous ? anchor(previous) : null
+  heightIndex.reset(next,heights);revision.value++
   // Drop height entries from a different conversation/deleted messages.
   const retained = new Set(next)
   for (const key of heights.keys()) if (!retained.has(key)) heights.delete(key)
-  if (previous.length && next[0] !== previous[0]) { await nextTick(); restore(saved) }
-})
+  if (previous?.length && next[0] !== previous[0]) { await nextTick(); restore(saved) }
+},{immediate:true})
 
 let observer: ResizeObserver | undefined, frame = 0, disposed = false
 const changed = new Map<string, number>()
@@ -70,7 +77,7 @@ function measured(entries: ResizeObserverEntry[]) {
   if (changed.size && !frame) frame = requestAnimationFrame(async () => {
     frame = 0
     const saved = anchor()
-    changed.forEach((height, key) => heights.set(key, height)); changed.clear()
+    changed.forEach((height, key) => { heights.set(key, height);heightIndex.update(key,height) }); changed.clear()
     revision.value++
     await nextTick()
     if (!disposed) restore(saved, true)
@@ -97,7 +104,22 @@ onMounted(() => {
   nodes.forEach((_, node) => observer!.observe(node, { box: 'border-box' }))
 })
 onBeforeUnmount(() => { disposed = true; cancelAnimationFrame(frame); observer?.disconnect(); nodes.clear(); changed.clear() })
-defineExpose({ element })
+function captureReading(): ReadingPosition | null {
+  const saved=anchor()
+  if(!saved)return null
+  const index=keys.value.indexOf(saved.key)
+  return {...saved,height:layout.value.offsetAt(index+1)-layout.value.offsetAt(index)}
+}
+async function restoreReading(position:ReadingPosition) {
+  // A tall row's saved offset can exceed the default estimate. Seed its height
+  // before scrolling so the first measurement keeps this row as the anchor.
+  if(position.height && Number.isFinite(position.height) && position.height>0) {
+    heights.set(position.key,position.height);heightIndex.update(position.key,position.height);revision.value++
+  }
+  await nextTick()
+  restore(position,position.bottom)
+}
+defineExpose({ element, captureReading, restoreReading })
 </script>
 
 <style scoped>

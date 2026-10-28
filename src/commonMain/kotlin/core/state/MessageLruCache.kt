@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 class MessageLruCache<T : Any>(
     maxSize: Int,
     private val id: (T) -> String,
-    private val timestamp: (T) -> Long
+    private val timestamp: (T) -> Long,
+    private val changed: (List<T>) -> Unit = {}
 ) {
     /** 当前缓存容量上限（可在前台/后台切换时动态调整，立即触发淘汰） */
     var maxSize: Int = maxSize
@@ -28,13 +29,16 @@ class MessageLruCache<T : Any>(
         }
     // 按时间戳排序的消息
     private val _items = mutableListOf<T>()
+    private val indices = HashMap<String, Int>()
+    private fun reindex() { indices.clear(); _items.forEachIndexed { index, item -> indices[id(item)] = index } }
 
     // 响应式状态：每次变更自动同步
     private val _state = MutableStateFlow<List<T>>(emptyList())
     val state: StateFlow<List<T>> = _state.asStateFlow()
+    val hasSubscribers: Boolean get() = _state.subscriptionCount.value > 0
 
     /** 当前列表快照（供 `ChatState.updateMessage*` 等只读场景使用，不触发 StateFlow 更新） */
-    val snapshot: List<T> get() = _items.toList()
+    val snapshot: List<T> get() = _state.value
     val size: Int get() = _items.size
 
     // LRU 访问顺序追踪器
@@ -50,9 +54,9 @@ class MessageLruCache<T : Any>(
      */
     fun add(message: T) {
         val msgId = id(message)
-        val existingIdx = _items.indexOfFirst { id(it) == msgId }
+        val existingIdx = indices[msgId]
 
-        if (existingIdx >= 0) {
+        if (existingIdx != null) {
             _items[existingIdx] = message
         } else {
             // 找插入位置（二分法：列表已按时间戳有序）
@@ -64,6 +68,7 @@ class MessageLruCache<T : Any>(
                 if (timestamp(_items[mid]) <= ts) lo = mid + 1 else hi = mid
             }
             _items.add(lo, message)
+            reindex()
         }
 
         lru.remove(msgId); lru.add(msgId)
@@ -78,8 +83,7 @@ class MessageLruCache<T : Any>(
      */
     fun prepend(messages: List<T>): List<T> {
         if (messages.isEmpty()) return emptyList()
-        val existingIds = _items.map { id(it) }.toSet()
-        val toAdd = messages.filter { id(it) !in existingIds }
+        val toAdd = messages.distinctBy(id).filter { id(it) !in indices }
         if (toAdd.isEmpty()) return emptyList()
 
         // 两个列表都已按时间戳有序 → 归并合并 O(n+m)
@@ -96,6 +100,7 @@ class MessageLruCache<T : Any>(
         while (j < _items.size) merged.add(_items[j++])
 
         _items.clear(); _items.addAll(merged)
+        reindex()
         toAdd.forEach { lru.remove(id(it)); lru.add(id(it)) }
         evictAndEmit()
 
@@ -118,9 +123,9 @@ class MessageLruCache<T : Any>(
      * 删除指定消息。
      */
     fun remove(messageId: String): Boolean {
-        val idx = _items.indexOfFirst { id(it) == messageId }
-        if (idx < 0) return false
+        val idx = indices[messageId] ?: return false
         _items.removeAt(idx)
+        reindex()
         lru.remove(messageId)
         emit()
         return true
@@ -131,6 +136,7 @@ class MessageLruCache<T : Any>(
      */
     fun clear() {
         _items.clear()
+        indices.clear()
         lru.clear()
         emit()
     }
@@ -141,9 +147,8 @@ class MessageLruCache<T : Any>(
     private fun emit() {
         val newList = _items.toList()
         // 仅在内容变化时发射新列表，避免 Compose 不必要的重组
-        if (_state.value != newList) {
-            _state.value = newList
-        }
+        _state.value = newList // StateFlow itself performs structural equality suppression.
+        changed(newList)
     }
 
     /**
@@ -155,6 +160,7 @@ class MessageLruCache<T : Any>(
         if (_items.size <= maxSize) { emit(); return }
         val keep = lru.toList().takeLast(maxSize).toSet()
         _items.removeAll { id(it) !in keep }
+        reindex()
         lru.retainAll(keep)
         emit()
     }

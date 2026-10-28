@@ -30,7 +30,7 @@ fun ForwardSelectDialog(
     onForward: (User) -> Unit
 ) {
     val s = LocalStrings.current
-    val userList by remember(users) { mutableStateOf(users.filter { it.id > 0 }) }
+    val userList by remember(users) { mutableStateOf(users.filter { !it.isGroup && it.id > 0 }) }
     var selectedUser by remember { mutableStateOf<User?>(null) }
 
     ModernDialog(onDismissRequest = onDismiss) {

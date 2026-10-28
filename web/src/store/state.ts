@@ -5,6 +5,7 @@ export const STORAGE_PREFIX = 'charroom_chat_history_'
 export const PAGE_SIZE = 50
 
 export const state = reactive<ChatState>({
+  directoryPhase: 'loading', historyHasNewer:false,historyFollowingLatest:true,historyLoading: false, historyError: false, historySyncing: false, historySyncError: false,
   users: [],
   groups: [],
   messages: [],

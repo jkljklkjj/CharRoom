@@ -3,6 +3,81 @@ const assert = require('node:assert/strict')
 const path = require('node:path')
 const { IDBFactory, IDBKeyRange } = require('fake-indexeddb')
 const { loadTs } = require('./helpers.cjs')
+
+test('clearing a conversation cannot delete the preview of a concurrently arriving message', async () => {
+  const { IDBDatabase } = require('fake-indexeddb')
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
+    indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
+  })
+  await db.appendMessage('A', '41', { user: '41', text: 'old', messageId: 'old', time: 1000 })
+  const original = IDBDatabase.prototype.transaction
+  let injected = false, arrival
+  IDBDatabase.prototype.transaction = function (...args) {
+    const tx = original.apply(this, args)
+    if (!injected && args[1] === 'readwrite') {
+      injected = true
+      // Enqueue the next delivery as soon as the clear's first transaction commits.
+      tx.addEventListener('complete', () => {
+        arrival = db.appendMessage('A', '41', { user: '41', text: 'new', messageId: 'new', time: 2000 })
+      }, { once: true })
+    }
+    return tx
+  }
+  try { await db.clearConversation('A', '41'); await arrival }
+  finally { IDBDatabase.prototype.transaction = original }
+  assert.deepEqual(Array.from(await db.getMessages('A', '41'), m => m.messageId), ['new'])
+  assert.equal((await db.getConversationMeta('A', '41'))?.lastMessagePreview, 'new')
+})
+
+test('aborting conversation cleanup rolls back both history and preview', async () => {
+  const { IDBObjectStore } = require('fake-indexeddb')
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
+    indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
+  })
+  await db.appendMessage('A', '41', { user: '41', text: 'keep', messageId: 'keep', time: 1000 })
+  const original = IDBObjectStore.prototype.delete
+  IDBObjectStore.prototype.delete = function (...args) {
+    const request = original.apply(this, args)
+    if (this.name === 'conversation_meta') this.transaction.abort()
+    return request
+  }
+  try { await assert.rejects(db.clearConversation('A', '41')) }
+  finally { IDBObjectStore.prototype.delete = original }
+  assert.deepEqual(Array.from(await db.getMessages('A', '41'), m => m.messageId), ['keep'])
+  assert.equal((await db.getConversationMeta('A', '41')).lastMessagePreview, 'keep')
+})
+
+test('single message deletion uses its exact index without scanning or decoding the conversation', async () => {
+  const { IDBIndex } = require('fake-indexeddb')
+  const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
+    indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
+  })
+  const rows = Array.from({ length: 1000 }, (_, i) => ({ user: '41', text: `body-${i}`, messageId: `m${i}`, time: i }))
+  await db.saveMessages('A', '41', rows)
+  await db.appendMessage('B', '41', rows[500])
+  await db.appendMessage('A', 'group:41', rows[500])
+  // The ID index is intentionally non-unique; remove all exact matches, including duplicates.
+  await db.saveMessage('A', '41', rows[500], 1000)
+  let decodedCursors = 0, keyCursors = 0
+  const original = { openCursor: IDBIndex.prototype.openCursor, openKeyCursor: IDBIndex.prototype.openKeyCursor }
+  IDBIndex.prototype.openCursor = function (...args) { decodedCursors++; return original.openCursor.apply(this, args) }
+  IDBIndex.prototype.openKeyCursor = function (...args) {
+    assert.equal(this.name, 'account_conversation_message_id')
+    keyCursors++
+    return original.openKeyCursor.apply(this, args)
+  }
+  try {
+    await db.deleteMessage('A', '41', 'm500')
+    await db.deleteMessage('A', '41', 'missing')
+    assert.equal(decodedCursors, 0)
+    assert.equal(keyCursors, 2)
+  } finally { Object.assign(IDBIndex.prototype, original) }
+  const remaining = await db.getMessages('A', '41')
+  assert.equal(remaining.length, 999)
+  assert.ok(remaining.every(row => row.messageId !== 'm500'))
+  assert.equal((await db.getMessages('B', '41')).length, 1)
+  assert.equal((await db.getMessages('A', 'group:41')).length, 1)
+})
 test('IndexedDB pagination preserves numeric order, deletion and account isolation', async () => {
   const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
     indexedDB: new IDBFactory(), IDBKeyRange, structuredClone
@@ -14,6 +89,9 @@ test('IndexedDB pagination preserves numeric order, deletion and account isolati
   const latest = await db.getMessagesPage('A', '41', null, 5)
   assert.deepEqual(Array.from(latest.messages, m => m.text), ['7', '8', '9', '10', '11'])
   assert.equal(latest.hasMore, true)
+  const boundary=await db.getMessageCursor('A','41','m7')
+  assert.ok(boundary)
+  assert.deepEqual(Array.from((await db.getMessagesPage('A','41',boundary,10)).messages,m=>m.text),['0','1','2','3','4','5','6'])
   const older = await db.getMessagesPage('A', '41', latest.beforeIndex, 10)
   assert.deepEqual(Array.from(older.messages, m => m.text), ['0', '1', '2', '3', '4', '5', '6'])
   assert.equal(older.hasMore, false)
@@ -33,7 +111,7 @@ test('bulk replacement survives refresh without erasing its new rows', async () 
   await db.saveMessages('A', '41', [{ user: 'you', text: 'new' }, { user: '41', text: 'reply' }])
   assert.deepEqual(Array.from(await db.getMessages('A', '41'), m => m.text), ['new', 'reply'])
 })
-test('version 1 numeric account keys migrate without losing existing history', async () => {
+test('obsolete numeric-account rows are not imported', async () => {
   const indexedDB = new IDBFactory()
   await new Promise((resolve, reject) => {
     const request = indexedDB.open('charroom_messages', 1)
@@ -48,7 +126,7 @@ test('version 1 numeric account keys migrate without losing existing history', a
     request.onsuccess = () => { request.result.close(); resolve() }
   })
   const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), { indexedDB, IDBKeyRange, structuredClone })
-  assert.deepEqual(Array.from(await db.getMessages('1', '41'), m => m.text), ['legacy history'])
+  assert.deepEqual(Array.from(await db.getMessages('1', '41'), m => m.text), [])
 })
 test('conversation meta tracks last message time and clears with conversation', async () => {
   const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), {
@@ -94,7 +172,7 @@ test('conversation meta keeps the newest message preview and supports backfill',
   assert.equal((await db.getConversationMeta('A', '41')).lastMessagePreview, '在的 刚忙完')
   assert.equal((await db.getConversationMeta('B', '41')).lastMessagePreview, '另一个账号')
 })
-test('legacy branch v3 schema (accountId_conversationId_index) upgrades to the ordered index', async () => {
+test('obsolete branch rows are ignored and current appends remain queryable', async () => {
   // 旧本地分支曾用 version 3 + 'accountId_conversationId_index' 索引名，
   // 与当前代码同版本号但 schema 不同——upgrade 不会触发，必须靠版本提升修复
   const indexedDB = new IDBFactory()
@@ -114,12 +192,12 @@ test('legacy branch v3 schema (accountId_conversationId_index) upgrades to the o
     request.onsuccess = () => { request.result.close(); resolve() }
   })
   const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), { indexedDB, IDBKeyRange, structuredClone })
-  // 旧数据可读
-  assert.deepEqual(Array.from(await db.getMessages('A', '41'), m => m.text), ['legacy branch row'])
+  // 不导入旧格式记录
+  assert.deepEqual(Array.from(await db.getMessages('A', '41'), m => m.text), [])
   // 排序索引/追加/分页可用（此前抛 NotFoundError: The specified index was not found）
   await db.appendMessage('A', '41', { user: 'you', text: 'appended', time: 1000 })
   const page = await db.getMessagesPage('A', '41', null, 10)
-  assert.deepEqual(Array.from(page.messages, m => m.text), ['legacy branch row', 'appended'])
+  assert.deepEqual(Array.from(page.messages, m => m.text), ['appended'])
   assert.equal((await db.getConversationMeta('A', '41')).lastIncomingMessageTime, 1000)
 })
 
@@ -164,7 +242,7 @@ test('history insertion leaves existing pagination cursors stable and only write
   assert.deepEqual(Array.from(older.messages, row => row.messageId), ['10', '30'])
 })
 
-test('version 5 history upgrades to timestamp/ID order without changing account ownership or send status', async () => {
+test('rows without current sort keys are not imported into current history', async () => {
   const indexedDB = new IDBFactory()
   await new Promise((resolve, reject) => {
     const request = indexedDB.open('charroom_messages', 5)
@@ -180,7 +258,7 @@ test('version 5 history upgrades to timestamp/ID order without changing account 
   })
   const { exports: db } = await loadTs(path.resolve(__dirname, '../src/utils/messageDB.ts'), { indexedDB, IDBKeyRange, structuredClone })
   const rows = await db.getMessages('A', '41')
-  assert.deepEqual(Array.from(rows, row => row.messageId), ['9007199254740993', '9007199254740994', '9007199254740995'])
+  assert.deepEqual(Array.from(rows, row => row.messageId), [])
   assert.ok(rows.every(row => row.isSent === 'failed'))
   assert.equal((await db.getMessages('B', '41')).length, 0)
 })

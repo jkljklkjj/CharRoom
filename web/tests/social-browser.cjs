@@ -15,7 +15,12 @@ function roomView(id,after=0) {
   return {state:room.state,roomId:room.id,serverTime:Date.now(),endsAt:room.endsAt,question:'如果今天多出一小时，你会做什么？',mySlot:id===room.users[0]?'A':'B',myReady:room.ready.has(id),extendRequested:room.extend.has(id),extensions:room.extensions,exchangeRequested:room.exchange.has(id),exchanged,messages:room.messages.filter(message=>message.seq>after),reason:room.reason||'',...(exchanged?{peer:publicProfile(other,id)}:{})}
 }
 function api(url,method,body,id) {
+  if(url.pathname==='/api/cluster/owner')return {ownerGatewayId:'fixture',ownerEndpoint:'',gateways:[{gatewayId:'fixture'}]}
   if(url.pathname==='/api/auth/validate')return {valid:true}
+  if(url.pathname==='/api/contacts/snapshot') {
+    const friends=accounts.filter(other=>friendships.has([id,other].sort().join(':'))),version=friends.join(',')||'empty'
+    return url.searchParams.get('version')===version?{version,unchanged:true}:{version,unchanged:false,users:friends.map(other=>({id:other,username:profiles.get(other).username})),groups:[]}
+  }
   if(url.pathname==='/api/users/me')return {id,username:'Fixture '+id}
   if(url.pathname==='/api/users/online-status')return {}
   if(url.pathname==='/api/social/discovery')return {users:accounts.filter(other=>other!==id).map(other=>({...publicProfile(other,id),reason:'INTEREST'})),nextCursor:null}
@@ -90,6 +95,30 @@ async function main(){
       await page.goto(origin+'/app');await page.waitForSelector('[aria-label="发现与遇见"]');await page.click('[aria-label="发现与遇见"]');await page.waitForSelector('.social-person');pages.push(page)
     }
     const [a,b]=pages
+    // Close/reopen keeps the applied filter, loaded page and reading position.
+    await a.type('.social-search-row input','Fixture')
+    await click(a,'.social-search-row button','搜索')
+    await a.waitForFunction(()=>!document.querySelector('.social-main button.save-btn')?.disabled)
+    const compact=await a.addStyleTag({content:'.social-hub{height:440px!important}'})
+    await a.$eval('.social-main',element=>{element.scrollTop=60})
+    const reading=await a.$eval('.social-main',element=>element.scrollTop)
+    assert.ok(reading>0)
+    const directoryReads=requests.filter(url=>url==='/api/social/discovery').length
+    await a.click('.social-hub .close-settings');await a.waitForFunction(()=>!document.querySelector('.social-hub'))
+    delays.set('/api/social/discovery',1500)
+    await a.click('button.discovery-entry');await a.waitForSelector('.social-person')
+    assert.equal(requests.filter(url=>url==='/api/social/discovery').length,directoryReads,'fresh discovery snapshot survives modal unmount')
+    assert.equal(await a.$eval('.social-search-row input',element=>element.value),'Fixture')
+    await a.waitForFunction(reading=>Math.abs(document.querySelector('.social-main').scrollTop-reading)<2,{},reading)
+    await compact.evaluate(element=>element.remove());delays.delete('/api/social/discovery')
+    if(process.env.SOCIAL_SCREENSHOT_DIR){
+      fs.mkdirSync(process.env.SOCIAL_SCREENSHOT_DIR,{recursive:true})
+      for(const theme of ['light','dark']){
+        await a.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme)
+        await a.screenshot({path:path.join(process.env.SOCIAL_SCREENSHOT_DIR,`discovery-${theme}.png`)})
+      }
+      await a.evaluate(()=>document.documentElement.setAttribute('data-theme','light'))
+    }
     // A delayed target must not replace the current page with a different loading layout.
     delays.set('/api/social/daily',650)
     await click(a,'.social-nav button','今日一问')
@@ -101,6 +130,21 @@ async function main(){
     await click(a,'.social-nav button','今日一问')
     await a.waitForFunction(()=>document.querySelector('.social-nav [aria-pressed="true"]')?.textContent==='今日一问')
     assert.equal(requests.filter(url=>url==='/api/social/daily').length,dailyReads,'fresh page snapshot avoids a duplicate read')
+    await a.type('.social-main textarea','尚未发布的本地草稿')
+    await click(a,'.social-nav button','找人');await click(a,'.social-nav button','今日一问')
+    assert.equal(await a.$eval('.social-main textarea',element=>element.value),'尚未发布的本地草稿')
+    await a.click('.social-hub .close-settings');await a.waitForFunction(()=>!document.querySelector('.social-hub'))
+    await a.reload();await a.waitForSelector('button.discovery-entry');await a.click('button.discovery-entry')
+    await click(a,'.social-nav button','今日一问');await a.waitForSelector('.social-main textarea')
+    assert.equal(await a.$eval('.social-main textarea',element=>element.value),'尚未发布的本地草稿','a browser reload restores only this account/day draft')
+    await a.$eval('.social-main textarea',element=>{element.value='刷新前最后一笔';element.dispatchEvent(new Event('input',{bubbles:true}))})
+    await a.reload();await a.waitForSelector('button.discovery-entry');await a.click('button.discovery-entry')
+    await click(a,'.social-nav button','今日一问');await a.waitForSelector('.social-main textarea')
+    assert.equal(await a.$eval('.social-main textarea',element=>element.value),'刷新前最后一笔','pagehide flushes edits made before the debounce deadline')
+    await click(b,'.social-nav button','今日一问');await b.waitForSelector('.social-main textarea')
+    assert.equal(await b.$eval('.social-main textarea',element=>element.value),'','the other account cannot see the draft')
+    await click(b,'.social-nav button','找人')
+    await a.$eval('.social-main textarea',element=>{element.value='';element.dispatchEvent(new Event('input',{bubbles:true}))})
     await click(a,'.social-nav button','找人');await a.waitForSelector('.social-person')
     delays.set('/api/social/profiles/91001',650)
     await click(a,'.social-nav button','我的名片');await click(a,'.social-nav button','找人')
@@ -138,6 +182,13 @@ async function main(){
     await a.$eval('.social-profile-editor input',input=>{input.value='Unsaved fixture';input.dispatchEvent(new Event('input',{bubbles:true}))})
     await click(a,'.social-profile-editor button','取消');await a.waitForSelector('.social-profile-card')
     assert.equal(await text(a,'.social-profile-card h2'),'Fixture 91001')
+    await click(a,'.social-nav button','找人')
+    delays.set('/api/social/profiles/91001',1500)
+    await click(a,'.social-nav button','我的名片');await a.waitForSelector('.social-profile-card',{timeout:1000})
+    assert.equal(await text(a,'.social-profile-card h2'),'Fixture 91001','own cached profile is visible while the network is delayed')
+    assert.equal(await a.$eval('.social-profile-primary button',element=>element.disabled),true,'cached settings wait for authoritative refresh before editing')
+    await a.waitForFunction(()=>document.querySelector('.social-profile-primary button')?.textContent==='编辑资料'&&!document.querySelector('.social-profile-primary button')?.disabled)
+    delays.delete('/api/social/profiles/91001')
     await click(a,'.social-profile-primary button','编辑资料');await a.waitForSelector('.social-profile-editor')
     await a.$$eval('.social-profile-editor select',selects=>{selects[1].value='FRIENDS';selects[1].dispatchEvent(new Event('change',{bubbles:true}))})
     // Simulate a short visible viewport with a focused field near the bottom of a long editor.
@@ -184,8 +235,13 @@ async function main(){
     for(let tries=0;room.extensions!==1&&tries<100;tries++)await new Promise(resolve=>setTimeout(resolve,20))
     assert.equal(room.extensions,1)
     await click(b,'.social-room button','结束并离开');await a.waitForFunction(()=>document.querySelector('.social-room')?.textContent.includes('本次相遇已结束'))
-    await click(a,'.social-nav button','今日一问');await a.waitForSelector('.social-main textarea');await a.type('.social-main textarea','<img src=x onerror=alert(1)> 只是文字');await click(a,'.social-main button','保存回答（留空可删除）')
+    await click(a,'.social-nav button','今日一问');await a.waitForSelector('.social-main textarea');await a.type('.social-main textarea','<img src=x onerror=alert(1)> 只是文字')
+    delays.set('/api/social/daily',650)
+    await click(a,'.social-main button','保存回答（留空可删除）')
+    await a.$eval('.social-main textarea',element=>{element.value='发布期间继续写的新草稿';element.dispatchEvent(new Event('input',{bubbles:true}))})
     await a.waitForFunction(()=>document.querySelector('.social-answer')?.textContent.includes('<img'))
+    assert.equal(await a.$eval('.social-main textarea',element=>element.value),'发布期间继续写的新草稿','publishing an older revision does not erase new edits')
+    delays.delete('/api/social/daily')
     assert.equal(await a.$('.social-answer img'),null)
     await click(a,'.social-nav button','我的名片');await click(a,'.social-profile button','编辑资料');await a.waitForSelector('.social-profile form')
     const editInputs=await a.$$('.social-profile form input');await editInputs[0].click({clickCount:3});await editInputs[0].type('Updated fixture')
@@ -230,7 +286,7 @@ async function main(){
     assert.equal(await a.evaluate(()=>document.body.style.overflow),'')
     assert.equal(await a.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'发现与遇见','dialog restores trigger focus')
     assert.deepEqual(errors,[])
-    console.log('PASS: two accounts, discovery/profile/request, random room readiness, lost-ACK retry, exchange, extension, leave, daily text escaping, edit/cancel/privacy preview, block/unblock/report/chat, keyboard viewport bounds, pure name cards, dark/mobile layout.')
+    console.log('PASS: two accounts, social permissions/encounter lifecycle, cache across modal remounts, filters/reading position, account-owned drafts after reload, publication/edit race, cached own profile with verified editing, keyboard/dark/mobile layout.')
   } finally {await browser.close();await new Promise(resolve=>server.close(resolve))}
 }
 main().catch(failure=>{console.error(failure);server.close();process.exitCode=1})

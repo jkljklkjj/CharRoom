@@ -25,7 +25,7 @@
         </div>
       </article>
       <div class="social-profile-tools">
-        <p v-if="error" class="social-error" role="alert">{{ error }}</p>
+        <p v-if="error" class="social-error" role="alert">{{ error }} <button v-if="isOwn && !editing" class="cancel-btn" @click="retryKey++">{{ t('polish.retry') }}</button></p>
         <p v-if="notice" class="social-notice" role="status">{{ notice }}</p>
         <h2 v-if="editing">{{ t('social.edit') }}</h2>
         <form v-if="editing" @submit.prevent="save" class="social-form social-profile-editor">
@@ -46,7 +46,7 @@
         </form>
         <template v-else>
           <div class="social-actions social-profile-primary">
-            <button v-if="profile.relation === 'SELF'" class="save-btn" :disabled="busy || !profile.settings" @click="edit">{{ t('social.edit') }}</button>
+            <button v-if="profile.relation === 'SELF'" class="save-btn" :disabled="busy || refreshing || !verified || !profile.settings" @click="edit">{{ t(refreshing ? 'sync.refreshing' : 'social.edit') }}</button>
             <button v-else-if="profile.relation === 'FRIEND'" class="save-btn" :disabled="busy" @click="emit('chat', profile)">{{ t('social.chat') }}</button>
             <button v-else class="save-btn" :disabled="busy || profile.relation === 'PENDING'" :aria-expanded="requesting" @click="requesting = !requesting">{{ t(profile.relation === 'PENDING' ? 'social.pending' : 'social.add') }}</button>
           </div>
@@ -76,14 +76,15 @@ import { getSocialProfile, saveSocialProfile, sendSocialFriendRequest, blockSoci
 import { useStore } from '../store'
 import { loadOwnProfileCache, saveOwnProfileCache } from '../utils/socialProfileCache'
 import type { SocialProfile, SocialEdit } from '../types/social'
-const props = defineProps<{ userId: string; initialProfile?: SocialProfile | null; initialBlocked?: Array<{ id: number; username: string }> }>()
+import {sessionEpoch} from '../services/sessionEpoch'
+const props = defineProps<{ userId: string; initialProfile?: SocialProfile | null; refreshInitial?:boolean; initialBlocked?: Array<{ id: number; username: string }> }>()
 const emit = defineEmits<{ chat: [profile: SocialProfile]; saved: [profile: SocialProfile]; blocked: [id: string]; changed: [] }>()
 const { t } = useI18n()
 const store = useStore()
 /** 是否在看自己的名片（只有本人资料走本地缓存） */
 const isOwn = computed(() => String(store.state.accountId) === String(props.userId))
 const profile = ref<SocialProfile | null>(null), error = ref(''), busy = ref(false), editing = ref(false)
-const notice = ref('')
+const notice = ref(''),refreshing=ref(false),verified=ref(false)
 const profileRoot = ref<HTMLElement | null>(null)
 const retryKey = ref(0)
 const blocked = ref<Array<{ id: number; username: string }>>([])
@@ -103,19 +104,29 @@ const detailsVisible = computed(() => {
   if (profile.value.relation !== 'SELF' || audience.value === 'self') return profile.value.detailsVisible
   return profile.value.settings?.visibility === 'PUBLIC' || (audience.value === 'friend' && profile.value.settings?.visibility === 'FRIENDS')
 })
-watch(() => `${props.userId}:${retryKey.value}`, async () => {
-  const id = props.userId
-  const current = ++generation
-  notice.value = ''
-  controller.abort(); controller = new AbortController(); profile.value = null; error.value = ''; busy.value = false; blocked.value = []; reason.value = ''; reportReason.value = ''; editing.value = false; requesting.value = false; reporting.value = false; audience.value = 'self'
-  if (retryKey.value === 0 && props.initialProfile?.id === id) { profile.value = props.initialProfile; blocked.value = props.initialBlocked || []; return }
-  // 本人名片：先渲染本地缓存，接口返回后再覆盖（失败时缓存仍可见）
-  if (isOwn.value) {
-    const cached = loadOwnProfileCache(store.state.accountId)
-    if (cached) profile.value = cached
+watch(() => `${store.state.accountId}:${props.userId}:${retryKey.value}`, async () => {
+  const id=props.userId,owner=String(store.state.accountId),session=sessionEpoch.capture(),current=++generation
+  controller.abort();controller=new AbortController()
+  const signal=controller.signal
+  const active=()=>current===generation&&session.isCurrent()&&owner===String(store.state.accountId)&&!signal.aborted
+  notice.value='';profile.value=null;error.value='';busy.value=false;blocked.value=[]
+  reason.value='';reportReason.value='';editing.value=false;requesting.value=false;reporting.value=false;audience.value='self'
+  verified.value=false;refreshing.value=false
+  if(retryKey.value===0&&props.initialProfile?.id===id){
+    profile.value=props.initialProfile;blocked.value=props.initialBlocked||[]
+    if(!props.refreshInitial){verified.value=true;if(isOwn.value)saveOwnProfileCache(owner,props.initialProfile);return}
   }
-  try { const next = await getSocialProfile(id, controller.signal); if (current === generation) { profile.value = next; blocked.value = []; if (next.relation === 'SELF') { saveOwnProfileCache(store.state.accountId, next); const users = await getBlockedUsers(); if (current === generation) blocked.value = users } } }
-  catch (failure) { if (current === generation && !controller.signal.aborted) error.value = (failure as Error).message }
+  if(isOwn.value&&!profile.value)profile.value=loadOwnProfileCache(owner)
+  refreshing.value=true
+  const [next,users]=await Promise.allSettled([getSocialProfile(id,signal),isOwn.value?getBlockedUsers(signal):Promise.resolve([])])
+  if(!active())return
+  if(next.status==='fulfilled'){
+    profile.value=next.value;verified.value=true
+    if(next.value.relation==='SELF')saveOwnProfileCache(owner,next.value)
+  }else error.value=String(next.reason instanceof Error?next.reason.message:next.reason)
+  if(users.status==='fulfilled')blocked.value=users.value
+  else error.value=String(users.reason instanceof Error?users.reason.message:users.reason)
+  refreshing.value=false
 }, { immediate: true })
 onBeforeUnmount(() => { generation++; controller.abort() })
 function edit() {

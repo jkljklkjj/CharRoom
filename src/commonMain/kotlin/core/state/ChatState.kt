@@ -7,10 +7,13 @@ import kotlinx.coroutines.sync.withLock
 import model.GroupMessage
 import model.Message
 import model.User
+import model.ConversationKey
 
 data class ConversationPreviewState(
     val lastIncomingMessageTime: Long = 0L,
-    val unreadCount: Int = 0
+    val unreadCount: Int = 0,
+    val previewText: String = "", val previewTimestamp: Long = 0,
+    val previewSender: String = "", val previewOwn: Boolean = false, val previewMessageId: String = ""
 )
 
 /**
@@ -50,8 +53,8 @@ class ChatState {
     val selectedChatTarget: StateFlow<User?> = _selectedChatTarget.asStateFlow()
 
     // 会话预览状态（最近消息时间、未读数）
-    private val _conversationStates = MutableStateFlow<Map<Int, ConversationPreviewState>>(emptyMap())
-    val conversationStates: StateFlow<Map<Int, ConversationPreviewState>> = _conversationStates.asStateFlow()
+    private val _conversationStates = MutableStateFlow<Map<ConversationKey, ConversationPreviewState>>(emptyMap())
+    val conversationStates: StateFlow<Map<ConversationKey, ConversationPreviewState>> = _conversationStates.asStateFlow()
 
     // 每个会话的 seqId 跟踪（用于消息去重和顺序保证）
     private val _conversationSeqIds = MutableStateFlow<Map<String, Long>>(emptyMap())
@@ -61,17 +64,62 @@ class ChatState {
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
-    /** 获取或创建指定会话的私聊消息缓存桶。 */
-    private fun getOrCreatePrivateCache(userId: Int): MessageLruCache<Message> {
-        return _privateMessageCaches.getOrPut(userId) {
-            MessageLruCache(MAX_MESSAGES, id = { it.messageId }, timestamp = { it.timestamp })
-        }
+    private val cacheBudget=ConversationCacheBudget()
+    private val bucketLock=Any()
+    private val previewLock=Any()
+    private val dirtyLock=Any()
+    private val dirtyPrivate=linkedMapOf<String,Message>()
+    private val dirtyGroups=linkedMapOf<String,GroupMessage>()
+    data class HistoryChanges(val privateRows:List<Message>,val groupRows:List<GroupMessage>)
+    fun queueHistoryChanges(privateRows:List<Message>,groupRows:List<GroupMessage>)=synchronized(dirtyLock) {
+        privateRows.forEach { dirtyPrivate[it.messageId]=it };groupRows.forEach { dirtyGroups[it.messageId]=it }
     }
-
-    private fun getOrCreateGroupCache(groupId: Int): MessageLruCache<GroupMessage> {
-        return _groupMessageCaches.getOrPut(groupId) {
-            MessageLruCache(MAX_MESSAGES, id = { it.messageId }, timestamp = { it.timestamp })
+    fun drainHistoryChanges()=synchronized(dirtyLock) {
+        HistoryChanges(dirtyPrivate.values.toList(),dirtyGroups.values.toList()).also { dirtyPrivate.clear();dirtyGroups.clear() }
+    }
+    private fun findPrivate(predicate:(Message)->Boolean):Message? = _messageCache.snapshot.firstOrNull(predicate)
+        ?: _privateMessageCaches.values.firstNotNullOfOrNull { it.snapshot.firstOrNull(predicate) }
+    private fun findGroup(predicate:(GroupMessage)->Boolean):GroupMessage? = _groupMessageCache.snapshot.firstOrNull(predicate)
+        ?: _groupMessageCaches.values.firstNotNullOfOrNull { it.snapshot.firstOrNull(predicate) }
+    suspend fun applyAgentSnapshot(owner:Int,snapshot:core.AgentSnapshot) {
+        val existing=messagesFor(core.ServerConfig.AGENT_ASSISTANT_ID).value.firstOrNull { it.messageId==snapshot.id }
+        if(existing==null)addMessage(Message(senderId=core.ServerConfig.AGENT_ASSISTANT_ID,receiverId=owner,message=snapshot.text,
+            sender=false,timestamp=System.currentTimeMillis(),isSent=true,messageId=snapshot.id))
+        else if(existing.message!=snapshot.text)updateMessage(existing.copy(message=snapshot.text))
+    }
+    private fun privatePreview(message:Message) = preview(ConversationKey.privateChat(privateConversationId(message)),message.messageId,message.message,message.timestamp,"",message.sender)
+    private fun groupPreview(message:GroupMessage) = preview(ConversationKey.group(message.groupId),message.messageId,message.text,message.timestamp,message.senderName,message.senderId==GlobalAppState.currentUserId)
+    private fun preview(key:ConversationKey,id:String,text:String,time:Long,sender:String,own:Boolean)=synchronized(previewLock) {
+        val previous=_conversationStates.value[key] ?: ConversationPreviewState()
+        if(time<previous.previewTimestamp)return@synchronized
+        val next=previous.copy(previewMessageId=id,previewText=text.replace('\n',' ').take(60),previewTimestamp=time,previewSender=sender.take(80),previewOwn=own)
+        if(next!=previous)_conversationStates.value=_conversationStates.value+(key to next)
+    }
+    private fun putPrivate(message:Message) {
+        synchronized(dirtyLock) { dirtyPrivate[message.messageId]=message }
+        _messageCache.add(message);privatePreview(message)
+    }
+    private fun putGroup(message:GroupMessage) {
+        synchronized(dirtyLock) { dirtyGroups[message.messageId]=message }
+        _groupMessageCache.add(message);groupPreview(message)
+    }
+    private fun getOrCreatePrivateCache(userId:Int):MessageLruCache<Message> = synchronized(bucketLock) {
+        val key=ConversationKey.privateChat(userId)
+        val cache=_privateMessageCaches.getOrPut(userId) {
+            val value=MessageLruCache<Message>(MAX_MESSAGES,{it.messageId},{it.timestamp}, { rows -> cacheBudget.changed(key,rows.size,rows.sumOf { it.message.length.toLong() }) })
+            cacheBudget.register(key,{value.hasSubscribers||_selectedChatTarget.value?.conversationKey==key},{value.clear()})
+            value
         }
+        cacheBudget.touch(key);cache
+    }
+    private fun getOrCreateGroupCache(groupId:Int):MessageLruCache<GroupMessage> = synchronized(bucketLock) {
+        val key=ConversationKey.group(groupId)
+        val cache=_groupMessageCaches.getOrPut(groupId) {
+            val value=MessageLruCache<GroupMessage>(MAX_MESSAGES,{it.messageId},{it.timestamp}, { rows -> cacheBudget.changed(key,rows.size,rows.sumOf { it.text.length.toLong() }) })
+            cacheBudget.register(key,{value.hasSubscribers||_selectedChatTarget.value?.conversationKey==key},{value.clear()})
+            value
+        }
+        cacheBudget.touch(key);cache
     }
 
     /**
@@ -82,24 +130,26 @@ class ChatState {
     }
 
     fun groupMessagesFor(groupId: Int): StateFlow<List<GroupMessage>> {
+        require(groupId > 0) { "Expected the server group ID" }
         return getOrCreateGroupCache(groupId).state
     }
 
     // 按领域拆分锁，减少互斥争用
     private val usersMutex = Mutex()
     private val messagesMutex = Mutex()
-    private val groupMessagesMutex = Mutex()
+    // Eviction can clear another bucket; all message data mutations share one boundary.
+    private val groupMessagesMutex = messagesMutex
     private val conversationStateMutex = Mutex()
     private val seqIdMutex = Mutex()
     private val loadingMutex = Mutex()
     private val clearMutex = Mutex()
 
     private fun updateConversationStateLocked(
-        conversationId: Int,
+        conversationId: ConversationKey,
         lastIncomingMessageTime: Long? = null,
         unreadDelta: Int = 0,
         unreadCount: Int? = null
-    ) {
+    ) = synchronized(previewLock) {
         val currentStates = _conversationStates.value.toMutableMap()
         val previousState = currentStates[conversationId] ?: ConversationPreviewState()
         val updatedState = previousState.copy(
@@ -118,7 +168,7 @@ class ChatState {
     }
 
     private fun groupConversationId(message: GroupMessage): Int {
-        return -message.groupId
+        return message.groupId
     }
 
     /**
@@ -127,11 +177,11 @@ class ChatState {
      */
     private fun recordPrivateConversationHistoryLocked(messages: List<Message>, markAsUnread: Boolean) {
         val currentUserId = GlobalAppState.currentUserId
-        val lastTimeByConversation = mutableMapOf<Int, Long>()
-        val unreadByConversation = mutableMapOf<Int, Int>()
+        val lastTimeByConversation = mutableMapOf<ConversationKey, Long>()
+        val unreadByConversation = mutableMapOf<ConversationKey, Int>()
 
         messages.forEach { message ->
-            val conversationId = privateConversationId(message)
+            val conversationId = ConversationKey.privateChat(privateConversationId(message))
             lastTimeByConversation[conversationId] = maxOf(lastTimeByConversation[conversationId] ?: 0L, message.timestamp)
             if (markAsUnread && !message.sender && message.senderId != currentUserId) {
                 unreadByConversation[conversationId] = (unreadByConversation[conversationId] ?: 0) + 1
@@ -142,11 +192,11 @@ class ChatState {
 
     private fun recordGroupConversationHistoryLocked(messages: List<GroupMessage>, markAsUnread: Boolean) {
         val currentUserId = GlobalAppState.currentUserId
-        val lastTimeByConversation = mutableMapOf<Int, Long>()
-        val unreadByConversation = mutableMapOf<Int, Int>()
+        val lastTimeByConversation = mutableMapOf<ConversationKey, Long>()
+        val unreadByConversation = mutableMapOf<ConversationKey, Int>()
 
         messages.forEach { message ->
-            val conversationId = groupConversationId(message)
+            val conversationId = ConversationKey.group(message.groupId)
             lastTimeByConversation[conversationId] = maxOf(lastTimeByConversation[conversationId] ?: 0L, message.timestamp)
             if (markAsUnread && message.senderId != currentUserId) {
                 unreadByConversation[conversationId] = (unreadByConversation[conversationId] ?: 0) + 1
@@ -157,8 +207,8 @@ class ChatState {
 
     /** 两个 record* 方法的公共尾：将统计结果刷入 _conversationStates。 */
     private fun applyConversationUpdates(
-        lastTimeByConversation: Map<Int, Long>,
-        unreadByConversation: Map<Int, Int>
+        lastTimeByConversation: Map<ConversationKey, Long>,
+        unreadByConversation: Map<ConversationKey, Int>
     ) {
         lastTimeByConversation.forEach { (conversationId, lastTime) ->
             updateConversationStateLocked(conversationId, lastIncomingMessageTime = lastTime)
@@ -210,13 +260,13 @@ class ChatState {
         val currentUsers = _users.value
         if (currentUsers == newUsers) return@withLock
 
-        val incomingById = newUsers.associateBy { it.id }
+        val incomingById = newUsers.associateBy { it.conversationKey }
         val mergedUsers = buildList {
             currentUsers.forEach { existingUser ->
-                incomingById[existingUser.id]?.let { add(it) }
+                incomingById[existingUser.conversationKey]?.let { add(it) }
             }
             newUsers.forEach { incomingUser ->
-                if (currentUsers.none { it.id == incomingUser.id }) {
+                if (currentUsers.none { it.conversationKey == incomingUser.conversationKey }) {
                     add(incomingUser)
                 }
             }
@@ -235,18 +285,18 @@ class ChatState {
     suspend fun mergeUsers(incoming: List<User>) = usersMutex.withLock {
         if (incoming.isEmpty()) return@withLock
         val current = _users.value.toMutableList()
-        val existingMap = current.associateBy { it.id }.toMutableMap()
+        val existingMap = current.associateBy { it.conversationKey }.toMutableMap()
         var changed = false
 
         for (user in incoming) {
-            val existing = existingMap[user.id]
+            val existing = existingMap[user.conversationKey]
             if (existing == null) {
-                existingMap[user.id] = user
+                existingMap[user.conversationKey] = user
                 changed = true
             } else if (existing.online != user.online
                     || existing.username != user.username
                     || existing.avatarUrl != user.avatarUrl) {
-                existingMap[user.id] = user
+                existingMap[user.conversationKey] = user
                 changed = true
             }
         }
@@ -261,7 +311,7 @@ class ChatState {
      */
     suspend fun upsertUser(user: User) = usersMutex.withLock {
         val currentUsers = _users.value.toMutableList()
-        val index = currentUsers.indexOfFirst { it.id == user.id }
+        val index = currentUsers.indexOfFirst { it.conversationKey == user.conversationKey }
         if (index == -1) {
             currentUsers.add(user)
         } else {
@@ -277,7 +327,7 @@ class ChatState {
         if (users.isEmpty()) return@withLock
         val currentUsers = _users.value.toMutableList()
         users.forEach { user ->
-            val index = currentUsers.indexOfFirst { it.id == user.id }
+            val index = currentUsers.indexOfFirst { it.conversationKey == user.conversationKey }
             if (index == -1) {
                 currentUsers.add(user)
             } else {
@@ -292,11 +342,11 @@ class ChatState {
      */
     suspend fun updateUserOnlineStatus(userId: Int, online: Boolean) = usersMutex.withLock {
         _users.value = _users.value.map { user ->
-            if (user.id == userId) user.copy(online = online) else user
+            if (!user.isGroup && user.id == userId) user.copy(online = online) else user
         }
 
         // 如果当前选中的是这个用户，也更新选中用户的状态
-        if (_selectedChatTarget.value?.id == userId) {
+        if (_selectedChatTarget.value?.conversationKey == ConversationKey.privateChat(userId)) {
             _selectedChatTarget.value = _selectedChatTarget.value?.copy(online = online)
         }
     }
@@ -307,14 +357,14 @@ class ChatState {
     suspend fun addMessage(message: Message) = messagesMutex.withLock {
         AppLogger.d("[ChatState] 添加私聊消息: messageId=${message.messageId}, senderId=${message.senderId}, receiverId=${message.receiverId}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
-        _messageCache.add(message)                           // 全量镜像
+        putPrivate(message)                           // 全量镜像
         val convUserId = privateConversationId(message)
         getOrCreatePrivateCache(convUserId).add(message)     // 分桶存储（O(1) 按会话访问）
 
-        val shouldIncreaseUnread = !message.sender && _selectedChatTarget.value?.id != convUserId
+        val shouldIncreaseUnread = !message.sender && _selectedChatTarget.value?.conversationKey != ConversationKey.privateChat(convUserId)
         conversationStateMutex.withLock {
             updateConversationStateLocked(
-                conversationId = convUserId,
+                conversationId = ConversationKey.privateChat(convUserId),
                 lastIncomingMessageTime = if (!message.sender) message.timestamp else null,
                 unreadDelta = if (shouldIncreaseUnread) 1 else 0
             )
@@ -332,11 +382,12 @@ class ChatState {
     ) = messagesMutex.withLock {
         if (!isCurrentAccount()) return@withLock
         val inserted = _messageCache.prepend(newMessages)
-        if (inserted.isNotEmpty()) {
-            val affectedUsers = inserted.map { privateConversationId(it) }.distinct()
+        newMessages.forEach(::privatePreview)
+        if (newMessages.isNotEmpty()) {
+            val affectedUsers = newMessages.map { privateConversationId(it) }.distinct()
             affectedUsers.forEach { uid ->
                 getOrCreatePrivateCache(uid).prepend(
-                    inserted.filter { privateConversationId(it) == uid }
+                    newMessages.filter { privateConversationId(it) == uid }
                 )
             }
             conversationStateMutex.withLock {
@@ -348,12 +399,52 @@ class ChatState {
     /**
      * 更新消息发送状态
      */
+    suspend fun updateDeliveryState(id: String, status: model.MessageDeliveryState) {
+        messagesMutex.withLock {
+            findPrivate { it.messageId == id }?.let { old ->
+                if (old.deliveryState == model.MessageDeliveryState.ACCEPTED && status != model.MessageDeliveryState.ACCEPTED) return@withLock
+                val updated = old.copy(isSent = status == model.MessageDeliveryState.ACCEPTED, deliveryState = status)
+                putPrivate(updated); getOrCreatePrivateCache(privateConversationId(updated)).add(updated)
+            }
+        }
+        groupMessagesMutex.withLock {
+            findGroup { it.messageId == id }?.let { old ->
+                if (old.deliveryState == model.MessageDeliveryState.ACCEPTED && status != model.MessageDeliveryState.ACCEPTED) return@withLock
+                val updated = old.copy(isSent = status == model.MessageDeliveryState.ACCEPTED, deliveryState = status)
+                putGroup(updated); getOrCreateGroupCache(updated.groupId).add(updated)
+            }
+        }
+    }
+
+    suspend fun confirmMessageId(clientId: String, serverId: String, seq: Long, conversation: String) {
+        messagesMutex.withLock {
+            findPrivate { it.messageId == clientId && !conversation.startsWith("group:") &&
+                conversation.removePrefix("user:") == listOf(it.senderId.toString(), it.receiverId.toString()).sorted().joinToString(":") }?.let { old ->
+                val updated = old.copy(messageId = serverId, seqId = seq, conversationId = conversation, isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+                _messageCache.remove(clientId)
+                getOrCreatePrivateCache(privateConversationId(old)).remove(clientId)
+                putPrivate(updated)
+                getOrCreatePrivateCache(privateConversationId(updated)).add(updated)
+            }
+        }
+        groupMessagesMutex.withLock {
+            findGroup { it.messageId == clientId && conversation == "group:${it.groupId}" }?.let { old ->
+                val updated = old.copy(messageId = serverId, seqId = seq, conversationId = conversation, isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+                _groupMessageCache.remove(clientId)
+                getOrCreateGroupCache(old.groupId).remove(clientId)
+                putGroup(updated)
+                getOrCreateGroupCache(updated.groupId).add(updated)
+            }
+        }
+    }
+
     suspend fun updateMessageSentStatus(messageId: String, isSent: Boolean) {
         messagesMutex.withLock {
             AppLogger.d("[ChatState] 更新私聊消息发送状态: messageId=$messageId, isSent=$isSent")
-            val msg = _messageCache.snapshot.find { it.messageId == messageId } ?: return@withLock
-            val updated = msg.copy(isSent = isSent)
-            _messageCache.add(updated)
+            val msg = findPrivate { it.messageId == messageId } ?: return@withLock
+            if (!isSent && msg.deliveryState == model.MessageDeliveryState.ACCEPTED) return@withLock
+            val updated = msg.copy(isSent = isSent, deliveryState = if (isSent) model.MessageDeliveryState.ACCEPTED else model.MessageDeliveryState.FAILED)
+            putPrivate(updated)
             getOrCreatePrivateCache(privateConversationId(updated)).add(updated)
         }
     }
@@ -362,7 +453,7 @@ class ChatState {
      * 原位更新私聊消息。
      */
     suspend fun updateMessage(updatedMessage: Message) = messagesMutex.withLock {
-        _messageCache.add(updatedMessage)
+        putPrivate(updatedMessage)
         getOrCreatePrivateCache(privateConversationId(updatedMessage)).add(updatedMessage)
     }
 
@@ -373,13 +464,13 @@ class ChatState {
         AppLogger.d("[ChatState] 添加群聊消息: messageId=${message.messageId}, groupId=${message.groupId}, senderId=${message.senderId}, senderName=${message.senderName}, isSent=${message.isSent}, timestamp=${message.timestamp}")
 
         val gid = groupConversationId(message)
-        _groupMessageCache.add(message)                       // 全量镜像
+        putGroup(message)                       // 全量镜像
         getOrCreateGroupCache(gid).add(message)                // 分桶
 
-        val shouldIncreaseUnread = message.senderId != GlobalAppState.currentUserId && _selectedChatTarget.value?.id != gid
+        val shouldIncreaseUnread = message.senderId != GlobalAppState.currentUserId && _selectedChatTarget.value?.conversationKey != ConversationKey.group(gid)
         conversationStateMutex.withLock {
             updateConversationStateLocked(
-                conversationId = gid,
+                conversationId = ConversationKey.group(gid),
                 lastIncomingMessageTime = if (message.senderId != GlobalAppState.currentUserId) message.timestamp else null,
                 unreadDelta = if (shouldIncreaseUnread) 1 else 0
             )
@@ -397,11 +488,12 @@ class ChatState {
     ) = groupMessagesMutex.withLock {
         if (!isCurrentAccount()) return@withLock
         val inserted = _groupMessageCache.prepend(newMessages)
-        if (inserted.isNotEmpty()) {
-            val affectedGroups = inserted.map { groupConversationId(it) }.distinct()
+        newMessages.forEach(::groupPreview)
+        if (newMessages.isNotEmpty()) {
+            val affectedGroups = newMessages.map { groupConversationId(it) }.distinct()
             affectedGroups.forEach { gid ->
                 getOrCreateGroupCache(gid).prepend(
-                    inserted.filter { groupConversationId(it) == gid }
+                    newMessages.filter { groupConversationId(it) == gid }
                 )
             }
             conversationStateMutex.withLock {
@@ -416,9 +508,10 @@ class ChatState {
     suspend fun updateGroupMessageSentStatus(messageId: String, isSent: Boolean) {
         groupMessagesMutex.withLock {
             AppLogger.d("[ChatState] 更新群聊消息发送状态: messageId=$messageId, isSent=$isSent")
-            val msg = _groupMessageCache.snapshot.find { it.messageId == messageId } ?: return@withLock
-            val updated = msg.copy(isSent = isSent)
-            _groupMessageCache.add(updated)
+            val msg = findGroup { it.messageId == messageId } ?: return@withLock
+            if (!isSent && msg.deliveryState == model.MessageDeliveryState.ACCEPTED) return@withLock
+            val updated = msg.copy(isSent = isSent, deliveryState = if (isSent) model.MessageDeliveryState.ACCEPTED else model.MessageDeliveryState.FAILED)
+            putGroup(updated)
             getOrCreateGroupCache(updated.groupId).add(updated)
         }
     }
@@ -429,9 +522,9 @@ class ChatState {
     suspend fun selectChatTarget(user: User?) = conversationStateMutex.withLock {
         _selectedChatTarget.value = user
         user?.let { targetUser ->
-            val previousState = _conversationStates.value[targetUser.id]
+            val previousState = _conversationStates.value[targetUser.conversationKey]
             if (previousState != null && previousState.unreadCount != 0) {
-                updateConversationStateLocked(targetUser.id, unreadCount = 0)
+                updateConversationStateLocked(targetUser.conversationKey, unreadCount = 0)
             }
         }
     }
@@ -477,33 +570,59 @@ class ChatState {
      * 删除私聊消息
      */
     suspend fun deleteMessage(messageId: String) = messagesMutex.withLock {
-        val msg = _messageCache.snapshot.find { it.messageId == messageId }
+        val msg = findPrivate { it.messageId == messageId }
         _messageCache.remove(messageId)
+        synchronized(dirtyLock) { dirtyPrivate.remove(messageId) }
         if (msg != null) getOrCreatePrivateCache(privateConversationId(msg)).remove(messageId)
+        if(msg!=null) {
+            val key=ConversationKey.privateChat(privateConversationId(msg))
+            synchronized(previewLock) {
+                val old=_conversationStates.value[key]
+                if(old?.previewMessageId==messageId) {
+                    _conversationStates.value=_conversationStates.value+(key to old.copy(previewText="",previewTimestamp=0,previewMessageId=""))
+                    getOrCreatePrivateCache(key.id).snapshot.lastOrNull()?.let(::privatePreview)
+                }
+            }
+        }
     }
 
     /**
      * 删除群聊消息
      */
     suspend fun deleteGroupMessage(messageId: String) = groupMessagesMutex.withLock {
-        val msg = _groupMessageCache.snapshot.find { it.messageId == messageId }
+        val msg = findGroup { it.messageId == messageId }
         _groupMessageCache.remove(messageId)
+        synchronized(dirtyLock) { dirtyGroups.remove(messageId) }
         if (msg != null) getOrCreateGroupCache(msg.groupId).remove(messageId)
+        if(msg!=null) {
+            val key=ConversationKey.group(msg.groupId)
+            synchronized(previewLock) {
+                val old=_conversationStates.value[key]
+                if(old?.previewMessageId==messageId) {
+                    _conversationStates.value=_conversationStates.value+(key to old.copy(previewText="",previewTimestamp=0,previewMessageId=""))
+                    getOrCreateGroupCache(key.id).snapshot.lastOrNull()?.let(::groupPreview)
+                }
+            }
+        }
     }
 
     /**
      * 清空所有聊天数据（退出登录时调用）
      */
-    suspend fun clear() = clearMutex.withLock {
+    suspend fun clear() = clearMutex.withLock { messagesMutex.withLock {
         _users.value = emptyList()
         _messageCache.clear()
         _groupMessageCache.clear()
+        _privateMessageCaches.values.forEach { it.clear() }
+        _groupMessageCaches.values.forEach { it.clear() }
         _privateMessageCaches.clear()
+        cacheBudget.clear();synchronized(dirtyLock) { dirtyPrivate.clear();dirtyGroups.clear() }
         _groupMessageCaches.clear()
         _selectedChatTarget.value = null
         _isLoadingMore.value = false
         _conversationStates.value = emptyMap()
         _conversationSeqIds.value = emptyMap()
+    }
     }
 }
 

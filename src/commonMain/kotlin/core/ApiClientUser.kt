@@ -118,26 +118,17 @@ suspend fun changePassword(token: String, oldPassword: String, newPassword: Stri
 
 
 
-suspend fun checkAppVersion(
-    appVersion: Int,
-    platform: String,
-    channel: String = "official"
-): VersionCheckResult? {
-    val requestBody = buildJsonObject {
-        put("versionCode", appVersion)
-        put("platform", platform)
-        put("channel", channel)
+suspend fun checkAppVersion(appVersion: String, platform: String): VersionCheckResult? {
+    val query = io.ktor.http.Parameters.build {
+        append("clientVersion", appVersion)
+        append("platform", platform)
+        append("os", core.update.UpdateRuntime.target.os)
+        append("architecture", core.update.UpdateRuntime.target.architecture)
     }
-
-    // 版本检查不需要token，公开接口
-    val response = sendRequest<VersionCheckResult>(
-        path = ApiEndpoints.APP_VERSION_CHECK,
-        method = "POST",
-        body = requestBody,
-        token = null // 明确不传token
+    val response = sendRequest<core.model.PublishedAppVersion>(
+        path = ApiEndpoints.APP_VERSION_CHECK + "?" + query.formUrlEncode(), method = "GET", token = null
     )
-
-    return response.data
+    return response.data?.toCheckResult()
 }
 
 

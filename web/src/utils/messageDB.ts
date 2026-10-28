@@ -2,12 +2,12 @@ import type { ChatMessage, Id } from '../types/chat'
 import { conversationPreviewText } from './format'
 
 const DB_NAME = 'charroom_messages'
-// v2: 插入顺序；v3: 会话元数据；v4: 旧分支兼容；v5: 消息 ID 去重；v6: 稳定时间/ID 游标
-// （旧本地分支也用过 version 3 但索引名不同，同版本不会触发 upgrade，必须提升版本号）
-const DB_VERSION = 6
+// Current indexed schema; older row formats are not imported.
+const DB_VERSION = 7
 const STORE_NAME = 'messages'
 const META_STORE_NAME = 'conversation_meta'
-const ORDER_INDEX = 'account_conversation_index' // retained for allocating legacy row keys
+const CURSOR_STORE_NAME = 'sync_cursors'
+const ORDER_INDEX = 'account_conversation_index'
 const TIME_INDEX = 'account_conversation_time_id'
 const MESSAGE_ID_INDEX = 'account_conversation_message_id'
 interface StoredMessage {
@@ -17,7 +17,7 @@ interface StoredMessage {
 export interface ConversationMeta {
   id: string; accountId: string; conversationId: string
   lastIncomingMessageTime: number
-  /** 最新一条消息的预览文本；v4 之前的元数据可能缺失（由 getLastMessage 补写） */
+  /** 最新一条消息的预览文本 */
   lastMessagePreview?: string
 }
 export type MessageCursor = [number, string, string]
@@ -34,6 +34,10 @@ function openDB(): Promise<IDBDatabase> {
     }
     request.onupgradeneeded = () => {
       const db = request.result
+      if(!db.objectStoreNames.contains(CURSOR_STORE_NAME)) {
+        const cursors=db.createObjectStore(CURSOR_STORE_NAME,{keyPath:['accountId','conversationId']})
+        cursors.createIndex('accountId','accountId')
+      }
       const store = db.objectStoreNames.contains(STORE_NAME)
         ? request.transaction!.objectStore(STORE_NAME)
         : db.createObjectStore(STORE_NAME, { keyPath: 'id' })
@@ -48,18 +52,7 @@ function openDB(): Promise<IDBDatabase> {
         const meta = db.createObjectStore(META_STORE_NAME, { keyPath: 'id' })
         meta.createIndex('accountId', 'accountId', { unique: false })
       }
-      // Older clients wrote both numeric and string IDs. Normalize existing
-      // rows in the upgrade transaction before querying the new ordered index.
-      const cursorRequest = store.openCursor()
-      cursorRequest.onsuccess = () => {
-        const cursor = cursorRequest.result
-        if (!cursor) return
-        const row = cursor.value as StoredMessage
-        const normalized = record(row.accountId, row.conversationId, row.message, row.index,
-          typeof row.timestamp === 'number' ? row.timestamp : row.index)
-        cursor.update({ ...normalized, id: row.id })
-        cursor.continue()
-      }
+
     }
   })
   return databasePromise
@@ -202,13 +195,25 @@ export function appendMessage(accountId: Id, conversationId: Id, message: ChatMe
     touchConversationMeta(tx, accountId, conversationId, message)
   }))
 }
+
+/** One indexed lookup when a bounded window changes its oldest displayed row. */
+export async function getMessageCursor(accountId:Id,conversationId:Id,messageId:string):Promise<MessageCursor|null>{
+  const db=await openDB()
+  return new Promise((resolve,reject)=>{
+    const request=db.transaction(STORE_NAME).objectStore(STORE_NAME).index(MESSAGE_ID_INDEX).get([String(accountId),String(conversationId),messageId])
+    request.onsuccess=()=>{const row=request.result as StoredMessage|undefined;resolve(row?[row.timestamp,row.sortId,row.id]:null)}
+    request.onerror=()=>reject(request.error)
+  })
+}
 /** Batch upsert by message ID: no full conversation scan, renumbering or replacement. */
-export async function mergeHistoryMessages(accountId: Id, conversationId: Id, messages: readonly ChatMessage[]) {
+export interface AppliedCursor {conversationId:string;seqId:Id}
+export async function mergeHistoryMessages(accountId: Id, conversationId: Id, messages: readonly ChatMessage[], applied?:AppliedCursor) {
+  if(applied && (!/^\d+$/.test(String(applied.seqId)) || String(messages.at(-1)?.seqId)!==String(applied.seqId)))throw Error('Invalid applied cursor')
   const batch = new Map(messages.filter(m => m.messageId).map(m => [m.messageId!, m]))
   if (!batch.size) return
   const db = await openDB()
   return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite')
+    const tx = db.transaction([STORE_NAME, META_STORE_NAME, CURSOR_STORE_NAME], 'readwrite')
     tx.oncomplete = () => resolve()
     tx.onerror = tx.onabort = () => reject(tx.error)
     const store = tx.objectStore(STORE_NAME)
@@ -225,51 +230,91 @@ export async function mergeHistoryMessages(accountId: Id, conversationId: Id, me
           const row = record(accountId, conversationId, merged, old ? old.index : index++, old?.timestamp)
           store.put(row)
           if (!newest || row.timestamp >= messageTimestamp(newest)) newest = merged
-          if (--remaining === 0 && newest) touchConversationMeta(tx, accountId, conversationId, newest)
+          if (--remaining === 0 && newest) {
+            touchConversationMeta(tx,accountId,conversationId,newest)
+            if(applied) {
+              const cursors=tx.objectStore(CURSOR_STORE_NAME),key=[String(accountId),applied.conversationId]
+              const request=cursors.get(key)
+              request.onsuccess=()=>{
+                if(BigInt(request.result?.seqId||'0')<BigInt(applied.seqId))cursors.put({accountId:String(accountId),conversationId:applied.conversationId,seqId:String(applied.seqId)})
+              }
+            }
+          }
         }
       }
     }
   })
 }
-function deleteRows(index: string, key: IDBKeyRange, match: (row: StoredMessage) => boolean = () => true) {
-  return write(store => {
-    const request = store.index(index).openCursor(key)
-    request.onsuccess = () => {
-      const cursor = request.result
-      if (cursor) { if (match(cursor.value as StoredMessage)) cursor.delete(); cursor.continue() }
+/** Delete using primary keys only; never clone message bodies just to remove them. */
+function deleteKeys(store: IDBObjectStore, index: string, key: IDBKeyRange) {
+  const request = store.index(index).openKeyCursor(key)
+  request.onsuccess = () => {
+    const cursor = request.result
+    if (cursor) { store.delete(cursor.primaryKey); cursor.continue() }
+  }
+}
+/** Rename the optimistic row and merge a history copy in the same IndexedDB transaction. */
+export async function confirmMessageId(accountId: Id, conversationId: Id, clientId: string,
+                                       serverId: string, seqId: Id): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = tx.onabort = () => reject(tx.error)
+    const store = tx.objectStore(STORE_NAME)
+    const index = store.index(MESSAGE_ID_INDEX)
+    const oldRequest = index.get([String(accountId), String(conversationId), clientId])
+    oldRequest.onsuccess = () => {
+      const old = oldRequest.result as StoredMessage | undefined
+      if (!old) return
+      const canonicalRequest = index.get([String(accountId), String(conversationId), serverId])
+      canonicalRequest.onsuccess = () => {
+        const canonical = canonicalRequest.result as StoredMessage | undefined
+        if (canonical && canonical.id !== old.id) store.delete(canonical.id)
+        const message = { ...old.message, ...canonical?.message, messageId: serverId, seqId, isSent: 'sent' as const }
+        store.put(record(accountId, conversationId, message, old.index, old.timestamp))
+      }
     }
   })
 }
+
 export function deleteMessage(accountId: Id, conversationId: Id, messageId: string) {
-  return deleteRows('accountId_conversationId', range(accountId, conversationId), row => row.message.messageId === messageId)
+  return write(store => {
+    // Key cursors avoid cloning message bodies and only visit exact matches.
+    // The index is non-unique, so remove every matching row in this transaction.
+    deleteKeys(store, MESSAGE_ID_INDEX, IDBKeyRange.only([String(accountId), String(conversationId), messageId]))
+  })
 }
-export function clearConversation(accountId: Id, conversationId: Id) {
-  const cleared = deleteRows('accountId_conversationId', range(accountId, conversationId))
-  return cleared.then(() => new Promise<void>((resolve, reject) => {
-    openDB().then(database => {
-      const tx = database.transaction(META_STORE_NAME, 'readwrite')
-      tx.oncomplete = () => resolve()
-      tx.onerror = tx.onabort = () => reject(tx.error)
-      tx.objectStore(META_STORE_NAME).delete(`${accountId}:${conversationId}`)
-    }).catch(reject)
-  }))
+export async function clearConversation(accountId: Id, conversationId: Id) {
+  const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
+    // A delivery queued after this transaction must retain both its message and preview.
+    const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = tx.onabort = () => reject(tx.error)
+    deleteKeys(tx.objectStore(STORE_NAME), 'accountId_conversationId', range(accountId, conversationId))
+    tx.objectStore(META_STORE_NAME).delete(`${accountId}:${conversationId}`)
+  })
 }
-export function clearAllMessages(accountId: Id) {
-  const cleared = deleteRows('accountId', IDBKeyRange.only(String(accountId)))
-  return cleared.then(() => new Promise<void>((resolve, reject) => {
-    const db = openDB()
-    db.then(database => {
-      const tx = database.transaction(META_STORE_NAME, 'readwrite')
-      tx.oncomplete = () => resolve()
-      tx.onerror = tx.onabort = () => reject(tx.error)
-      const request = tx.objectStore(META_STORE_NAME).index('accountId').openCursor(IDBKeyRange.only(String(accountId)))
-      request.onsuccess = () => {
-        const cursor = request.result
-        if (cursor) { cursor.delete(); cursor.continue() }
-      }
-    }).catch(reject)
-  }))
+export async function clearAllMessages(accountId: Id) {
+  const db=await openDB()
+  return new Promise<void>((resolve,reject)=>{
+    const tx=db.transaction([STORE_NAME,META_STORE_NAME,CURSOR_STORE_NAME],'readwrite')
+    tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(tx.error)
+    for(const name of [STORE_NAME,META_STORE_NAME,CURSOR_STORE_NAME]) {
+      deleteKeys(tx.objectStore(name), 'accountId', IDBKeyRange.only(String(accountId)))
+    }
+  })
 }
+export async function getAppliedCursors(accountId:Id):Promise<Record<string,string>> {
+  const db=await openDB()
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(CURSOR_STORE_NAME),request=tx.objectStore(CURSOR_STORE_NAME).index('accountId').getAll(String(accountId))
+    tx.oncomplete=()=>resolve(Object.fromEntries(request.result.map(row=>[row.conversationId,String(row.seqId)])))
+    tx.onerror=tx.onabort=()=>reject(tx.error)
+  })
+}
+
 /**
  * 获取账号下所有会话的元数据（会话预览用，避免全量读消息）。
  */

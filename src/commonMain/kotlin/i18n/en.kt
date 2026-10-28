@@ -2,6 +2,17 @@ package com.chatlite.i18n
 
 val enStrings = Strings(
     mapOf(
+        "update.recheckRelease" to "Check for a new release",
+        "update.completed" to "Updated to %s",
+        "update.progress" to "Downloading %d%% · %d MiB",
+        "update.verifying" to "Verifying installer integrity and identity…",
+        "update.preparing" to "Saving messages and drafts…",
+        "update.installing" to "Opening the system installer…",
+        "update.handedOff" to "The system installer is open. Complete installation and restart Qingliao. Installation has not been confirmed yet.",
+        "update.failed" to "Update did not complete. Your current version is retained.",
+        "update.ready" to "Installer verified. Messages and drafts will be saved before installation. Install now?",
+        "update.retry" to "Retry",
+        "update.recheck" to "Check installation status",
         "contacts.tab.messages" to "Messages",
         "contacts.tab.contacts" to "Contacts",
         "contacts.directory" to "Your people, in one place",
@@ -66,6 +77,7 @@ val enStrings = Strings(
         "chat.placeholder" to "Say something interesting...",
         "chat.send" to "Send",
         "chat.send.failed" to "Send failed, tap to retry",
+        "chat.queued" to "Queued…",
         "chat.sending" to "Sending...",
         "chat.resend" to "Resend",
         "chat.emoji" to "Emoji",

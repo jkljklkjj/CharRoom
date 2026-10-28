@@ -27,7 +27,7 @@ export function createTransport() {
 }
 
 export function buildWebTransportUrl(host: string, port: number) {
-  return `https://${host}:${port}/.well-known/webtransport`
+  return `https://${host}:${port}/.well-known/webtransport${import.meta.env.VITE_WT_FRAMING === 'raw' ? '' : '?framing=length-v1'}`
 }
 
 export default { createTransport, configureTransport, isWebTransportSupported }

@@ -1,401 +1,246 @@
-import core.ApiEndpoints
-import core.ServerConfig
-import core.agentChat
-import core.ApiService
-import core.ChatTransport
+import cli.*
+import core.*
 import core.di.KoinInitializer
 import core.di.desktopModule
 import core.state.AuthState
 import core.state.GlobalAppState
-import data.datasource.local.LocalDataSourceImpl
-import data.repository.GlobalAuthRepository
-import data.repository.GlobalChatRepository
-import io.github.oshai.kotlinlogging.KotlinLogging
+import data.datasource.local.CliFileProvider
+import data.datasource.local.fileProvider
+import data.repository.AuthRepository
 import kotlinx.coroutines.*
-import model.Message
+import org.jline.reader.UserInterruptException
 import java.io.File
-import java.util.Properties
+import java.io.FileDescriptor
+import java.io.FileOutputStream
+import java.io.PrintStream
+import kotlin.system.exitProcess
 
-private val log = KotlinLogging.logger {}
-
-// ── ANSI 彩色输出（终端 UI） ─────────────────────────────
-private const val ANSI_RESET = "\u001B[0m"
-private const val ANSI_GREEN = "\u001B[32m"
-private const val ANSI_RED = "\u001B[31m"
-private const val ANSI_YELLOW = "\u001B[33m"
-private const val ANSI_CYAN = "\u001B[36m"
-private const val ANSI_BOLD = "\u001B[1m"
-
-private fun green(s: String) = "$ANSI_GREEN$s$ANSI_RESET"
-private fun red(s: String) = "$ANSI_RED$s$ANSI_RESET"
-private fun yellow(s: String) = "$ANSI_YELLOW$s$ANSI_RESET"
-private fun cyan(s: String) = "$ANSI_CYAN$s$ANSI_RESET"
-private fun bold(s: String) = "$ANSI_BOLD$s$ANSI_RESET"
-
-fun main(args: Array<String>) = runBlocking {
-    ChatLiteCli(args).run()
+fun main(args: Array<String>) {
+    // Keep pipes and PowerShell output deterministic instead of using Windows' legacy code page.
+    System.setOut(PrintStream(FileOutputStream(FileDescriptor.out), true, Charsets.UTF_8))
+    System.setErr(PrintStream(FileOutputStream(FileDescriptor.err), true, Charsets.UTF_8))
+    val code = try {
+        runBlocking { ChatLiteCli(args).run() }
+        0
+    } catch (_: CancellationException) {
+        130
+    } catch (_: UserInterruptException) {
+        130
+    } catch (error: IllegalArgumentException) {
+        System.err.println(terminalText(error.message ?: "参数错误")); 2
+    } catch (error: Exception) {
+        System.err.println("CLI 未能完成操作（${error.javaClass.simpleName}），请检查本地配置、网络或文件权限"); 1
+    }
+    if (code != 0) exitProcess(code)
 }
 
 class ChatLiteCli(private val args: Array<String>) {
-
-    private var serverUrl = "https://chatlite.xin"
-    private var username = ""
-    private var password = ""
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val localDataSource = LocalDataSourceImpl()
-    private lateinit var transport: ChatTransport
-
-    // ── 配置文件持久化（~/.qingliao/config.properties） ──
-    private val configFile: File by lazy {
-        File(System.getProperty("user.home"), ".qingliao/config.properties")
-    }
-
-    private fun loadConfig() {
-        try {
-            if (!configFile.exists()) return
-            val props = Properties()
-            configFile.inputStream().use { props.load(it) }
-            props.getProperty("server")?.takeIf { it.isNotBlank() }?.let {
-                serverUrl = it.removeSuffix("/")
-                ApiEndpoints.setBaseUrl(serverUrl + "/api")
-            }
-            props.getProperty("quic.host")?.takeIf { it.isNotBlank() }?.let { ServerConfig.QUIC_HOST = it }
-            props.getProperty("quic.port")?.toIntOrNull()?.let { ServerConfig.QUIC_PORT = it }
-            props.getProperty("username")?.takeIf { it.isNotBlank() }?.let { username = it }
-        } catch (_: Exception) { /* 配置损坏时忽略，不影响启动 */ }
-    }
-
-    private fun saveConfig() {
-        try {
-            configFile.parentFile?.mkdirs()
-            val props = Properties()
-            props.setProperty("server", serverUrl)
-            props.setProperty("quic.host", ServerConfig.QUIC_HOST)
-            props.setProperty("quic.port", ServerConfig.QUIC_PORT.toString())
-            if (username.isNotBlank()) props.setProperty("username", username)
-            configFile.outputStream().use { props.store(it, "ChatLite CLI config") }
-        } catch (_: Exception) { /* 保存失败不影响主流程 */ }
-    }
-    private var isReconnecting = false
-    private var reconnectDelay = 1000L
-    private val maxReconnectDelay = 30000L
-
     suspend fun run() {
-        // 初始化 DI
-        KoinInitializer.init(platformModules = listOf(desktopModule))
-        transport = org.koin.core.context.GlobalContext.get().get<ChatTransport>()
-
-        // 先读配置文件（~/.qingliao/config.properties），命令行参数再覆盖
-        loadConfig()
-        parseArgs()
-        saveConfig()
-        printWelcome()
-
-        // 登录：优先命令行参数 → 自动登录（读 ~/.qingliao/auth.txt） → 交互式
-        val loggedIn = loginWithArgs()
-            || tryAutoLogin()
-            || interactiveLogin()
-
-        if (!loggedIn) { println(red("认证失败，退出")); scope.cancel(); return }
-
-        val token = GlobalAppState.currentToken ?: run { println(red("认证状态异常")); scope.cancel(); return }
-
-        println(green("登录成功") + "，欢迎使用轻聊命令行客户端！输入 " + yellow("/help") + " 查看所有命令")
-
-        // QUIC 传输层初始化
-        showConnectionStatus()
-        if (token.isNotBlank()) {
-            ServerConfig.DEVICE_TYPE = "cli"
-            transport.addMessageReceiveListener(object : core.MessageReceiveListener {
-                override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long, seqId: Long, conversationId: String) {
-                    println("\n💬 [用户 $senderId]: $message"); print("> ")
-                }
-                override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long, seqId: Long, conversationId: String) {
-                    println("\n👥 [群 $groupId $senderName]: $message"); print("> ")
-                }
-            })
-            transport.addAuthStateListener { reason ->
-                println("\n⚠️ 登录失效: $reason")
-            }
-
-            // 启动连接状态监控
-            scope.launch {
-                monitorConnection(token)
-            }
-            try {
-                transport.start()
-                log.info { "QUIC 连接完成" }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                log.error(e) { "QUIC 连接失败" }
-            }
-        }
-
-        // 加载联系人
-        try { println("已加载 ${GlobalChatRepository.fetchFriends().size} 个联系人") } catch (_: Exception) {}
-
-        // 登录后拉取离线消息
-        fetchOfflineMessages(token)
-
-        // 命令循环
-        enterReplLoop(token)
-        transport.logoutAndDisconnect()
-        scope.cancel()
-        println("再见")
-    }
-
-    // ── 连接监控与自动重连 ──
-
-    private suspend fun monitorConnection(token: String) {
-        while (true) {
-            delay(5000) // 每5秒检查一次连接状态
-            if (!transport.isConnected() && !isReconnecting) {
-                println("\n🔌 连接断开，尝试重连...")
-                attemptReconnect(token)
-            }
-        }
-    }
-
-    private suspend fun attemptReconnect(token: String) {
-        isReconnecting = true
-        var attempts = 0
-
-        while (isReconnecting && attempts < 10) {
-            attempts++
-            println("🔄 重连尝试 $attempts/10 (等待 ${reconnectDelay}ms)...")
-
-            try {
-                delay(reconnectDelay)
-                transport.start()
-                println("✅ 重连成功")
-                isReconnecting = false
-                reconnectDelay = 1000L // 重置延迟
-                return
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                println("❌ 重连失败: ${e.message}")
-                // 指数退避
-                reconnectDelay = (reconnectDelay * 2).coerceAtMost(maxReconnectDelay)
-            }
-        }
-
-        println("❌ 重连失败次数过多，停止重连")
-        isReconnecting = false
-        reconnectDelay = 1000L
-    }
-
-    private suspend fun loginWithArgs(): Boolean {
-        if (username.isBlank() || password.isBlank()) return false
-        print("登录 $username ... ")
-        val r = GlobalAuthRepository.login(username, password, rememberMe = true)
-        val ok = r is AuthState.Authenticated
-        println(if (ok) "OK" else "FAIL")
-        return ok
-    }
-
-    private suspend fun tryAutoLogin(): Boolean {
-        val acct = localDataSource.getSavedAccount() ?: return false
-        print("自动登录 $acct ... ")
-        GlobalAuthRepository.init()
-        val ok = GlobalAppState.authState.value is AuthState.Authenticated
-        println(if (ok) "OK" else "FAIL（清除旧凭证）")
-        if (!ok) localDataSource.clearAuth()
-        return ok
-    }
-
-    private suspend fun interactiveLogin(): Boolean {
-        print("账号: "); username = readLine()?.trim().orEmpty()
-        if (username.isBlank()) return false
-        print("密码: "); password = System.console()?.readPassword()?.concatToString() ?: readLine().orEmpty()
-        return loginWithArgs()
-    }
-
-    // ── 离线消息 ──
-
-    private suspend fun fetchOfflineMessages(token: String) {
-        try {
-            val msgs = ApiService(token).getOfflineMessages()
-            if (msgs.isEmpty()) return
-            println("\n📩 ${msgs.size} 条离线消息:")
-            msgs.forEach { msg: Message ->
-                println("  💬 [${msg.senderId}]: ${msg.message.take(80)}")
-            }
-        } catch (_: Exception) { /* 拉取离线消息失败，不影响主流程 */ }
-    }
-
-    // ── 发送私聊消息 ──
-
-    private suspend fun sendPrivateMessage(token: String, receiverId: String, content: String) {
-        val api = ApiService(token)
-        val ok = api.sendPrivateMessage(receiverId = receiverId, content = content, messageType = "text")
-        println(if (ok) "✅ 已发送" else "❌ 发送失败")
-    }
-
-    // ── 发送群聊消息 ──
-
-    private suspend fun sendGroupMessage(token: String, groupId: String, content: String) {
-        val api = ApiService(token)
-        val ok = api.sendGroupMessage(groupId = groupId, content = content, messageType = "text")
-        println(if (ok) "✅ 已发送" else "❌ 发送失败")
-    }
-
-    // ---- 以下为 CLI 特有的命令处理 ----
-
-    private fun enterReplLoop(token: String) = runBlocking {
-        // jline3：命令历史（~/.qingliao/history.txt）+ Tab 补全
-        val terminal = org.jline.terminal.TerminalBuilder.builder().system(true).build()
-        val historyFile = java.io.File(System.getProperty("user.home"), ".qingliao/history.txt")
-        val history = org.jline.reader.impl.history.DefaultHistory()
-        try { history.read(historyFile.toPath(), false) } catch (_: Exception) { /* 历史文件不存在/损坏时忽略 */ }
-        val completer = org.jline.reader.Completer { _reader, line, candidates ->
-            val buf = line.line().substring(0, line.cursor()).lowercase()
-            CLI_COMMANDS.filter { it.startsWith(buf) }.forEach { candidates.add(org.jline.reader.Candidate(it)) }
-        }
-        val reader = org.jline.reader.LineReaderBuilder.builder()
-            .terminal(terminal)
-            .history(history)
-            .completer(completer)
-            .option(org.jline.reader.LineReader.Option.HISTORY_IGNORE_SPACE, true)
-            .build()
-
-        while (true) {
-            val line = reader.readLine("> ") ?: break
-            val t = line.trim(); if (t.isBlank()) continue
-            when {
-                t.startsWith("/ai ") -> handleAi(token, t.removePrefix("/ai ").trim())
-                t == "/friend list" -> { val f = GlobalChatRepository.fetchFriends(); println("好友(${f.size}): ${f.joinToString { "${it.id}:${it.username}" }}") }
-                t.startsWith("/friend add ") -> { val ok = GlobalChatRepository.addFriend(t.removePrefix("/friend add ").trim()); println(if (ok) "OK" else "FAIL") }
-                t.startsWith("/friend accept ") -> { val ok = GlobalChatRepository.acceptFriend(t.removePrefix("/friend accept ").trim()); println(if (ok) "OK" else "FAIL") }
-                t.startsWith("/friend reject ") -> { val ok = GlobalChatRepository.rejectFriend(t.removePrefix("/friend reject ").trim()); println(if (ok) "OK" else "FAIL") }
-                t == "/group list" -> { val g = GlobalChatRepository.fetchGroups(); println("群组(${g.size}): ${g.joinToString { "${it.id}:${it.username}" }}") }
-                t.startsWith("/group join ") -> { val ok = GlobalChatRepository.addGroup(t.removePrefix("/group join ").trim()); println(if (ok) "OK" else "FAIL") }
-                t.startsWith("/msg ") -> {
-                    // /msg <userId> <text>
-                    val rest = t.removePrefix("/msg ").trim()
-                    val spaceIdx = rest.indexOf(' ')
-                    if (spaceIdx > 0) {
-                        val targetId = rest.substring(0, spaceIdx)
-                        val text = rest.substring(spaceIdx + 1).trim()
-                        sendPrivateMessage(token, targetId, text)
-                    } else println("用法: /msg <用户ID> <消息内容>")
-                }
-                t.startsWith("/group send ") -> {
-                    // /group send <groupId> <text>
-                    val rest = t.removePrefix("/group send ").trim()
-                    val spaceIdx = rest.indexOf(' ')
-                    if (spaceIdx > 0) {
-                        val groupId = rest.substring(0, spaceIdx)
-                        val text = rest.substring(spaceIdx + 1).trim()
-                        sendGroupMessage(token, groupId, text)
-                    } else println("用法: /group send <群组ID> <消息内容>")
-                }
-                t == "/status" -> showConnectionStatus()
-                t == "/help" -> printHelp()
-                t.startsWith("/help ") -> printHelp(t.removePrefix("/help ").trim())
-                t == "/exit" || t == "/quit" -> break
-                else -> handleAi(token, t)
-            }
-        }
-        // 持久化历史 + 释放终端
-        try { history.write(historyFile.toPath(), false) } catch (_: Exception) {}
-        try { terminal.close() } catch (_: Exception) {}
-    }
-
-    private companion object {
-        /** Tab 补全的命令列表 */
-        val CLI_COMMANDS = listOf(
-            "/ai", "/msg", "/friend list", "/friend add", "/friend accept", "/friend reject",
-            "/group list", "/group join", "/group send", "/status", "/help", "/exit", "/quit"
-        )
-    }
-
-    private suspend fun handleAi(token: String, content: String) {
-        print("AI 思考中... ")
-        println(agentChat(token, content, stream = false))
-    }
-
-    private fun showConnectionStatus() {
-        val status = if (transport.isConnected()) green("🟢已连接") else red("🔴未连接")
-        println("服务器: ${cyan(serverUrl)} | QUIC: $status | 用户: ${cyan(GlobalAppState.currentAccount ?: "-")}")
-    }
-
-    private fun printHelp(command: String? = null) {
-        val all = mapOf(
-            "/ai" to "AI 对话",
-            "/msg" to "发送私聊消息",
-            "/friend" to "好友管理（list / add / accept / reject）",
-            "/group" to "群组管理（list / join / send）",
-            "/status" to "连接状态",
-            "/help" to "此帮助（/help <命令> 查看详细）",
-            "/exit" to "退出"
-        )
-        if (command != null) {
-            val entry = all.entries.firstOrNull { command == it.key }
-            if (entry == null) {
-                println(yellow("未知命令: $command （输入 /help 查看全部命令）"))
-                return
-            }
-            when (command) {
-                "/ai" -> println("""${cyan("/ai <text>")} — 与 AI 助手对话
-  示例: /ai 帮我写一段介绍
-  说明: 普通文本输入也会自动走 AI 对话""".trimIndent())
-                "/msg" -> println("""${cyan("/msg <userId> <text>")} — 发送私聊消息
-  示例: /msg 10001 你好
-  说明: userId 为对方账号 ID""".trimIndent())
-                "/friend" -> println("""${cyan("/friend <操作> <参数>")} — 好友管理
-  /friend list                — 好友列表
-  /friend add <account>       — 添加好友
-  /friend accept <id>         — 接受好友请求
-  /friend reject <id>         — 拒绝好友请求""".trimIndent())
-                "/group" -> println("""${cyan("/group <操作> <参数>")} — 群组管理
-  /group list                 — 群组列表
-  /group join <id>            — 加入群组
-  /group send <id> <text>     — 发送群聊消息""".trimIndent())
-                "/status" -> println("""${cyan("/status")} — 显示服务器地址、QUIC 连接状态与当前用户""".trimIndent())
-                "/help" -> println("""${cyan("/help [<命令>]")} — 不带参数显示全部命令；带参数显示指定命令的详细帮助
-  示例: /help /msg""".trimIndent())
-                "/exit" -> println("""${cyan("/exit")}（或 /quit）— 退出客户端""".trimIndent())
-            }
+        val options = CliOptions.parse(args)
+        if (options.help) {
+            println("""轻聊 CLI ${AppConfig.VERSION_NAME}
+用法：java -jar chatlite-cli.jar [参数]
+  --server <HTTPS根地址>       REST 地址，不带 /api；本机可使用 HTTP
+  --quic-host <主机>           实时入口，和 REST 分别设置
+  --quic-port <1..65535>       QUIC 端口
+  --username <账号>            显式登录指定账号，不回退到其他账号
+  --password-stdin             从标准输入第一行读取密码，需指定账号
+  --no-auto-login              跳过保存的登录凭证
+  --help / --version           显示帮助或版本，不连接网络
+交互：/help 查看命令；Ctrl+C 清空当前输入，Ctrl+D 或 /exit 退出。
+密码和消息不会保存到终端历史文件。""")
             return
         }
-        println(bold("命令："))
-        all.forEach { (cmd, desc) -> println("  ${yellow(cmd.padEnd(20))}$desc") }
-        println()
-        println(bold("特性："))
-        println("  • 自动重连：连接断开后自动尝试重连（指数退避，最多10次）")
-        println("  • 离线消息：登录后自动拉取离线消息")
-        println("  • 安全输入：密码输入不回显（使用 readPassword）")
-        println("  • 配置持久化：服务器/QUIC 地址保存在 ~/.qingliao/config.properties")
-    }
-
-    private fun parseArgs() {
-        var i = 0
-        while (i < args.size) {
-            when (args[i]) {
-                "--server" -> {
-                    serverUrl = args.getOrElse(i + 1) { serverUrl }.removeSuffix("/")
-                    ApiEndpoints.setBaseUrl(serverUrl + "/api")
-                    i++
-                }
-                "--quic-host" -> {
-                    val qhost = args.getOrElse(i + 1) { "" }
-                    if (qhost.isNotBlank()) core.ServerConfig.QUIC_HOST = qhost
-                    i++
-                }
-                "--quic-port" -> {
-                    core.ServerConfig.QUIC_PORT = args.getOrElse(i + 1) { "443" }.toIntOrNull() ?: 443
-                    i++
-                }
-                "--username" -> { username = args.getOrElse(i + 1) { "" }; i++ }
-                "--password" -> { password = args.getOrElse(i + 1) { "" }; i++ }
+        if (options.version) { println("ChatLite CLI ${AppConfig.VERSION_NAME}"); return }
+        val config = CliConfig()
+        val saved = config.load()
+        val server = options.server ?: saved.server ?: "https://chatlite.xin"
+        require(options.server == null || options.server == (saved.server ?: "https://chatlite.xin")
+            || options.quicHost != null && options.quicPort != null) {
+            "切换 REST 服务器请同时指定 --quic-host 和 --quic-port，避免连接到旧环境"
+        }
+        val host = options.quicHost ?: saved.quicHost ?: ServerConfig.QUIC_HOST
+        val port = options.quicPort ?: saved.quicPort ?: ServerConfig.QUIC_PORT
+        // Endpoint selection and validation finish before any DI, token read or network request.
+        ApiEndpoints.setBaseUrl("$server/api")
+        ServerConfig.QUIC_HOST = host
+        ServerConfig.QUIC_PORT = port
+        ServerConfig.DEVICE_TYPE = "cli"
+        val directory = config.directory(server)
+        val passwordFromStdin = if (options.passwordStdin) readCliPassword(System.`in`) else null
+        config.lock(directory).use {
+            fileProvider = CliFileProvider(File(directory, "data"))
+            LocalChatHistoryStore = FileLocalChatHistoryStore(File(directory, "history"))
+            val koin = KoinInitializer.init(platformModules = listOf(desktopModule)).koin
+            try {
+                val transport = koin.get<ChatTransport>()
+                Chat = transport
+                try {
+                    CliConsole().use { console ->
+                        console.output("轻聊 CLI ${AppConfig.VERSION_NAME} · $server · QUIC $host:$port")
+                        val auth = koin.get<AuthRepository>()
+                        if (!login(auth, options, passwordFromStdin, console)) {
+                            throw IllegalStateException("认证未完成")
+                        }
+                        config.save(server, host, port)
+                        runSession(transport, console, server)
+                    }
+                } finally { transport.stop() }
+            } finally {
+                try { KoinInitializer.destroy() } finally { httpClient.close() }
             }
-            i++
         }
     }
 
-    private fun printWelcome() {
-        println("=".repeat(50))
-        println("     ChatLite CLI v1.0 — Server: $serverUrl")
-        println("=".repeat(50))
+    private suspend fun login(auth: AuthRepository, options: CliOptions, supplied: String?, console: CliConsole): Boolean {
+        if (options.username == null && !options.noAutoLogin) {
+            auth.init()
+            if (GlobalAppState.authState.value is AuthState.Authenticated) return true
+        }
+        val account = options.username ?: console.line("账号: ")?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        val password = supplied ?: console.line("密码: ", secret = true) ?: return false
+        val state = auth.login(account, password, rememberMe = true)
+        if (state !is AuthState.Authenticated) console.output("登录失败，请检查账号或网络后重新启动；未切换到其他账号。")
+        return state is AuthState.Authenticated
+    }
+
+    private suspend fun runSession(transport: ChatTransport, console: CliConsole, server: String) = coroutineScope {
+        val session = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(coroutineContext + session + Dispatchers.IO)
+        val valid = java.util.concurrent.atomic.AtomicBoolean(true)
+        val listener = object : MessageReceiveListener {
+            override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long, seqId: Long, conversationId: String) {
+                console.output("[用户 $senderId] $message")
+            }
+            override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long, seqId: Long, conversationId: String) {
+                console.output("[群 $groupId · $senderName] $message")
+            }
+        }
+        val invalidated = AuthStateListener {
+            valid.set(false)
+            transport.stop()
+            console.output("登录已失效，请退出后重新登录。")
+        }
+        val shutdown = Thread({ transport.stop() }, "cli-shutdown")
+        transport.addMessageReceiveListener(listener)
+        transport.addAuthStateListener(invalidated)
+        Runtime.getRuntime().addShutdownHook(shutdown)
+        try {
+            transport.start()
+            // QUIC owns reconnection. Observe authenticated state without starting a second reconnect loop.
+            scope.launch {
+                var connected = false
+                while (isActive) {
+                    val current = transport.isConnected()
+                    if (current != connected) {
+                        connected = current
+                        console.output(if (current) "实时连接已就绪" else "实时连接断开，正在等待传输层恢复")
+                    }
+                    delay(1000)
+                }
+            }
+            console.output("登录成功。输入 /help 查看命令，普通文本会请求 AI 助手。")
+            val account = checkNotNull(GlobalAppState.currentUserId).also { check(it > 0) }
+            val api = ApiService() // Resolve the latest global token at each request, rather than capturing login's token.
+            val sender = CliMessageSender(transport, { wrapper, failed ->
+                if (wrapper.type == MsgType.GROUP_CHAT) {
+                    val message = wrapper.groupChat.localMessage().copy(isSent = false,
+                        deliveryState = if (failed) model.MessageDeliveryState.FAILED else model.MessageDeliveryState.SENDING)
+                    LocalChatHistoryStore.save(account.toString(), emptyList(), listOf(message))
+                } else {
+                    val message = wrapper.chat.localMessage(account).copy(isSent = false,
+                        deliveryState = if (failed) model.MessageDeliveryState.FAILED else model.MessageDeliveryState.SENDING)
+                    LocalChatHistoryStore.save(account.toString(), listOf(message), emptyList())
+                }
+            }, { console.output("◌ 发送中，正在等待服务端确认…") })
+            scope.launch {
+                try {
+                    val messages = ApiService().getOfflineMessages()
+                    if (valid.get() && messages.isNotEmpty()) {
+                        LocalChatHistoryStore.save(account.toString(), messages, emptyList())
+                        console.output("已保存 ${messages.size} 条离线消息；/history user <ID> 查看本地记录。")
+                        messages.takeLast(20).forEach { console.output("[离线 · ${it.senderId}] ${it.message}") }
+                    }
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    console.output("离线消息加载失败，可稍后重新登录重试。")
+                }
+            }
+            while (true) {
+                val line = try { console.line() } catch (_: UserInterruptException) { continue }
+                if (line == null) break
+                if (line.isBlank()) continue
+                try {
+                    val command = CliCommands.parse(line)
+                    val values = command.arguments
+                    if (command.name in listOf("exit", "quit")) break
+                    if (command.name == "help") { help(values.firstOrNull(), console); continue }
+                    if (command.name == "status") {
+                        console.output("服务器: $server · QUIC: ${if (transport.isConnected()) "已认证" else "未就绪"} · 账号: ${GlobalAppState.currentAccount}")
+                        continue
+                    }
+                    check(valid.get()) { "登录已失效，请退出后重新登录" }
+                    withTimeout(35_000) {
+                        when (command.name) {
+                            "ai" -> {
+                                console.output("助手正在处理…")
+                                val text = agentChat(checkNotNull(GlobalAppState.currentToken), values[0])
+                                console.output(text.ifBlank { "助手暂未返回内容，请稍后再试。" })
+                            }
+                            "msg", "group send" -> when (sender.send(account, values[0].toInt(), values[1], command.name == "group send")) {
+                                CliSendResult.ACCEPTED -> Unit // Quiet on success; server ACK is not recipient delivery.
+                                CliSendResult.REJECTED -> console.output("! 服务端拒绝接收消息。")
+                                CliSendResult.UNCONFIRMED -> console.output("! 未收到接收确认，消息可能已送达；请核实后再重发。")
+                            }
+                            "history" -> showHistory(account, values, console)
+                            "friend list" -> api.fetchFriends().also { console.output("好友 ${it.size} 人") }.forEach { console.output("${it.id}  ${it.username}") }
+                            "group list" -> api.fetchGroups().also { console.output("群组 ${it.size} 个") }.forEach { console.output("${it.id}  ${it.username}") }
+                            "friend add" -> result(api.addFriend(values[0]), console)
+                            "friend accept" -> result(api.acceptFriend(values[0]), console)
+                            "friend reject" -> result(api.rejectFriend(values[0]), console)
+                            "group join" -> {
+                                val response = api.addGroupWithResponse(values[0])
+                                if (response.code == GROUP_JOIN_PENDING_CODE) console.output("入群申请已提交，等待管理员审核。")
+                                else result(response.isSuccess, console)
+                            }
+                        }
+                    }
+                } catch (_: TimeoutCancellationException) {
+                    console.output("操作超时，服务端可能已处理，请核实后再决定是否重试。")
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    console.output(if (error is IllegalArgumentException || error is IllegalStateException)
+                        error.message ?: "操作失败" else "操作失败（${error.javaClass.simpleName}），可以继续输入命令。")
+                }
+            }
+        } finally {
+            withContext(NonCancellable) {
+                session.cancelAndJoin()
+                transport.removeMessageReceiveListener(listener)
+                transport.removeAuthStateListener(invalidated)
+                try { transport.logoutAndDisconnect() } finally {
+                    Runtime.getRuntime().removeShutdownHook(shutdown)
+                }
+            }
+        }
+        console.output("再见")
+    }
+
+    private fun showHistory(account: Int, args: List<String>, console: CliConsole) {
+        val target = args[1].toInt()
+        val count = args[2].toInt()
+        val lines = if (args[0] == "group") LocalChatHistoryStore.getGroupMessagesPage(account.toString(), target, 0, count)
+            .sortedBy { it.timestamp }.map { "[${it.senderId}] ${it.text}" }
+        else LocalChatHistoryStore.getPrivateMessagesPage(account.toString(), target, 0, count)
+            .sortedBy { it.timestamp }.map { "[${if (it.sender) "我" else it.senderId}] ${it.message}" }
+        if (lines.isEmpty()) console.output("本地暂无记录；这不表示服务器没有历史消息。")
+        lines.forEach(console::output)
+    }
+    private fun result(ok: Boolean, console: CliConsole) = console.output(if (ok) "操作完成" else "操作未完成，请核实状态。")
+    private fun help(name: String?, console: CliConsole) {
+        val key = name?.removePrefix("/")
+        val commands = CliCommands.usages.filterKeys { key == null || it == key || it.startsWith("$key ") }
+        if (commands.isEmpty()) console.output("没有此命令，请输入 /help")
+        commands.values.forEach(console::output)
     }
 }

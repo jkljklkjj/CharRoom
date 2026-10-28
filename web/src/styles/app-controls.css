@@ -47,8 +47,8 @@
   padding: 12px 16px;
   border: none;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent-1, #ff7a33), var(--accent-2, #ff5f5f));
-  color: white;
+  background: var(--action);
+  color: var(--on-action);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -115,8 +115,8 @@
 
 .theme-options button.active {
   border-color: var(--accent-2);
-  background: var(--accent-2);
-  color: white;
+  background: var(--action);
+  color: var(--on-action);
 }
 
 .theme-options button:hover {

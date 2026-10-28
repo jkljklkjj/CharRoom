@@ -46,12 +46,18 @@ fun SocialScreen(token: String, userId: String, onBack: () -> Unit, onChat: (Use
     LaunchedEffect(vm, initialProfileId) { initialProfileId?.let(vm::profile) }
     val state by vm.state.collectAsState()
     val s = LocalStrings.current
-    var query by remember { mutableStateOf("") }
-    var tag by remember { mutableStateOf("") }
-    var channel by remember { mutableStateOf("all") }
+    var query by remember(vm) { mutableStateOf(vm.filters.query) }
+    var tag by remember(vm) { mutableStateOf(vm.filters.tag) }
+    var channel by remember(vm) { mutableStateOf(vm.filters.channel) }
     val tabs = listOf("people", "encounter", "daily", "me")
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    LaunchedEffect(state.tab, state.profile?.id) { listState.scrollToItem(0) }
+    val pageKey = "${state.tab}:${state.profile?.id.orEmpty()}:${vm.filters}"
+    val listState = remember(vm, pageKey) {
+        val position = vm.position(pageKey)
+        androidx.compose.foundation.lazy.LazyListState(position.index, position.offset)
+    }
+    DisposableEffect(vm, pageKey, listState) {
+        onDispose { vm.rememberPosition(pageKey, listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+    }
     component.BackHandler(enabled = state.profile != null && initialProfileId == null) { vm.closeProfile() }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
@@ -80,7 +86,10 @@ fun SocialScreen(token: String, userId: String, onBack: () -> Unit, onChat: (Use
                     }
                     val profile = state.profile
                     if (profile != null) {
-                        item { SocialProfilePanel(profile, state.busy, vm, onChat) }
+                        item { SocialProfilePanel(profile, state.busy || !state.profileReady, vm, onChat) }
+                        if (!state.profileReady && !state.busy) item {
+                            TextButton(onClick = { vm.profile(profile.id) }) { Text(s["social.retry"]) }
+                        }
                         if (profile.relation == "SELF" && state.blocked.isNotEmpty()) {
                             item { Text(s["social.blockedList"], style = MaterialTheme.typography.subtitle1) }
                             items(state.blocked, key = { it.id }) { person ->
@@ -134,11 +143,11 @@ fun SocialScreen(token: String, userId: String, onBack: () -> Unit, onChat: (Use
                                     }
                                 }
                             }
-                            if (state.cursor != null) item { OutlinedButton(onClick = { vm.search(query, tag, channel, true) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text(s["social.more"]) } }
+                            if (state.cursor != null) item { OutlinedButton(onClick = { vm.search(vm.filters.query, vm.filters.tag, vm.filters.channel, true) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text(s["social.more"]) } }
                         }
                         "encounter" -> item { EncounterPanel(state.room, state.busy, vm) }
                         "daily" -> state.daily?.let { daily ->
-                            item { DailyEditor(daily, state.busy, vm::answer) }
+                            item { DailyEditor(daily, state.answerDraft, state.busy, vm::editAnswer, vm::answer) }
                             items(daily.answers, key = { it.id }) { answer ->
                                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), elevation = 0.dp, border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = .08f))) {
                                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -210,7 +219,7 @@ private fun SocialProfilePanel(profile: SocialProfile,busy: Boolean,vm: SocialVi
                 profile.intent?.takeIf { it.isNotBlank() }?.let { Text(s["social.intent"],style=MaterialTheme.typography.subtitle1);Text(it) }
             } else Text(s["social.hidden"])
             when(profile.relation) {
-                "SELF" -> Button(onClick={editing=true}) { Text(s["social.edit"]) }
+                "SELF" -> Button(onClick={editing=true}, enabled=!busy) { Text(s["social.edit"]) }
                 "FRIEND" -> Button(onClick={onChat(profile.asUser())}) { Text(s["social.chat"]) }
                 "PENDING" -> Text(s["social.pending"])
                 else -> Button(onClick={requesting=!requesting},enabled=!busy) { Text(s["social.add"]) }
@@ -261,13 +270,12 @@ private fun ProfileEditor(profile: SocialProfile,busy: Boolean,onSave: (SocialEd
 }
 
 @Composable
-private fun DailyEditor(daily: DailyQuestion,busy: Boolean,onSave: (String)->Unit) {
+private fun DailyEditor(daily: DailyQuestion, answer: String, busy: Boolean, onEdit: (String)->Unit, onSave: (String)->Unit) {
     val s=LocalStrings.current
-    var answer by remember(daily.day,daily.myAnswer) { mutableStateOf(daily.myAnswer) }
     Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Text(daily.question,style=MaterialTheme.typography.h6)
         Text(daily.day+" · "+s["social.dailyHint"],style=MaterialTheme.typography.caption)
-        OutlinedTextField(answer,{answer=it.take(500)},label={Text(s["social.yourAnswer"])},modifier=Modifier.fillMaxWidth())
+        OutlinedTextField(answer,{onEdit(it.take(500))},label={Text(s["social.yourAnswer"])},modifier=Modifier.fillMaxWidth())
         Button(onClick={onSave(answer)},enabled=!busy) { Text(s["social.publish"]) }
         Text(s["social.answerPrivacy"],style=MaterialTheme.typography.caption)
     }

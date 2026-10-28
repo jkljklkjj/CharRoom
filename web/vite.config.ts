@@ -29,8 +29,8 @@ export default defineConfig({
         description: '简洁安全的即时通讯应用',
         start_url: '/',
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#ff7a33',
+        background_color: '#FAF7F2',
+        theme_color: '#FAF7F2',
         lang: 'zh-CN',
         orientation: 'portrait-primary',
         prefer_related_applications: false,
@@ -70,14 +70,7 @@ export default defineConfig({
           },
           {
             urlPattern: /^https:\/\/chatlite\.xin\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 5 * 60 // 缓存5分钟
-              }
-            }
+            handler: 'NetworkOnly'
           }
         ]
       }

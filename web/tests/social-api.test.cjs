@@ -23,3 +23,16 @@ test('discovery search parameters are escaped and cancellation is forwarded',asy
   assert.equal(new URL('http://local'+call.url).searchParams.get('q'),'猫&狗')
   assert.equal(call.options.signal,signal)
 })
+
+test('successful social mutations invalidate page snapshots but reads and rejected writes do not',async()=>{
+  let invalidations=0,reject=false
+  const {exports:api}=await loadTs(source,{}, {
+    '../services/socialViewCache':{socialViewCache:{invalidate(){invalidations++}}},
+    './http':{API_BASE:'/api',safeFetch:async()=>({ok:true,status:200,body:reject?{code:1005,message:'denied'}:{code:0,data:{}}})}
+  })
+  await api.getSocialProfile('42');assert.equal(invalidations,0)
+  await api.blockSocialUser('42');assert.equal(invalidations,1)
+  await api.answerDailyQuestion('2026-10-28','answer');assert.equal(invalidations,2)
+  await api.actEncounter({action:'exchange'});assert.equal(invalidations,3)
+  reject=true;await assert.rejects(api.blockSocialUser('42'),/denied/);assert.equal(invalidations,3)
+})

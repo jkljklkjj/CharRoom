@@ -34,6 +34,8 @@ class ChatApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AppSettings.installStorage(AndroidSettingsStorage(this))
+        core.NativeSocialCache.installDirectory(java.io.File(filesDir, "social"))
+        core.update.NativeComposerDrafts.installDirectory(java.io.File(filesDir, "drafts"))
 
         // 初始化依赖注入
         KoinInitializer.init {
@@ -66,14 +68,15 @@ class ChatApplication : Application() {
         AvatarCropDialogImpl = AndroidAvatarCropDialog
         // 原生 QUIC：ALPN custom，与后端控制流/会话流协议一致。
         Chat = QuicheChatClient(this)
+        com.chatlite.charroom.core.initAppUpdateManager(this)
         core.PlatformMessageNotifications.sink = object : core.MessageNotificationSink {
             override fun privateMessage(senderId: Int, content: String) {
-                val user = core.state.GlobalChatState.users.value.firstOrNull { it.id == senderId }
+                val user = core.state.GlobalChatState.users.value.firstOrNull { !it.isGroup && it.id == senderId }
                 chatNotificationManager.showPrivateMessageNotification(senderId, user?.username, content)
             }
             override fun groupMessage(groupId: Int, senderId: Int, senderName: String, content: String) {
                 if (senderId == core.state.GlobalAppState.currentUserId) return
-                val group = core.state.GlobalChatState.users.value.firstOrNull { it.id == -groupId }
+                val group = core.state.GlobalChatState.users.value.firstOrNull { it.conversationKey == model.ConversationKey.group(groupId) }
                 chatNotificationManager.showGroupMessageNotification(groupId, group?.username, senderName, content)
             }
         }

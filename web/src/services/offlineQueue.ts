@@ -1,183 +1,117 @@
 import type { MessageWrapper } from '../proto/messages'
 import type { SendOptions } from '../types/transport'
 export const MAX_RETRIES = 3
-/** 离线队列容量上限（条数），达到上限后新消息不再入队 */
 export const MAX_QUEUE_SIZE = 1000
 export interface QueueEntry {
-  messageId: string; wrapperObj: MessageWrapper; buffer: number[] | Uint8Array<ArrayBuffer>
-  opts: SendOptions; timestamp: number; retryCount: number
+  accountId: string; messageId: string; wrapperObj: MessageWrapper; buffer: Uint8Array<ArrayBuffer>
+  opts: SendOptions; timestamp: number; nextAttemptAt: number; retryCount: number; state: 'pending' | 'sending' | 'failed'
 }
-/**
- * PWA 离线消息队列（IndexedDB 持久化）。
- *
- * 当用户发送消息时网络不可用，消息存入 IndexedDB。
- * 网络恢复后自动重发并清理已发送的消息。
- */
-
-const DB_NAME = 'chatlite_offline'
-const DB_VERSION = 1
-const STORE_NAME = 'pending_messages'
-
-let db: IDBDatabase | null = null
-
-/**
- * 打开 IndexedDB 连接（懒初始化）。
- */
-function openDB(): Promise<IDBDatabase> {
-  if (db) return Promise.resolve(db)
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-    request.onupgradeneeded = (event) => {
-      const database = request.result
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        const store = database.createObjectStore(STORE_NAME, { keyPath: 'messageId' })
-        store.createIndex('timestamp', 'timestamp', { unique: false })
+const STORE = 'account_outbox'
+let database: Promise<IDBDatabase> | null = null
+function openDB() {
+  database ??= new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open('chatlite_offline', 3)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(STORE)) {
+        const store = db.createObjectStore(STORE, { keyPath: ['accountId', 'messageId'] })
+        store.createIndex('account', 'accountId')
       }
+      const store = request.transaction!.objectStore(STORE)
+      if (!store.indexNames.contains('due')) store.createIndex('due', ['accountId', 'nextAttemptAt'])
+
     }
-    request.onsuccess = (event) => {
-      db = request.result
+    request.onerror = () => { database = null; reject(request.error) }
+    request.onsuccess = () => {
+      const db = request.result
+      db.onversionchange = () => { db.close(); database = null }
       resolve(db)
     }
-    request.onerror = (event) => {
-      console.error('[OfflineQueue] IndexedDB 打开失败:', request.error)
-      reject(request.error)
+  })
+  return database
+}
+function owner(accountId: string) { if (!accountId) throw new Error('Outbox owner required'); return String(accountId) }
+async function mutate<T>(operation: (store: IDBObjectStore, result: (value: T) => void) => void): Promise<T> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    let value: T
+    tx.oncomplete = () => resolve(value)
+    tx.onerror = tx.onabort = () => reject(tx.error || new Error('Outbox transaction failed'))
+    operation(tx.objectStore(STORE), result => { value = result })
+  })
+}
+export async function saveToQueue(accountId: string, wrapperObj: MessageWrapper, buffer: ArrayBuffer, opts: SendOptions) {
+  const account = owner(accountId), messageId = wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId
+  if (!messageId) throw new Error('Stable message ID required')
+  return mutate<boolean>((store, result) => {
+    const existing = store.get([account, messageId])
+    existing.onsuccess = () => {
+      if (existing.result) { result(true); return }
+      const count = store.index('account').count(IDBKeyRange.only(account))
+      count.onsuccess = () => {
+        if (count.result >= MAX_QUEUE_SIZE) { store.transaction.abort(); return }
+        store.put({ accountId: account, messageId, wrapperObj: JSON.parse(JSON.stringify(wrapperObj)), buffer: new Uint8Array(buffer),
+          opts: { ...opts }, timestamp: Date.now(), nextAttemptAt: 0, retryCount: 0, state: 'pending' } satisfies QueueEntry)
+        result(true)
+      }
     }
   })
 }
-
-/**
- * 保存消息到离线队列。
- * @param {object} wrapperObj - protobuf wrapper 对象
- * @param {ArrayBuffer} buffer - 编码后的 protobuf 二进制
- * @param {object} opts - { streamType, conversationId }
- */
-export async function saveToQueue(wrapperObj: MessageWrapper, buffer: ArrayBuffer, opts: SendOptions) {
-  try {
-    const database = await openDB()
-    const tx = database.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-
-    const entry: QueueEntry = {
-      messageId: wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId || `offline_${Date.now()}`,
-      wrapperObj,
-      buffer: new Uint8Array(buffer), // IndexedDB stores typed arrays through structured clone
-      opts,
-      timestamp: Date.now(),
-      retryCount: 0
-    }
-
-    return new Promise((resolve) => {
-      // 队列容量上限检查，避免 PWA 离线期间 IndexedDB 无限增长
-      const countRequest = store.count()
-      countRequest.onsuccess = () => {
-        if (countRequest.result >= MAX_QUEUE_SIZE) {
-          console.warn(`[OfflineQueue] 队列已满(${MAX_QUEUE_SIZE})，丢弃消息:`, entry.messageId)
-          resolve(false) // 队列满未保存，明确返回 false，不再误导调用方
-          return
-        }
-        store.put(entry)
-      }
-      countRequest.onerror = () => resolve(false)
-      tx.oncomplete = () => resolve(true)
-      tx.onerror = (e) => {
-        console.warn('[OfflineQueue] 保存失败:', tx.error)
-        resolve(false)
-      }
-    })
-  } catch (e) {
-    console.warn('[OfflineQueue] saveToQueue 异常:', e)
-    return false
-  }
+export async function getAllPending(accountId: string): Promise<QueueEntry[]> {
+  const account = owner(accountId), db = await openDB()
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE).objectStore(STORE).index('account').getAll(IDBKeyRange.only(account))
+    request.onsuccess = () => resolve((request.result as QueueEntry[]).sort((a, b) => a.timestamp - b.timestamp))
+    request.onerror = () => reject(request.error)
+  })
 }
-
-/**
- * 获取所有待发送的消息。
- * @returns {Array} 待发送消息列表
- */
-export async function getAllPending(): Promise<QueueEntry[]> {
-  try {
-    const database = await openDB()
-    const tx = database.transaction(STORE_NAME, 'readonly')
-    const store = tx.objectStore(STORE_NAME)
-    const request = store.getAll()
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || [])
-      request.onerror = (e) => reject(tx.error)
-    })
-  } catch (e) {
-    console.warn('[OfflineQueue] getAllPending 异常:', e)
-    return []
-  }
+export async function removeMessage(accountId: string, messageId: string) {
+  return mutate<void>(store => { store.delete([owner(accountId), messageId]) })
 }
-
-/**
- * 删除已发送的消息。
- * @param {string} messageId
- */
-export async function removeMessage(messageId: string) {
-  try {
-    const database = await openDB()
-    const tx = database.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    store.delete(messageId)
-  } catch (e) {
-    console.warn('[OfflineQueue] removeMessage 异常:', e)
-  }
+export async function getPending(accountId: string, messageId: string): Promise<QueueEntry | null> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE).objectStore(STORE).get([owner(accountId), messageId])
+    request.onsuccess = () => resolve(request.result || null)
+    request.onerror = () => reject(request.error)
+  })
 }
-
-/**
- * 清空整个离线队列。
- */
-export async function clearQueue() {
-  try {
-    const database = await openDB()
-    const tx = database.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    store.clear()
-  } catch (e) {
-    console.warn('[OfflineQueue] clearQueue 异常:', e)
-  }
+export async function getDuePending(accountId: string, now = Date.now(), limit = 32): Promise<QueueEntry[]> {
+  const account = owner(accountId), db = await openDB()
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE).objectStore(STORE).index('due')
+      .getAll(IDBKeyRange.bound([account, 0], [account, now]), Math.max(1, Math.min(100, limit)))
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
 }
-
-/**
- * 获取队列中的消息数量。
- */
-export async function getQueueSize(): Promise<number> {
-  try {
-    const database = await openDB()
-    const tx = database.transaction(STORE_NAME, 'readonly')
-    const store = tx.objectStore(STORE_NAME)
-    const request = store.count()
-
-    return new Promise((resolve) => {
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => resolve(0)
-    })
-  } catch (e) {
-    return 0
-  }
-}
-
-/**
- * 重试发送单条消息（更新重试计数）。
- * @param {string} messageId
- */
-export async function incrementRetry(messageId: string) {
-  try {
-    const database = await openDB()
-    const tx = database.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    const request = store.get(messageId)
-
+async function update(accountId: string, messageId: string, change: (row: QueueEntry) => void) {
+  return mutate<QueueEntry | null>((store, result) => {
+    const request = store.get([owner(accountId), messageId])
     request.onsuccess = () => {
-      const entry = request.result as QueueEntry | undefined
-      if (entry) {
-        entry.retryCount = (entry.retryCount || 0) + 1
-        store.put(entry)
-      }
+      const row = request.result as QueueEntry | undefined
+      if (!row) { result(null); return }
+      change(row); store.put(row); result(row)
     }
-  } catch (e) {
-    // ignore
-  }
+  })
+}
+export const markAttempt = (accountId: string, messageId: string) => update(accountId, messageId, row => {
+  row.retryCount++; row.state = 'sending'; row.nextAttemptAt = Date.now() + 16000
+})
+export const markFailed = (accountId: string, messageId: string) => update(accountId, messageId, row => { row.state = 'failed'; row.nextAttemptAt = Number.MAX_SAFE_INTEGER })
+export const retryMessage = (accountId: string, messageId: string) => update(accountId, messageId, row => { row.state = 'pending'; row.retryCount = 0; row.nextAttemptAt = 0 })
+export async function clearQueue(accountId: string) {
+  return mutate<void>(store => {
+    const request = store.index('account').openCursor(IDBKeyRange.only(owner(accountId)))
+    request.onsuccess = () => { const cursor = request.result; if (cursor) { cursor.delete(); cursor.continue() } }
+  })
+}
+export async function getQueueSize(accountId: string): Promise<number> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE).objectStore(STORE).index('account').count(IDBKeyRange.only(owner(accountId)))
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
 }

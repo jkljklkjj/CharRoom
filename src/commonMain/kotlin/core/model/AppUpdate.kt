@@ -8,10 +8,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AppVersionInfo(
     /**
-     * 版本号（整数，用于比较）
-     */
-    val versionCode: Int,
-    /**
      * 版本名称（显示用，如"1.0.0"）
      */
     val versionName: String,
@@ -23,18 +19,15 @@ data class AppVersionInfo(
      * 下载地址
      */
     val downloadUrl: String,
+    val packageType: String,
+    val architecture: String,
+    val fileSize: Long,
+    val sha256: String,
+    val versionCode: Int,
     /**
      * 是否强制更新
      */
     val forceUpdate: Boolean = false,
-    /**
-     * 文件大小（字节）
-     */
-    val fileSize: Long = 0,
-    /**
-     * 文件MD5校验值
-     */
-    val md5: String? = null,
     /**
      * 发布时间
      */

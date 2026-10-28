@@ -60,8 +60,6 @@ import core.AppSettings
 import core.GlobalAppUpdateManager
 import core.LocalChatHistoryStore
 import core.ThemeMode
-import core.UpdateState
-import core.model.AppVersionInfo
 import core.state.GlobalAppState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,52 +93,8 @@ fun SettingsScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
-    var showUpdateDialog by remember { mutableStateOf(false) }
-    var showUpdateProgressDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
-    var latestVersionInfo: AppVersionInfo? by remember { mutableStateOf(null) }
-    var updateError: String? by remember { mutableStateOf(null) }
-
-    // Listen for update state
-    val updateState by GlobalAppUpdateManager.updateState.collectAsState()
-
-    LaunchedEffect(updateState) {
-        when (val state = updateState) {
-            is UpdateState.Available -> {
-                latestVersionInfo = state.versionInfo
-                showUpdateDialog = true
-            }
-            is UpdateState.Downloading -> {
-                showUpdateProgressDialog = true
-            }
-            is UpdateState.Downloaded -> {
-                showUpdateProgressDialog = false
-                // Ask whether to install
-                if (state.versionInfo.forceUpdate) {
-                    // Force update installs directly
-                    launch(Dispatchers.IO) {
-                        GlobalAppUpdateManager.installUpdate(state.filePath)
-                    }
-                } else {
-                    // Show confirm install dialog
-                    showUpdateDialog = true
-                }
-            }
-            is UpdateState.Failed -> {
-                showUpdateProgressDialog = false
-                // Silent failure, no popup
-                updateError = state.error
-                AppLog.w({ "Check for update failed: ${state.error}" })
-            }
-            is UpdateState.NoUpdate -> {
-                updateError = s["settings.up.to.date"]
-                showUpdateDialog = true
-            }
-            else -> {}
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -355,156 +309,6 @@ fun SettingsScreen(
         )
     }
 
-    // Update notification dialog
-    if (showUpdateDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showUpdateDialog = false
-                updateError = null
-                if (latestVersionInfo?.forceUpdate == true) {
-                    // Force update cannot be dismissed
-                    return@AlertDialog
-                }
-            },
-            title = {
-                Text(
-                    when {
-                        updateError != null -> s["settings.update.title"]
-                        latestVersionInfo != null -> s["settings.update.found"].format(latestVersionInfo?.versionName ?: "")
-                        else -> s["settings.update.checking"]
-                    }
-                )
-            },
-            text = {
-                when {
-                    updateError != null -> {
-                        Text(updateError!!)
-                    }
-                    latestVersionInfo != null -> {
-                        val version = latestVersionInfo!!
-                        Column {
-                            Text(s["settings.update.size"].format(formatFileSize(s, version.fileSize)))
-                            if (version.releaseTime != null) {
-                                Text(s["settings.update.release.time"].format(version.releaseTime))
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(s["settings.update.content"].format(version.updateContent))
-                            if (version.forceUpdate) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(s["settings.update.force"], color = MaterialTheme.colors.error)
-                            }
-                        }
-                    }
-                    else -> {
-                        Text(s["settings.update.checking.dots"])
-                    }
-                }
-            },
-            confirmButton = {
-                when {
-                    updateError != null -> {
-                        TextButton(onClick = {
-                            showUpdateDialog = false
-                            updateError = null
-                        }) {
-                            Text(s["settings.confirm"])
-                        }
-                    }
-                    latestVersionInfo != null -> {
-                        val version = latestVersionInfo!!
-                        when (updateState) {
-                            is UpdateState.Downloaded -> {
-                                Button(
-                                    onClick = {
-                                        showUpdateDialog = false
-                                        coroutineScope.launch(Dispatchers.IO) {
-                                            val filePath = (updateState as UpdateState.Downloaded).filePath
-                                            GlobalAppUpdateManager.installUpdate(filePath)
-                                        }
-                                    }
-                                ) {
-                                    Text(s["settings.update.install"])
-                                }
-                            }
-                            else -> {
-                                Button(
-                                    onClick = {
-                                        showUpdateDialog = false
-                                        coroutineScope.launch(Dispatchers.IO) {
-                                            GlobalAppUpdateManager.downloadUpdate(version)
-                                        }
-                                    }
-                                ) {
-                                    Text(if (version.forceUpdate) s["settings.update.force.update"] else s["settings.update.now"])
-                                }
-                            }
-                        }
-                    }
-                    else -> {}
-                }
-            },
-            dismissButton = {
-                if (latestVersionInfo?.forceUpdate != true && updateError == null && latestVersionInfo != null) {
-                    TextButton(
-                        onClick = {
-                            showUpdateDialog = false
-                        },
-                        enabled = latestVersionInfo?.forceUpdate != true
-                    ) {
-                        Text(s["settings.update.later"])
-                    }
-                }
-            }
-        )
-    }
-
-    // Update progress dialog
-    if (showUpdateProgressDialog) {
-        val downloadState = updateState as? UpdateState.Downloading
-        AlertDialog(
-            onDismissRequest = {
-                if (latestVersionInfo?.forceUpdate != true) {
-                    showUpdateProgressDialog = false
-                    GlobalAppUpdateManager.cancelDownload()
-                }
-            },
-            title = { Text(s["settings.update.downloading"]) },
-            text = {
-                Column {
-                    val progress = downloadState?.progress ?: 0
-                    val total = downloadState?.total ?: 0
-                    Text(s["settings.update.downloaded"].format(progress, formatFileSize(s, progress.toLong() * total / 100), formatFileSize(s, total)))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // Simple progress bar
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .background(Color.LightGray, RoundedCornerShape(4.dp))
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(progress / 100f)
-                                .height(8.dp)
-                                .background(MaterialTheme.colors.primary, RoundedCornerShape(4.dp))
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                if (latestVersionInfo?.forceUpdate != true) {
-                    TextButton(onClick = {
-                        showUpdateProgressDialog = false
-                        GlobalAppUpdateManager.cancelDownload()
-                    }) {
-                        Text(s["settings.cancel"])
-                    }
-                }
-            }
-        )
-    }
-
     // ── Theme selection dialog ──
     if (showThemeDialog) {
         val currentTheme by AppSettings.themeMode.collectAsState()
@@ -605,15 +409,7 @@ fun SettingsScreen(
 /**
  * Format file size to human-readable string
  */
-private fun formatFileSize(s: Strings, size: Long): String {
-    return when {
-        size <= 0 -> s["settings.file.size.unknown"]
-        size < 1024 -> "$size B"
-        size < 1024 * 1024 -> "%.1f KB".format(size / 1024.0)
-        size < 1024 * 1024 * 1024 -> "%.1f MB".format(size / (1024.0 * 1024))
-        else -> "%.1f GB".format(size / (1024.0 * 1024 * 1024))
-    }
-}
+
 
 /**
  * Settings item component

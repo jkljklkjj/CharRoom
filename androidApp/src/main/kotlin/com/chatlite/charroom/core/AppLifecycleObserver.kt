@@ -38,6 +38,7 @@ object AppLifecycleObserver : Application.ActivityLifecycleCallbacks {
 
     private fun updateForegroundState() {
         isAppInForeground = activityCount > 0
+        core.AppActivity.foreground(isAppInForeground)
     }
 
     /**

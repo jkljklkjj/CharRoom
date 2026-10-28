@@ -86,7 +86,7 @@ fun MessageBubble(
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             // 重发按钮
-            if (isMine && !message.chatIsSent && onResend != null) {
+            if (isMine && message.chatDeliveryState == model.MessageDeliveryState.FAILED && onResend != null) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = s["chat.resend"],
@@ -163,6 +163,15 @@ fun MessageBubble(
                         message = message,
                         bubbleTextColor = bubbleTextColor
                     )
+
+                    if (isMine && message.chatDeliveryState != model.MessageDeliveryState.ACCEPTED) {
+                        val key = when (message.chatDeliveryState) {
+                            model.MessageDeliveryState.QUEUED -> "chat.queued"
+                            model.MessageDeliveryState.SENDING -> "chat.sending"
+                            else -> "chat.send.failed"
+                        }
+                        Text(s[key], style = MaterialTheme.typography.caption, color = bubbleTextColor.copy(alpha = 0.7f))
+                    }
 
                     // 时间戳
                     if (showTimestamp) {

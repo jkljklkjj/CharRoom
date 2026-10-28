@@ -9,6 +9,7 @@ function loginSync(api, store) {
   const start = source.indexOf('async function syncAllConversations()')
   const end = source.indexOf('/** 建立 WebTransport', start)
   const code = ts.transpileModule(source.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+  store.beginHistorySync=()=>()=>{}
   const context = vm.createContext({ api, store, console, Date, Number, String, BigInt, sessionEpoch: { capture: () => ({ isCurrent: () => true }) } })
   const mapping = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/utils/historyMessages.ts'), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace('export function', 'function')
   vm.runInContext(mapping, context)

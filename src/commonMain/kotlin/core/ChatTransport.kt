@@ -93,6 +93,11 @@ interface ChatTransport {
  * 全局消息接收回调接口
  */
 interface MessageReceiveListener {
+    /** Preserves server message identity and metadata; legacy listeners remain compatible. */
+    fun onPrivateEnvelope(message: model.Message) = onPrivateMessageReceived(message.senderId,
+        message.message, message.timestamp, message.seqId, message.conversationId)
+    fun onGroupEnvelope(message: model.GroupMessage) = onGroupMessageReceived(message.groupId,
+        message.senderId, message.senderName, message.text, message.timestamp, message.seqId, message.conversationId)
     /**
      * 收到私聊消息
      * @param seqId 会话级序列号（用于增量同步游标，0 表示服务端未携带）
@@ -133,6 +138,7 @@ interface MessageReceiveListener {
      * @param seqId 当前会话的 seqId（用于更新增量同步游标）
      * @param conversationId 会话 ID
      */
+    fun onMessageIdConfirmed(clientId: String, serverId: String, seqId: Long, conversationId: String) {}
     fun onAckReceived(messageId: String, seqId: Long, conversationId: String) {}
 
     /** 服务端拒绝接收该消息，不可作为发送成功处理。 */

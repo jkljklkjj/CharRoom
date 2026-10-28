@@ -2,6 +2,17 @@ package com.chatlite.i18n
 
 val jaStrings = Strings(
     mapOf(
+        "update.recheckRelease" to "公開バージョンを再確認",
+        "update.completed" to "%s に更新しました",
+        "update.progress" to "ダウンロード中 %d%% · %d MiB",
+        "update.verifying" to "インストーラーの整合性と署名を確認中…",
+        "update.preparing" to "メッセージと下書きを保存中…",
+        "update.installing" to "システムインストーラーを開いています…",
+        "update.handedOff" to "インストーラーを開きました。インストール後に軽聊を再起動してください。完了はまだ確認されていません。",
+        "update.failed" to "更新は完了していません。現在のバージョンは保持されています。",
+        "update.ready" to "検証済みです。インストール前にメッセージと下書きを保存します。今すぐ実行しますか？",
+        "update.retry" to "再試行",
+        "update.recheck" to "インストール状態を確認",
         "contacts.tab.messages" to "メッセージ",
         "contacts.tab.contacts" to "連絡先",
         "contacts.directory" to "つながりを、ひとつの場所に",
@@ -66,6 +77,7 @@ val jaStrings = Strings(
         "chat.placeholder" to "楽しいことを話しましょう...",
         "chat.send" to "送信",
         "chat.send.failed" to "送信に失敗しました。アイコンをタップして再試行",
+        "chat.queued" to "送信待ち…",
         "chat.sending" to "送信中...",
         "chat.resend" to "再送信",
         "chat.emoji" to "絵文字",

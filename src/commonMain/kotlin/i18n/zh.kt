@@ -2,6 +2,17 @@ package com.chatlite.i18n
 
 val zhStrings = Strings(
     mapOf(
+        "update.recheckRelease" to "重新检查发布版本",
+        "update.completed" to "已更新至 %s",
+        "update.progress" to "正在下载 %d%% · %d MiB",
+        "update.verifying" to "正在校验安装包完整性与身份…",
+        "update.preparing" to "正在保存消息和草稿，请稍候…",
+        "update.installing" to "正在交给系统安装器…",
+        "update.handedOff" to "已打开系统安装器。请完成安装并重新启动轻聊；这还不代表安装成功。",
+        "update.failed" to "更新未完成，当前版本仍然保留。",
+        "update.ready" to "安装包已校验。安装前会保存消息和草稿，请确认现在安装。",
+        "update.retry" to "重试",
+        "update.recheck" to "重新检查安装状态",
         "contacts.tab.messages" to "消息",
         "contacts.tab.contacts" to "联系人",
         "contacts.directory" to "常联系的人，都在这里",
@@ -68,6 +79,7 @@ val zhStrings = Strings(
         "chat.placeholder" to "说点有趣的...",
         "chat.send" to "发送",
         "chat.send.failed" to "发送失败，点击图标重试",
+        "chat.queued" to "等待发送…",
         "chat.sending" to "发送中...",
         "chat.resend" to "重发",
         "chat.emoji" to "表情",

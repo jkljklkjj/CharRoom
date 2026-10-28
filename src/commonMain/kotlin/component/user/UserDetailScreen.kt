@@ -58,11 +58,11 @@ fun UserDetailScreen(
                 it.avatarUrl?.let { url ->
                     if (url.isNotBlank()) {
                         val cacheKey = it.avatarKey
-                        avatarBitmap = cacheKey?.let { key -> getCachedImage(key) } ?: loadImageBitmapFromUrl(url, cacheKey)
+                        avatarBitmap = getCachedImage(url, cacheKey) ?: loadImageBitmapFromUrl(url, cacheKey)
                     }
                 }
                 // 检查是否已经是好友
-                isFriend = chatViewModel.usersFlow.value.any { u -> u.id == userId }
+                isFriend = chatViewModel.usersFlow.value.any { u -> !u.isGroup && u.id == userId }
             }
             isLoading = false
         }
@@ -78,7 +78,7 @@ fun UserDetailScreen(
             if (success) {
                 user?.let { targetUser ->
                     val currentUsers = chatViewModel.usersFlow.value
-                    if (currentUsers.none { it.id == targetUser.id }) {
+                    if (currentUsers.none { it.conversationKey == targetUser.conversationKey }) {
                         chatViewModel.updateUsers(currentUsers + targetUser)
                     }
                 }

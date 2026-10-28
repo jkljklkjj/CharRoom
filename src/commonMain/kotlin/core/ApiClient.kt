@@ -151,6 +151,7 @@ suspend inline fun <reified T> sendRequest(
             }
         }
     } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
         ApiResponse(
             code = -1,
             message = e.message ?: "Unknown error"
@@ -458,7 +459,7 @@ fun convertMessages(messages: List<GroupMessageSerializer>, groupId: Int): List<
         val senderIdInt = msg.senderId.toIntOrNull() ?: 0
         Message(
             senderId = senderIdInt,
-            receiverId = -groupId, // 群消息receiverId用负的groupId表示
+            receiverId = groupId,
             message = msg.content,
             sender = msg.senderId == GlobalAppState.currentAccount,
             timestamp = msg.timestamp,

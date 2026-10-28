@@ -10,14 +10,17 @@ class ProtobufMessageDispatcher(
     private val agentHandler: () -> AgentStreamHandler? = { null },
     private val onResponse: (MessageProtos.ResponseMessage) -> Unit = {},
     private val onAcknowledgement: (MessageProtos.AckMessage, ByteArray) -> Unit = { _, _ -> },
-    private val onFailure: (Exception) -> Unit = {}
+    private val onFailure: (Exception) -> Unit = {},
+    private val persistIncoming: (MessageProtos.MessageWrapper) -> Unit = {},
+    private val accountId: () -> Int = { 0 }
 ) {
     private val recent = object : LinkedHashMap<String, Boolean>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?): Boolean =
             size > MessageProtocol.RECENT_MESSAGE_LIMIT
     }
 
-    fun clear() = synchronized(recent) { recent.clear() }
+    private val agentText = linkedMapOf<Long, String>()
+    @Synchronized fun clear() { synchronized(recent) { recent.clear() }; agentText.clear() }
 
     private fun seen(key: String): Boolean = synchronized(recent) { recent[key] == true }
     private fun remember(key: String) = synchronized(recent) { recent[key] = true }
@@ -42,8 +45,12 @@ class ProtobufMessageDispatcher(
             MsgType.RESPONSE -> if (wrapper.hasResponse()) onResponse(wrapper.response)
             MsgType.ACK -> if (wrapper.hasAck()) {
                 val ack = wrapper.ack
+                if ((ack.success) && ack.serverMessageId.isNotBlank() && ack.seqId > 0) {
+                    persistIncoming(wrapper)
+                    notifyListeners { it.onMessageIdConfirmed(ack.messageId, ack.serverMessageId, ack.seqId, ack.conversationId) }
+                }
                 onAcknowledgement(ack, data)
-                if (ack.hasSuccess() && !ack.success) {
+                if (!ack.success) {
                     notifyListeners { it.onAckRejected(ack.messageId, ack.message) }
                 } else {
                     notifyListeners { it.onAckReceived(ack.messageId, ack.seqId, ack.conversationId) }
@@ -51,28 +58,30 @@ class ProtobufMessageDispatcher(
             }
             MsgType.CHAT, MsgType.AGENT_CHAT -> if (wrapper.hasChat()) {
                 val chat = wrapper.chat
+                require(chat.messageId.isNotBlank()) { "Missing private message ID" }
                 val key = "chat:${chat.messageId}"
-                if (chat.messageId.isNotBlank() && seen(key)) {
+                if (seen(key)) {
                     safely { acknowledge(chat.messageId, chat.conversationId) }
                     return@safely
                 }
-                val delivered = notifyListeners { it.onPrivateMessageReceived(chat.userId.toInt(), chat.content,
-                    chat.timestamp, chat.seqId, chat.conversationId) }
-                if (delivered && chat.messageId.isNotBlank()) {
+                persistIncoming(wrapper)
+                val delivered = notifyListeners { it.onPrivateEnvelope(chat.localMessage(accountId())) }
+                if (delivered) {
                     remember(key)
                     safely { acknowledge(chat.messageId, chat.conversationId) }
                 }
             }
             MsgType.GROUP_CHAT -> if (wrapper.hasGroupChat()) {
                 val chat = wrapper.groupChat
+                require(chat.messageId.isNotBlank()) { "Missing group message ID" }
                 val key = "group:${chat.messageId}"
-                if (chat.messageId.isNotBlank() && seen(key)) {
+                if (seen(key)) {
                     safely { acknowledge(chat.messageId, chat.conversationId) }
                     return@safely
                 }
-                val delivered = notifyListeners { it.onGroupMessageReceived(chat.targetClientId.toInt(), chat.userId.toInt(),
-                    chat.userId.toString(), chat.content, chat.timestamp, chat.seqId, chat.conversationId) }
-                if (delivered && chat.messageId.isNotBlank()) {
+                persistIncoming(wrapper)
+                val delivered = notifyListeners { it.onGroupEnvelope(chat.localMessage()) }
+                if (delivered) {
                     remember(key)
                     safely { acknowledge(chat.messageId, chat.conversationId) }
                 }
@@ -91,7 +100,13 @@ class ProtobufMessageDispatcher(
                 } else {
                     if (seen(terminalKey) || seen(key)) return@safely
                 }
-                val text = if (stream.hasText()) stream.text else ""
+                persistIncoming(wrapper)
+                val previous = agentText[stream.requestId].orEmpty()
+                val text = previous + when (stream.type) {
+                    AgentStreamType.STREAM_TEXT -> stream.text
+                    AgentStreamType.STREAM_ERROR -> "\n" + stream.error.message
+                    else -> ""
+                }
                 val handler = agentHandler()
                 val delivered = if (handler != null) {
                     handler.onAgentStreamChunk(stream.requestId.toString(), text, done, error)
@@ -104,6 +119,8 @@ class ProtobufMessageDispatcher(
                         if (stream.hasUsage()) stream.usage.outputTokens else 0) }
                 }
                 if (delivered) {
+                    agentText[stream.requestId] = text
+                    while (agentText.size > 200) agentText.remove(agentText.keys.first())
                     remember(key)
                     if (done || error) safely { acknowledge(stream.requestId.toString(), "agent") }
                 }

@@ -1,38 +1,19 @@
+/* Matches the native QingliaoPalette; action and decoration have separate roles. */
 :root{
-  --bg:#fff8f5;
-  --panel:#ffffff;
-  --accent-1:#ff9966; /* 冷橙 */
-  --accent-2:#ff7a33;
-  --muted:#666;
-  --surface-border: rgba(0,0,0,0.04);
-  --surface-border-strong: rgba(0,0,0,0.08);
-  --surface-2:#f0f0f0; /* 头像等次级表面 */
-  --hover: rgba(0,0,0,0.05);
-  --input-bg:#fafafa;
-  --input-border:#e8e8e8;
-  --input-placeholder:#bbb;
-  --text-primary: #222;
-  --text-secondary: #666;
-  --bubble-bg: #f5f5f5;
+  --bg:#FAF7F2;--panel:#FFFDF9;--text-primary:#342B25;--text-secondary:#75665B;--muted:#75665B;
+  --accent-1:#F47B35;--accent-2:#B94D1D;--action:#B94D1D;--on-action:#FFFFFF;
+  --apricot:#FFEAD8;--on-apricot:#98451E;--message-self:#FFDFC4;--on-message-self:#59341F;
+  --surface-border:#E8DED3;--surface-border-strong:#DBCDBF;--surface-2:#F1E8DC;--hover:#F3EBE1;
+  --input-bg:#FFFDF9;--input-border:#DBCDBF;--input-placeholder:#89796B;--bubble-bg:#FFFDF9;
+  --sage-soft:#E9EEE7;--sage-ink:#476456;--bubble-radius:17px;--avatar-radius:14px;
 }
-
-/* 深色主题 */
-[data-theme="dark"] {
-  --bg:#1a1a1a;
-  --panel:#2d2d2d;
-  --accent-1:#ff9966;
-  --accent-2:#ff7a33;
-  --muted:#9a9a9a;
-  --surface-border: rgba(255,255,255,0.08);
-  --surface-border-strong: rgba(255,255,255,0.14);
-  --surface-2:#3a3a3a;
-  --hover: rgba(255,255,255,0.08);
-  --input-bg:#232323;
-  --input-border:#3d3d3d;
-  --input-placeholder:#7d7d7d;
-  --text-primary: #f2f2f2;
-  --text-secondary: #b5b5b5;
-  --bubble-bg: #3d3d3d;
+[data-theme="dark"]{
+  --bg:#211D1A;--panel:#2D2722;--text-primary:#F4EAE0;--text-secondary:#C2B2A4;--muted:#C2B2A4;
+  --accent-1:#F69250;--accent-2:#FFB17A;--action:#FFB17A;--on-action:#43230F;
+  --apricot:#483122;--on-apricot:#FFBD8D;--message-self:#573924;--on-message-self:#FFE5D0;
+  --surface-border:#463B32;--surface-border-strong:#645345;--surface-2:#3B322B;--hover:#3A3028;
+  --input-bg:#2D2722;--input-border:#645345;--input-placeholder:#B5A394;--bubble-bg:#2D2722;
+  --sage-soft:#29392F;--sage-ink:#B6D2BD;
 }
 body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans CJK SC",sans-serif;background:var(--bg);color:var(--text-primary);margin:0;overflow-x:hidden}
 
@@ -66,14 +47,14 @@ body.app-viewport #app {
 
 /* 2. 触摸体验优化 */
 * {
-  /* 禁用长按选择/复制，提升应用感 */
-  user-select: none;
+  /* 浏览器正文保留选择和复制能力。 */
+  user-select: auto;
   /* 禁用点击高亮效果 */
   -webkit-tap-highlight-color: transparent;
   /* 禁止双击缩放 */
   touch-action: manipulation;
-  /* 平滑滚动 */
-  scroll-behavior: smooth;
+  /* 列表定位由组件控制，不全局强制平滑滚动。 */
+  scroll-behavior: auto;
 }
 
 /* 3. iOS弹性滚动优化 */
@@ -151,3 +132,15 @@ img {
 html,body,#app{height:100%}
 .app-main{display:flex;height:100%}
 
+
+/* Shared product primitives used by the demo and the real conversation. */
+.paper-avatar{display:inline-grid;place-items:center;flex:none;width:42px;height:42px;border-radius:var(--avatar-radius);background:var(--apricot);color:var(--on-apricot);font-weight:600;font-size:17px}
+.paper-avatar.small{width:30px;height:30px;border-radius:10px;font-size:12px}.paper-avatar.sage{background:var(--sage-soft);color:var(--sage-ink)}
+.paper-bubble{background:var(--bubble-bg);color:var(--text-primary);border:1px solid var(--surface-border);border-radius:var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 4px;padding:11px 15px;line-height:1.7;overflow-wrap:anywhere}
+.paper-bubble.mine{background:var(--message-self);color:var(--on-message-self);border-color:transparent;border-radius:var(--bubble-radius) var(--bubble-radius) 4px var(--bubble-radius)}
+.paper-button{display:inline-flex;align-items:center;justify-content:center;gap:20px;min-height:46px;box-sizing:border-box;padding:13px 21px;border-radius:13px;font:inherit;font-size:14px;font-weight:600;text-decoration:none;transition:transform .14s,background .14s;cursor:pointer}
+.paper-button.primary{border:1px solid var(--action);background:var(--action);color:var(--on-action)}.paper-button.secondary{border:1px solid var(--surface-border-strong);background:var(--panel);color:var(--text-primary)}
+button,input,textarea,select{font-family:inherit}button,a,input,textarea,select,summary{ -webkit-tap-highlight-color:transparent }
+:where(a,button,input,textarea,select,summary,[tabindex]):focus-visible{outline:2px solid var(--action);outline-offset:4px}
+a,button{touch-action:manipulation}a:hover{opacity:.9}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}

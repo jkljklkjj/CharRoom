@@ -34,9 +34,6 @@ import component.DesktopAvatarCropDialog
 import component.dialog.AvatarCropDialogImpl
 import core.di.KoinInitializer
 import core.initAppUpdateManager
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 // 平台信息
 import component.settings.CurrentPlatform
@@ -64,20 +61,8 @@ fun main() = application {
     CurrentPlatform = AppPlatform.DESKTOP
 
     // 初始化应用更新管理器
-    initAppUpdateManager()
-
-    // 启动时自动检查更新
-    @OptIn(DelicateCoroutinesApi::class)
-    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-        try {
-            GlobalAppUpdateManager.checkForUpdates(
-                platform = "desktop",
-                autoDownload = false
-            )
-        } catch (_: Exception) {
-            // 忽略更新检查错误
-        }
-    }
+    val updater = remember { initAppUpdateManager(); GlobalAppUpdateManager }
+    androidx.compose.runtime.DisposableEffect(updater) { onDispose { updater.close() } }
 
     // 窗口状态记忆
     val prefs = Preferences.userNodeForPackage(javaClass)
@@ -95,6 +80,9 @@ fun main() = application {
 
     // 窗口可见状态
     var isWindowVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(isWindowVisible,windowState.isMinimized) {
+        core.AppActivity.foreground(isWindowVisible&&!windowState.isMinimized)
+    }
 
     // 系统托盘初始化
     val trayState = rememberTrayState()
@@ -187,10 +175,19 @@ class DesktopNotificationManager : MessageReceiveListener {
         }
     }
 
+    override fun onPrivateEnvelope(message: model.Message) {
+        if (!message.sender) onPrivateMessageReceived(message.senderId, message.message, message.timestamp, message.seqId, message.conversationId)
+    }
+
+    override fun onGroupEnvelope(message: model.GroupMessage) {
+        if (message.senderId != core.state.GlobalAppState.currentUserId) onGroupMessageReceived(
+            message.groupId, message.senderId, message.senderName, message.text, message.timestamp, message.seqId, message.conversationId)
+    }
+
     override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
                                           seqId: Long, conversationId: String) {
         val chatViewModel: ChatViewModel = org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
-        val sender = chatViewModel.usersFlow.value.find { it.id == senderId }
+        val sender = chatViewModel.usersFlow.value.find { !it.isGroup && it.id == senderId }
         val senderName = sender?.username ?: currentStrings["tray.stranger"]
         showNotification(currentStrings["tray.new.message"], "$senderName: $message")
     }
@@ -198,7 +195,7 @@ class DesktopNotificationManager : MessageReceiveListener {
     override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long,
                                         seqId: Long, conversationId: String) {
         val chatViewModel: ChatViewModel = org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
-        val group = chatViewModel.usersFlow.value.find { it.id == -groupId }
+        val group = chatViewModel.usersFlow.value.find { it.conversationKey == model.ConversationKey.group(groupId) }
         val groupName = group?.username ?: currentStrings["tray.group"]
         showNotification(currentStrings["tray.group.message"].format(groupName), "$senderName: $message")
     }

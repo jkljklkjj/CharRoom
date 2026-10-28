@@ -1,0 +1,11 @@
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path')
+const {loadTs}=require('./helpers.cjs')
+test('display windows bound rows and characters while preserving the reading edge',async()=>{
+ const {exports:{historyWindow}}=await loadTs(path.resolve(__dirname,'../src/utils/historyWindow.ts'))
+ const rows=Array.from({length:5000},(_,i)=>({messageId:String(i),text:'x'.repeat(20)}))
+ const old=historyWindow(rows,'oldest'),latest=historyWindow(rows,'latest')
+ assert.equal(old.messages.length,2000);assert.equal(old.messages[0].messageId,'0');assert.ok(old.trimmedAfter)
+ assert.equal(latest.messages.length,2000);assert.equal(latest.messages[0].messageId,'3000');assert.ok(latest.trimmedBefore)
+ assert.equal(historyWindow(rows,'oldest',2000,100).messages.length,5)
+ assert.equal(rows.length,5000)
+})

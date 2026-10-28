@@ -1,20 +1,13 @@
 {
   "baseUrl": "https://www.chatlite.xin",
   "routes": [
-    {
-      "path": "/",
-      "changefreq": "daily",
-      "priority": 1.0
-    },
-    {
-      "path": "/app",
-      "changefreq": "weekly",
-      "priority": 0.8
-    },
-    {
-      "path": "/verify",
-      "changefreq": "monthly",
-      "priority": 0.3
-    }
+    { "path": "/", "key": "home", "index": true },
+    { "path": "/features", "key": "features", "index": true },
+    { "path": "/faq", "key": "faq", "index": true },
+    { "path": "/compare", "key": "compare", "index": false },
+    { "path": "/app", "key": "app", "index": false },
+    { "path": "/verify", "key": "verify", "index": false },
+    { "path": "/admin", "key": "admin", "index": false },
+    { "path": "/copilot", "key": "copilot", "index": false }
   ]
 }

@@ -20,7 +20,7 @@ async function syncEntry(api, store) {
 }
 test('view incremental sync drains hasMore and waits for durable batch writes', async () => {
   let cursor = '0', writes = 0, calls = 0
-  const store = { state: { accountId: '1' }, getConversationSeqId: () => cursor,
+  const store = { beginHistorySync:()=>()=>{}, state: { accountId: '1' }, getConversationSeqId: () => cursor,
     restoreHistoryPage: async () => { writes++ }, addMessage: async () => { writes++ },
     setConversationSeqId: (_, value) => { cursor = String(value) } }
   const api = { syncMessages: async () => { calls++; return { messages: [{ senderId: '2', id: String(calls), seqId: String(calls) }], nextSeqId: String(calls), hasMore: calls === 1 } } }

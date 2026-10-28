@@ -72,7 +72,7 @@ fun UserList(
     onTabSelected: (SidebarTab) -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    selectedUserId: Int? = null,
+    selectedConversation: model.ConversationKey? = null,
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenApplications: () -> Unit = {},
@@ -90,28 +90,13 @@ fun UserList(
     val s = LocalStrings.current
     val userListState by chatViewModel.usersFlow.collectAsState()
     val conversationStates by chatViewModel.conversationStatesFlow.collectAsState()
-    // 收集消息用于构建 subtitle 和 lastMessageTime（仅在 UI 需要时计算）
-    val allMessages by chatViewModel.messagesFlow.collectAsState()
-    val allGroupMessages by chatViewModel.groupMessagesFlow.collectAsState()
-
-    // 预计算每个用户的 subtitle 和 lastMessageTime，避免每次 recomposition 重复计算
-    val userPreviews by remember(userListState, allMessages, allGroupMessages) {
-        derivedStateOf {
-            userListState.associateWith { user ->
-                val subtitle = buildSubtitle(user, allMessages, allGroupMessages)
-                val lastTime = buildLastMessageTime(user, allMessages, allGroupMessages)
-                UserPreview(subtitle, lastTime)
-            }
-        }
-    }
-
     val sortedUsers by remember(searchQuery, userListState, conversationStates) {
         derivedStateOf {
-            val indexById = userListState.withIndex().associate { it.value.id to it.index }
+            val indexById = userListState.withIndex().associate { it.value.conversationKey to it.index }
             userListState.sortedWith(
-                compareByDescending<User> { conversationStates[it.id]?.lastIncomingMessageTime ?: 0L }
-                    .thenByDescending { conversationStates[it.id]?.unreadCount ?: 0 }
-                    .thenBy { indexById[it.id] ?: Int.MAX_VALUE }
+                compareByDescending<User> { conversationStates[it.conversationKey]?.lastIncomingMessageTime ?: 0L }
+                    .thenByDescending { conversationStates[it.conversationKey]?.unreadCount ?: 0 }
+                    .thenBy { indexById[it.conversationKey] ?: Int.MAX_VALUE }
             )
         }
     }
@@ -164,7 +149,7 @@ fun UserList(
         onOpenApplications()
     }
 
-    val onlineCount = userListState.count { it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
+    val onlineCount = userListState.count { !it.isGroup && it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
 
     // On first entry, only load current user info and avatar; contact list loaded by ChatApp
     LaunchedEffect(Unit) {
@@ -220,24 +205,32 @@ fun UserList(
                 else listOf("" to filteredUsers)
             sections.forEach { (label, contacts) ->
                 if (label.isNotEmpty() && contacts.isNotEmpty()) item(key = label) { PaperContactSection(s[label], contacts.size) }
-                items(contacts, key = { it.id }) { user ->
-                    val preview = userPreviews[user]
+                items(contacts, key = { it.conversationKey.value }) { user ->
+                    val summary=conversationStates[user.conversationKey]
+                    val text=when {
+                        !user.isGroup&&ServerConfig.isAgentAssistant(user.id) -> s["contact.ai.assistant"]
+                        summary==null||summary.previewMessageId.isEmpty() -> if(user.isGroup)s["contact.no.group.messages"] else if(user.online==true)s["chat.status.online"] else s["contact.no.messages"]
+                        user.isGroup -> "${summary.previewSender}: ${summary.previewText.take(24)}"
+                        summary.previewOwn -> s["contact.me.prefix"].format(summary.previewText.take(24))
+                        else -> "${user.username}: ${summary.previewText.take(24)}"
+                    }
+                    val preview=UserPreview(text,summary?.previewTimestamp?.takeIf { it>0 }?.let { component.chat.formatTime(it) }.orEmpty())
                     PaperConversationRow(
                         user = user,
                         subtitle = if (isContacts) user.signature?.takeIf { it.isNotBlank() }
-                            ?: s[if (user.id < 0) "contacts.groupId" else "contacts.accountId"].format(kotlin.math.abs(user.id))
-                            else preview?.subtitle.orEmpty(),
-                        time = if (isContacts) "" else preview?.lastMessageTime.orEmpty(),
-                        unreadCount = if (isContacts) 0 else conversationStates[user.id]?.unreadCount ?: 0,
-                        selected = selectedUserId == user.id,
-                        onAvatarClick = if (user.id > 0) onUserLongClick?.let { callback -> { callback(user) } } else null,
+                            ?: s[if (user.isGroup) "contacts.groupId" else "contacts.accountId"].format(user.id)
+                            else preview.subtitle,
+                        time = if (isContacts) "" else preview.lastMessageTime,
+                        unreadCount = if (isContacts) 0 else conversationStates[user.conversationKey]?.unreadCount ?: 0,
+                        selected = selectedConversation == user.conversationKey,
+                        onAvatarClick = if (!user.isGroup && user.id > 0) onUserLongClick?.let { callback -> { callback(user) } } else null,
                         onClick = {
                             try {
                                 ActionLogger.log(Action(type = ActionType.OPEN_CHAT, targetId = user.id.toString(), metadata = mapOf("username" to user.username)))
                             } catch (e: Exception) {
                                 if (e is kotlinx.coroutines.CancellationException) throw e
                             }
-                            if (Chat.isServerConnected && user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
+                            if (Chat.isServerConnected && !user.isGroup && user.id > 0 && !ServerConfig.isAgentAssistant(user.id)) {
                                 Chat.send(buildCheckPayload(user.id.toString()), MsgType.CHECK, user.id.toString(), 1) { _, _ -> }
                             }
                             onUserClick(user)
@@ -254,47 +247,4 @@ fun UserList(
 
 private fun buildDisplayName(user: User): String {
     return user.username
-}
-
-
-private fun buildSubtitle(
-    user: User,
-    messages: List<model.Message>,
-    groupMessages: List<model.GroupMessage>
-): String {
-    if (ServerConfig.isAgentAssistant(user.id)) {
-        return currentStrings["contact.ai.assistant"]
-    }
-
-    if (user.id < 0) {
-        val groupId = -user.id
-        val last = groupMessages.lastOrNull { it.groupId == groupId }
-        return if (last == null) {
-            currentStrings["contact.no.group.messages"]
-        } else {
-            "${last.senderName}: ${last.text.take(24)}"
-        }
-    }
-
-    val last = messages.lastOrNull { it.senderId == user.id || it.receiverId == user.id }
-    return if (last == null) {
-        if (user.online == true) currentStrings["chat.status.online"] else currentStrings["contact.no.messages"]
-    } else {
-        if (last.sender) currentStrings["contact.me.prefix"].format(last.message.take(24)) else "${user.username}: ${last.message.take(24)}"
-    }
-}
-
-private fun buildLastMessageTime(
-    user: User,
-    messages: List<model.Message>,
-    groupMessages: List<model.GroupMessage>
-): String {
-    val timestamp = if (user.id < 0) {
-        val groupId = -user.id
-        groupMessages.lastOrNull { it.groupId == groupId }?.timestamp
-    } else {
-        messages.lastOrNull { it.senderId == user.id || it.receiverId == user.id }?.timestamp
-    }
-
-    return timestamp?.let { component.chat.formatTime(it) } ?: ""
 }

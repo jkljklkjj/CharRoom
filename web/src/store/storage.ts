@@ -1,4 +1,5 @@
 import type { Id, TimeValue, ChatMessage } from '../types/chat'
+import {ConversationId} from '../utils/conversationId'
 import { STORAGE_PREFIX } from './state'
 
 export function sanitizeId(value: Id | null | undefined) {
@@ -18,11 +19,11 @@ export function buildAccountPrefix(accountId: Id) {
 }
 
 export function getConversationKey(conversationId: Id | null) {
-  return String(conversationId || '')
+  return conversationId == null ? '' : ConversationId.parse(conversationId).key
 }
 
 export function isGroupConversationId(conversationId: Id | null) {
-  return Number(conversationId) < 0
+  return conversationId != null && ConversationId.parse(conversationId).isGroup
 }
 
 export function normalizeTimeValue(value: TimeValue | null | undefined) {

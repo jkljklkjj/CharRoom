@@ -16,6 +16,8 @@ interface LocalChatHistoryStoreProvider {
     /** Merge by message ID; a UI snapshot may contain only a page of the full local history. */
     fun save(accountId: String, privateMessages: List<Message>, groupMessages: List<GroupMessage>)
 
+    fun confirmMessageId(accountId: String, ack: com.chatlite.proto.MessageProtos.AckMessage)
+
     fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean)
 
     /**
@@ -100,28 +102,15 @@ interface LocalChatHistoryStoreProvider {
      * 保存会话 seqId 游标（增量同步用）
      * @param ids conversationId -> seqId 映射
      */
-    fun saveConversationSeqIds(ids: Map<String, Long>)
+    fun saveConversationSeqIds(accountId: String, ids: Map<String, Long>)
 
     /**
      * 恢复会话 seqId 游标
      * @return conversationId -> seqId 映射
      */
-    fun restoreConversationSeqIds(): Map<String, Long>
+    fun restoreConversationSeqIds(accountId: String): Map<String, Long>
 
-    /**
-     * 保存离线待发送消息队列
-     */
-    fun savePendingMessages(privatePending: List<Message>, groupPending: List<GroupMessage>)
 
-    /**
-     * 恢复离线待发送消息队列
-     */
-    fun restorePendingMessages(): Pair<List<Message>, List<GroupMessage>>
-
-    /**
-     * 清空离线待发送消息队列
-     */
-    fun clearPendingMessages()
 }
 
 /**

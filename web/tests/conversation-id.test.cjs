@@ -1,0 +1,12 @@
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path')
+const {loadTs}=require('./helpers.cjs')
+test('typed conversations keep same-number peers and groups distinct without numeric coercion',async()=>{
+ const {exports:{ConversationId:C}}=await loadTs(path.resolve(__dirname,'../src/utils/conversationId.ts'))
+ assert.equal(C.privateChat(42).key,'user:42');assert.equal(C.group(42).key,'group:42')
+ assert.notEqual(C.forContact({id:42}).key,C.forContact({id:42,conversationKind:'group'}).key)
+ assert.equal(C.parse('group:9007199254740999').id,'9007199254740999')
+ assert.equal(C.privateChat(0).key,'user:0')
+ for(const value of [-42,'-42','42','group:0','user:-42'])assert.throws(()=>C.parse(value))
+ assert.throws(()=>C.group(-42));assert.throws(()=>C.privateChat(9007199254740992))
+ assert.equal(C.fromHistoryKey('42').key,'user:42');assert.equal(C.parse('user:42').historyKey,'42')
+})

@@ -36,13 +36,15 @@ class ProtobufMessageDispatcherTest {
     }
 
     @Test
-    fun legacyMessagesWithoutIdsAreNotAllTreatedAsTheSameMessage() {
+    fun messagesWithoutIdsAreRejectedWithoutDeliveryOrAcknowledgement() {
         val listener = Listener()
         val dispatcher = ProtobufMessageDispatcher({ listOf(listener) })
+        var acknowledgements = 0
         for (text in listOf("first", "second")) {
-            dispatcher.dispatch(buildChatPayload("42", text, timestamp = 123L, messageId = "")) { _, _ -> }
+            dispatcher.dispatch(buildChatPayload("42", text, timestamp = 123L, messageId = "")) { _, _ -> acknowledgements++ }
         }
-        assertEquals(listOf("first", "second"), listener.privateMessages)
+        assertTrue(listener.privateMessages.isEmpty())
+        assertEquals(0, acknowledgements)
     }
 
     @Test
@@ -85,7 +87,7 @@ class ProtobufMessageDispatcherTest {
         dispatcher.dispatch(chunk(3, AgentStreamProtos.AgentStreamType.STREAM_DONE, "")) { _, _ -> }
         dispatcher.dispatch(chunk(4, AgentStreamProtos.AgentStreamType.STREAM_TEXT, "late")) { _, _ -> }
         assertEquals(1, loginCount)
-        assertEquals(listOf("!", "!", ""), chunks)
+        assertEquals(listOf("!", "!!", "!!"), chunks)
     }
 
     @Test

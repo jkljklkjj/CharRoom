@@ -26,7 +26,7 @@ class PendingMessageAcks(
 
     fun acknowledge(ack: MessageProtos.AckMessage, bytes: ByteArray) {
         val entry = synchronized(pending) { pending[ack.messageId] } ?: return
-        complete(entry, !ack.hasSuccess() || ack.success, listOf(bytes))
+        complete(entry, ack.success, listOf(bytes))
     }
 
     fun fail(messageId: String) {

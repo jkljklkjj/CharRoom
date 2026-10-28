@@ -6,7 +6,7 @@ export function historyMessages(rows: OfflineMessage[], accountId: string): Chat
     const isMe = String(msg.senderId) === accountId
     const common = { user: isMe ? 'you' : String(msg.senderId), text: msg.message,
       time: msg.timestamp, messageId: msg.id || msg.messageId || undefined, seqId: msg.seqId,
-      messageType: msg.messageType === 1 ? 'image' : msg.messageType === 2 ? 'file' : 'text',
+      messageType: msg.messageType === 1 ? 1 as const : msg.messageType === 2 ? 2 as const : 0 as const,
       fileUrl: msg.fileUrl, fileName: msg.fileName, fileSize: msg.fileSize,
       replyTo: msg.replyToMessageId ? { messageId: msg.replyToMessageId,
         content: msg.replyToContent || '', sender: msg.replyToSender || '' } : undefined }

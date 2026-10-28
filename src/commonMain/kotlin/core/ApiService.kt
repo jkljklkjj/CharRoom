@@ -236,10 +236,10 @@ class ApiService(private val authToken: String? = null) {
         platform: String,
         channel: String = "official"
     ): VersionCheckResult? {
+        require(channel == "official") { "Only the official release channel is supported" }
         return core.checkAppVersion(
-            appVersion = AppConfig.VERSION_CODE,
-            platform = platform,
-            channel = channel
+            appVersion = core.update.UpdateRuntime.installedVersion,
+            platform = platform
         )
     }
 

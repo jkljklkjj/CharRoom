@@ -1,47 +1,16 @@
 package core
 
-// 本文件由 ApiClient.kt 拆分而来：AI Agent API。
-// 共享基础设施（httpClient / sendRequest / json / ApiResponse 等）见 ApiClient.kt。
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
-import core.model.AppVersionInfo
-import core.model.VersionCheckResult
-import core.state.GlobalAppState
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.*
-import kotlinx.serialization.serializer
-import model.Group
-import model.Message
-import model.MessageType
-import model.User
-
-suspend fun agentChat(token: String, message: String, stream: Boolean = false): String {
-    val requestBody = buildJsonObject {
-        put("message", message)
-        put("stream", stream)
-    }
-
-    return try {
-        val response = httpClient.request(ApiEndpoints.url(ApiEndpoints.AGENT_NL)) {
-            method = HttpMethod.Post
-            header(HttpHeaders.Authorization, "Bearer $token")
-            setBody(requestBody)
-            timeout {
-                requestTimeoutMillis = 30000
-            }
-        }
-        response.bodyAsText()
-    } catch (e: Exception) {
-        ""
-    }
+/** CLI non-streaming endpoint; protocol fields match AgentRequest.input and ApiResponse<String>. */
+suspend fun agentChat(token: String, message: String): String {
+    val result = sendRequest<String>(
+        path = ApiEndpoints.AGENT_NL,
+        method = "POST",
+        body = buildJsonObject { put("input", message) },
+        token = token
+    )
+    check(result.isSuccess) { "助手请求失败（${result.code}），请检查连接或额度后再试" }
+    return checkNotNull(result.data) { "助手响应缺少正文" }
 }
-
-

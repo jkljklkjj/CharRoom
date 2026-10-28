@@ -17,11 +17,18 @@ enum class MessageType {
 /**
  * 聊天消息公共接口，统一私聊 Message 和群聊 GroupMessage 的字段访问。
  */
+@Serializable
+enum class MessageDeliveryState {
+    QUEUED, SENDING, ACCEPTED, FAILED;
+    fun afterRestart(): MessageDeliveryState = if (this == QUEUED || this == SENDING) FAILED else this
+}
+
 interface ChatMessage {
     val chatMessageId: String
     val chatText: String
     val chatSenderId: Int
     val chatTimestamp: Long
+    val chatDeliveryState: MessageDeliveryState get() = if (chatIsSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED
     val chatIsSent: Boolean
     val chatMessageType: MessageType
     val chatFileUrl: String?
@@ -43,8 +50,12 @@ data class User(
     val avatarKey: String? = null,
     val online: Boolean? = null,
     val createdAt: Long? = null, // 注册时间，时间戳
-    val friendRequestReason: String? = null
-)
+    val friendRequestReason: String? = null,
+    val conversationKind: ConversationKind = ConversationKind.PRIVATE
+) {
+    val isGroup: Boolean get() = conversationKind == ConversationKind.GROUP
+    val conversationKey: ConversationKey get() = ConversationKey(conversationKind, id)
+}
 
 @Serializable
 data class Message(
@@ -63,12 +74,14 @@ data class Message(
     val fileName: String? = null,         // 文件名称
     val fileSize: Long? = null,            // 文件大小
     val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
-    val conversationId: String = ""        // 会话ID
+    val conversationId: String = "",        // 会话ID
+    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED
 ) : ChatMessage {
     override val chatMessageId get() = messageId
     override val chatText get() = message
     override val chatSenderId get() = senderId
     override val chatTimestamp get() = timestamp
+    override val chatDeliveryState get() = deliveryState
     override val chatIsSent get() = isSent
     override val chatMessageType get() = messageType
     override val chatFileUrl get() = fileUrl
@@ -88,6 +101,7 @@ data class Message(
         receiverId = receiverId,
         timestamp = timestamp,
         isSent = isSent,
+        deliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
         messageId = messageId,
         replyToMessageId = replyToMessageId,
         replyToContent = replyToContent,
@@ -118,12 +132,14 @@ data class GroupMessage(
     val fileName: String? = null,         // 文件名称
     val fileSize: Long? = null,            // 文件大小
     val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
-    val conversationId: String = ""        // 会话ID
+    val conversationId: String = "",        // 会话ID
+    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED
 ) : ChatMessage {
     override val chatMessageId get() = messageId
     override val chatText get() = text
     override val chatSenderId get() = senderId
     override val chatTimestamp get() = timestamp
+    override val chatDeliveryState get() = deliveryState
     override val chatIsSent get() = isSent
     override val chatMessageType get() = messageType
     override val chatFileUrl get() = fileUrl
@@ -143,6 +159,7 @@ data class GroupMessage(
         senderId = senderId,
         timestamp = timestamp,
         isSent = isSent,
+        deliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
         messageId = messageId,
         replyToMessageId = replyToMessageId,
         replyToContent = replyToContent,
@@ -160,40 +177,15 @@ data class GroupMessage(
 data class Group(val id: Int, val name: String)
 
 /**
- * 消息ID生成工具
- */
-object MessageIdGenerator {
-    private var counter = 0L
-
-    /**
-     * 生成私聊消息ID
-     * 使用毫秒级时间戳 + 原子计数器，避免碰撞
-     */
-    fun generateMessageId(senderId: Int, content: String, timestamp: Long): String {
-        val id = "${senderId}_${timestamp}_${++counter}"
-        return id.hashCode().toString()
-    }
-
-    /**
-     * 生成群聊消息ID
-     * 使用毫秒级时间戳 + 原子计数器，避免碰撞
-     */
-    fun generateGroupMessageId(groupId: Int, senderId: Int, content: String, timestamp: Long): String {
-        val id = "${groupId}_${senderId}_${timestamp}_${++counter}"
-        return id.hashCode().toString()
-    }
-}
-
-/**
  * 群组转换为用户类型（用于UI显示）
  */
-fun Group.toUiUser(): User = User(id = -this.id, username = this.name)
+fun Group.toUiUser(): User = User(id = this.id, username = this.name, conversationKind = ConversationKind.GROUP)
 
 /**
  * 添加AI助手到用户列表
  */
 fun List<User>.withAgentAssistant(): List<User> {
-    if (this.any { it.id == core.ServerConfig.AGENT_ASSISTANT_ID }) {
+    if (this.any { !it.isGroup && it.id == core.ServerConfig.AGENT_ASSISTANT_ID }) {
         return this
     }
     return listOf(User(id = core.ServerConfig.AGENT_ASSISTANT_ID, username = core.ServerConfig.AGENT_ASSISTANT_NAME)) + this

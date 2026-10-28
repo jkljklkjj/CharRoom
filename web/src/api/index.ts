@@ -128,6 +128,7 @@ export async function acceptFriend(requesterId: Id) {
   const { ok, body: resp } = await safeFetch<User>(`${API_BASE}/friends/accept`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body
   })
+  if(ok && resp?.data)window.dispatchEvent(new Event('contacts-changed'))
   // 返回新好友的用户信息（增量更新用）
   return ok ? (resp?.data || null) : null
 }
@@ -160,6 +161,7 @@ export async function markFriendNotificationsRead() {
 
 export async function addGroup(groupId: Id) {
   const { ok } = await safeFetch(`${API_BASE}/groups/${groupId}/join`, { method: 'POST' })
+  if(ok)window.dispatchEvent(new Event('contacts-changed'))
   return ok
 }
 
@@ -171,6 +173,7 @@ export async function getUserDetail(id: Id) {
 
 export async function delFriend(friendId: Id) {
   const { ok } = await safeFetch(`${API_BASE}/friends/${friendId}`, { method: 'DELETE' })
+  if(ok)window.dispatchEvent(new Event('contacts-changed'))
   return ok
 }
 

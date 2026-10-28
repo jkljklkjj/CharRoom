@@ -21,35 +21,54 @@ async function main() {
   const origin = `http://127.0.0.1:${server.address().port}`
   const browser = await puppeteer.launch({ executablePath, headless: 'new', args: ['--no-proxy-server'] })
   const errors = []
-  async function fixturePage(empty = false, locale = 'zh-CN') {
+  function framed(bytes) { const frame = Buffer.alloc(4 + bytes.length); frame.writeUInt32BE(bytes.length); Buffer.from(bytes).copy(frame, 4); return Array.from(frame) }
+  async function fixturePage(empty = false, locale = 'zh-CN', large = false, collision = false) {
+    const login = framed(Wrapper.encode(Wrapper.fromObject({ type: types.RESPONSE, response: { success: true, clientId: '91001' } })).finish())
     const context = await browser.createIncognitoBrowserContext(), page = await context.newPage()
+    let directoryDelay=0,directoryRequests=0,directoryPending=0
+    page.setDirectoryDelay=value=>{directoryDelay=value}
+    page.directoryRequests=()=>directoryRequests
+    page.directoryPending=()=>directoryPending
     page.setDefaultTimeout(12000)
     await page.setViewport({ width: 1180, height: 850 }); await page.setBypassServiceWorker(true)
     page.on('pageerror', error => errors.push(error.message))
-    await page.evaluateOnNewDocument(locale => {
+    await page.evaluateOnNewDocument(({ locale, login }) => {
       sessionStorage.setItem('charroom_token', 'fixture-token')
       localStorage.setItem('charroom_accountId', '91001'); localStorage.setItem('locale', locale)
       globalThis.fixtureWrites = []; globalThis.fixtureReaders = []
       globalThis.WebTransport = class {
         constructor() { this.ready = Promise.resolve(); this.closed = new Promise(() => {}); this.incomingBidirectionalStreams = new ReadableStream() }
-        async createBidirectionalStream() { return { readable: new ReadableStream({ start(controller) { globalThis.fixtureReaders.push(controller) } }), writable: new WritableStream({ write(bytes) { globalThis.fixtureWrites.push(Array.from(bytes)) } }) } }
+        async createBidirectionalStream() { return { readable: new ReadableStream({ start(controller) { globalThis.fixtureReaders.push(controller); if (globalThis.fixtureReaders.length === 1) queueMicrotask(() => controller.enqueue(new Uint8Array(login))) } }), writable: new WritableStream({ write(bytes) { globalThis.fixtureWrites.push(Array.from(bytes)) } }) } }
         close() {}
       }
-    }, locale)
+    }, { locale, login })
     await page.setRequestInterception(true)
     page.on('request', request => {
       const url = new URL(request.url())
       if (url.origin === origin) { request.continue(); return }
       if (!url.pathname.startsWith('/api/')) { request.abort(); return }
       let data = []
+      if (url.pathname === '/api/cluster/owner') data = { ownerGatewayId: 'fixture', ownerEndpoint: '', gateways: [{ gatewayId: 'fixture' }] }
       if (url.pathname === '/api/auth/validate') data = { valid: true }
       if (url.pathname === '/api/users/me') data = { id: 91001, username: 'Fixture self' }
       if (url.pathname === '/api/users/online-status') data = {}
       if (url.pathname === '/api/groups') data = empty ? [] : [{ id: 91010, name: '周末散步的人' }]
       if (url.pathname === '/api/friends') data = [{ id: 0, username: 'AI Assistant' }, { id: 91001, username: 'Fixture self' }, ...(empty ? [] : [{ id: 91003, username: 'Zoe', signature: '一起看一场日落。' }, { id: 91002, username: 'Alice', signature: '慢慢走，也好好聊。' }])]
-      request.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' }, body: JSON.stringify({ code: 0, data }) })
+      if(url.pathname==='/api/contacts/snapshot') {
+        const version=empty?'empty':'full'
+        data=url.searchParams.get('version')===version?{version,unchanged:true}:{version,unchanged:false,
+          users:[{id:0,username:'AI Assistant'},{id:91001,username:'Fixture self'},...(empty?[]:[{id:91003,username:'Zoe',signature:'一起看一场日落。'},{id:91002,username:'Alice',signature:'慢慢走，也好好聊。'}]),...(large?Array.from({length:5000},(_,i)=>({id:100000+i,username:`Contact ${String(i).padStart(5,'0')}`})):[]),...(collision?[{id:91010,username:'Same number friend'}]:[])],
+          groups:empty?[]:[{id:91010,name:'周末散步的人'}]}
+      }
+      const response={ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' }, body: JSON.stringify({ code: 0, data }) }
+      if(url.pathname==='/api/contacts/snapshot' && request.method()==='GET') {
+        directoryRequests++
+        if(directoryDelay){directoryPending++;setTimeout(()=>{directoryPending--;void request.respond(response)},directoryDelay);return}
+      }
+      void request.respond(response)
     })
-    await page.goto(origin + '/app'); await page.waitForSelector('.user-row')
+    await page.goto(origin + '/app'); await page.waitForSelector('#sidebar-panel[aria-busy="false"]')
+    if(!empty)await page.waitForSelector('[data-contact-id="user:91002"]')
     return page
   }
   async function screenshot(page, name) {
@@ -61,48 +80,70 @@ async function main() {
     const page = await fixturePage()
     await page.waitForFunction(() => globalThis.fixtureReaders.length > 0)
     const incoming = Wrapper.encode(Wrapper.fromObject({ type: types.CHAT, chat: { userId: 91003, targetClientId: 91001, content: 'Fixture unread message', timestamp: Date.now(), messageId: 'contacts-unread-1' } })).finish()
-    await page.evaluate(bytes => globalThis.fixtureReaders[0].enqueue(new Uint8Array(bytes)), Array.from(incoming))
-    await page.waitForSelector('[data-contact-id="91003"] .unread-badge')
+    await page.evaluate(bytes => globalThis.fixtureReaders[0].enqueue(new Uint8Array(bytes)), framed(incoming))
+    await page.waitForSelector('[data-contact-id="user:91003"] .unread-badge')
     await page.focus('#sidebar-tab-messages'); await page.keyboard.press('ArrowRight')
     await page.waitForSelector('#sidebar-tab-contacts[aria-selected="true"]')
     assert.equal(await page.evaluate(() => document.activeElement.id), 'sidebar-tab-contacts')
-    assert.deepEqual(await page.$$eval('.user-row', rows => rows.map(row => row.dataset.contactId)), ['91002', '91003', '-91010'])
+    assert.deepEqual(await page.$$eval('.user-row', rows => rows.map(row => row.dataset.contactId)), ['user:91002', 'user:91003', 'group:91010'])
     assert.equal(await page.$('.unread-badge'), null)
     await page.keyboard.press('Home')
-    await page.waitForSelector('[data-contact-id="91003"] .unread-badge')
-    assert.equal(await page.$eval('[data-contact-id="91003"] .unread-badge', element => element.textContent), '1', 'tab change must preserve unread count')
+    await page.waitForSelector('[data-contact-id="user:91003"] .unread-badge')
+    assert.equal(await page.$eval('[data-contact-id="user:91003"] .unread-badge', element => element.textContent), '1', 'tab change must preserve unread count')
+    await page.click('[data-contact-id="user:91002"]'); await page.waitForSelector('.composer textarea')
+    await page.type('.composer textarea', 'Alice draft')
+    await page.click('[data-contact-id="group:91010"]')
+    assert.equal(await page.$eval('.composer textarea', el => el.value), '', 'a group cannot inherit a private draft')
+    await page.type('.composer textarea', 'Group draft')
+    await page.click('[data-contact-id="user:91002"]')
+    assert.equal(await page.$eval('.composer textarea', el => el.value), 'Alice draft')
+    await page.click('[data-contact-id="group:91010"]')
+    assert.equal(await page.$eval('.composer textarea', el => el.value), 'Group draft')
+    await page.focus('.composer textarea'); await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control'); await page.keyboard.press('Backspace')
+    await page.click('[data-contact-id="user:91002"]')
     await page.click('#sidebar-tab-contacts'); await page.type('.search-bar input', ' ALI ')
     await page.waitForFunction(() => document.querySelectorAll('.user-row').length === 1)
-    assert.equal(await page.$eval('.user-row', element => element.dataset.contactId), '91002')
+    assert.equal(await page.$eval('.user-row', element => element.dataset.contactId), 'user:91002')
     await page.setViewport({ width: 390, height: 844 })
-    await page.waitForSelector('.mobile-view [data-contact-id="91002"]')
+    await page.waitForSelector('.mobile-view [data-contact-id="user:91002"]')
     await page.waitForSelector('#sidebar-tab-contacts[aria-selected="true"]')
-    await page.click('[data-contact-id="91002"]'); await page.waitForSelector('.mobile-header .back-btn')
+    await page.click('[data-contact-id="user:91002"]'); await page.waitForSelector('.mobile-header .back-btn')
+    assert.equal(await page.$eval('.composer textarea', el => el.value), 'Alice draft', 'responsive remount preserves the conversation draft')
+    await page.focus('.composer textarea'); await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control'); await page.keyboard.press('Backspace')
     await page.click('.mobile-header .back-btn'); await page.waitForSelector('#sidebar-tab-contacts[aria-selected="true"]')
     assert.equal(await page.$eval('.search-bar input', element => element.value), ' ALI ')
     await page.click('.clear-search'); await page.type('.search-bar input', 'not-a-contact')
     await page.waitForSelector('#sidebar-panel [role="status"]')
     assert.equal(await page.$('.user-row'), null)
-    await page.click('.clear-search'); await page.waitForSelector('[data-contact-id="-91010"]'); await page.click('[data-contact-id="-91010"]')
+    await page.click('.clear-search'); await page.waitForSelector('[data-contact-id="group:91010"]'); await page.click('[data-contact-id="group:91010"]')
     await page.waitForSelector('.composer textarea'); await page.type('.composer textarea', 'Fixture group send')
     const beforeSend = await page.evaluate(() => globalThis.fixtureWrites.length)
     await page.keyboard.press('Enter')
     await page.waitForFunction(() => document.querySelector('.messages')?.textContent.includes('Fixture group send'))
     await page.waitForFunction(count => globalThis.fixtureWrites.length > count, {}, beforeSend)
     const written = await page.evaluate(() => globalThis.fixtureWrites)
-    const groupSend = written.map(bytes => Wrapper.decode(Uint8Array.from(bytes))).find(message => message.type === types.GROUP_CHAT)
+    const groupSend = written.map(bytes => Wrapper.decode(Uint8Array.from(bytes).subarray(4))).find(message => message.type === types.GROUP_CHAT)
     assert.ok(groupSend, 'group entry must send GROUP_CHAT')
-    assert.equal(groupSend.groupChat.targetClientId.toString(), '91010', 'sidebar negative ID must not reach wire')
+    assert.equal(groupSend.groupChat.targetClientId.toString(), '91010', 'typed conversation key must resolve to the raw wire ID')
     assert.equal(await page.$eval('.mobile-header .chat-title', element => element.textContent), '周末散步的人')
     await page.click('.mobile-header .back-btn'); await page.waitForSelector('#sidebar-tab-contacts[aria-selected="true"]')
     for (const theme of ['light', 'dark']) for (const width of [1180, 320]) {
       await page.setViewport({ width, height: 850 })
       await page.evaluate(theme => document.documentElement.setAttribute('data-theme', theme), theme)
       await page.waitForSelector('#sidebar-tab-contacts[aria-selected="true"]')
-      assert.equal(await page.$eval('#sidebar-tab-contacts', element => getComputedStyle(element).backgroundColor), theme === 'dark' ? 'rgb(73, 48, 36)' : 'rgb(255, 234, 216)', 'selected tab uses the theme palette')
+      assert.equal(await page.$eval('#sidebar-tab-contacts', element => getComputedStyle(element).backgroundColor), theme === 'dark' ? 'rgb(72, 49, 34)' : 'rgb(255, 234, 216)', 'selected tab uses the native paper palette')
       assert.equal(await page.$eval('.sidebar', element => element.scrollWidth > element.clientWidth + 1), false, `${theme}/${width} must fit`)
       await screenshot(page, `contacts-${theme}-${width}`)
     }
+    await page.click('.settings-btn');await page.waitForSelector('.settings-dialog')
+    assert.equal(await page.$('.transport-info'),null,'daily settings do not expose transport internals')
+    assert.ok(await page.$eval('.theme-options button.active',element=>{
+      const style=getComputedStyle(element)
+      const luminance=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(value=>value/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0)
+      const a=luminance(style.color),b=luminance(style.backgroundColor)
+      return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5
+    }),'selected settings control retains readable contrast in dark mode')
+    await page.keyboard.press('Escape');await page.waitForSelector('.settings-dialog',{hidden:true})
     for (const locale of ['en', 'ja']) {
       const translated = await fixturePage(false, locale)
       await translated.click('#sidebar-tab-contacts')
@@ -113,8 +154,92 @@ async function main() {
     await empty.click('#sidebar-tab-contacts'); await empty.waitForSelector('#sidebar-panel [role="status"]')
     assert.equal(await empty.$('.user-row'), null, 'assistant/self alone is an empty directory')
     assert.ok((await empty.$eval('#sidebar-panel', element => element.textContent)).includes('还没有联系人'))
+    await page.setViewport({width:1180,height:850})
+    const requestsBeforeReload=page.directoryRequests()
+    page.setDirectoryDelay(2000)
+    await page.reload({waitUntil:'domcontentloaded'})
+    await page.waitForSelector('[data-contact-id="user:91002"]')
+    assert.ok(page.directoryPending()>0,'cached directory must render before the delayed validation finishes')
+    assert.equal(await page.$('.skeleton-list'),null,'warm directory must not flash the first-load skeleton')
+    assert.equal(page.directoryRequests()-requestsBeforeReload,1,'login and sidebar must share one directory validation')
+    page.setDirectoryDelay(0)
+    await page.waitForFunction(()=>!document.querySelector('.directory-feedback'))
+    // Keep the real Worker/outbox/ACK handling; withhold only the remote ACK.
+    const delayed=await fixturePage()
+    await delayed.click('[data-contact-id="user:91002"]');await delayed.waitForSelector('.composer textarea')
+    await delayed.type('.composer textarea','quiet ACK fixture');await delayed.click('.composer .send')
+    await delayed.waitForFunction(()=>document.querySelector('.msg.me .text-content')?.textContent==='quiet ACK fixture')
+    await new Promise(resolve=>setTimeout(resolve,3000))
+    assert.equal(await delayed.$('.send-indicator'),null,'normal sends remain quiet for the first four seconds')
+    await delayed.waitForSelector('.send-spinner',{timeout:4000})
+    assert.equal(await delayed.$eval('.send-spinner',element=>Boolean(element.closest('.bubble-col'))),false,'spinner sits beside the bubble')
+    await delayed.waitForSelector('.send-failure',{timeout:8000})
+    assert.equal(await delayed.$eval('.send-failure',element=>element.textContent),'!')
+    assert.equal(await delayed.$('.send-spinner'),null,'failure replaces the spinner')
+    await delayed.click('.send-failure');await delayed.waitForSelector('.send-failure',{hidden:true})
+    assert.equal(await delayed.$('.send-spinner'),null,'manual retry starts a new quiet period')
+    await delayed.waitForSelector('.send-spinner',{timeout:6000})
+    await delayed.waitForSelector('.send-failure',{timeout:8000})
+    const sends=(await delayed.evaluate(()=>globalThis.fixtureWrites)).map(bytes=>Wrapper.decode(Uint8Array.from(bytes).subarray(4))).filter(message=>message.type===types.CHAT)
+    assert.ok(sends.length>=2);assert.equal(sends[0].chat.messageId,sends[1].chat.messageId,'retry keeps the same identity')
+    assert.ok(await delayed.evaluate(async()=>{
+      const db=await new Promise(resolve=>{const request=indexedDB.open('chatlite_offline');request.onsuccess=()=>resolve(request.result)})
+      try{return await new Promise(resolve=>{const request=db.transaction('account_outbox').objectStore('account_outbox').count();request.onsuccess=()=>resolve(request.result>0)})}finally{db.close()}
+    }),'a display timeout must retain the durable outbox record')
+    const success=framed(Wrapper.encode(Wrapper.fromObject({type:types.ACK,ack:{messageId:sends[0].chat.messageId,serverMessageId:'9007199254740998',success:true,conversationId:'user:91001:91002',seqId:'1'}})).finish())
+    await delayed.evaluate(bytes=>globalThis.fixtureReaders[0].enqueue(new Uint8Array(bytes)),success)
+    await delayed.waitForSelector('.send-indicator',{hidden:true})
+    assert.equal(await delayed.$('.status.sent'),null,'a successful ACK has no persistent success marker')
+    await delayed.close()
+    const large=await fixturePage(false,'zh-CN',true)
+    await large.click('#sidebar-tab-contacts')
+    assert.ok(await large.$$eval('.virtual-contacts .user-row',rows=>rows.length<35),'5000 contacts must not create 5000 DOM rows')
+    await large.$eval('#sidebar-panel',el=>{el.scrollTop=el.scrollHeight;el.dispatchEvent(new Event('scroll'))})
+    await large.waitForSelector('[data-contact-id="group:91010"]')
+    await large.focus('[data-contact-id="group:91010"]');await large.keyboard.press('Home')
+    await large.waitForFunction(()=>document.activeElement?.getAttribute('data-contact-id')==='user:91002')
+    await large.keyboard.press('End')
+    await large.waitForFunction(()=>document.activeElement?.getAttribute('data-contact-id')==='group:91010')
+    await large.type('.search-bar input','104999');await large.waitForSelector('[data-contact-id="user:104999"]')
+    assert.equal(await large.$$eval('.virtual-contacts .user-row',rows=>rows.length),1)
+    await large.click('[data-contact-id="user:104999"]');await large.waitForSelector('.composer textarea')
+    await large.close()
+    const collision=await fixturePage(false,'zh-CN',false,true)
+    await collision.click('#sidebar-tab-contacts')
+    await collision.click('[data-contact-id="user:91010"]');await collision.waitForSelector('.composer textarea')
+    await collision.type('.composer textarea','private same ID')
+    await collision.click('[data-contact-id="group:91010"]')
+    assert.equal(await collision.$eval('.composer textarea',el=>el.value),'')
+    await collision.type('.composer textarea','group same ID')
+    await collision.click('[data-contact-id="user:91010"]')
+    await collision.click('#sidebar-tab-messages')
+    assert.equal(await collision.$eval('.composer textarea',el=>el.value),'private same ID')
+    const privateWrites=await collision.evaluate(()=>globalThis.fixtureWrites.length)
+    await collision.focus('.composer textarea');await collision.keyboard.press('Enter')
+    await collision.waitForFunction(()=>document.querySelector('.messages')?.textContent.includes('private same ID'))
+    await collision.waitForFunction(count=>globalThis.fixtureWrites.length>count,{},privateWrites)
+    await collision.click('[data-contact-id="group:91010"]')
+    assert.equal(await collision.$eval('.composer textarea',el=>el.value),'group same ID')
+    const groupWrites=await collision.evaluate(()=>globalThis.fixtureWrites.length)
+    await collision.focus('.composer textarea');await collision.keyboard.press('Enter')
+    await collision.waitForFunction(()=>document.querySelector('.messages')?.textContent.includes('group same ID'))
+    await collision.waitForFunction(count=>globalThis.fixtureWrites.length>count,{},groupWrites)
+    const sameIdWrites=(await collision.evaluate(()=>globalThis.fixtureWrites)).map(bytes=>Wrapper.decode(Uint8Array.from(bytes).subarray(4)))
+    assert.equal(sameIdWrites.find(message=>message.type===types.CHAT)?.chat.targetClientId.toString(),'91010')
+    assert.equal(sameIdWrites.find(message=>message.type===types.GROUP_CHAT)?.groupChat.targetClientId.toString(),'91010')
+    await collision.click('[data-contact-id="user:91010"]')
+    const groupIncoming=framed(Wrapper.encode(Wrapper.fromObject({type:types.GROUP_CHAT,groupChat:{targetClientId:91010,userId:91003,content:'isolated group delivery',timestamp:Date.now(),messageId:'same-id-group-incoming'}})).finish())
+    await collision.evaluate(bytes=>globalThis.fixtureReaders[0].enqueue(new Uint8Array(bytes)),groupIncoming)
+    await collision.waitForSelector('[data-contact-id="group:91010"] .unread-badge')
+    assert.ok(!await collision.$eval('.messages',el=>el.textContent.includes('isolated group delivery')))
+    await collision.click('[data-contact-id="group:91010"]')
+    await collision.waitForFunction(()=>document.querySelector('.messages')?.textContent.includes('isolated group delivery'))
+    await collision.click('[data-contact-id="user:91010"]')
+    await collision.waitForFunction(()=>document.querySelector('.messages')?.textContent.includes('private same ID'))
+    assert.ok(!await collision.$eval('.messages',el=>el.textContent.includes('isolated group delivery')))
+    await collision.close()
     assert.deepEqual(errors, [])
-    console.log('PASS: tabs/keyboard, unread preserved, directory/search/empty, mobile back, private/group navigation, positive group wire ID, three languages, light/dark 320px layout.')
+    console.log('PASS: typed same-ID private/group drafts, wire routing, unread and history isolation; 5000-contact bounded DOM, keyboard/mobile navigation, cache-first reload and delayed ACK lifecycle.')
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)) }
 }
 main().catch(error => { console.error(error); server.close(); process.exitCode = 1 })

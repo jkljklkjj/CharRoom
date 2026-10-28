@@ -133,6 +133,7 @@ message AckMessage {
     optional int64 seqId = 6;       // 当前会话的 seqId（乐观 UI 更新游标用）
     optional string conversationId = 7; // 会话ID
     optional int64 timestamp = 8;   // 客户端时间戳（回传用于 RTT 测量）
+    optional string serverMessageId = 9; // 持久化主键；messageId 仍回传原客户端 ID
 }
 
 // 通用消息包装器

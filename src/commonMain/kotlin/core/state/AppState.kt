@@ -81,6 +81,7 @@ class AppState {
      * 清除认证状态（退出登录）
      */
     fun clearAuth() {
+        core.NativeSocialCache.cache.logout()
         _authState.value = AuthState.Unauthenticated
     }
 }

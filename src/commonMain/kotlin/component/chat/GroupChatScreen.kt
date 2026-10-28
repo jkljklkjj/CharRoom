@@ -82,21 +82,16 @@ fun GroupChatScreen(
     onAvatarClick: ((User) -> Unit)? = null, // 点击消息头像回调
     onMyAvatarClick: (() -> Unit)? = null // 点击自己头像回调
 ) {
-    var messageText by remember { mutableStateOf("") }
+    var messageText by rememberComposerDraft(core.state.GlobalAppState.currentUserId, model.ConversationKey.group(group.id))
     // 从ViewModel收集状态
-    val allGroupMessages by chatViewModel.groupMessagesFlow.collectAsState()
+    val groupMessages = remember(group.id) { core.state.GlobalChatState.groupMessagesFor(group.id) }
+    val groupMessageList by groupMessages.collectAsState()
     val allUsers by chatViewModel.usersFlow.collectAsState()
 
-    // 使用derivedStateOf优化消息过滤，只有groupMessages变化或group变化时才重新计算
-    val groupMessageList by remember(group.id, allGroupMessages) {
-        derivedStateOf {
-            allGroupMessages.filter { it.groupId == group.id }
-        }
-    }
     // 获取当前登录用户信息（自己）
     val currentUser: User? by remember(allUsers) {
         derivedStateOf {
-            allUsers.find { user -> user.id == GlobalAppState.currentUserId }
+            allUsers.find { user -> !user.isGroup && user.id == GlobalAppState.currentUserId }
         }
     }
 
@@ -468,7 +463,7 @@ fun GroupChatScreen(
                                 showTimestamp = false,
                                 senderAvatar = if (!isMine) {
                                     {
-                                        val senderUser = allUsers.find { it.id == message.senderId }
+                                        val senderUser = allUsers.find { !it.isGroup && it.id == message.senderId }
                                         AvatarImage(
                                             avatarUrl = senderUser?.avatarUrl,
                                             avatarKey = senderUser?.avatarKey,
@@ -716,22 +711,7 @@ fun sendGroupMessage(
  * 重发群消息
  */
 fun resendGroupMessage(chatViewModel: ChatViewModel, group: Group, message: GroupMessage) {
-    // 删除原来的消息
-    chatViewModel.deleteGroupMessage(message.messageId)
-
-    // 重新发送
-    sendGroupMessage(
-        chatViewModel = chatViewModel,
-        group = group,
-        messageText = message.text,
-        messageType = message.messageType,
-        fileUrl = message.fileUrl,
-        fileName = message.fileName,
-        fileSize = message.fileSize,
-        replyToMessageId = message.replyToMessageId,
-        replyToContent = message.replyToContent,
-        replyToSender = message.replyToSender
-    )
+    chatViewModel.retryGroupMessage(message)
 }
 
 // formatTime, formatDate, isSameDay, formatFileSize 已提取到 component.chat.ChatUtils

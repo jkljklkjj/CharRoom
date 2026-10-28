@@ -12,8 +12,8 @@
 .social-nav { align-self:flex-start; display:flex; gap:3px; max-width:calc(100% - 40px); margin:8px 20px 10px; padding:4px; overflow-x:auto; scrollbar-width:none; border:1px solid var(--surface-border); border-radius:12px; background:var(--panel); }
 .social-nav::-webkit-scrollbar { display:none; }
 .social-nav button { flex:0 0 auto; min-width:0; padding:8px 12px; border:0; border-radius:8px; background:transparent; color:var(--text-secondary); font-size:13px; white-space:nowrap; cursor:pointer; transition:background .18s,color .18s; }
-.social-nav button.active { background:#ffe8d5; color:#98451e; font-weight:600; }
-[data-theme="dark"] .social-nav button.active { background:#493024; color:#ffb785; }
+.social-nav button.active { background:var(--apricot); color:var(--on-apricot); font-weight:600; }
+
 .social-nav button:hover { opacity:.85; }
 .social-layout { flex:1; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); min-height:0; }
 .social-layout.has-profile { grid-template-columns:minmax(0,1fr) minmax(270px,340px); }
@@ -81,7 +81,7 @@
 .social-author-name { font-size:13px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .social-room-messages { display:flex; flex-direction:column; gap:12px; height:clamp(160px,32dvh,360px); overflow:auto; overscroll-behavior:contain; scroll-behavior:auto; padding:14px 4px; scrollbar-gutter:stable; }
 .social-room-message { max-width:85%; align-self:flex-start; background:var(--bubble-bg); padding:10px 14px; border-radius:12px; user-select:text; }
-.social-room-message.mine { align-self:flex-end; background:var(--bubble-bg); border:1px solid var(--accent-1); color:var(--text-primary); }
+.social-room-message.mine { align-self:flex-end; background:var(--message-self); border:1px solid transparent; color:var(--on-message-self); }
 .social-room-status { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; background:var(--panel); border:1px solid var(--surface-border); border-radius:10px; font-size:14px; }
 .social-room-status time { font-variant-numeric:tabular-nums; font-size:20px; font-weight:600; }
 .social-compose-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -145,3 +145,9 @@
 .social-entry-error button { flex:none; }
 .social-nav button { position:relative; }
 .social-nav button[aria-busy="true"]::after { content:''; position:absolute; bottom:2px; left:12px; right:12px; height:2px; border-radius:2px; background:var(--accent-2); animation:social-pulse .7s ease-in-out infinite alternate; }
+
+.social-brand-heading{display:flex;align-items:center;gap:14px}.social-brand-heading>span:last-child{font-size:12px;color:var(--muted);border-left:1px solid var(--surface-border-strong);padding-left:14px}
+.social-welcome{padding:22px 22px 8px;flex-shrink:0}.social-welcome h2{font-size:24px;letter-spacing:-.03em;margin:0 0 5px}.social-welcome p{font-size:13px;color:var(--muted);margin:0;line-height:1.8}
+.social-initial{background:var(--apricot);color:var(--on-apricot);border-radius:var(--avatar-radius)}
+.social-tags span{background:var(--sage-soft);color:var(--sage-ink);border-radius:8px}
+@media(max-width:699px){.social-welcome{padding:16px 20px 4px}.social-welcome h2{font-size:21px}.social-welcome p{font-size:12px}}

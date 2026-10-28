@@ -123,7 +123,7 @@ class NetworkRepository private constructor() {
     suspend fun fetchFriendAndGroupList(token: String): List<User> = withContext(Dispatchers.IO) {
         val friends = fetchList(FRIEND_GET_PATH, token, "POST")
         val groups = fetchGroups(GROUP_GET_PATH, token)
-        (friends + groups).distinctBy { it.id }
+        (friends + groups).distinctBy { it.conversationKey }
     }
 
     suspend fun addFriend(account: String, token: String): Boolean = withContext(Dispatchers.IO) {
@@ -327,10 +327,11 @@ class NetworkRepository private constructor() {
                     val username = item.optString("name", item.optString("groupName", "群组$id"))
                     val avatarUrl = item.optString("avatarUrl").takeIf { it.isNotBlank() && it != "null" }
                         ?: item.optString("avatar").takeIf { it.isNotBlank() && it != "null" }
-                    // 群组用负ID存储，后续在AndroidRemoteDataSource中转换为Group对象
+                    // 群组保留服务端ID，以显式会话类型区分同号联系人
                     add(
                         User(
-                            id = -id, // 群组ID用负值表示
+                            id = id,
+                            conversationKind = model.ConversationKind.GROUP,
                             username = username,
                             avatarUrl = avatarUrl,
                             online = false

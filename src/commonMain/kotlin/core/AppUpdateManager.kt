@@ -32,7 +32,7 @@ sealed class UpdateState {
     /**
      * 正在下载更新
      */
-    data class Downloading(val progress: Int, val total: Long) : UpdateState()
+    data class Downloading(val progress: Int, val total: Long, val versionInfo: AppVersionInfo) : UpdateState()
 
     /**
      * 下载完成，等待安装
@@ -43,11 +43,15 @@ sealed class UpdateState {
      * 正在安装
      */
     object Installing : UpdateState()
+    data class Verifying(val versionInfo: AppVersionInfo) : UpdateState()
+    data class Preparing(val versionInfo: AppVersionInfo) : UpdateState()
+    data class HandedOff(val versionInfo: AppVersionInfo) : UpdateState()
+    data class Completed(val version: String) : UpdateState()
 
     /**
      * 更新失败
      */
-    data class Failed(val error: String) : UpdateState()
+    data class Failed(val error: String, val versionInfo: AppVersionInfo? = null) : UpdateState()
 }
 
 /**
@@ -59,6 +63,7 @@ interface AppUpdateManager {
      * 更新状态流
      */
     val updateState: StateFlow<UpdateState>
+    val promptVisible: StateFlow<Boolean>
 
     /**
      * 检查更新
@@ -69,7 +74,8 @@ interface AppUpdateManager {
     suspend fun checkForUpdates(
         platform: String,
         channel: String = "official",
-        autoDownload: Boolean = false
+        autoDownload: Boolean = false,
+        silent: Boolean = false
     )
 
     /**
@@ -88,6 +94,9 @@ interface AppUpdateManager {
      * 取消下载
      */
     fun cancelDownload()
+    fun dismiss()
+    fun close()
+    suspend fun restore()
 }
 
 /**

@@ -129,22 +129,7 @@ fun sendMessage(
  * 重发消息
  */
 fun resendMessage(chatViewModel: ChatViewModel, user: User, message: Message) {
-    // 删除原来的消息
-    chatViewModel.deleteMessage(message.messageId)
-
-    // 重新发送
-    sendMessage(
-        chatViewModel = chatViewModel,
-        user = user,
-        messageText = message.message,
-        messageType = message.messageType,
-        fileUrl = message.fileUrl,
-        fileName = message.fileName,
-        fileSize = message.fileSize,
-        replyToMessageId = message.replyToMessageId,
-        replyToContent = message.replyToContent,
-        replyToSender = message.replyToSender
-    )
+    chatViewModel.retryMessage(message)
 }
 
 /**
@@ -185,7 +170,7 @@ private fun ChatScreenContent(
     onUserMenuClick: ((User) -> Unit)? = null
 ) {
     val s = LocalStrings.current
-    var messageText by remember { mutableStateOf("") }
+    var messageText by rememberComposerDraft(GlobalAppState.currentUserId, model.ConversationKey.privateChat(user.id))
     var showDeleteConfirm by remember { mutableStateOf(false) }
     // 从ViewModel收集用户列表状态
     val allUsers by chatViewModel.usersFlow.collectAsState()
@@ -195,7 +180,7 @@ private fun ChatScreenContent(
     // 获取当前登录用户信息（自己）
     val currentUser: User? by remember(allUsers) {
         derivedStateOf {
-            allUsers.find { user -> user.id == GlobalAppState.currentUserId }
+            allUsers.find { user -> !user.isGroup && user.id == GlobalAppState.currentUserId }
         }
     }
     var historyQuery by remember { mutableStateOf("") }
@@ -722,7 +707,7 @@ private fun ChatScreenContent(
                             }
                         }
 
-                        if (message.sender && !message.isSent) {
+                        if (message.sender && message.deliveryState == model.MessageDeliveryState.FAILED) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End,

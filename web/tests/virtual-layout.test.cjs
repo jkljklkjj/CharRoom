@@ -13,3 +13,18 @@ test('large histories render a bounded range with variable heights and preserve 
   assert.equal(after.offsets[5001] + 35 - anchor, 500)
   assert.deepEqual({ ...virtualLayout([], new Map()).range(0, 800) }, { start: 0, end: 0 })
 })
+
+test('height updates reuse the index and preserve prefix sums through prepends and deletes', async()=>{
+ const {exports:{IncrementalVirtualLayout}}=await loadTs(path.resolve(__dirname,'../src/utils/virtualLayout.ts'))
+ const keys=Array.from({length:10000},(_,i)=>String(i)),heights=new Map()
+ const layout=new IncrementalVirtualLayout();layout.reset(keys,heights)
+ layout.update('10',500)
+ assert.equal(layout.offsetAt(5000),500400)
+ assert.equal(layout.indexAt(500435),5000)
+ assert.equal(layout.total,1000400)
+ heights.set('10',500);layout.reset(['older',...keys],heights)
+ assert.equal(layout.offsetAt(5001),500500)
+ layout.reset(['10'],heights);assert.equal(layout.total,500)
+ layout.update('missing',200);assert.equal(layout.total,500)
+ layout.reset([],heights);assert.deepEqual({...layout.range(0,800)},{start:0,end:0})
+})
