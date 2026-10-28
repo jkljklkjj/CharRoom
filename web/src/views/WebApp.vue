@@ -105,6 +105,7 @@ import type { Tokens } from '../types/api'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ensureLocale } from '../i18n'
 import LoginRegister from '../components/LoginRegister.vue'
 import SidebarUsers from '../components/SidebarUsers.vue'
 import type { SidebarTab } from '../utils/contactDirectory'
@@ -178,7 +179,14 @@ function openProfileEdit() {
 
 // 主题设置（theme / setTheme / initTheme 来自 utils/theme.ts）
 
-function switchLang(lang: string) {
+async function switchLang(lang: string) {
+  // 先加载语言包再切换，避免整页出现未翻译的 key
+  try {
+    await ensureLocale(lang)
+  } catch (error) {
+    console.warn('[i18n] 语言包加载失败', error)
+    return
+  }
   locale.value = lang
   localStorage.setItem('locale', lang)
   document.documentElement.lang = lang
