@@ -140,6 +140,7 @@
   "chat.selectContact": "連絡先を選択してチャットを開始",
   "chat.selectContactHint": "👆 左の連絡先を選択してチャットを始めましょう",
   "chat.inputPlaceholder": "メッセージを入力、画像を貼り付け、またはファイルをドラッグ...",
+  "chat.inputPlaceholderCompact": "メッセージ、画像を貼り付け…",
   "chat.send": "送信",
   "chat.myself": "自分",
   "chat.groupChat": "グループチャット",

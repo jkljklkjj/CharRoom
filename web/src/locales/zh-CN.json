@@ -161,6 +161,7 @@
   "chat.selectContact": "请选择一个联系人开始聊天",
   "chat.selectContactHint": "👆 请在左侧选择一个联系人开始聊天",
   "chat.inputPlaceholder": "输入消息，支持粘贴图片/拖拽文件发送...",
+  "chat.inputPlaceholderCompact": "输入消息，可粘贴图片…",
   "chat.send": "发送",
   "chat.myself": "我",
   "chat.groupChat": "群聊",

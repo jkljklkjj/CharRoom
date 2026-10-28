@@ -2,10 +2,11 @@
   <div class="settings-overlay social-overlay" :style="viewportStyle" @click.self="emit('close')">
     <div ref="dialog" class="settings-dialog social-hub" :class="{ 'room-mode': tab === 'encounter' && !selected }" role="dialog" aria-modal="true" :aria-label="t('social.discover')" tabindex="-1">
       <header class="settings-header"><div class="social-brand-heading"><BrandMark /><span>{{ t('social.discover') }}</span></div><button class="close-settings" :aria-label="t('social.close')" @click="emit('close')">×</button></header>
-      <div class="social-welcome" v-if="tab === 'people'"><h2>{{ t('product.discoverTitle') }}</h2><p>{{ t('product.discoverLead') }}</p></div>
       <nav class="social-nav" :aria-label="t('social.discover')">
         <button v-for="item in ['people', 'encounter', 'daily', 'me'] as const" :key="item" :aria-pressed="ready && tab === item" :aria-busy="pending === item" :class="{ active: tab === item }" @click="changeTab(item)">{{ t(`social.${item}`) }}</button>
       </nav>
+      <!-- 标题块放在标签栏下方：它只随“找人”页出现，若置于上方会把整排标签按钮顶下去 -->
+      <div class="social-welcome" v-if="tab === 'people'"><h2>{{ t('product.discoverTitle') }}</h2><p>{{ t('product.discoverLead') }}</p></div>
       <div class="social-loading-track"><div v-if="busy || pending" class="social-loading-line" role="progressbar" :aria-label="t('social.loading')"></div></div>
       <div class="social-entry-status" role="status" aria-live="polite"><span v-if="pending">{{ t('social.preparing', { page: t(`social.${pending}`) }) }}</span></div>
       <div v-if="entryError" class="social-entry-error social-error" role="alert">{{ entryError }} <button class="cancel-btn" @click="retryEntry">{{ t('polish.retry') }}</button></div>

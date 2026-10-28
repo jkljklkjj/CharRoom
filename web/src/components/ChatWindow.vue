@@ -146,7 +146,7 @@
         <textarea
           v-model="text"
           ref="messageInput"
-          :placeholder="$t('chat.inputPlaceholder')"
+          :placeholder="inputPlaceholder"
           :aria-label="$t('chat.inputPlaceholder')"
           rows="1"
           @keydown="composerEnter($event, send)"
@@ -223,6 +223,10 @@ function handleResize() {
     windowWidth.value = window.innerWidth
   }, 100)
 }
+// 竖屏/窄屏用短文案，避免 placeholder 在输入框里折成两行
+const inputPlaceholder = computed(() => windowWidth.value < 768
+  ? t('chat.inputPlaceholderCompact')
+  : t('chat.inputPlaceholder'))
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)

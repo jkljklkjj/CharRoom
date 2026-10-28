@@ -161,6 +161,7 @@
   "chat.selectContact": "Select a contact to start chatting",
   "chat.selectContactHint": "👆 Select a contact on the left to start chatting",
   "chat.inputPlaceholder": "Type a message, paste images, or drag files here...",
+  "chat.inputPlaceholderCompact": "Message or paste an image…",
   "chat.send": "Send",
   "chat.myself": "Me",
   "chat.groupChat": "Group Chat",
