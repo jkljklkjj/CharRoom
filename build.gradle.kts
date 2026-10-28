@@ -9,7 +9,6 @@ buildscript {
     }
     dependencies {
         classpath("com.android.tools.build:gradle:8.13.2")
-        classpath("com.guardsquare:proguard-gradle:7.8.2")
     }
 }
 
@@ -24,6 +23,23 @@ plugins {
 group = "com.chatlite"
 val releaseVersion = providers.gradleProperty("appVersion").get()
 val releaseVersionCode = providers.gradleProperty("appVersionCode").get().toInt()
+val desktopOs = System.getProperty("os.name").lowercase()
+val desktopArch = System.getProperty("os.arch").lowercase()
+val desktopNativeClassifier = when {
+    desktopOs.contains("win") && desktopArch in listOf("amd64", "x86_64") -> "windows-x86_64"
+    desktopOs.contains("mac") && desktopArch in listOf("aarch64", "arm64") -> "osx-aarch_64"
+    desktopOs.contains("mac") && desktopArch in listOf("amd64", "x86_64") -> "osx-x86_64"
+    desktopOs.contains("linux") && desktopArch in listOf("amd64", "x86_64") -> "linux-x86_64"
+    else -> error("Unsupported desktop QUIC platform: $desktopOs/$desktopArch")
+}
+// Rich-text dependencies can transitively bring a foreign Skiko runtime.
+val desktopSkikoPlatform = desktopNativeClassifier.replace("windows-x86_64", "windows-x64")
+    .replace("linux-x86_64", "linux-x64").replace("osx-x86_64", "macos-x64").replace("osx-aarch_64", "macos-arm64")
+configurations.configureEach {
+    listOf("windows-x64", "windows-arm64", "linux-x64", "linux-arm64", "macos-x64", "macos-arm64")
+        .filter { it != desktopSkikoPlatform }
+        .forEach { exclude(group = "org.jetbrains.skiko", module = "skiko-awt-runtime-$it") }
+}
 require(releaseVersion.matches(Regex("[1-9][0-9]*\\.[0-9]+\\.[0-9]+")) && releaseVersionCode > 0)
 version = releaseVersion
 val releaseSources = layout.buildDirectory.dir("generated/releaseVersion")
@@ -74,12 +90,7 @@ dependencies {
     implementation("io.netty:netty-handler:4.2.5.Final")
     // Netty QUIC (与后端 QUIC 协议兼容)
     implementation("io.netty.incubator:netty-incubator-codec-classes-quic:0.0.75.Final")
-    implementation("io.netty.incubator:netty-incubator-codec-native-quic:0.0.75.Final:linux-x86_64")
-    implementation("io.netty.incubator:netty-incubator-codec-native-quic:0.0.75.Final:windows-x86_64")
-    implementation("io.netty.incubator:netty-incubator-codec-native-quic:0.0.75.Final:osx-x86_64")
-    implementation("io.netty.incubator:netty-incubator-codec-native-quic:0.0.75.Final:osx-aarch_64")
-    implementation("org.jboss.marshalling:jboss-marshalling:2.3.0")
-    implementation("org.jboss.marshalling:jboss-marshalling-river:2.3.0")
+    runtimeOnly("io.netty.incubator:netty-incubator-codec-native-quic:0.0.75.Final:$desktopNativeClassifier")
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("org.slf4j:slf4j-simple:2.0.17")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.2")
@@ -99,22 +110,19 @@ dependencies {
     implementation("io.insert-koin:koin-core:4.2.0-RC1")
     implementation("io.insert-koin:koin-compose:4.2.0-RC1")
 
-    // WebRTC 视频通话（跨桌面端 + Android）
-    implementation("dev.onvoid.webrtc:webrtc-java:0.14.0")
-
     // 桌面端特有依赖
     implementation("io.ktor:ktor-client-cio:3.4.3")
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
 
-    // CLI 交互增强：命令历史 + Tab 补全（jline3）
-    implementation("org.jline:jline:3.27.1")
+    testImplementation(kotlin("test"))
+
 }
 
 // 源集配置
 sourceSets {
     main {
-        kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin", "src/cliMain/kotlin")
+        kotlin.srcDirs("src/commonMain/kotlin", "src/desktopMain/kotlin")
         kotlin.srcDir(generateReleaseVersion)
         resources.srcDirs("src/commonMain/resources", "src/desktopMain/resources")
         // 排除 Android 特定文件和 WebRTC call（包名不匹配）
@@ -122,9 +130,7 @@ sourceSets {
     }
     test {
         kotlin.srcDirs("src/commonTest/kotlin", "src/desktopTest/kotlin", "src/androidUnitTest/kotlin")
-        dependencies {
-            implementation(kotlin("test"))
-        }
+        kotlin.exclude("cli/**")
     }
 }
 
@@ -148,7 +154,7 @@ compose.desktop {
             "-Dconsole.encoding=UTF-8"
         )
 
-        // CI 通过 org.gradle.java.home 指向 jlink 裁剪的最小 JRE，本地开发使用当前 JDK
+        // Compose invokes jlink itself; packaging requires a full JDK with jmods/jpackage.
         javaHome = System.getProperty("java.home")
 
         buildTypes {
@@ -165,11 +171,12 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            // Compose Desktop 不需要 java.desktop (Swing/AWT)、java.sql、java.xml 等模块
-            // 指定最小模块集，jlink 生成更小的运行时
+            // Swing/AWT is required by Compose Desktop. Keep EC crypto for HTTPS/QUIC trust.
             modules(
+                "java.desktop",
                 "java.logging",
                 "java.prefs",
+                "jdk.crypto.ec",
                 "jdk.unsupported"
             )
             packageName = "chatlite"
@@ -201,37 +208,32 @@ tasks.register("buildInstallers") {
     group = "distribution"
     description = "Build native installers (DMG / MSI / DEB)"
 
-    val isWindows = System.getProperty("os.name").contains("Windows", ignoreCase = true)
-
-    dependsOn(tasks.matching {
-        (it.name.startsWith("package") || it.name.startsWith("jpackage")) &&
-            (!isWindows || it.name != "packageReleaseMsi")
+    dependsOn(when {
+        desktopOs.contains("win") -> "packageReleaseMsi"
+        desktopOs.contains("mac") -> "packageReleaseDmg"
+        else -> "packageReleaseDeb"
     })
-
-    if (isWindows) {
-        dependsOn("packageReleaseMsi")
-    }
 }
 
-tasks.register<Copy>("stageDesktopReleaseArtifacts") {
+tasks.register<Sync>("stageDesktopReleaseArtifacts") {
     group = "distribution"
     description = "Stage desktop release installers with fixed filenames"
     dependsOn("buildInstallers")
     into(layout.buildDirectory.dir("release-artifacts/desktop"))
 
-    from(layout.buildDirectory.dir("compose/binaries")) {
-        include("**/*.msi")
-        rename { "chatlite.msi" }
+    val format = when {
+        desktopOs.contains("win") -> "msi"
+        desktopOs.contains("mac") -> "dmg"
+        else -> "deb"
     }
-
-    from(layout.buildDirectory.dir("compose/binaries")) {
-        include("**/*.dmg")
-        rename { "chatlite.dmg" }
+    from(layout.buildDirectory.dir("compose/binaries/main-release/$format")) {
+        include("*.$format")
+        rename { "chatlite.$format" }
     }
-
-    from(layout.buildDirectory.dir("compose/binaries")) {
-        include("**/*.deb")
-        rename { "chatlite.deb" }
+    doFirst {
+        val installers = layout.buildDirectory.dir("compose/binaries/main-release/$format").get().asFile
+            .listFiles { f -> f.extension == format }.orEmpty()
+        check(installers.size == 1) { "Expected one release installer, found ${installers.size}; clean stale installers first" }
     }
 }
 
@@ -258,14 +260,7 @@ tasks.register<Jar>("customJar") {
     archiveBaseName.set("在线聊天App")
     archiveVersion.set(releaseVersion)
 
-    from(kotlin.sourceSets["main"].kotlin.srcDirs)
-    from("src/desktopMain/java") { into("") }
-    from(kotlin.sourceSets["main"].resources.srcDirs)
-    from("src/commonMain/resources") { into("") }
-    from("src/desktopMain/resources") { into("") }
-    from("build/classes/kotlin/main")
-    from("build/classes/java/main") { into("") }
-    from("build/extracted-include-protos") { into("extracted-include-protos") }
+    from(sourceSets.main.get().output)
 
     // Include all runtime dependencies into the fat JAR so java -jar works
     from({
@@ -281,8 +276,57 @@ tasks.register<Jar>("customJar") {
         attributes["Main-Class"] = "MainKt"
     }
 
-    dependsOn("assemble")
-    dependsOn(":proto:protoJar")
+    dependsOn("classes", ":proto:jar")
+}
+
+val verifyDesktopRuntime = tasks.register("verifyDesktopRuntime") {
+    group = "verification"
+    description = "Reject foreign native libraries and unused CLI/call dependencies in desktop packages"
+    doLast {
+        val artifacts = configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
+        val forbidden = artifacts.filter {
+            val id = it.moduleVersion.id
+            (id.name == "netty-incubator-codec-native-quic" && it.classifier != desktopNativeClassifier) ||
+                (id.group == "org.jetbrains.skiko" && id.name.startsWith("skiko-awt-runtime-") &&
+                    id.name != "skiko-awt-runtime-$desktopSkikoPlatform") ||
+                id.group in listOf("dev.onvoid.webrtc", "org.jline", "org.jboss.marshalling") ||
+                id.name.startsWith("kotlin-test")
+        }
+        check(forbidden.isEmpty()) { "Unexpected desktop runtime dependencies: $forbidden" }
+        check(artifacts.count { it.name == "netty-incubator-codec-native-quic" } == 1)
+        check(artifacts.count { it.name.startsWith("skiko-awt-runtime-") } == 1)
+    }
+}
+tasks.matching { it.name in listOf("check", "createDistributable", "createReleaseDistributable", "customJar",
+    "packageReleaseMsi", "packageReleaseDmg", "packageReleaseDeb", "packageMsi", "packageDmg", "packageDeb") }
+    .configureEach { dependsOn(verifyDesktopRuntime) }
+
+tasks.register("desktopSizeReport") {
+    group = "distribution"
+    description = "Report runtime JAR sizes and generated desktop image/installer sizes"
+    dependsOn(verifyDesktopRuntime)
+    doLast {
+        val artifacts = configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
+        val report = buildString {
+            appendLine("Desktop platform: $desktopNativeClassifier")
+            appendLine("Runtime dependencies: ${artifacts.sumOf { it.file.length() }} bytes")
+            artifacts.sortedByDescending { it.file.length() }.forEach {
+                appendLine("${it.file.length()}\t${it.moduleVersion.id}\t${it.classifier.orEmpty()}")
+            }
+            val binaries = layout.buildDirectory.dir("compose/binaries").get().asFile
+            binaries.listFiles()?.filter { it.isDirectory }?.sortedBy { it.name }?.forEach { variant ->
+                variant.listFiles()?.sortedBy { it.name }?.forEach { component ->
+                    val bytes = if (component.isFile) component.length()
+                        else component.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                    appendLine("$bytes\t${component.relativeTo(projectDir)}")
+                }
+            }
+        }
+        val output = layout.buildDirectory.file("reports/packaging/desktop-size.txt").get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(report)
+        logger.lifecycle(report)
+    }
 }
 
 tasks.register("customApkRelease") {
@@ -302,7 +346,7 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
     config.setFrom(file("$rootDir/config/detekt/detekt.yml"))
-    source.setFrom("src/commonMain/kotlin", "src/desktopMain/kotlin", "src/cliMain/kotlin")
+    source.setFrom("src/commonMain/kotlin", "src/desktopMain/kotlin")
 }
 
 tasks.register("customApk") {
@@ -311,32 +355,10 @@ tasks.register("customApk") {
     dependsOn(tasks.named("customApkRelease"))
 }
 
-tasks.register<proguard.gradle.ProGuardTask>("customProguardReleaseJars") {
-    description = "Run ProGuard on the desktop JAR output"
-    dependsOn(":proto:jar")
-    configuration("proguard-rules.pro")
-    injars("build/libs/CharRoom-1.0-SNAPSHOT.jar")
-    outjars("build/libs/CharRoom-1.0-SNAPSHOT-obfuscated.jar")
-    libraryjars(files(configurations.compileClasspath.get().files + configurations.runtimeClasspath.get().files))
-    val javaHome = System.getProperty("java.home")
-    val modulesFile = file("$javaHome/lib/modules")
-    val jrtFsFile = file("$javaHome/lib/jrt-fs.jar")
-    val jmodsDir = file("$javaHome/jmods")
-    val jdkLibs = mutableListOf<File>()
-    if (modulesFile.exists()) {
-        jdkLibs.add(modulesFile)
-    }
-    if (jrtFsFile.exists()) {
-        jdkLibs.add(jrtFsFile)
-    }
-    if (jmodsDir.exists() && jmodsDir.isDirectory) {
-        jdkLibs.addAll(jmodsDir.listFiles { file -> file.extension == "jmod" }?.toList().orEmpty())
-    }
-    if (jdkLibs.isNotEmpty()) {
-        libraryjars(files(jdkLibs))
-    }
-    verbose()
-    ignorewarnings()
+tasks.register("customProguardReleaseJars") {
+    group = "distribution"
+    description = "Run the same ProGuard pipeline used by release installers"
+    dependsOn("proguardReleaseJars")
 }
 
 tasks.register("runDesktopProguard") {
@@ -346,27 +368,12 @@ tasks.register("runDesktopProguard") {
 }
 
 // CLI 可执行 Fat JAR 任务
-tasks.register<Jar>("cliJar") {
-    description = "Build CLI chat client executable fat JAR"
+tasks.register<Copy>("cliJar") {
     group = "cli"
-    archiveBaseName.set("chatlite-cli")
-    archiveVersion.set(releaseVersion)
-
-    from(sourceSets.main.get().output)
-
-    // 打包全部运行时依赖
-    from({
-        configurations["runtimeClasspath"].filter { it.name.endsWith(".jar") }.map { zipTree(it) }
-    }) {
-        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/*.EC")
-        exclude("META-INF/*.kotlin_module")
-    }
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    manifest {
-        attributes["Main-Class"] = "CliMainKt"
-    }
-    dependsOn(tasks.named("compileKotlin"), ":proto:jar")
+    description = "Build and copy the independent headless CLI executable"
+    dependsOn(":cli:fatJar")
+    from(project(":cli").layout.buildDirectory.dir("libs")) { include("chatlite-cli-*.jar") }
+    into(layout.buildDirectory.dir("libs"))
 }
 
 // Do not run custom ProGuard automatically on every JAR build in CI.

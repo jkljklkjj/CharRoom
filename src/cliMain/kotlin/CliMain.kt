@@ -1,12 +1,10 @@
 import cli.*
 import core.*
-import core.di.KoinInitializer
-import core.di.desktopModule
 import core.state.AuthState
 import core.state.GlobalAppState
 import data.datasource.local.CliFileProvider
+import data.datasource.local.LocalDataSourceImpl
 import data.datasource.local.fileProvider
-import data.repository.AuthRepository
 import kotlinx.coroutines.*
 import org.jline.reader.UserInterruptException
 import java.io.File
@@ -71,44 +69,49 @@ class ChatLiteCli(private val args: Array<String>) {
         config.lock(directory).use {
             fileProvider = CliFileProvider(File(directory, "data"))
             LocalChatHistoryStore = FileLocalChatHistoryStore(File(directory, "history"))
-            val koin = KoinInitializer.init(platformModules = listOf(desktopModule)).koin
             try {
-                val transport = koin.get<ChatTransport>()
+                val transport = QuicClientImpl()
                 Chat = transport
                 try {
                     CliConsole().use { console ->
                         console.output("轻聊 CLI ${AppConfig.VERSION_NAME} · $server · QUIC $host:$port")
-                        val auth = koin.get<AuthRepository>()
+                        val auth = CliAuthentication(LocalDataSourceImpl())
                         if (!login(auth, options, passwordFromStdin, console)) {
                             throw IllegalStateException("认证未完成")
                         }
                         config.save(server, host, port)
-                        runSession(transport, console, server)
+                        runSession(transport, console, server, directory)
                     }
                 } finally { transport.stop() }
             } finally {
-                try { KoinInitializer.destroy() } finally { httpClient.close() }
+                httpClient.close()
             }
         }
     }
 
-    private suspend fun login(auth: AuthRepository, options: CliOptions, supplied: String?, console: CliConsole): Boolean {
+    private suspend fun login(auth: CliAuthentication, options: CliOptions, supplied: String?, console: CliConsole): Boolean {
         if (options.username == null && !options.noAutoLogin) {
             auth.init()
             if (GlobalAppState.authState.value is AuthState.Authenticated) return true
         }
         val account = options.username ?: console.line("账号: ")?.trim()?.takeIf { it.isNotBlank() } ?: return false
         val password = supplied ?: console.line("密码: ", secret = true) ?: return false
-        val state = auth.login(account, password, rememberMe = true)
+        val state = auth.login(account, password)
         if (state !is AuthState.Authenticated) console.output("登录失败，请检查账号或网络后重新启动；未切换到其他账号。")
         return state is AuthState.Authenticated
     }
 
-    private suspend fun runSession(transport: ChatTransport, console: CliConsole, server: String) = coroutineScope {
+    private suspend fun runSession(transport: ChatTransport, console: CliConsole, server: String, directory: File) = coroutineScope {
         val session = SupervisorJob(coroutineContext[Job])
         val scope = CoroutineScope(coroutineContext + session + Dispatchers.IO)
         val valid = java.util.concurrent.atomic.AtomicBoolean(true)
+        val account = checkNotNull(GlobalAppState.currentUserId).also { check(it > 0) }
+        val outbox = CliOutbox(directory, account)
+        val assistant = CliAssistantTask(scope, { text -> agentChat(checkNotNull(GlobalAppState.currentToken), text) }, console::output)
+        val historyRequests = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
         val listener = object : MessageReceiveListener {
+            override fun onAckReceived(messageId: String, seqId: Long, conversationId: String) { outbox.accepted(messageId) }
+            override fun onAckRejected(messageId: String, reason: String) { outbox.failed(messageId, rejected = true) }
             override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long, seqId: Long, conversationId: String) {
                 console.output("[用户 $senderId] $message")
             }
@@ -118,6 +121,7 @@ class ChatLiteCli(private val args: Array<String>) {
         }
         val invalidated = AuthStateListener {
             valid.set(false)
+            assistant.cancel()
             transport.stop()
             console.output("登录已失效，请退出后重新登录。")
         }
@@ -126,7 +130,7 @@ class ChatLiteCli(private val args: Array<String>) {
         transport.addAuthStateListener(invalidated)
         Runtime.getRuntime().addShutdownHook(shutdown)
         try {
-            transport.start()
+            scope.launch { runInterruptible { transport.start() } }
             // QUIC owns reconnection. Observe authenticated state without starting a second reconnect loop.
             scope.launch {
                 var connected = false
@@ -134,14 +138,14 @@ class ChatLiteCli(private val args: Array<String>) {
                     val current = transport.isConnected()
                     if (current != connected) {
                         connected = current
+                        if (current) historyRequests.trySend(Unit)
                         console.output(if (current) "实时连接已就绪" else "实时连接断开，正在等待传输层恢复")
                     }
                     delay(1000)
                 }
             }
             console.output("登录成功。输入 /help 查看命令，普通文本会请求 AI 助手。")
-            val account = checkNotNull(GlobalAppState.currentUserId).also { check(it > 0) }
-            val api = ApiService() // Resolve the latest global token at each request, rather than capturing login's token.
+            val api = CliApi() // Resolve the latest global token at each request, rather than capturing login's token.
             val sender = CliMessageSender(transport, { wrapper, failed ->
                 if (wrapper.type == MsgType.GROUP_CHAT) {
                     val message = wrapper.groupChat.localMessage().copy(isSent = false,
@@ -153,19 +157,31 @@ class ChatLiteCli(private val args: Array<String>) {
                     LocalChatHistoryStore.save(account.toString(), listOf(message), emptyList())
                 }
             }, { console.output("◌ 发送中，正在等待服务端确认…") })
+            val delivery = CliDeliveryQueue(outbox, sender, transport, console::output)
             scope.launch {
-                try {
-                    val messages = ApiService().getOfflineMessages()
-                    if (valid.get() && messages.isNotEmpty()) {
-                        LocalChatHistoryStore.save(account.toString(), messages, emptyList())
-                        console.output("已保存 ${messages.size} 条离线消息；/history user <ID> 查看本地记录。")
-                        messages.takeLast(20).forEach { console.output("[离线 · ${it.senderId}] ${it.message}") }
-                    }
-                } catch (error: Exception) {
+                try { delivery.run() }
+                catch (error: Exception) {
                     if (error is CancellationException) throw error
-                    console.output("离线消息加载失败，可稍后重新登录重试。")
+                    console.output("待发处理已暂停，请检查磁盘和 /pending 后重新启动；原队列保留。")
                 }
             }
+            scope.launch {
+                for (ignored in historyRequests) {
+                    try {
+                        val token = checkNotNull(GlobalAppState.currentToken)
+                        val count = syncCliHistory(account, { valid.get() && isActive },
+                            { getRecentHistoryPage(token, it) }, { getOfflineHistoryPage(token) }, { rows ->
+                                LocalChatHistoryStore.save(account.toString(), rows.filterNot { it.isGroup }.map { it.privateMessage(account) },
+                                    rows.filter { it.isGroup }.map { it.groupMessage() })
+                            }, { confirmOfflineMessages(token, it) })
+                        console.output("历史同步完成：$count 条已合并到本地；/history 查看。")
+                    } catch (error: Exception) {
+                        if (error is CancellationException) throw error
+                        console.output("历史同步未完成，已落盘部分保留；使用 /sync 重试。")
+                    }
+                }
+            }
+            historyRequests.trySend(Unit)
             while (true) {
                 val line = try { console.line() } catch (_: UserInterruptException) { continue }
                 if (line == null) break
@@ -176,21 +192,29 @@ class ChatLiteCli(private val args: Array<String>) {
                     if (command.name in listOf("exit", "quit")) break
                     if (command.name == "help") { help(values.firstOrNull(), console); continue }
                     if (command.name == "status") {
-                        console.output("服务器: $server · QUIC: ${if (transport.isConnected()) "已认证" else "未就绪"} · 账号: ${GlobalAppState.currentAccount}")
+                        console.output("服务器: $server · QUIC: ${if (transport.isConnected()) "已认证" else "未就绪"} · 账号: ${GlobalAppState.currentAccount} · 助手: ${if (assistant.isRunning()) "处理中" else "空闲"} · 待发: ${outbox.entries().size}")
                         continue
                     }
+                    if (command.name == "cancel") {
+                        console.output(if (assistant.cancel()) "已停止等待助手；服务端可能仍在处理。" else "当前没有助手任务。")
+                        continue
+                    }
+                    if (command.name == "pending") {
+                        val entries = outbox.entries()
+                        console.output("待发 ${entries.size} 条；REVIEW/REJECTED 需核实后 /discard <ID>。")
+                        entries.forEach { console.output("${it.id} · ${it.status} · 尝试 ${it.attempts} 次") }
+                        continue
+                    }
+                    if (command.name == "discard") { outbox.accepted(values[0]); console.output("已从待发队列移除，不撤回服务端消息。"); continue }
+                    if (command.name == "sync") { historyRequests.trySend(Unit); console.output("已安排历史同步。"); continue }
                     check(valid.get()) { "登录已失效，请退出后重新登录" }
                     withTimeout(35_000) {
                         when (command.name) {
-                            "ai" -> {
-                                console.output("助手正在处理…")
-                                val text = agentChat(checkNotNull(GlobalAppState.currentToken), values[0])
-                                console.output(text.ifBlank { "助手暂未返回内容，请稍后再试。" })
-                            }
-                            "msg", "group send" -> when (sender.send(account, values[0].toInt(), values[1], command.name == "group send")) {
-                                CliSendResult.ACCEPTED -> Unit // Quiet on success; server ACK is not recipient delivery.
-                                CliSendResult.REJECTED -> console.output("! 服务端拒绝接收消息。")
-                                CliSendResult.UNCONFIRMED -> console.output("! 未收到接收确认，消息可能已送达；请核实后再重发。")
+                            "ai" -> console.output(if (assistant.start(values[0])) "助手正在处理，可继续输入；/cancel 停止等待。" else "助手已有任务，可先 /cancel。")
+                            "msg", "group send" -> {
+                                outbox.enqueue(sender.prepare(account, values[0].toInt(), values[1], command.name == "group send"))
+                                delivery.request()
+                                if (!transport.isConnected()) console.output("已保存待发消息，认证连接恢复后使用原 ID 发送。")
                             }
                             "history" -> showHistory(account, values, console)
                             "friend list" -> api.fetchFriends().also { console.output("好友 ${it.size} 人") }.forEach { console.output("${it.id}  ${it.username}") }
@@ -215,7 +239,11 @@ class ChatLiteCli(private val args: Array<String>) {
             }
         } finally {
             withContext(NonCancellable) {
-                session.cancelAndJoin()
+                assistant.cancel()
+                historyRequests.close()
+                session.cancel()
+                transport.stop()
+                session.join()
                 transport.removeMessageReceiveListener(listener)
                 transport.removeAuthStateListener(invalidated)
                 try { transport.logoutAndDisconnect() } finally {

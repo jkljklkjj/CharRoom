@@ -142,18 +142,6 @@ class ChatRepository(
     }
 
     /**
-     * 分页获取离线消息
-     */
-    suspend fun getOfflineMessagesPage(page: Int = 0, pageSize: Int = 50): List<Message> {
-        val token = authRepository.getCurrentToken() ?: return emptyList()
-        // 如果API还不支持分页，先调用全量接口分页返回（兼容模式）
-        val allMessages = getOfflineMessages(token)
-        val start = page * pageSize
-        val end = minOf(start + pageSize, allMessages.size)
-        return if (start < allMessages.size) allMessages.subList(start, end) else emptyList()
-    }
-
-    /**
      * 更新用户个人资料
      */
     suspend fun updateUserProfile(

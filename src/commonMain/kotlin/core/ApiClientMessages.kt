@@ -3,8 +3,6 @@ package core
 // 本文件由 ApiClient.kt 拆分而来：消息 API（历史/离线/同步/发送/在线状态）。
 // 共享基础设施（httpClient / sendRequest / json / ApiResponse 等）见 ApiClient.kt。
 
-import core.model.AppVersionInfo
-import core.model.VersionCheckResult
 import core.state.GlobalAppState
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -51,16 +49,22 @@ suspend fun getGroupHistoryMessages(token: String, groupId: Int, page: Int = 1, 
 
 
 
-suspend fun getOfflineMessages(token: String): List<Message> {
-    val response = sendRequest<List<MessageSerializer>>(
-        path = ApiEndpoints.OFFLINE,
-        method = "GET",
-        token = token
-    )
-
-    return response.data?.let { convertMessages(it) } ?: emptyList()
+suspend fun getOfflineHistoryPage(token: String, limit: Int = 100): List<RecentHistoryMessage> {
+    val result = sendRequest<List<RecentHistoryMessage>>("${ApiEndpoints.OFFLINE}?pageSize=${limit.coerceIn(1,200)}", token = token)
+    check(result.isSuccess) { "离线消息读取失败（${result.code}）" }
+    return checkNotNull(result.data) { "离线消息响应缺少正文" }
 }
 
+suspend fun confirmOfflineMessages(token: String, ids: List<String>) {
+    if (ids.isEmpty()) return
+    val result = sendRequest<kotlinx.serialization.json.JsonElement>("${ApiEndpoints.OFFLINE}/ack", method = "POST",
+        body = buildJsonObject { put("ids", JsonArray(ids.map(::JsonPrimitive))) }, token = token)
+    check(result.isSuccess) { "离线消息确认失败（${result.code}）" }
+}
+
+suspend fun getOfflineMessages(token: String): List<Message> = getOfflineHistoryPage(token).map {
+    it.privateMessage(checkNotNull(GlobalAppState.currentUserId))
+}
 
 
 suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int = 50): SyncMessagesResult {

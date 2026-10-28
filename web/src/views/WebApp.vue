@@ -336,6 +336,10 @@ async function syncAllConversations() {
       const messages = historyMessages(page.messages, accountId)
       await store.restoreHistoryPage(accountId, messages)
       if (!session.isCurrent() || String(store.state.accountId) !== accountId) return
+      const receivedIds = page.messages.filter(message => !message.conversationId?.startsWith('group:') &&
+        String(message.receiverId) === accountId).map(message => String(message.id))
+      await api.confirmOfflineMessages(receivedIds)
+      if (!session.isCurrent() || String(store.state.accountId) !== accountId) return
       await store.rebuildConversationStates(true)
       if (!page.hasMore) return
       if (!page.nextId || page.nextTimestamp == null ||

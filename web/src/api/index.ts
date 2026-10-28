@@ -3,6 +3,7 @@ import { getDeviceId, getDeviceType, DEVICE_TYPE } from '../utils/device'
 import { safeFetch, API_BASE, refreshToken } from './http'
 import { getTokenQuota, getTokenPrices, purchaseTokens, getPurchaseStatus } from './quota'
 import * as copilotApi from './copilot'
+import { sessionEpoch } from '../services/sessionEpoch'
 import type { Id, User, Group } from '../types/chat'
 import type { Tokens, LoginResult, OfflineMessage, SyncResult, RecentHistoryRequest, RecentHistoryPage, FriendRequest, FriendNotification, UserProfile } from '../types/api'
 export { safeFetch, API_BASE, refreshToken }
@@ -81,8 +82,20 @@ export async function getRecentMessages(request: RecentHistoryRequest = {}): Pro
 export async function getOfflineMessages(pageSize?: number) {
   const params = pageSize ? `?pageSize=${pageSize}` : ''
   const { ok, body } = await safeFetch<OfflineMessage[]>(`${API_BASE}/messages/offline${params}`, { method: 'GET' })
-  if (!ok) return []
-  return body?.data || []
+  if (!ok || body?.code !== 0 || !body.data) throw new Error('Offline history request failed')
+  return body.data
+}
+
+/** Call only after the account's IndexedDB transaction has committed. */
+export async function confirmOfflineMessages(ids: string[]) {
+  const session = sessionEpoch.capture()
+  for (let offset = 0; offset < ids.length; offset += 200) {
+    if (!session.isCurrent()) throw new Error('Offline receipt session changed')
+    const { ok, body } = await safeFetch<null>(`${API_BASE}/messages/offline/ack`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: ids.slice(offset, offset + 200) })
+    })
+    if (!ok || body?.code !== 0) throw new Error('Offline history receipt failed')
+  }
 }
 
 /**
@@ -291,6 +304,7 @@ export default {
   getCurrentUser,
   validateToken,
   getOfflineMessages,
+  confirmOfflineMessages,
   getRecentMessages,
   addFriend,
   getFriendRequests,

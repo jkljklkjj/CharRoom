@@ -61,7 +61,8 @@
 -keep class com.google.protobuf.** { *; }
 
 # 11. Compose 运行时
--keep class androidx.compose.** { *; }
+# Icon getters are direct references. Let ProGuard remove the thousands of unused icons.
+-keep class !androidx.compose.material.icons.**,androidx.compose.** { *; }
 -keep class org.jetbrains.compose.** { *; }
 
 # 12. 保持所有注解 (反射需要)

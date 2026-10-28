@@ -3,8 +3,6 @@ package core
 // 本文件由 ApiClient.kt 拆分而来：联系人 API（好友/群组/申请/资料）。
 // 共享基础设施（httpClient / sendRequest / json / ApiResponse 等）见 ApiClient.kt。
 
-import core.model.AppVersionInfo
-import core.model.VersionCheckResult
 import core.state.GlobalAppState
 import io.ktor.client.*
 import io.ktor.client.call.*

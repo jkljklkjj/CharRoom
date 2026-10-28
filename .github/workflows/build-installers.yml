@@ -62,10 +62,7 @@ jobs:
         shell: powershell
 
       - name: Build installers
-        run: .\gradlew.bat clean buildInstallers --no-daemon
-
-      - name: Stage release artifacts
-        run: .\gradlew.bat stageDesktopReleaseArtifacts --no-daemon
+        run: .\gradlew.bat clean stageDesktopReleaseArtifacts desktopSizeReport --no-daemon
 
       - name: Optional code signing (Windows)
         shell: powershell
@@ -82,9 +79,16 @@ jobs:
           $pw = $env:WINDOWS_PFX_PASSWORD
           certutil -f -p $pw -importpfx $pfxPath
           $signtool = '"C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe"'
-          Get-ChildItem -Path build\compose\binaries -Recurse -Include *.msi | ForEach-Object {
+          Get-ChildItem -Path build\release-artifacts\desktop -Filter *.msi | ForEach-Object {
             & $signtool sign /fd SHA256 /a /f $pfxPath /p $pw /tr http://timestamp.digicert.com /td SHA256 $_.FullName
           }
+
+      - name: Upload size report
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-size-windows
+          path: build/reports/packaging/desktop-size.txt
+          if-no-files-found: error
 
       - name: List staged desktop artifacts (Windows)
         shell: powershell
@@ -96,6 +100,8 @@ jobs:
         with:
           name: windows-installers
           path: build/release-artifacts/desktop/**
+          compression-level: 0
+          if-no-files-found: error
 
   build-macos:
     name: Build DMG (macOS)
@@ -163,11 +169,7 @@ jobs:
         shell: bash
 
       - name: Build installers
-        run: ./gradlew clean buildInstallers
-        shell: bash
-
-      - name: Stage release artifacts
-        run: ./gradlew stageDesktopReleaseArtifacts
+        run: ./gradlew clean stageDesktopReleaseArtifacts desktopSizeReport
         shell: bash
 
       - name: Optional sign & notarize (macOS)
@@ -185,7 +187,7 @@ jobs:
           fi
           echo "Decoding Apple API key"
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > apple_api_key.p8
-          ARTIFACT=$(find build/compose/binaries -type f -name "*.dmg" | head -n 1 || true)
+          ARTIFACT=$(find build/release-artifacts/desktop -type f -name "*.dmg" | head -n 1 || true)
           if [ -n "$ARTIFACT" ]; then
             echo "Found dmg: $ARTIFACT"
             # Optional signing step: requires MACOS_IDENTITY secret
@@ -206,6 +208,13 @@ jobs:
             echo "No DMG found to notarize"
           fi
 
+      - name: Upload size report
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-size-macos
+          path: build/reports/packaging/desktop-size.txt
+          if-no-files-found: error
+
       - name: List staged desktop artifacts (macOS)
         run: |
           if [ -d "build/release-artifacts/desktop" ]; then
@@ -219,6 +228,8 @@ jobs:
         with:
           name: macos-installers
           path: build/release-artifacts/desktop/**
+          compression-level: 0
+          if-no-files-found: error
 
   build-linux:
     name: Build DEB (Linux)
@@ -271,12 +282,15 @@ jobs:
         shell: bash
 
       - name: Build installers
-        run: ./gradlew clean buildInstallers --no-daemon
+        run: ./gradlew clean stageDesktopReleaseArtifacts desktopSizeReport --no-daemon
         shell: bash
 
-      - name: Stage release artifacts
-        run: ./gradlew stageDesktopReleaseArtifacts --no-daemon
-        shell: bash
+      - name: Upload size report
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-size-linux
+          path: build/reports/packaging/desktop-size.txt
+          if-no-files-found: error
 
       - name: List staged desktop artifacts (Linux)
         run: |
@@ -291,6 +305,8 @@ jobs:
         with:
           name: linux-installers
           path: build/release-artifacts/desktop/**
+          compression-level: 0
+          if-no-files-found: error
 
   build-android:
     name: Build Android APK

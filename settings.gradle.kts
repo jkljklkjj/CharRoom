@@ -93,6 +93,7 @@ dependencyResolutionManagement {
 rootProject.name = "CharRoom"
 include("main")
 include("proto")
+include("cli")
 
 // 仅 Android 构建时包含 androidApp，桌面构建（buildInstallers）自动跳过，
 // 避免 Gradle 配置阶段触发 AGP 与新版 Gradle 的兼容性问题。

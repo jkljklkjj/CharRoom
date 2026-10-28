@@ -5,7 +5,7 @@
 ## 按实际构建理解项目
 
 - 根构建应用的是 Kotlin **JVM** 插件，不是 `kotlin("multiplatform")`。`commonMain` 是共享源码目录命名，不能据此假定 JS/iOS target 或 expect/actual 源集已经存在。
-- [build.gradle.kts](build.gradle.kts) 把 `src/commonMain/kotlin`、`src/desktopMain/kotlin`、`src/cliMain/kotlin` 加入同一 JVM main；目前排除 `**/*.android.kt`、`**/call/**`。
+- [build.gradle.kts](build.gradle.kts) 把 `src/commonMain/kotlin`、`src/desktopMain/kotlin` 加入 JVM main，排除 Android 与 call；CLI 由独立 [cli/build.gradle.kts](cli/build.gradle.kts) 编译 `src/cliMain` 和明确列出的共享源码，运行时禁止引入 GUI 依赖。
 - Android 模块通过 [androidApp/build.gradle](androidApp/build.gradle) 加入共享目录及 `src/androidMain/kotlin`；自身代码在 `androidApp/src/main/kotlin/com/chatlite/charroom/`。
 - [settings.gradle.kts](settings.gradle.kts) 仅在任务名称包含 `android` 时 include `androidApp`。需要 Android 时使用 `:androidApp:...`，不能假定 `customApkDebug` 会启用模块。
 - 版本看构建文件与 [gradle.properties](gradle.properties)：JDK 21、Kotlin 2.3.20；不要把后端 JDK 25 直接套到客户端。
@@ -44,10 +44,12 @@
 | 协议生成 | `./gradlew.bat :proto:generateProto` |
 | JVM 编译 / 启动 | `./gradlew.bat compileKotlin`、`./gradlew.bat run` |
 | JVM 检查 | `./gradlew.bat test detekt`（先确认测试源存在；NO-SOURCE 不代表回归通过） |
-| CLI 包 | `./gradlew.bat cliJar` |
+| CLI 检查 / 包 | `./gradlew.bat :cli:test :cli:verifyHeadlessRuntime cliJar` |
 | Android 编译 | `./gradlew.bat :androidApp:assembleDebug`（需要 SDK/JDK、Rust/NDK/CMake/libclang 或 `-PquicJniLibsDir=<预构建目录>`；见 `native/README.md`） |
 
 安装包、签名与发布另见 [packaging/README.md](packaging/README.md) 和工作流，不以发版任务替代 PR 检查。Wrapper 缺失时报告阻断并确认已有删除意图，不自动还原用户删除或下载不明版本。
+
+桌面发布使用 `stageDesktopReleaseArtifacts`，只收集当前系统的 `main-release` 安装器；打包前执行 `verifyDesktopRuntime`，体积用 `desktopSizeReport` 测量。QUIC/Skiko 原生依赖只允许目标平台各一份，不给桌面重新引入 CLI 或已排除通话模块的依赖。
 
 橙色纸感 UI 的离线 Compose 预览见 [设计与预览说明](docs/design/ORANGE-PAPER.md)；使用虚构数据，不启动应用连接。
 

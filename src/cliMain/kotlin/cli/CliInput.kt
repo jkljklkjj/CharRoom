@@ -71,7 +71,8 @@ object CliCommands {
         "friend accept" to "/friend accept <申请ID>", "friend reject" to "/friend reject <申请ID>",
         "group list" to "/group list", "group join" to "/group join <群ID>",
         "group send" to "/group send <群ID> <内容>", "history" to "/history <user|group> <ID> [条数1..100]",
-        "status" to "/status", "help" to "/help [命令]", "exit" to "/exit", "quit" to "/quit"
+        "status" to "/status", "pending" to "/pending", "discard" to "/discard <待发ID>",
+        "sync" to "/sync", "cancel" to "/cancel", "help" to "/help [命令]", "exit" to "/exit", "quit" to "/quit"
     )
     private fun id(value: String) { require(value.toIntOrNull()?.let { it > 0 } == true) { "ID 必须是正整数" } }
     fun parse(input: String): CliCommand {
@@ -96,6 +97,7 @@ object CliCommands {
         require(name in usages) { "未知命令，请输入 /help；与 AI 对话请使用普通文本或 /ai" }
         val values = parts.drop(if (' ' in name) 2 else 1)
         when (name) {
+            "discard" -> require(values.size == 1 && values[0].matches(Regex("[A-Za-z0-9_-]{1,80}"))) { "用法：${usages[name]}" }
             "help" -> require(values.size <= 1) { "用法：${usages[name]}" }
             "history" -> {
                 require(values.size in 2..3 && values[0] in listOf("user", "group")) { "用法：${usages[name]}" }

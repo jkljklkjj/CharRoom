@@ -3,8 +3,6 @@ package core
 // 本文件由 ApiClient.kt 拆分而来：认证 API（登录/注册/刷新/验证码）。
 // 共享基础设施（httpClient / sendRequest / json / ApiResponse 等）见 ApiClient.kt。
 
-import core.model.AppVersionInfo
-import core.model.VersionCheckResult
 import core.state.GlobalAppState
 import io.ktor.client.*
 import io.ktor.client.call.*

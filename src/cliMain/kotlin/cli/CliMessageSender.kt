@@ -18,8 +18,7 @@ class CliMessageSender(
     private val slowAfter: Long = 4_000,
     private val ackTimeout: Long = 10_000
 ) {
-    suspend fun send(account: Int, target: Int, text: String, group: Boolean): CliSendResult = coroutineScope {
-        check(transport.isConnected()) { "实时连接尚未认证，请连接恢复后再发送" }
+    fun prepare(account: Int, target: Int, text: String, group: Boolean): MessageProtos.MessageWrapper {
         require(account > 0 && target > 0)
         val id = MessageIdGenerator.nextId()
         val now = System.currentTimeMillis()
@@ -27,6 +26,15 @@ class CliMessageSender(
             else buildChatPayload(target.toString(), text, account, timestamp = now, messageId = id)
         val wrapper = MessageProtos.MessageWrapper.parseFrom(bytes)
         require(bytes.size <= core.MessageProtocol.QUIC_SERVER_MAX_PAYLOAD_BYTES) { "消息超过协议大小限制" }
+        return wrapper
+    }
+    suspend fun send(account: Int, target: Int, text: String, group: Boolean): CliSendResult = attempt(prepare(account, target, text, group))
+
+    suspend fun attempt(wrapper: MessageProtos.MessageWrapper): CliSendResult = coroutineScope {
+        check(transport.isConnected()) { "实时连接尚未认证，请连接恢复后再发送" }
+        val bytes = wrapper.toByteArray()
+        val group = wrapper.hasGroupChat()
+        val target = if (group) wrapper.groupChat.targetClientId else wrapper.chat.targetClientId
         persist(wrapper, false)
         val completion = CompletableDeferred<CliSendResult>()
         val notice = launch { delay(slowAfter); if (!completion.isCompleted) showSlow() }

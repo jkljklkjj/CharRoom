@@ -8,7 +8,6 @@ import io.netty.channel.ChannelInitializer
 import io.netty.channel.EventLoopGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioDatagramChannel
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import io.netty.incubator.codec.quic.*
 import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
@@ -56,7 +55,7 @@ class QuicNettyClient {
         val sslCtx = try {
             QuicSslContextBuilder.forClient()
                 .applicationProtocols(ServerConfig.QUIC_ALPN)
-                .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                .trustManager(QuicPeerTrust.system(address.hostString))
                 .build()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -73,6 +72,7 @@ class QuicNettyClient {
         val codec = try {
             QuicClientCodecBuilder()
                 .sslContext(sslCtx)
+                .sslEngineProvider { channel -> sslCtx.newEngine(channel.alloc(), address.hostString, address.port) }
                 // 与服务端对齐：QUIC 取双方 min，客户端必须和服务端一致或更大
                 .maxIdleTimeout(180_000, TimeUnit.MILLISECONDS)         // 3 min，与服务端对齐（原 10 min 导致异常断开后幽灵连接残留过久）
                 .initialCongestionWindowPackets(10)                    // 与服务端 QuicProperties 对齐

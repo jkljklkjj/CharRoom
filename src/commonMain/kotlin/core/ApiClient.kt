@@ -1,7 +1,6 @@
 package core
 import core.AppLogger
 
-import androidx.compose.runtime.mutableStateOf
 import core.state.GlobalAppState
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -17,8 +16,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
-import core.model.AppVersionInfo
-import core.model.VersionCheckResult
 import model.Group
 import model.Message
 import model.MessageType
@@ -78,25 +75,6 @@ val httpClient = HttpClient {
     // 默认请求头配置
     install(DefaultRequest) {
         header(HttpHeaders.Accept, ContentType.Application.Json.toString())
-    }
-}
-
-private suspend fun attachActionHeader(builder: HttpRequestBuilder) {
-    try {
-        if (builder.url.encodedPath != ApiEndpoints.AGENT_NL && builder.url.encodedPath != ApiEndpoints.AGENT_NL_STREAM) {
-            ActionLogger.log(
-                Action(
-                    type = ActionType.OTHER,
-                    targetId = builder.url.encodedPath,
-                    metadata = mapOf(
-                        "source" to "sendRequest",
-                        "method" to builder.method.value
-                    )
-                )
-            )
-        }
-    } catch (_: Exception) {
-        // keep existing request behavior
     }
 }
 

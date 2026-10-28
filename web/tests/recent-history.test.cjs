@@ -24,7 +24,8 @@ test('new device restores received, sent and group history over every page', asy
     conversationId: 'user:1:2', seqId: '9' }
   const sent = { ...received, id: '9007199254740994', senderId: '1', receiverId: '2', message: 'sent' }
   const group = { ...received, id: '9007199254740995', receiverId: 'group:7', conversationId: 'group:7' }
-  const api = { getOfflineMessages: async () => [], getRecentMessages: async request => {
+  const receipts = []
+  const api = { confirmOfflineMessages: async ids => { assert.ok(privateMessages.length); receipts.push(...ids) }, getRecentMessages: async request => {
     requests.push(request)
     return requests.length === 1
       ? { messages: [received, sent], windowEnd: 200, nextTimestamp: 100, nextId: sent.id, hasMore: true }
@@ -39,6 +40,7 @@ test('new device restores received, sent and group history over every page', asy
   assert.equal(requests[1].windowEnd, 200)
   assert.equal(groups[0].groupId, '7')
   assert.equal(cursors.length, 0, 'history bootstrap must not advance incremental cursors')
+  assert.deepEqual(receipts, [received.id])
 })
 
 test('account switch discards an in-flight history response', async () => {
@@ -50,4 +52,13 @@ test('account switch discards an in-flight history response', async () => {
   } }
   await loginSync(api, store)()
   assert.equal(applied, false)
+})
+
+test('a failed local write never sends an offline receipt', async () => {
+  let receipts = 0
+  const api = { getRecentMessages: async () => ({ messages: [{ id: '101', senderId: '2', receiverId: '1', message: 'fixture', timestamp: 1 }], hasMore: false }),
+    confirmOfflineMessages: async () => { receipts++ } }
+  const store = { state: { accountId: '1' }, restoreHistoryPage: async () => { throw Error('fixture disk failure') } }
+  await loginSync(api, store)()
+  assert.equal(receipts, 0)
 })

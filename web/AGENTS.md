@@ -56,6 +56,7 @@ REST 支持 `VITE_API_BASE`，默认指向线上；QUIC 目标还要单独检查
 - ACK 的 `messageId` 匹配待发请求，可选 `serverMessageId` 是历史主键；先在 IndexedDB 单事务中归并两种 ID，再删除对应账号的 outbox。
 - 发消息区分已入本地队列、写入传输层、服务端 ACK、对端送达、已读。只在匹配的服务端确认后移除待发项；重试保持 messageId，登录完成后才恢复队列。
 - IndexedDB、PWA Cache 与内存状态按账号隔离。退出登录捕获原账号再异步清理，防止切换账号后读错或删除错数据；不要缓存认证后的 REST 响应到共享缓存。
+- 历史中的收到私聊消息必须在 IndexedDB 提交后才调用 `/messages/offline/ack`，查询本身不确认接收；切换账号或写入失败不得发送回执。跨端约定见 [CLI 与离线确认](../docs/development/CLI.md)。
 - 消息文本保持净化与转义，token/密码不进日志，不记录完整聊天正文。
 - 新增用户可见文本同步 `zh-CN`、`en`、`ja`；不顺手引入另一套 UI/状态框架。
 

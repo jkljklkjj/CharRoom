@@ -445,6 +445,7 @@ open class ChatViewModel(
                 val groupMessages = rows.filter { it.isGroup }.map { it.groupMessage() }
                 // Persist the whole page before proceeding; the UI LRU may keep fewer records.
                 LocalChatHistoryStore.save(owner.toString(), privateMessages, groupMessages)
+                if (isCurrent()) core.confirmStoredMessages(owner, rows) { ids -> core.confirmOfflineMessages(token, ids) }
                 if (!isCurrent()) return@restoreRecentHistory
                 chatState.prependMessages(privateMessages, markAsUnread = false, isCurrentAccount = ::isCurrent)
                 if (!isCurrent()) return@restoreRecentHistory
@@ -457,59 +458,31 @@ open class ChatViewModel(
         }
     }
 
-    /**
-     * 分页拉取离线消息（每次拉取50条，自动处理顺序问题）
-     * 保留作为降级回退方案
-     */
-    open suspend fun fetchOfflineMessages(page: Int = 0, pageSize: Int = 50): Boolean {
-        if (isFetchingOfflineMessages) {
-            AppLogger.d(" 已有离线消息拉取任务在进行中，跳过重复请求")
-            return false
-        }
-
+    /** Commit complete pages before confirming delivery; no offset over a shrinking unread set. */
+    open suspend fun fetchOfflineMessages(): Boolean {
+        if (isFetchingOfflineMessages) return false
+        val owner = GlobalAppState.currentUserId ?: return false
+        val token = GlobalAppState.currentToken ?: return false
+        val generation = sessionJob
+        fun current() = sessionJob === generation && generation.isActive && GlobalAppState.currentUserId == owner
         isFetchingOfflineMessages = true
-        isLoadingMore = page > 0 // 第一页不显示加载状态
-
         return try {
-            AppLogger.d(" 开始拉取离线消息，页码: $page, 每页大小: $pageSize")
-
-            // 分页拉取离线消息（需要API支持分页参数，这里假设接口已经支持）
-            val messages = chatRepository.getOfflineMessagesPage(page, pageSize)
-
-            if (messages.isEmpty()) {
-                AppLogger.d(" 离线消息拉取完成，没有更多消息")
-                return false
-            }
-
-            // 分页拉取的离线消息本身就是按时间从旧到新排序的，直接批量前置插入
-            chatState.prependMessages(messages.sortedBy { it.timestamp }, markAsUnread = true)
-            chatState.queueHistoryChanges(messages,emptyList())
-            AppLogger.d(" 成功拉取离线消息 ${messages.size} 条，页码: $page，批量插入完成")
-
-            // 递归拉取下一页
-            val hasMore = fetchOfflineMessages(page + 1, pageSize)
-
-            // 所有页面拉取完成后，处理缓存的临时消息
-            if (!hasMore) {
-                AppLogger.d(" 所有离线消息拉取完成，开始处理缓存的临时消息，共 ${pendingMessages.size} 条私聊, ${pendingGroupMessages.size} 条群聊")
-                pendingMessages.sortedBy { it.timestamp }.forEach { chatState.addMessage(it) }
-                pendingGroupMessages.sortedBy { it.timestamp }.forEach { chatState.addGroupMessage(it) }
-                pendingMessages.clear()
-                pendingGroupMessages.clear()
-            }
-
-            hasMore
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            AppLogger.d(" 拉取离线消息失败: ${e.message}")
-            logger.error(e) { "ChatViewModel error" }
+            core.drainOfflineHistory(owner, ::current, { core.getOfflineHistoryPage(token) }, { rows ->
+                val messages = rows.map { it.privateMessage(owner) }
+                LocalChatHistoryStore.save(owner.toString(), messages, emptyList())
+                if (current()) chatState.prependMessages(messages, markAsUnread = true)
+            }, { core.confirmOfflineMessages(token, it) }) > 0
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            AppLogger.w("离线消息恢复未完成，将保留服务端未确认记录")
             false
         } finally {
             isFetchingOfflineMessages = false
             isLoadingMore = false
-            // 保存到本地存储
-            sessionScope.launch(Dispatchers.IO) {
-                saveChatHistoryToLocal()
+            if (current()) {
+                pendingMessages.sortedBy { it.timestamp }.forEach { chatState.addMessage(it) }
+                pendingGroupMessages.sortedBy { it.timestamp }.forEach { chatState.addGroupMessage(it) }
+                pendingMessages.clear(); pendingGroupMessages.clear()
             }
         }
     }

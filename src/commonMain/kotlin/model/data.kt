@@ -1,7 +1,5 @@
 package model
 
-import androidx.compose.runtime.*
-import core.state.GlobalChatState
 import kotlinx.serialization.Serializable
 // 数据层只定义纯数据模型，不依赖任何其他层
 
