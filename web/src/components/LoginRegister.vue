@@ -12,7 +12,7 @@
             <label for="login-password">{{ $t('login.passwordLabel') }}</label>
             <input id="login-password" type="password" v-model="password" :autocomplete="isRegister?'new-password':'current-password'" required :placeholder="$t('login.passwordPlaceholder')" :aria-invalid="Boolean(isRegister && passwordError)" :aria-describedby="isRegister && passwordError ? 'password-error' : undefined" @input="onPasswordInput" />
             <div v-if="isRegister && passwordError" id="password-error" class="error-hint" role="status">{{ passwordError }}</div>
-            <div class="actions"><button class="primary" type="submit" :disabled="submitting"><span v-if="submitting" class="spinner" aria-hidden="true"></span>{{ submitting ? $t('login.loading') : (isRegister ? $t('login.createAccount') : $t('login.login')) }} <span v-if="!submitting" aria-hidden="true">↗</span></button><button type="button" class="toggle-mode" @click="toggleMode">{{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}</button></div>
+            <div class="actions"><button class="primary" type="submit" :disabled="submitting"><span v-if="submitting" class="spinner" aria-hidden="true"></span>{{ submitting ? $t('login.loading') : (isRegister ? $t('login.createAccount') : $t('login.login')) }} <span v-if="!submitting" aria-hidden="true">↗</span></button><button type="button" class="toggle-mode" @click="toggleMode">{{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}</button><button v-if="!isRegister" type="button" class="toggle-mode forgot" @click="$router.push('/reset')">{{ $t('login.forgotPassword') }}</button></div>
           </form>
           <p class="login-footer">{{ $t('product.loginFooter') }}</p>
         </section>

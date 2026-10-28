@@ -261,6 +261,25 @@ export async function validateToken(): Promise<TokenValidationResult> {
   return { state: 'unavailable' }
 }
 
+export async function sendResetCode(email: string) {
+  if (!email) return { ok: false, error: '请输入邮箱地址' }
+  const { ok, body } = await safeFetch<unknown>(`${API_BASE}/auth/password/reset/code`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+  })
+  if (!ok) return { ok: false, error: body?.message || '验证码发送失败' }
+  return { ok: true }
+}
+
+export async function resetPassword(email: string, code: string, newPassword: string) {
+  if (!email || !code || !newPassword) return { ok: false, error: '请填写完整信息' }
+  const { ok, body } = await safeFetch<boolean>(`${API_BASE}/auth/password/reset`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, newPassword })
+  })
+  if (!ok) return { ok: false, error: body?.message || '重置失败' }
+  return { ok: true }
+}
+
 export async function getFriends() {
   const { ok, body } = await safeFetch<User[]>(`${API_BASE}/friends`, { method: 'GET' })
   if (!ok) return []
@@ -336,6 +355,8 @@ export default {
   callAgentStream,
   sendVerifyCode,
   verifyRegister,
+  sendResetCode,
+  resetPassword,
   refreshToken,
   syncMessages,
   getTokenQuota,
