@@ -584,11 +584,12 @@ async function restoreSession() {
   store.setAccountId(savedAccountId)
   const validation = sessionEpoch.capture()
 
-  // 验证 token，失效则尝试刷新
-  let validated = await api.validateToken()
+  // 校验 token：只有 invalid（401/业务码非 0）才登出；
+  // unavailable（网络/5xx）不能当作凭证失效应，继续进入会话，由后续请求的 401 处理链路兑底。
+  let result = await api.validateToken()
   if (!validation.isCurrent()) return
 
-  if (!validated && savedRefreshToken) {
+  if (result.state === 'invalid' && savedRefreshToken) {
     const refreshed = await api.refreshToken(savedRefreshToken)
     if (!validation.isCurrent()) return
     if (refreshed?.accessToken) {
@@ -596,16 +597,19 @@ async function restoreSession() {
       store.setToken(refreshed.accessToken)
       store.setRefreshToken(refreshed.refreshToken || '')
       persistTokens(refreshed.accessToken, refreshed.refreshToken)
-      validated = await api.validateToken()
+      result = await api.validateToken()
       if (!validation.isCurrent()) return
     }
   }
 
-  if (validated) {
-    await initUserSession(activeToken, store.state.refreshToken)
-  } else {
+  if (result.state === 'invalid') {
     clearAuth()
     router.push('/')
+  } else {
+    if (result.state === 'unavailable') {
+      console.warn('[auth] token 校验暂时不可用（网络/5xx），保留登录态并继续进入')
+    }
+    await initUserSession(activeToken, store.state.refreshToken)
   }
 
   loading.value = false

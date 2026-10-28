@@ -214,33 +214,51 @@ export async function updateUserProfile({ username, phone, signature, password }
   return ok
 }
 
-export async function validateToken() {
-  try {
-    const { ok, body } = await safeFetch<Partial<Tokens>>(`${API_BASE}/auth/validate`, { method: 'GET' })
-    if (!ok) return null
-    if (body?.code === 0) {
-      // 验证成功
-      if (body?.data && typeof body.data === 'object') {
-        // 新接口：返回token对，更新store中的token
-        const accessToken = String(body.data.accessToken || '')
-        const refreshToken = String(body.data.refreshToken || '')
-        if (accessToken) {
-          store.setToken(accessToken)
-          if (refreshToken) {
-            store.setRefreshToken(refreshToken)
-          }
-          return body.data // 返回token对象
-        }
-      }
-      // 只要code=0就表示验证通过，即使没有返回新token
-      return { valid: true }
-    }
-    // 验证失败（包括401、token过期、旧接口验证失败等）统一返回null
-    return null
-  } catch (e) {
-    // 任何异常都返回null
-    return null
+export type TokenValidationResult =
+  | { state: 'valid'; tokens: Partial<Tokens> | null }
+  | { state: 'invalid' }
+  | { state: 'unavailable' }
+
+/**
+ * 单次 token 校验。
+ * <p>必须区分两类失败：
+ * - `invalid`：401 / 业务码非 0——凭证确实失效，可以登出；
+ * - `unavailable`：网络错误、超时、5xx——网关或后端暂时不可用，**不能据此登出**，
+ *   否则一次 Cloudflare 503/重启窗口就会把用户踢回首页。
+ */
+async function requestTokenValidation(): Promise<TokenValidationResult> {
+  const { ok, status, body } = await safeFetch<Partial<Tokens>>(`${API_BASE}/auth/validate`, { method: 'GET' })
+  if (!ok) {
+    // safeFetch 在网络错误/请求中断时返回 status=0
+    return status === 0 || status >= 500 ? { state: 'unavailable' } : { state: 'invalid' }
   }
+  if (body?.code !== 0) return { state: 'invalid' }
+  const data = body.data && typeof body.data === 'object' ? body.data : null
+  if (data) {
+    // 新接口返回 token 对：刷新后回写 store
+    const accessToken = String(data.accessToken || '')
+    const refreshToken = String(data.refreshToken || '')
+    if (accessToken) {
+      store.setToken(accessToken)
+      if (refreshToken) store.setRefreshToken(refreshToken)
+    }
+  }
+  // 只要 code=0 就表示验证通过，即使没有返回新 token
+  return { state: 'valid', tokens: data }
+}
+
+const VALIDATION_RETRY_DELAY_MS = 300
+
+/** 校验 token；瞬时故障（网络/5xx）重试两次，避免网关抖动把用户踢下线 */
+export async function validateToken(): Promise<TokenValidationResult> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await requestTokenValidation()
+    if (result.state !== 'unavailable') return result
+    if (attempt < 2) {
+      await new Promise(resolve => setTimeout(resolve, VALIDATION_RETRY_DELAY_MS * (attempt + 1)))
+    }
+  }
+  return { state: 'unavailable' }
 }
 
 export async function getFriends() {
