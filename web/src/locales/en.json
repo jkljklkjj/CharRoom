@@ -467,6 +467,18 @@
     "loginFooter": "Your contacts and recent messages sync after you sign in.",
     "greeting": "Who’s on your mind today?",
     "greetingHint": "Little things are worth sharing.",
+    "greetings": {
+      "0": { "title": "Who's on your mind today?", "hint": "Little things are worth sharing." },
+      "1": { "title": "Someone's waiting for a word.", "hint": "Even “hey” is a fine start." },
+      "2": { "title": "How did today treat you?", "hint": "Good or bad, tell someone." },
+      "3": { "title": "Need someone to catch that thought?", "hint": "Pick a person, take your time." },
+      "4": { "title": "Anything new lately?", "hint": "Let's hear it." },
+      "5": { "title": "Feeling like a chat?", "hint": "Whose name just crossed your mind?" },
+      "6": { "title": "What would you like to talk about?", "hint": "Anything works." },
+      "7": { "title": "Waiting on a reply?", "hint": "You could start instead." },
+      "8": { "title": "Got a small thing to share?", "hint": "It's worth saying." },
+      "9": { "title": "Who's waiting for you today?", "hint": "Start with a hello." }
+    },
     "emptyTitle": "Pick a friend. Catch up.",
     "emptyHint": "Or explore the question of the day.",
     "chatPresence": "Online now",

@@ -11,7 +11,7 @@
       </div>
     </div>
 
-    <div class="directory-greeting"><h1>{{ $t('product.greeting') }}</h1><p>{{ $t('product.greetingHint') }}</p></div>
+    <div class="directory-greeting"><h1>{{ $t(`product.greetings.${greetingIndex}.title`) }}</h1><p>{{ $t(`product.greetings.${greetingIndex}.hint`) }}</p></div>
 
     <div class="sidebar-tabs" role="tablist" :aria-label="$t('sidebar.navigation')">
       <button v-for="item in tabs" :key="item" :id="`sidebar-tab-${item}`" role="tab"
@@ -116,6 +116,7 @@ import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
 import { contactDirectory, contactName, filterContacts, filterContactDirectory, sortConversationUsers, sidebarUsers, chatTargetId, type SidebarTab } from '../utils/contactDirectory'
+import { pickDailyGreeting } from '../utils/dailyGreeting'
 
 const props = defineProps<{ tab: SidebarTab; query: string }>()
 const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': []; 'open-discovery': []; 'update:tab': [tab: SidebarTab]; 'update:query': [query: string] }>()
@@ -123,6 +124,9 @@ const tabs: SidebarTab[] = ['messages', 'contacts']
 
 const store = useStore()
 const { t, locale } = useI18n()
+// 顶部问候语：10 条文案每天随机一条，三天内不重复（localStorage 记录，当天刷新不变）
+const greetingIndex = ref(0)
+onMounted(() => { greetingIndex.value = pickDailyGreeting() })
 const showFriendRequests = ref(false)
 const friendRequests = ref<FriendRequest[]>([])
 const friendsLoading = computed(() => store.state.directoryPhase === 'loading')
