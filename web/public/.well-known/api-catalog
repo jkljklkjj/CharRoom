@@ -1,0 +1,14 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://www.chatlite.xin/",
+      "service-doc": [
+        {
+          "href": "https://www.chatlite.xin/docs/api/",
+          "type": "text/html",
+          "title": "ChatRoom API Documentation"
+        }
+      ]
+    }
+  ]
+}
