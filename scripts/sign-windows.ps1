@@ -1,34 +1,67 @@
 <#
-PowerShell helper to sign Windows installer files using a base64-encoded PFX provided in env var WINDOWS_PFX.
-Usage example in CI (secrets stored in GitHub):
-  $env:WINDOWS_PFX = '<base64 content>'
-  $env:WINDOWS_PFX_PASSWORD = '<pfx password>'
-  ./sign-windows.ps1 -Files build\compose\binaries\**\*.msi
+Signs and verifies final Windows release artifacts. Requires WINDOWS_PFX (base64)
+and WINDOWS_PFX_PASSWORD. Uses the PFX directly without importing a certificate.
 #>
+[CmdletBinding()]
 param(
-  [Parameter(Mandatory=$true, ValueFromRemainingArguments=$true)]
-  [String[]]$Files
+    [Parameter(Mandatory = $true, ValueFromRemainingArguments = $true)]
+    [string[]]$Files,
+    [string]$SignToolPath
 )
 
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 if (-not $env:WINDOWS_PFX -or -not $env:WINDOWS_PFX_PASSWORD) {
-  Write-Error "Environment variables WINDOWS_PFX and WINDOWS_PFX_PASSWORD are required"
-  exit 1
+    throw 'WINDOWS_PFX and WINDOWS_PFX_PASSWORD must both be provided.'
 }
 
-try {
-  $pfxPath = Join-Path $env:TEMP 'codesign.pfx'
-  [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_PFX))
-  $pw = $env:WINDOWS_PFX_PASSWORD
-  certutil -f -p $pw -importpfx $pfxPath | Out-Null
-  $signtool = 'C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe'
-  foreach ($f in $Files) {
-    $matches = Get-ChildItem -Path $f -Recurse -File -ErrorAction SilentlyContinue
-    foreach ($m in $matches) {
-      Write-Host "Signing: $($m.FullName)"
-      & $signtool sign /fd SHA256 /a /f $pfxPath /p $pw /tr http://timestamp.digicert.com /td SHA256 $m.FullName
+# Resolve every artifact before signing anything. Missing globs must fail the release.
+$artifacts = @(
+    foreach ($pattern in $Files) {
+        $matches = @(Resolve-Path -Path $pattern -ErrorAction Stop)
+        if ($matches.Count -eq 0) { throw "No installer matched: $pattern" }
+        foreach ($match in $matches) {
+            $item = Get-Item -LiteralPath $match.ProviderPath
+            if ($item.PSIsContainer -or $item.Extension -notin @('.msi', '.exe')) {
+                throw "Expected an MSI or EXE: $($item.Name)"
+            }
+            $item.FullName
+        }
     }
-  }
-} catch {
-  Write-Error "Signing failed: $_"
-  exit 1
+) | Sort-Object -Unique
+if (-not $artifacts) { throw 'No installers provided.' }
+
+if ($SignToolPath) {
+    $signer = (Get-Command $SignToolPath -CommandType Application -ErrorAction Stop).Source
+} else {
+    $onPath = Get-Command signtool.exe -CommandType Application -ErrorAction SilentlyContinue
+    if ($onPath) {
+        $signer = $onPath.Source
+    } else {
+        # SDK tools live under a versioned directory on current Windows runners.
+        $sdkRoot = if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin' } else { $null }
+        $candidates = if ($sdkRoot -and (Test-Path -LiteralPath $sdkRoot)) {
+            Get-ChildItem -LiteralPath $sdkRoot -Directory |
+                Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
+                Sort-Object { [version]$_.Name } -Descending |
+                ForEach-Object { Join-Path $_.FullName 'x64/signtool.exe' } |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+        }
+        $signer = @($candidates) | Select-Object -First 1
+        if (-not $signer) { throw 'signtool.exe not found; install Windows SDK or supply -SignToolPath.' }
+    }
+}
+
+$certificate = Join-Path ([IO.Path]::GetTempPath()) ("chatlite-sign-{0}.pfx" -f [Guid]::NewGuid().ToString('N'))
+try {
+    [IO.File]::WriteAllBytes($certificate, [Convert]::FromBase64String($env:WINDOWS_PFX))
+    foreach ($artifact in $artifacts) {
+        Write-Host "Signing: $([IO.Path]::GetFileName($artifact))"
+        & $signer sign /fd SHA256 /a /f $certificate /p $env:WINDOWS_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $artifact
+        if ($LASTEXITCODE -ne 0) { throw "signtool sign failed (exit $LASTEXITCODE)." }
+        & $signer verify /pa /all $artifact
+        if ($LASTEXITCODE -ne 0) { throw "signtool verify failed (exit $LASTEXITCODE)." }
+    }
+} finally {
+    if (Test-Path -LiteralPath $certificate) { Remove-Item -LiteralPath $certificate -Force }
 }

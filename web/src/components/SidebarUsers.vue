@@ -115,7 +115,7 @@ import { useDialog } from '../composables/useDialog'
 import chatSocket from '../services/chatSocket'
 import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
-import { contactDirectory, contactName, matchesContact, sidebarUsers, chatTargetId, type SidebarTab } from '../utils/contactDirectory'
+import { contactDirectory, contactName, filterContacts, filterContactDirectory, sortConversationUsers, sidebarUsers, chatTargetId, type SidebarTab } from '../utils/contactDirectory'
 
 const props = defineProps<{ tab: SidebarTab; query: string }>()
 const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': []; 'open-discovery': []; 'update:tab': [tab: SidebarTab]; 'update:query': [query: string] }>()
@@ -133,23 +133,13 @@ useDialog(requestsDialog, () => { showFriendRequests.value = false })
 const allUsers = computed(() => sidebarUsers(store.state.users, store.state.groups))
 
 // Vue computed tracks profile changes as well as conversation activity.
-const sortedUsers = computed(() => {
-  return allUsers.value
-    .slice()
-    .sort((a, b) => {
-      const left=store.state.conversationStates[ConversationId.forContact(a).key],right=store.state.conversationStates[ConversationId.forContact(b).key]
-      const timeDiff = (right?.lastIncomingMessageTime || 0) - (left?.lastIncomingMessageTime || 0)
-      if (timeDiff !== 0) return timeDiff
-      const unreadDiff = (right?.unreadCount || 0) - (left?.unreadCount || 0)
-      if (unreadDiff !== 0) return unreadDiff
-      return 0 // Stable sort preserves original directory order for ties.
-    })
-})
+const sortedUsers = computed(() => sortConversationUsers(allUsers.value, key => store.state.conversationStates[key]))
 
-const directory = computed(() => contactDirectory(allUsers.value, store.state.accountId, props.query, locale.value))
+const sortedDirectory = computed(() => contactDirectory(allUsers.value, store.state.accountId, locale.value))
+const directory = computed(() => filterContactDirectory(sortedDirectory.value, props.query))
 const sections = computed(() => props.tab === 'contacts'
   ? [{ key: 'friends', label: t('sidebar.friends'), users: directory.value.friends }, { key: 'groups', label: t('sidebar.groups'), users: directory.value.groups }]
-  : [{ key: 'messages', label: '', users: sortedUsers.value.filter(user => matchesContact(user, props.query)) }])
+  : [{ key: 'messages', label: '', users: filterContacts(sortedUsers.value, props.query) }])
 const visibleCount = computed(() => sections.value.reduce((total, section) => total + section.users.length, 0))
 const directoryPanel=ref<HTMLElement|null>(null),directoryTop=ref(0),directoryHeight=ref(700)
 const rows=computed(()=>contactRows(sections.value))

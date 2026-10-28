@@ -1,4 +1,4 @@
-import type { Group, Id, User } from '../types/chat'
+import type { ConversationState, Group, Id, User } from '../types/chat'
 import {ConversationId} from './conversationId'
 import { AGENT_USER_ID } from '../constants'
 
@@ -19,14 +19,32 @@ export function sidebarUsers(users: readonly User[], groups: readonly Group[]): 
   return [...merged.values()]
 }
 
-export function matchesContact(user: User, query: string): boolean {
-  const keyword = query.trim().toLocaleLowerCase()
+function matchesKeyword(user: User, keyword: string): boolean {
   return !keyword || [user.name, user.username, user.account, String(user.id)].some(value => value?.toLocaleLowerCase().includes(keyword))
 }
 
-export function contactDirectory(users: readonly User[], selfId: Id, query: string, locale: string) {
+export function filterContacts(users: User[], query: string): User[] {
+  const keyword = query.trim().toLocaleLowerCase()
+  return keyword ? users.filter(user => matchesKeyword(user, keyword)) : users
+}
+
+export interface ContactDirectory { friends: User[]; groups: User[] }
+export function filterContactDirectory(directory: ContactDirectory, query: string): ContactDirectory {
+  if (!query.trim()) return directory
+  return { friends: filterContacts(directory.friends, query), groups: filterContacts(directory.groups, query) }
+}
+
+export function contactDirectory(users: readonly User[], selfId: Id, locale: string): ContactDirectory {
   const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true })
-  const sorted = users.filter(user => (user.conversationKind==='group' || (Number(user.id) !== AGENT_USER_ID && String(user.id) !== String(selfId))) && matchesContact(user, query))
+  const sorted = users.filter(user => user.conversationKind==='group' || (Number(user.id) !== AGENT_USER_ID && String(user.id) !== String(selfId)))
     .sort((a, b) => collator.compare(contactName(a), contactName(b)) || collator.compare(String(a.id), String(b.id)))
   return { friends: sorted.filter(user => user.conversationKind!=='group'), groups: sorted.filter(user => user.conversationKind==='group') }
+}
+
+/** Compute identities and activity once, outside the O(n log n) comparator. */
+export function sortConversationUsers(users: readonly User[], activity: (key: string) => ConversationState | undefined): User[] {
+  return users.map(user => {
+    const summary = activity(ConversationId.forContact(user).key)
+    return { user, time: summary?.lastIncomingMessageTime || 0, unread: summary?.unreadCount || 0 }
+  }).sort((a, b) => b.time - a.time || b.unread - a.unread).map(row => row.user)
 }

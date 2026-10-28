@@ -92,7 +92,7 @@ private fun PreviewList(modifier: Modifier, contacts: Boolean = false) {
         Spacer(Modifier.height(8.dp))
         LazyColumn(Modifier.weight(1f)) {
             if (contacts) {
-                val directory = buildContactDirectory(people, 10, "")
+                val directory = buildContactDirectory(people, 10)
                 listOf("好友" to directory.friends, "群聊" to directory.groups).forEach { (title, users) ->
                     item { PaperContactSection(title, users.size) }
                     items(users.size) { index ->

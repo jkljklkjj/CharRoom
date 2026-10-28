@@ -1,47 +1,36 @@
-Signing and Notarization (examples)
+# Windows 签名与 macOS 公证
 
-This document explains how to provide signing credentials to CI and how to sign/notarize produced installers.
+桌面构建与产物收集见 [打包说明](README.md)。签名使用 CI secrets，不将证书、密码或 API 私钥纳入 Git。
 
-Secrets used in GitHub Actions
-- `WINDOWS_PFX` (base64): base64-encoded .pfx file for Windows code signing.
-- `WINDOWS_PFX_PASSWORD`: password for the PFX.
-- `MACOS_IDENTITY` (optional): code signing identity string for `codesign`, e.g. "Developer ID Application: Your Name (TEAMID)".
-- `APPLE_API_KEY_BASE64` (optional): base64-encoded App Store Connect API key (.p8) content for notarization.
-- `APPLE_KEY_ID` (optional): App Store Connect Key ID (e.g. ABCDE12345).
-- `APPLE_ISSUER_ID` (optional): Apple Issuer ID (Team ID).
+## Windows
 
-How to generate base64 PFX (Linux/macOS):
-```bash
-base64 -w 0 mycert.pfx > mycert.pfx.b64
-# copy contents and add to GitHub secret WINDOWS_PFX
-```
-On macOS without -w:
-```bash
-base64 mycert.pfx | tr -d '\n' > mycert.pfx.b64
-```
-On Windows (PowerShell):
+- `WINDOWS_PFX`：代码签名 PFX 的 base64 内容。
+- `WINDOWS_PFX_PASSWORD`：PFX 密码。两项均缺失时 CI 跳过签名；仅提供其中一项时报错。
+- `scripts/sign-windows.ps1` 优先寻找 PATH 上的 `signtool.exe`，再查找 Windows SDK 版本目录下的 x64 工具；也可用 `-SignToolPath` 指定工具。
+
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\to\mycert.pfx')) | Out-File -Encoding ASCII mycert.pfx.b64
+# 环境变量已通过安全方式注入；对最终上传副本执行
+./scripts/sign-windows.ps1 -Files 'build/release-artifacts/desktop/*.msi'
 ```
 
-Recommended CI workflow
-- Use `.github/workflows/build-installers.yml` (added) which builds on `windows-latest` and `macos-latest`.
-- Set the necessary repository secrets via GitHub Settings → Secrets.
-- Trigger workflow via `workflow_dispatch` or by pushing a tag `v*`.
+脚本先检查全部输入，缺失的通配符或非 MSI/EXE 文件使任务失败；重复匹配的文件只签一次。每个文件执行 SHA-256 签名和时间戳，再执行 `signtool verify /pa /all`，任何非零退出码使 CI 失败。PFX 写入唯一临时文件，直接传给工具，完成或失败均清理，不导入 Windows 证书库。签名后不要再次运行依赖安装器构建的收集任务，以免重建覆盖签名。
 
-Local signing (macOS)
-- Build DMG locally on macOS.
-- Run `./scripts/sign-macos.sh /path/to/MyApp.app` (set `MACOS_IDENTITY` env var first).
-- Notarize: `APPLE_API_KEY_BASE64` + `APPLE_KEY_ID` + `APPLE_ISSUER_ID` required; run `./scripts/notarize-macos.sh /path/to/MyApp.dmg`.
+离线回归使用假 signtool 和无效的测试 PFX，不访问真实证书库、时间戳服务或生产安装器：
 
-Local signing (Windows)
-- Run `scripts/sign-windows.ps1 -Files "build\\compose\\binaries\\**\\*.msi"` with env `WINDOWS_PFX` (base64) and `WINDOWS_PFX_PASSWORD`.
+```powershell
+python scripts/tests/test_windows_signing.py
+```
 
-Notes and caveats
-- macOS DMG notarization requires Apple Developer credentials and must be run on macOS with Xcode tools installed.
-- Windows MSI signing requires a PFX code signing certificate. The script imports the PFX into current user cert store for use by signtool.
-- CI secrets must be protected; do NOT commit raw certificates into the repository.
+覆盖正常签名验证、签名失败、验证失败、文件缺失、凭据缺失、重叠通配符去重及临时证书清理。Windows 上需要 `pwsh`；其他系统跳过，不能当作签名测试通过。
 
-If you want, I can:
-- Add a GitHub Actions workflow job to automatically create a GitHub Release and attach installer artifacts.
-- Generate placeholder icons and commit them under `packaging/icons/` (currently README exists).
+## macOS
+
+- `MACOS_IDENTITY`：Developer ID Application 签名身份。
+- `APPLE_API_KEY_BASE64`：App Store Connect API 私钥 base64。
+- `APPLE_KEY_ID`、`APPLE_ISSUER_ID`：对应 API key 与 issuer 标识。
+
+需要 macOS、Xcode 命令行工具及 Apple Developer 凭据。应用签名可用 `scripts/sign-macos.sh /path/to/App.app`；DMG 公证可用 `scripts/notarize-macos.sh /path/to/App.dmg`。现有 macOS 工作流需要在 macOS 上单独验证，Windows 的假签名测试不覆盖它。
+
+## 本轮验证
+
+2026-10-28：六项 Windows 离线签名回归通过，包含带空格的工具/安装器路径。未使用真实代码签名证书，也未执行真实签名、公证或联网时间戳验证。

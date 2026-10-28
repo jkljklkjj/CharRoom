@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -90,32 +89,32 @@ fun UserList(
     val s = LocalStrings.current
     val userListState by chatViewModel.usersFlow.collectAsState()
     val conversationStates by chatViewModel.conversationStatesFlow.collectAsState()
-    val sortedUsers by remember(searchQuery, userListState, conversationStates) {
-        derivedStateOf {
-            val indexById = userListState.withIndex().associate { it.value.conversationKey to it.index }
-            userListState.sortedWith(
-                compareByDescending<User> { conversationStates[it.conversationKey]?.lastIncomingMessageTime ?: 0L }
-                    .thenByDescending { conversationStates[it.conversationKey]?.unreadCount ?: 0 }
-                    .thenBy { indexById[it.conversationKey] ?: Int.MAX_VALUE }
-            )
-        }
-    }
-    val filteredUsers by remember(searchQuery, sortedUsers) {
-        derivedStateOf {
-            val keyword = searchQuery.trim().lowercase()
-            if (keyword.isBlank()) return@derivedStateOf sortedUsers
-            sortedUsers.filter { user ->
-                val displayName = buildDisplayName(user).lowercase()
-                val accountId = user.id.toString().lowercase()
-                val extra = user.username + " " + user.email
-                extra.lowercase().contains(keyword) || displayName.contains(keyword) || accountId.contains(keyword)
-            }
-        }
-    }
-    val directory = remember(userListState, searchQuery, currentUser?.id) {
-        buildContactDirectory(userListState, currentUser?.id ?: core.state.GlobalAppState.currentUserId, searchQuery)
-    }
     val isContacts = selectedTab == SidebarTab.CONTACTS
+    val sortedUsers = remember(userListState, conversationStates, isContacts) {
+        if (isContacts) return@remember userListState
+        sortConversationUsers(userListState) { key ->
+            val summary = conversationStates[key]
+            (summary?.lastIncomingMessageTime ?: 0L) to (summary?.unreadCount ?: 0)
+        }
+    }
+    val filteredUsers = remember(searchQuery, sortedUsers, isContacts) {
+        if (isContacts) return@remember sortedUsers
+        val keyword = searchQuery.trim().lowercase()
+        if (keyword.isBlank()) return@remember sortedUsers
+        sortedUsers.filter { user ->
+            val displayName = user.username.lowercase()
+            val accountId = user.id.toString()
+            val extra = user.username + " " + user.email
+            extra.lowercase().contains(keyword) || displayName.contains(keyword) || accountId.contains(keyword)
+        }
+    }
+    val directoryLocale = java.util.Locale.getDefault()
+    val sortedDirectory = remember(userListState, currentUser?.id, directoryLocale) {
+        buildContactDirectory(userListState, currentUser?.id ?: core.state.GlobalAppState.currentUserId, directoryLocale)
+    }
+    val directory = remember(sortedDirectory, searchQuery, isContacts) {
+        if (isContacts) sortedDirectory.filtered(searchQuery) else sortedDirectory
+    }
     val visibleCount = if (isContacts) directory.size else filteredUsers.size
 
     // Check for pending applications (only on explicit invocation)
@@ -149,7 +148,9 @@ fun UserList(
         onOpenApplications()
     }
 
-    val onlineCount = userListState.count { !it.isGroup && it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
+    val onlineCount = remember(userListState) {
+        userListState.count { !it.isGroup && it.id > 0 && !ServerConfig.isAgentAssistant(it.id) && it.online == true }
+    }
 
     // On first entry, only load current user info and avatar; contact list loaded by ChatApp
     LaunchedEffect(Unit) {
@@ -243,8 +244,4 @@ fun UserList(
         PaperDiscoveryEntry(onOpenDiscovery)
         Spacer(Modifier.height(12.dp))
     }
-}
-
-private fun buildDisplayName(user: User): String {
-    return user.username
 }

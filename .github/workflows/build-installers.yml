@@ -61,6 +61,15 @@ jobs:
           Set-Content -Path src\commonMain\resources\server.properties -Value "server.ip=chatlite.xin"
         shell: powershell
 
+      - name: Set up Python for packaging tests
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Test Windows signing script
+        shell: pwsh
+        run: python scripts/tests/test_windows_signing.py
+
       - name: Build installers
         run: .\gradlew.bat clean stageDesktopReleaseArtifacts desktopSizeReport --no-daemon
 
@@ -70,18 +79,11 @@ jobs:
           WINDOWS_PFX: ${{ secrets.WINDOWS_PFX }}
           WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
         run: |
-          if (-not $env:WINDOWS_PFX -or -not $env:WINDOWS_PFX_PASSWORD) {
+          if (-not $env:WINDOWS_PFX -and -not $env:WINDOWS_PFX_PASSWORD) {
             Write-Host 'Skipping Windows code signing: secrets not provided.'
             exit 0
           }
-          $pfxPath = Join-Path $env:TEMP 'codesign.pfx'
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_PFX))
-          $pw = $env:WINDOWS_PFX_PASSWORD
-          certutil -f -p $pw -importpfx $pfxPath
-          $signtool = '"C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe"'
-          Get-ChildItem -Path build\release-artifacts\desktop -Filter *.msi | ForEach-Object {
-            & $signtool sign /fd SHA256 /a /f $pfxPath /p $pw /tr http://timestamp.digicert.com /td SHA256 $_.FullName
-          }
+          ./scripts/sign-windows.ps1 -Files 'build/release-artifacts/desktop/*.msi'
 
       - name: Upload size report
         uses: actions/upload-artifact@v7

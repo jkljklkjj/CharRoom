@@ -25,3 +25,27 @@
 - `git diff --check` 通过。没有提交或推送；保留工作区此前修改。
 
 以上是行为和算法开销的验证，不能据此推算真实设备的帧率、峰值堆内存或速度提升百分比。
+
+
+## 联系人排序与搜索分离（2026-10-28 后续）
+
+Web `contactDirectory.ts` 和共享原生 `ContactDirectory.kt` 将姓名排序与搜索筛选拆开。组件按联系人数据、账号及排序 locale 缓存分组目录；查询词变化只过滤已排序结果，不重新创建 Collator 或再次执行 O(n log n) 排序。空搜索直接复用目录/联系人列表，搜索仍即时更新，没有增加人为输入延迟。姓名或 ID、群组/好友分组、排除本人及助手的规则保持原样。
+
+会话列表使用两端对应的 `sortConversationUsers`：先对每个联系人计算一次类型化会话键、活动时间和未读数，再比较投影后的数值。活动状态读取从比较器内的重复调用降为每个联系人一次；排序仍按最近活动、未读数降序，相同时保留输入顺序，不把同数字的私聊和群聊合并。排序投影为本次计算的 O(n) 临时空间，没有增加跨账号全局缓存。
+
+原生 `UserListScreen` 的会话排序不再依赖搜索词，在线人数按用户快照缓存。联系人标签页不执行隐藏会话列表的活动排序；会话标签页不筛选隐藏的联系人分组。Web computed 本身按实际读取的标签页惰性求值；搜索关键词归一化每次过滤只做一次，避免每个联系人重复 trim 和转换查询词。
+
+验证：Web 123 项隔离测试、类型检查和生产构建通过；JVM 122 项测试、Android `compileDebugKotlin -x buildQuicNative` 通过。新增测试覆盖缓存目录过滤、空搜索复用、排序不修改源列表、每个联系人只读取一次活动状态、稳定并列顺序及同 ID 私聊/群聊隔离。先增加失败测试复现排序/筛选未分离，再完成实现。
+
+Edge 的 `contacts-browser.cjs` 使用本地虚构数据运行，通过 5000 联系人的真实 Vue 页面验证：搜索输入前后 Intl.Collator 比较次数不增加，继续满足少于 35 行联系人 DOM 的限制；键盘导航、移动布局、缓存恢复及延迟 ACK 回归通过。计数断言证明搜索没有重新排序，不代表真实设备帧率或耗时提升百分比。
+
+命令（工作目录 CharRoom；Web 命令在 web）：
+
+```text
+./scripts/gradle-windows.ps1 -GradleArguments @(':test', ':androidApp:compileDebugKotlin', '-x', 'buildQuicNative')
+node --experimental-vm-modules --test --test-concurrency=1 tests/*.test.cjs
+npm run build
+node tests/contacts-browser.cjs <Chromium executable>
+```
+
+本轮原生共享 UI 同时覆盖桌面和 Android，Web 同步实现；CLI 无图形联系人列表，无需修改。离线 Compose 预览的函数调用已更新。未运行 Android 真机、桌面实际交互性能分析或真实服务器联调；没有修改协议、本地数据库格式、发送确认时序或后端接口。工作区前一轮的后端、CLI 和签名改动均保留，本轮未提交或推送。

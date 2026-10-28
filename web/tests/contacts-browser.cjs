@@ -36,6 +36,14 @@ async function main() {
       sessionStorage.setItem('charroom_token', 'fixture-token')
       localStorage.setItem('charroom_accountId', '91001'); localStorage.setItem('locale', locale)
       globalThis.fixtureWrites = []; globalThis.fixtureReaders = []
+      globalThis.fixtureCollatorComparisons = 0
+      Intl.Collator = new Proxy(Intl.Collator, { construct(Target, args) {
+        const collator = new Target(...args), compare = collator.compare
+        Object.defineProperty(collator, 'compare', { value: (a, b) => {
+          globalThis.fixtureCollatorComparisons++; return compare(a, b)
+        } })
+        return collator
+      } })
       globalThis.WebTransport = class {
         constructor() { this.ready = Promise.resolve(); this.closed = new Promise(() => {}); this.incomingBidirectionalStreams = new ReadableStream() }
         async createBidirectionalStream() { return { readable: new ReadableStream({ start(controller) { globalThis.fixtureReaders.push(controller); if (globalThis.fixtureReaders.length === 1) queueMicrotask(() => controller.enqueue(new Uint8Array(login))) } }), writable: new WritableStream({ write(bytes) { globalThis.fixtureWrites.push(Array.from(bytes)) } }) } }
@@ -200,7 +208,10 @@ async function main() {
     await large.waitForFunction(()=>document.activeElement?.getAttribute('data-contact-id')==='user:91002')
     await large.keyboard.press('End')
     await large.waitForFunction(()=>document.activeElement?.getAttribute('data-contact-id')==='group:91010')
+    const comparisonsBeforeSearch=await large.evaluate(()=>globalThis.fixtureCollatorComparisons)
+    assert.ok(comparisonsBeforeSearch>0)
     await large.type('.search-bar input','104999');await large.waitForSelector('[data-contact-id="user:104999"]')
+    assert.equal(await large.evaluate(()=>globalThis.fixtureCollatorComparisons),comparisonsBeforeSearch,'Typing must filter the cached directory without sorting 5000 contacts again')
     assert.equal(await large.$$eval('.virtual-contacts .user-row',rows=>rows.length),1)
     await large.click('[data-contact-id="user:104999"]');await large.waitForSelector('.composer textarea')
     await large.close()
