@@ -88,15 +88,16 @@ const SHELL = `
 
 let html = fs.readFileSync(indexFile, 'utf8')
 
+const emptyApp = /<div id="app"[^>]*><\/div>/
+
 if (html.includes(MARKER)) {
   console.log('[inline-shell] skipped (already present)')
+} else if (!emptyApp.test(html)) {
+  // 预渲染产物：#app 里已是真实内容，静态壳没有意义（且会被相邻选择器立即隐藏）
+  console.log('[inline-shell] skipped (#app 已有预渲染内容)')
 } else {
   html = html.replace('</head>', `${STYLE}\n</head>`)
-  const appTag = /<div id="app"[^>]*><\/div>/
-  if (!appTag.test(html)) {
-    throw new Error('[inline-shell] 未找到空的 #app 容器，index.html 结构已变化')
-  }
-  html = html.replace(appTag, match => `${match}${SHELL}`)
+  html = html.replace(emptyApp, match => `${match}${SHELL}`)
   fs.writeFileSync(indexFile, html)
   console.log(`[inline-shell] injected (${Buffer.byteLength(SHELL)} bytes shell + ${Buffer.byteLength(STYLE)} bytes style)`)
 }
