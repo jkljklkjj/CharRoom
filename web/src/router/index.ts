@@ -1,20 +1,11 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, createMemoryHistory } from 'vue-router'
+import { routes } from './routes'
 
-const routes = [
-  { path: '/', name: 'Home', component: () => import('../views/Home.vue') },
-  { path: '/admin', name: 'Admin', component: () => import('../views/AdminConsole.vue') },
-  { path: '/app', name: 'WebApp', component: () => import('../views/WebApp.vue') }
-  ,{ path: '/verify', name: 'Verify', component: () => import('../views/VerifyCode.vue') }
-  ,{ path: '/reset', name: 'ResetPassword', component: () => import('../views/ResetPassword.vue') }
-  ,{ path: '/faq', name: 'FAQ', component: () => import('../views/FAQ.vue') }
-  ,{ path: '/features', name: 'Features', component: () => import('../views/Features.vue') }
-  ,{ path: '/compare', name: 'Compare', component: () => import('../views/Compare.vue') }
-  ,{ path: '/copilot', name: 'Copilot', component: () => import('../views/CopilotConsole.vue') }
-  ,{ path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('../views/NotFound.vue') }
-]
+// SSR（Node）没有 window.history，用内存路由；客户端保持浏览器历史
+const history = typeof window === 'undefined' ? createMemoryHistory() : createWebHistory()
 
 const router = createRouter({
-  history: createWebHistory(),
+  history,
   routes
 })
 

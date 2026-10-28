@@ -1,6 +1,8 @@
 import config from '../../site.routes.json'
 
 export function applyPageSeo(path: string, locale: string, t: (key: string) => string): void {
+  // SSR 渲染阶段没有 document；标题/描述由构建期的 build-route-heads 写死在各路由 HTML 里
+  if (typeof document === 'undefined') return
   const normalizedPath = path === '/' ? path : path.replace(/\/+$/, '')
   const route = config.routes.find(route => route.path === normalizedPath)
   const key = route?.key ?? 'missing'

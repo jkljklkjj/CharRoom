@@ -14,6 +14,8 @@ const LAZY_LOADERS: Record<Exclude<AppLocale, 'zh-CN'>, () => Promise<{ default:
 const loaded = new Set<AppLocale>(['zh-CN'])
 
 function detectLocale(): AppLocale {
+  // 服务端渲染没有 localStorage/navigator，固定站点默认语言，保证 HTML 与客户端 hydrate 一致
+  if (typeof window === 'undefined') return 'zh-CN'
   try {
     const saved = localStorage.getItem('locale')
     if (saved && (SUPPORTED as readonly string[]).includes(saved)) return saved as AppLocale

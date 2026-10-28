@@ -8,8 +8,17 @@ import { ref } from 'vue'
 
 const STORAGE_KEY = 'theme'
 
+/** SSR 环境没有 localStorage，统一回退 auto（客户端挂载后 initTheme 会再读一次） */
+function readStoredTheme(): string {
+  try {
+    return typeof localStorage === 'undefined' ? 'auto' : localStorage.getItem(STORAGE_KEY) || 'auto'
+  } catch {
+    return 'auto'
+  }
+}
+
 /** 当前主题选择：auto / light / dark（ref，供设置面板高亮当前项） */
-export const theme = ref(localStorage.getItem(STORAGE_KEY) || 'auto')
+export const theme = ref(readStoredTheme())
 
 /** 根据选择（或系统偏好）应用 data-theme 到 <html> */
 export function applyTheme(mode?: string) {

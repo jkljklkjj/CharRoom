@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, createSSRApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import i18n, { ensureLocale, initialLocale } from './i18n'
@@ -16,16 +16,46 @@ if (import.meta.env.PROD) {
 document.body.insertAdjacentHTML('beforeend', '<div id="app-toast"></div>')
 createApp(ToastGlobal).mount('#app-toast')
 
+const SSR_LOCALE = 'zh-CN'
+
 async function bootstrap() {
-  // 入口只内联 zh-CN；其它语言先加载语言包，避免首屏闪中文/显示 key
-  if (initialLocale !== 'zh-CN') {
+  const container = document.getElementById('app')
+  const hydrating = Boolean(container?.hasAttribute('data-ssr'))
+
+  if (!hydrating) {
+    // 入口只内联 zh-CN；其它语言先加载语言包，避免首屏闪中文/显示 key
+    if (initialLocale !== SSR_LOCALE) {
+      try {
+        await ensureLocale(initialLocale)
+      } catch (error) {
+        console.warn('[i18n] 语言包加载失败，回退中文', error)
+      }
+    }
+    createApp(App).use(router).use(i18n).mount('#app')
+    return
+  }
+
+  // 预渲染产物：必须与 SSR 时的状态完全一致才能复用 DOM。
+  // SSR 固定用 zh-CN 渲染，这里也用 zh-CN hydrate，完成后再切到用户语言。
+  // locale 的静态类型由 messages 推断为 'zh-CN'，运行时允许切到 en/ja
+  const globalLocale = i18n.global.locale as unknown as { value: string }
+  globalLocale.value = SSR_LOCALE
+  // 必须先用 app.use(router)：初始导航是在插件安装时触发的，
+  // 在此之前 await router.isReady() 永远不 resolve，挂载根本不会发生。
+  const app = createSSRApp(App)
+  app.use(router).use(i18n)
+  await router.isReady()
+  app.mount('#app')
+
+  if (initialLocale !== SSR_LOCALE) {
     try {
       await ensureLocale(initialLocale)
+      globalLocale.value = initialLocale
+      document.documentElement.lang = initialLocale
     } catch (error) {
-      console.warn('[i18n] 语言包加载失败，回退中文', error)
+      console.warn('[i18n] 语言包加载失败，保持中文', error)
     }
   }
-  createApp(App).use(router).use(i18n).mount('#app')
 }
 
 void bootstrap()

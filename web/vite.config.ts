@@ -2,16 +2,19 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   build: {
     rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor': ['vue', 'vue-router'],
-          'proto': ['protobufjs', 'long'],
-          'ui': ['dompurify']
-        }
-      }
+      output: isSsrBuild
+        // SSR 产物要能被 Node ESM 直接 import：.mjs + 单入口
+        ? { format: 'es', entryFileNames: '[name].mjs', chunkFileNames: 'chunks/[name]-[hash].mjs' }
+        : {
+            manualChunks: {
+              'vendor': ['vue', 'vue-router'],
+              'proto': ['protobufjs', 'long'],
+              'ui': ['dompurify']
+            }
+          }
     },
     chunkSizeWarningLimit: 400
   },
@@ -79,4 +82,4 @@ export default defineConfig({
   server: {
     port: 5173
   }
-})
+}))
