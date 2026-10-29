@@ -558,26 +558,30 @@ async function retryMessage(m: ChatMessage) {
   const wrapper = group
     ? {
         type: MSG_TYPE.GROUP_CHAT,
-        groupChat: { targetClientId: chatTargetId(to!), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId, ...replyFields, ...metadata }
+        groupChat: { targetClientId: chatTargetId(to!), content: m.text, timestamp: normalizeTimeValue(m.time ?? m.timestamp) || Date.now(), messageId: newMessageId, ...replyFields, ...metadata }
       }
     : isAgent
       ? {
           type: MSG_TYPE.AGENT_CHAT,
-          chat: { targetClientId: chatTargetId(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId, ...replyFields, ...metadata }
+          chat: { targetClientId: chatTargetId(to), content: m.text, timestamp: normalizeTimeValue(m.time ?? m.timestamp) || Date.now(), messageId: newMessageId, ...replyFields, ...metadata }
         }
       : {
           type: MSG_TYPE.CHAT,
-          chat: { targetClientId: chatTargetId(to), content: m.text, timestamp: new Date(m.time || Date.now()).getTime(), messageId: newMessageId, ...replyFields, ...metadata }
+          chat: { targetClientId: chatTargetId(to), content: m.text, timestamp: normalizeTimeValue(m.time ?? m.timestamp) || Date.now(), messageId: newMessageId, ...replyFields, ...metadata }
         }
 
   // 更新状态为发送中
   store.updateMessageStatus(m.messageId, 'sending', Date.now())
 
   try {
+    // sendWrapper 会复用原 ID 并把失败/超限的 outbox 记录重新置为 pending；
+    // 返回 false 通常表示当前未连接，记录仍会在重连后自动补发。
     await chatSocket.sendWrapper(wrapper)
+    toast.info(t('product.retryQueued'))
   } catch (e) {
     console.warn("重试失败:", e instanceof Error ? e.message : String(e))
     store.updateMessageStatus(newMessageId, 'failed')
+    toast.error(t('product.retryFailed'))
   }
 }
 

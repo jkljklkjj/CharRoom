@@ -547,6 +547,8 @@
     "yourSpace": "Your conversation space",
     "conversationOptions": "Conversation options",
     "sendFailed": "Send failed. Click to retry.",
+    "retryQueued": "Retry started",
+    "retryFailed": "Retry failed. Check your connection.",
     "dailyPreview": {
       "one": {
         "initial": "X",

@@ -547,6 +547,8 @@
     "yourSpace": "あなたの会話スペース",
     "conversationOptions": "会話の操作",
     "sendFailed": "送信できませんでした。クリックして再試行",
+    "retryQueued": "再送信を開始しました",
+    "retryFailed": "再送信に失敗しました。接続を確認してください。",
     "dailyPreview": {
       "one": {
         "initial": "夏",

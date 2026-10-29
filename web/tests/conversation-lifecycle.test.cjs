@@ -144,3 +144,28 @@ test('an authenticated session restores exact committed cursors and ignores late
   other.renew();other.state.accountId='B';delayed.resolve({'A:1':'9007199254740999'})
   await pending;assert.deepEqual({...other.state.conversationSeqIds},{})
 })
+
+test('a server copy replaces a pending optimistic row instead of duplicating it', async () => {
+  const { messages, state } = await fixture(async () => page('initial'))
+  await messages.loadConversation('user:42')
+  await messages.addMessage({ messageId: 'local_a', targetId: '42', user: 'you', text: 'hello', time: 1000, isSent: 'sending' })
+  await messages.addMessage({ messageId: '9001', targetId: '42', user: 'you', text: 'hello', time: 1500 })
+  assert.deepEqual(Array.from(state.messages, row => row.messageId), ['initial', '9001'])
+})
+
+test('own group history rows reconcile with local optimistic group messages', async () => {
+  const { messages, state } = await fixture(async () => ({ messages: [], beforeIndex: null, hasMore: false }))
+  await messages.loadConversation('group:9')
+  await messages.addGroupMessage({ messageId: 'local_g', groupId: '9', user: 'you', text: 'hi', time: 1000, isSent: 'sending' })
+  await messages.addGroupMessage({ messageId: '9002', groupId: '9', user: 'A', text: 'hi', time: 1000 })
+  assert.deepEqual(Array.from(state.groupMessages, row => row.messageId), ['9002'])
+})
+
+test('a late echo carrying an ACK-confirmed server id never adds a second row', async () => {
+  const { messages, state } = await fixture(async () => ({ messages: [], beforeIndex: null, hasMore: false }))
+  await messages.loadConversation('user:42')
+  await messages.addMessage({ messageId: 'local_b', targetId: '42', user: 'you', text: 'ack', time: 1000, isSent: 'sending' })
+  messages.confirmMessageId('local_b', '9003', '3')
+  await messages.addMessage({ messageId: '9003', targetId: '42', user: 'you', text: 'ack', time: 1000 })
+  assert.deepEqual(Array.from(state.messages, row => [row.messageId, row.isSent]), [['9003', 'sent']])
+})

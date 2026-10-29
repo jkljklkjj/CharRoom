@@ -2,7 +2,7 @@ import {historyWindow} from '../utils/historyWindow'
 import type { Id, ChatMessage } from '../types/chat'
 import {ConversationId, type ConversationKey} from '../utils/conversationId'
 import { state, PAGE_SIZE } from './state'
-import { AGENT_USER_ID } from '../constants'
+import { AGENT_USER_ID, SELF_USER } from '../constants'
 import { getPrivateConversationId, normalizeTimeValue } from './storage'
 import { conversationPreviewText } from '../utils/format'
 import DOMPurify from 'dompurify'
@@ -105,12 +105,44 @@ function conversationKey(id:Id) {return ConversationId.parse(id).historyKey}
 function mergeRows(older:readonly ChatMessage[],current:readonly ChatMessage[]) {
   const rows=new Map<string,ChatMessage>()
   for(const message of [...older,...current])rows.set(message.messageId || `${message.time}:${message.user}:${message.text}`,message)
-  return [...rows.values()].sort((a,b)=>{
+  const sorted=[...rows.values()].sort((a,b)=>{
     const time=normalizeTimeValue(a.time ?? a.timestamp)-normalizeTimeValue(b.time ?? b.timestamp)
     if(time)return time
     const left=String(a.messageId||''),right=String(b.messageId||'')
     if(/^\d+$/.test(left)&&/^\d+$/.test(right))return BigInt(left)<BigInt(right)?-1:BigInt(left)>BigInt(right)?1:0
     return left<right?-1:left>right?1:0
+  })
+  return reconcileOptimistic(sorted)
+}
+
+/** Local optimistic rows are only a placeholder until the server copy arrives. */
+function isOwnMessage(message: ChatMessage) {
+  return message.user === SELF_USER || String(message.user) === String(state.accountId)
+}
+function peerIdentity(message: ChatMessage) {
+  return message.groupId != null ? `group:${message.groupId}`
+    : message.targetId != null ? `user:${message.targetId}` : ''
+}
+function sendText(message: ChatMessage) { return message.text || '' }
+function sendTime(message: ChatMessage) { return normalizeTimeValue(message.time ?? message.timestamp) }
+/**
+ * The server timestamp may be truncated to seconds, so match the exact peer/text
+ * plus a small window. Only still-pending/failed local placeholder rows are dropped;
+ * real server rows are never removed.
+ */
+function reconcileOptimistic(rows: ChatMessage[]): ChatMessage[] {
+  const server = new Map<string, number[]>()
+  for (const row of rows) {
+    if (!row.messageId || row.messageId.startsWith('local_') || !isOwnMessage(row)) continue
+    const key = `${peerIdentity(row)}|${sendText(row)}`
+    const times = server.get(key)
+    if (times) times.push(sendTime(row)); else server.set(key, [sendTime(row)])
+  }
+  if (!server.size) return rows
+  return rows.filter(row => {
+    if (!row.messageId?.startsWith('local_') || (row.isSent !== 'sending' && row.isSent !== 'failed')) return true
+    const times = server.get(`${peerIdentity(row)}|${sendText(row)}`)
+    return !times?.some(time => Math.abs(time - sendTime(row)) <= 2000)
   })
 }
 export function setHistoryFollowingLatest(value:boolean){state.historyFollowingLatest=value}
@@ -190,7 +222,7 @@ export function loadOlderMessages(): Promise<boolean> {
     if (!view.isCurrent()) return false
     const current = isGroup ? state.groupMessages : state.messages
     const ids = new Set(current.map(m => m.messageId).filter(Boolean))
-    const merged = [...page.messages.filter(m => !m.messageId || !ids.has(m.messageId)), ...current]
+    const merged = reconcileOptimistic([...page.messages.filter(m => !m.messageId || !ids.has(m.messageId)), ...current])
     if (isGroup) state.hasMoreGroupMessages = page.hasMore
     else state.hasMoreMessages = page.hasMore
     const bounded=historyWindow(merged,'oldest');state.historyHasNewer ||= bounded.trimmedAfter
@@ -208,16 +240,24 @@ export function loadOlderMessages(): Promise<boolean> {
 // 重连补拉/增量同步也可能与实时推送重复）
 const seenMessageIds = new Set<string>()
 let seenVersion = -1
-function alreadySeen(messageId?: string | null): boolean {
+function seenScope() {
   const version = sessionEpoch.capture().version
   if (version !== seenVersion) { seenVersion = version; seenMessageIds.clear() }
-  if (!messageId) return false
-  if (seenMessageIds.has(messageId)) return true
+}
+function rememberSeen(messageId?: string | null) {
+  if (!messageId) return
+  seenScope()
   seenMessageIds.add(messageId)
   if (seenMessageIds.size > 500) {
     const oldest = seenMessageIds.values().next().value
     if (oldest !== undefined) seenMessageIds.delete(oldest)
   }
+}
+function alreadySeen(messageId?: string | null): boolean {
+  if (!messageId) return false
+  seenScope()
+  if (seenMessageIds.has(messageId)) return true
+  rememberSeen(messageId)
   return false
 }
 
@@ -231,6 +271,7 @@ export async function addMessage(m: ChatMessage) {
   if (!session.isCurrent() || alreadySeen(m.messageId)) return
   if (state.selectedChatId === ConversationId.privateChat(chatId).key) {
     if (!m.messageId || !state.messages.some(row => row.messageId === m.messageId)) state.messages.push(sanitized)
+    state.messages = reconcileOptimistic(state.messages)
     await installWindow(state.messages,state.historyFollowingLatest?'latest':'oldest')
   }
   if(!session.isCurrent())return
@@ -321,6 +362,7 @@ export async function addGroupMessage(m: ChatMessage) {
   if (!session.isCurrent() || alreadySeen(m.messageId)) return
   if (state.selectedChatId === conversationId) {
     if (!m.messageId || !state.groupMessages.some(row => row.messageId === m.messageId)) state.groupMessages.push(sanitized)
+    state.groupMessages = reconcileOptimistic(state.groupMessages)
     await installWindow(state.groupMessages,state.historyFollowingLatest?'latest':'oldest')
   }
   if(!session.isCurrent())return
@@ -339,6 +381,8 @@ export async function addGroupMessage(m: ChatMessage) {
 }
 
 export function confirmMessageId(clientId: string, serverId: string, seqId: Id) {
+  // A late echo/history copy with the server ID must not create a second row after the local ID is renamed.
+  rememberSeen(serverId)
   conversationViews.updateAll(rows=>rows.some(row=>row.messageId===clientId)?mergeRows([],rows.map(row=>row.messageId===clientId?{...row,messageId:serverId,seqId,isSent:'sent'}:row)):rows)
   for (const rows of [state.messages, state.groupMessages]) {
     const position = rows.findIndex(row => row.messageId === clientId)

@@ -5,8 +5,9 @@ test('manual retry preserves message identity and reply metadata', async () => {
   const start = source.indexOf('async function retryMessage('), end = source.indexOf('// 处理粘贴事件', start)
   const sent = []
   const context = { currentChatId: { value: '42' }, isGroupChat: { value: false }, AGENT_USER_ID: 0,
-    MSG_TYPE: { CHAT: 3, GROUP_CHAT: 4, AGENT_CHAT: 5 }, chatTargetId: Number, store: { updateMessageStatus() {} },
-    chatSocket: { sendWrapper: async wrapper => { sent.push(wrapper) } }, console }
+    MSG_TYPE: { CHAT: 3, GROUP_CHAT: 4, AGENT_CHAT: 5 }, chatTargetId: Number, store: { state: { accountId: 'A' }, updateMessageStatus() {} },
+    chatSocket: { sendWrapper: async wrapper => { sent.push(wrapper) }, enqueueWrapper: async wrapper => { sent.push(wrapper) } },
+    toast: { info() {}, error() {} }, t: key => key, normalizeTimeValue: value => Number(value) || 0, console }
   vm.runInNewContext(transpile(source.slice(start, end) + '\nglobalThis.retry = retryMessage'), context)
   const message = { messageId: 'local-stable', text: 'fixture', time: 1, replyTo: { messageId: 'original', content: 'quote', sender: 'fixture' } }
   await context.retry(message)
