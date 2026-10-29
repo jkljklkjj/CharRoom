@@ -13,7 +13,7 @@
 - [x] DOMPurify 预清洗
 - [x] localStorage O(n) 消息持久化 → IndexedDB
 
-- [ ] **`/app` 首屏静态壳（app shell）** — 试过两条路：注入灰条骨架、以及"真实文案壳 + 乐观启动"，刷新时仍有「壳 → 界面」的观感跳变，已整体撤回（`scripts/inline-app-shell.cjs`、`src/styles/app-boot.css` 已删除）。重新评估的前置条件：`/app` 能 SSR 出真实界面（或持久化上次渲染），否则静态壳只会让首帧更吵。当前保持「转圈 + 正在验证登录状态…」。
+- [x] **`/app` 首屏静态壳（app shell）** — 使用真实 `WebApp` / `LoginRegister` 组件构建期 SSR，并通过 hydration 复用 DOM；认证等待态与登录表单共享品牌、欢迎区和面板，随 HTML 输出路由 CSS，不再注入仿界面骨架或乐观放行。首页 `/` 优先完成首屏样式内联和入场动画稳定化，不请求认证；仅 `/app` 挂载后恢复会话。静态产物不包含联系人、消息或凭证，已登录聊天内容仍在验证后由客户端加载。实现与回归见 `docs/development/WEB-SEO.md`。
 - [ ] WebTransport Datagram（长期）
 - [ ] WASM 编解码（长期）
 

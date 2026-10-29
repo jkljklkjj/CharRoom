@@ -1,12 +1,7 @@
 <template>
   <div class="app-wrap">
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-wrap">
-      <div class="loading-spinner"></div>
-      <p>{{ $t('app.loading') }}</p>
-    </div>
-
-    <LoginRegister v-else-if="!store.state.token || !store.state.loginValid" @logged="onLogged" />
+    <!-- SSR 与客户端共用真实认证入口，验证完成只切换面板内容。 -->
+    <LoginRegister v-if="loading || !store.state.token || !store.state.loginValid" :verifying="loading" @logged="onLogged" />
 
     <div v-else class="app-main" :class="{ 'mobile-view': isMobile }">
       <!-- 移动端视图 -->
@@ -132,6 +127,10 @@ import {ConversationId} from '../utils/conversationId'
 import { AGENT_USER_ID } from '../constants'
 // 主题设置（统一由 utils/theme.ts 管理，App.vue 已在全局初始化）
 import { theme, setTheme, initTheme } from '../utils/theme'
+import { hasUsableAccessToken, readAccessSession, persistAccessSession } from '../services/accessSession'
+import { refreshSession } from '../api/http'
+import '../styles/app-controls.css'
+import '../styles/social.css'
 
 function normalizeTimestamp(raw: TimeValue | null | undefined) {
   if (raw == null || raw === '') return new Date().toISOString()
@@ -152,7 +151,7 @@ const router = useRouter()
 const { t, locale } = useI18n()
 
 // 移动端适配
-const isMobile = ref(window.innerWidth < 768)
+const isMobile = ref(false)
 const sidebarTab = ref<SidebarTab>('messages')
 const sidebarQueries = ref({ messages: '', contacts: '' })
 const currentView = ref('list') // 'list' | 'chat'
@@ -374,7 +373,12 @@ function connectChat(token: string, accountId: Id) {
   return chatSocket.connect(host, port, token, String(accountId), {
     onAuthenticated:()=>{if(isCurrent())void refreshContacts()},
     onmessage: async msg => { if (isCurrent()) await handleIncomingMessage(msg) },
-    onAuthFailed: () => { if (isCurrent()) void logout() },
+    onAuthFailed: async (_reason, rejectedToken) => {
+      if (!isCurrent()) return false
+      const rejected = rejectedToken || store.state.token
+      const result = await refreshSession(rejected)
+      return isCurrent() && (result === 'ready' || result === 'unavailable')
+    },
     onFriendAccepted: async (accepterId) => {
       if (!isCurrent()) return
       // 好友请求被接受，增量添加新好友
@@ -418,6 +422,7 @@ function clearAuth() {
   sidebarQueries.value = { messages: '', contacts: '' }
   currentView.value = 'list'
   sessionStorage.removeItem('charroom_token')
+  sessionStorage.removeItem('charroom_tokenExpiresAt')
   localStorage.removeItem('charroom_refreshToken')
   localStorage.removeItem('charroom_accountId')
   store.setToken('')
@@ -450,15 +455,12 @@ function doLogout() {
   logout()
 }
 
-/** 保存登录凭证到本地 — access token 用 sessionStorage（XSS 安全），refresh token 用 localStorage */
+/** 会话缓存 access token 与到期时间；refresh token 沿用持久缓存。 */
 function persistTokens(accessToken: string, refreshToken: string) {
-  try {
-    sessionStorage.setItem('charroom_token', accessToken)
-    localStorage.setItem('charroom_refreshToken', refreshToken || '')
-  } catch (_e) { /* ignore */ }
+  persistAccessSession({ accessToken, refreshToken: refreshToken || '' })
 }
 
-/** 获取当前用户信息并标记登录有效 */
+/** 恢复本地会话；REST 与 LOGIN 仍独立执行服务端鉴权。 */
 async function initUserSession(accessToken: string, refreshToken: string) {
   clearAgentStreams()
   sessionEpoch.renew()
@@ -467,7 +469,9 @@ async function initUserSession(accessToken: string, refreshToken: string) {
   const attempt = sessionEpoch.capture()
   store.setToken(accessToken)
   store.setRefreshToken(refreshToken || '')
-  const userRes = await api.getCurrentUser()
+  // JWT claims restore local UI only; every backend request and LOGIN still authenticates.
+  const local = readAccessSession(accessToken)
+  const userRes = local ? { id: local.accountId } : await api.getCurrentUser()
   if (!attempt.isCurrent()) return false
   if (!userRes?.id) { clearAuth(); return false }
 
@@ -475,6 +479,7 @@ async function initUserSession(accessToken: string, refreshToken: string) {
   const owner = String(userRes.id), session = sessionEpoch.capture()
   const isCurrent = () => session.isCurrent() && String(store.state.accountId) === owner
   store.setLoginValid(true)
+  loading.value = false
   persistTokens(store.state.token, store.state.refreshToken)
   localStorage.setItem('charroom_accountId', owner)
 
@@ -536,6 +541,7 @@ function onBusinessResume(){revalidateContacts();void refreshFriendRequests?.()}
 function onDirectoryVisibility() { if(document.visibilityState==='visible')onBusinessResume() }
 let directoryTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
+  handleResize()
   window.addEventListener('contacts-changed',invalidateContacts)
   window.addEventListener('online',onBusinessResume)
   window.addEventListener('focus',onBusinessResume)
@@ -555,74 +561,32 @@ onMounted(() => {
 
 async function restoreSession() {
   const attempt = sessionEpoch.capture()
-  const savedToken = sessionStorage.getItem('charroom_token')
-  const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
-  const savedAccountId = localStorage.getItem('charroom_accountId')
+  try {
+    const savedToken = sessionStorage.getItem('charroom_token') || ''
+    const savedRefreshToken = localStorage.getItem('charroom_refreshToken') || ''
+    const identity = readAccessSession(savedToken)
+    const accountId = identity?.accountId || localStorage.getItem('charroom_accountId') || ''
+    if (!accountId) return
 
-  // sessionStorage 在浏览器关闭后清空，但 refreshToken 在 localStorage 中持久保存。
-  // 即使 accessToken 丢失，只要有 refreshToken 就尝试恢复登录。
-  if (!savedAccountId) {
-    loading.value = false
-    return
-  }
-
-  // 如果 accessToken 缺失但有 refreshToken，先用它刷新一个新 token
-  let activeToken = savedToken
-  if (!activeToken && savedRefreshToken) {
-    try {
-      const refreshed = await api.refreshToken(savedRefreshToken)
-      if (!attempt.isCurrent()) return
-      if (refreshed?.accessToken) {
-        activeToken = refreshed.accessToken
-        store.setToken(refreshed.accessToken)
-        store.setRefreshToken(refreshed.refreshToken || '')
-        persistTokens(refreshed.accessToken, refreshed.refreshToken)
-      }
-    } catch (e) {
-      console.debug('刷新 token 失败:', e)
+    // A signed token's account wins over a stale, separately stored account ID.
+    if (hasUsableAccessToken(savedToken)) {
+      await initUserSession(savedToken, savedRefreshToken)
+      return
     }
+    if (!savedRefreshToken) { clearAuth(); return }
+    store.setToken(savedToken)
+    store.setRefreshToken(savedRefreshToken)
+    store.setAccountId(accountId)
+    const session = sessionEpoch.capture()
+    const result = await refreshSession(savedToken)
+    if (!session.isCurrent() || result !== 'ready') return
+    await initUserSession(store.state.token, store.state.refreshToken)
+  } catch (error) {
+    console.warn('Session restoration unavailable', error)
+  } finally {
+    // initUserSession renews the epoch and releases the gate itself.
+    if (attempt.isCurrent() || !store.state.loginValid) loading.value = false
   }
-
-  if (!activeToken) {
-    loading.value = false
-    return
-  }
-
-  store.setToken(activeToken)
-  store.setRefreshToken(savedRefreshToken)
-  if (!attempt.isCurrent()) return
-  store.setAccountId(savedAccountId)
-  const validation = sessionEpoch.capture()
-
-  // 校验 token：只有 invalid（401/业务码非 0）才登出；
-  // unavailable（网络/5xx）不能当作凭证失效应，继续进入会话，由后续请求的 401 处理链路兑底。
-  let result = await api.validateToken()
-  if (!validation.isCurrent()) return
-
-  if (result.state === 'invalid' && savedRefreshToken) {
-    const refreshed = await api.refreshToken(savedRefreshToken)
-    if (!validation.isCurrent()) return
-    if (refreshed?.accessToken) {
-      activeToken = refreshed.accessToken
-      store.setToken(refreshed.accessToken)
-      store.setRefreshToken(refreshed.refreshToken || '')
-      persistTokens(refreshed.accessToken, refreshed.refreshToken)
-      result = await api.validateToken()
-      if (!validation.isCurrent()) return
-    }
-  }
-
-  if (result.state === 'invalid') {
-    clearAuth()
-    router.push('/')
-  } else {
-    if (result.state === 'unavailable') {
-      console.warn('[auth] token 校验暂时不可用（网络/5xx），保留登录态并继续进入')
-    }
-    await initUserSession(activeToken, store.state.refreshToken)
-  }
-
-  loading.value = false
 }
 
 // 页面关闭时发送登出消息
@@ -690,35 +654,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.loading-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  background: var(--bg);
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid var(--action);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.loading-wrap p {
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
 /* 高度跟随 body 内容盒（已扣掉顶部/底部安全区留白），避免多出可拖拽的溢出区域 */
 .app-wrap{height:100%;display:flex;flex-direction:column}
 .app-main{display:flex;flex:1;min-height:0}

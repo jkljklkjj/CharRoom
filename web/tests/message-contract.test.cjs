@@ -154,6 +154,10 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
     '../utils/device': exportsModule({ getDeviceId: () => 'fixture', getDeviceType: () => 'web' })
   }
   const socketModule = new vm.SourceTextModule(readTs(path.join(web, 'src/services/chatSocket.ts')), { context })
+  const budgetModule = new vm.SourceTextModule(readTs(path.join(web, 'src/services/handshakeBudget.ts')), { context })
+  await budgetModule.link(() => { throw new Error('budget has no dependencies') })
+  await budgetModule.evaluate()
+  dependencies['./handshakeBudget'] = budgetModule
   await socketModule.link(name => dependencies[name])
   await socketModule.evaluate()
   const socket = socketModule.namespace
@@ -205,8 +209,15 @@ test('real decoded CHAT reaches the UI and only a successful server ACK marks se
     const abandoned = socket.sendWrapper({ type: types.CHAT,
       chat: { targetClientId: '41', content: 'old session encoding', messageId: 'abandoned' } })
     socket.close()
-    await socket.connect('fixture.invalid', 443, 'another-fixture-token', '42', { onmessage: receive })
+    let authFailures = 0
+    await socket.connect('fixture.invalid', 443, 'another-fixture-token', '42', { onmessage: receive, onAuthFailed: () => { authFailures++ } })
     assert.equal(await abandoned, false, 'old asynchronous encoding must not send on a new connection')
+    const scheduled = [], realTimeout = context.setTimeout
+    context.setTimeout = (callback, delay) => { scheduled.push(delay); return realTimeout(callback, delay) }
+    transport.onmessage(wire({ type: types.RESPONSE, response: { success: false, message: 'HANDSHAKE_RATE_LIMITED:60000' } }))
+    await until(() => !transport.connected)
+    assert.equal(authFailures, 0, 'device cooldown must not invalidate credentials')
+    assert.ok(scheduled.some(delay => delay >= 60000), 'reconnect must honor the server cooldown')
   } finally { socket.close() }
 })
 

@@ -16,6 +16,7 @@
 - 消息 ID 在 `model/MessageIdGenerator.kt` 生成；ACK 的 `serverMessageId` 用于主键归并，`core/MessageIdAliases.kt` 先持久化账号/会话别名，再完成发送回调。
 - `core/IndexedHistoryJournal.kt` 为桌面/Android 提供增量历史与索引分页；仅使用 `.history` 格式，不读取旧 JSON。格式边界见相邻后端的 `docs/development/JVM-AND-INTERACTION.md`。
 - `core/GatewayOwner.kt` 负责连接前 owner 发现；`ReceivedMessagePersistence` 在接收 ACK 前持久化服务端消息；共享 `core/AtomicHistoryFile.kt` 供桌面和 Android（API 26+）原子替换历史文件。
+- 握手限流按 token 校验后的账号与签名设备，滚动一分钟每设备最多 6 次、每账号所有设备合计最多 12 次；`HANDSHAKE_RATE_LIMITED` 应保留凭证并等待冷却，不能当作登录失效。Web 本地恢复与各端边界见 [会话恢复](docs/development/SESSION-RESTORATION.md)。
 - 原生发现页缓存与本人资料/回答草稿由共享 `core/SocialLocalCache.kt` 管理；Android 在 Application 中安装私有文件目录。缓存范围、失效与 Web 对齐情况见 [本地优先加载](docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)。
 
 ## 功能入口

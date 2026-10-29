@@ -25,6 +25,12 @@ suspend fun discoverGatewayOwner(token: String, fallbackHost: String, fallbackPo
     return fallbackHost to fallbackPort // single-node development may omit its advertised endpoint
 }
 
-/** Routing changes and server saturation are retriable; neither invalidates credentials. */
+/** Routing changes, saturation and device cooldown are retriable without invalidating credentials. */
 fun isTransientGatewayResponse(message: String): Boolean =
-    message in setOf("OWNER_REDIRECT", "OWNER_UNAVAILABLE", "SERVER_BUSY")
+    message in setOf("OWNER_REDIRECT", "OWNER_UNAVAILABLE", "SERVER_BUSY") || handshakeRetryAfterMillis(message) != null
+
+/** The server limit is per signed account/device; throttling never revokes credentials. */
+fun handshakeRetryAfterMillis(message: String): Long? =
+    if (message.startsWith("HANDSHAKE_RATE_LIMITED:"))
+        message.substringAfter(':').toLongOrNull()?.coerceIn(1L, 60_000L)
+    else null

@@ -7,6 +7,10 @@ class DurableReceiveTest {
     @Test fun overloadIsRetriableAndDoesNotInvalidateCredentials() {
         assertTrue(isTransientGatewayResponse("SERVER_BUSY"))
         assertTrue(isTransientGatewayResponse("OWNER_UNAVAILABLE"))
+        assertTrue(isTransientGatewayResponse("HANDSHAKE_RATE_LIMITED:60000"))
+        assertEquals(60000L, handshakeRetryAfterMillis("HANDSHAKE_RATE_LIMITED:60000"))
+        assertEquals(1L, handshakeRetryAfterMillis("HANDSHAKE_RATE_LIMITED:0"))
+        assertNull(handshakeRetryAfterMillis("HANDSHAKE_RATE_LIMITED:bad"))
         assertFalse(isTransientGatewayResponse("token invalid"))
     }
 

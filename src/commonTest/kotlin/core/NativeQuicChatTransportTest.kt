@@ -70,6 +70,27 @@ class NativeQuicChatTransportTest {
         } finally { client.stop() }
     }
 
+    @Test fun handshakeCooldownDoesNotInvalidateAuthOrImmediatelyReconnect() {
+        val driver = Driver()
+        val created = java.util.concurrent.atomic.AtomicInteger()
+        val failures = CopyOnWriteArrayList<String>()
+        val client = NativeQuicChatTransport(driverFactory = { created.incrementAndGet(); driver },
+            identity = { QuicIdentity("fixture-token", 42, "fixture-device") }, timing = QuicTransportTiming(reconnectMillis = 1))
+        client.addAuthStateListener { failures += it }
+        try {
+            client.start("fixture.invalid", 443)
+            driver.incoming.put(QuicEvent.Connected)
+            until { driver.sent.isNotEmpty() }
+            driver.receive(0, response(false).toBuilder().setResponse(MessageProtos.ResponseMessage.newBuilder()
+                .setSuccess(false).setMessage("HANDSHAKE_RATE_LIMITED:60000")).build())
+            until { driver.closed }
+            // Would reconnect in 1ms without the server cooldown; stop must interrupt that wait.
+            Thread.sleep(30)
+            assertEquals(1, created.get())
+            assertTrue(failures.isEmpty())
+        } finally { client.stop() }
+    }
+
     @Test fun conversationWaitsForInitializationAndMatchingBusinessAck() {
         val driver = Driver(); val client = client(driver)
         val results = CopyOnWriteArrayList<Boolean>()

@@ -11,6 +11,7 @@
 - Web 纸感品牌在 `styles.css`，与原生 `QingliaoPalette` 对齐；`BrandMark.vue` / `ConversationPreview.vue` 共享首页和登录的视觉元素。产品范围与跨页验证见 [Web 产品设计](../docs/design/WEB-PAPER-PRODUCT.md)。
 - 聊天 UI：`src/components/ChatWindow.vue`、`SidebarUsers.vue`、`LoginRegister.vue`。
 - REST：`src/api/index.ts`（请求与刷新在 `http.ts`）；状态：`src/store/{state,auth,users,messages,storage}.ts`。
+- `/app` 使用 JWT 账号/exp 恢复本地 UI，未到期不请求 `/auth/validate`，后台握手与 REST 拒绝共用懒刷新；握手滚动一分钟每设备最多 6 次、每账号合计最多 12 次，冷却不可当作登出。入口、存储和验证见 [会话恢复](../docs/development/SESSION-RESTORATION.md)。
 - 实时：`src/services/chatSocket.ts` → `src/services/transport/TransportFactory.ts` / `WebTransport.ts`。文件名 chatSocket 不代表 WebSocket。
 - 草稿：`services/composerDrafts.ts` 定义按账号/会话的版本状态，`composables/useComposerDrafts.ts` 跨布局共享；附件经 `api/attachments.ts` 上传，发送前捕获账号与目标。
 - 本地存储：`src/utils/messageDB.ts`；待发消息：`src/services/offlineQueue.ts`。新设备七天历史入口与 IndexedDB 合并规则见 [历史恢复](../docs/development/RECENT-HISTORY.md)。
@@ -22,6 +23,7 @@
 - 协议常量：`src/proto/constants.ts`，由 `scripts/generate-protocol-constants.cjs` 生成；组件从这里导入，不再从 chatSocket 服务导入类型常量。业务常量仍在 `src/constants.ts`；wire 接口 `src/proto/messages.ts` 同时生成，store/UI 类型放 `src/types/`。
 - PWA/构建：`vite.config.ts`、`scripts/generate-static-site-files.cjs`；文案在 `src/locales/` 三份语言文件。
 - SEO 路由与索引范围在 `site.routes.json`，运行时由 `services/pageSeo.ts` 同步；正式 SEO 产物用 `npm run build:seo`（需 `CHROME_BIN`），部署与验证见 [Web SEO](../docs/development/WEB-SEO.md)。私有入口保持 noindex，不能重新放入 sitemap。
+- `npm run build` 已对公开索引页和 `/app` 真实认证入口执行构建期 SSR；`render-ssr.mjs` 根据客户端 SSR manifest 内联路由 CSS，`main.ts` 复用 DOM。首屏回归用 `node tests/app-ssr-browser.cjs <浏览器路径>`；首页不做认证，静态 HTML 不得写入账号数据。
 
 ## 开发命令（工作目录：CharRoom/web）
 

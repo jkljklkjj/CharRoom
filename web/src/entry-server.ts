@@ -8,16 +8,17 @@
 import { createSSRApp } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { renderToString } from '@vue/server-renderer'
+import type { SSRContext } from '@vue/server-renderer'
 import App from './App.vue'
 import { routes } from './router/routes'
 import i18n from './i18n'
 
-export async function render(url: string): Promise<string> {
+export async function render(url: string, context: SSRContext = {}): Promise<string> {
   const app = createSSRApp(App)
   const router = createRouter({ history: createMemoryHistory(), routes })
   app.use(router)
   app.use(i18n)
   await router.push(url)
   await router.isReady()
-  return await renderToString(app)
+  return await renderToString(app, context)
 }

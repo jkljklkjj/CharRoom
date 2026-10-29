@@ -24,7 +24,7 @@ node tests/seo-browser.cjs <Chrome-or-Chromium-executable>
 
 `build` 生成每个路由的 head；面向生产的完整 SEO 构建使用 `build:seo`，需预先设置 `CHROME_BIN` 为已安装的 Chrome/Chromium 可执行文件。CI 可使用预装浏览器，本脚本不会下载浏览器。预渲染只访问本机 dist，只渲染可索引公开页，固定中文、亮色，不带真实账号，不请求外部 API。任何页面失败都会使命令失败并释放浏览器和本地服务器，不再悄悄发布不完整产物。
 
-预渲染输出直接写入 `dist/index.html`、`dist/features/index.html`、`dist/faq/index.html`；私有路由保持无账号数据的入口 shell。原有脚本误把首页写到 `dist/index.html/index.html` 的路径错误已修复。生成产物不手改、不提交。
+构建期 SSR 输出直接写入 `dist/index.html`、`dist/features/index.html`、`dist/faq/index.html` 和 `dist/app/index.html`；`/app` 只渲染无账号数据的真实认证入口，仍为 noindex，不进入 sitemap。其他私有路由保持无账号数据的入口 shell。原有脚本误把首页写到 `dist/index.html/index.html` 的路径错误已修复。生成产物不手改、不提交。
 
 部署 `build:seo` 产生的整个 dist，并使用本仓库 `web/nginx.conf`；其他托管服务需保持已知路由静态文件优先、未知 URL 404，不能把所有地址都返回首页。canonical 与 sitemap 的正式域名来自同一配置；更换域名时修改配置及 index.html 默认分享图片/站点数据，部署前检查结果，不再通过单独 SITE_BASE_URL 覆盖造成域名不一致。
 
@@ -33,6 +33,28 @@ Google Search Console / 百度站长平台的站点验证、sitemap 提交、实
 参考：[Google JavaScript SEO](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics)、[sitemap 与 lastmod](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)、[noindex](https://developers.google.com/search/docs/crawling-indexing/block-indexing)。
 
 跨端评估：本轮只改变 Web 搜索、链接分享和部署输出，原生桌面、CLI、Android 不被网页搜索抓取，无需移植 SEO 元信息；聊天、ACK、本地缓存和接口协议未变更。
+
+## 首页与 /app 首屏（2026-10-29）
+
+优先保证首页 `/` 在 JavaScript 到达前即可完整呈现。`vite build` 生成客户端 SSR manifest，`scripts/render-ssr.mjs` 收集实际渲染组件的 CSS 并内联进对应 HTML，避免只有正文却缺少懒加载路由样式的首帧。首页首屏对话示例不在 hydration 后重播入场动画；聊天设置与社交样式移到 `/app` 按需加载。首页不读取登录凭证、不校验登录、不请求业务 API，也不预加载聊天运行时。
+
+`/app` 使用同一 `WebApp.vue` / `LoginRegister.vue` 组件渲染与 hydration。验证期间保留品牌、欢迎区与面板；真实空白登录表单以 `visibility:hidden` 保留尺寸并设置 `inert`，完成后原位显示表单或进入聊天，避免猜测骨架高度造成位移。移动端宽度在挂载后读取，SSR 不访问 window；Windows 动态导入 SSR 入口使用 file URL。构建不连接服务器、不保存上次聊天 DOM，不在 HTML 中写入凭证、联系人或消息。已登录用户的聊天内容仍由客户端恢复会话后加载，本项不是私有聊天内容的服务端渲染。
+
+在 `web` 执行（浏览器路径为本机已安装的 Chromium/Edge）：
+
+```text
+npm run build
+npm test
+node tests/app-ssr-browser.cjs <浏览器路径>
+node tests/seo-browser.cjs <浏览器路径>
+node tests/browser-smoke.cjs <浏览器路径> --startup-only
+```
+
+首屏测试暂缓所有 JavaScript，验证桌面 1180px、移动端 390px 的真实首帧样式，然后放行脚本验证 DOM 复用、布局宽度、首页无认证/聊天加载及首页到 `/app` 导航。可选 `CLIENT_SCREENSHOT_DIR` 保存截图。SEO 测试覆盖无 JavaScript 正文、canonical/noindex、404、语言恢复与导航。聊天启动回归使用两份虚构账号、mock REST/WebTransport 与真实 Worker/IndexedDB；`--startup-only` 仅验证会话启动、双向收发和 ACK，不包含完整历史滚动回归。旧测试夹具同步了当前的目录快照、网关发现、length-v1 帧与虚拟列表可交互行。
+
+本次生产构建（含类型检查）、128 项隔离测试、首屏浏览器回归、SEO 浏览器回归和双账号启动回归通过。完整 `browser-smoke.cjs` 在“jump to latest”滚动位置检查超时；该项未修复，不计为完整聊天回归通过。没有连接真实后端或部署，未测线上网络条件下的 LCP 分数。
+
+跨端评估：已检查原生 `App.kt`、`component/LoginRegisterApp.kt` 与 `presentation/viewmodel/AuthViewModel.kt` 的登录入口。本次改变的是 Web 静态 HTML、CSS 装载与 hydration；桌面/CLI/Android 没有对应 SSR 链路，不适用，未修改其登录契约或执行原生构建。
 
 ## 本次验证（2026-10-28）
 

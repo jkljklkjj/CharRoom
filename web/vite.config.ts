@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ isSsrBuild }) => ({
   build: {
+    ssrManifest: !isSsrBuild,
     rollupOptions: {
       output: isSsrBuild
         // SSR 产物要能被 Node ESM 直接 import：.mjs + 单入口

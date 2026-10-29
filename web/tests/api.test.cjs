@@ -89,3 +89,32 @@ test('late refresh after account switch cannot replace the new account credentia
   assert.equal(store.state.refreshToken, 'refresh-B')
   assert.equal(sessionStorage.getItem('charroom_token'), undefined)
 })
+
+test('REST and realtime rejection share one refresh; transient outages preserve credentials', async () => {
+  const store = fixtureStore(), saved = storage(); let calls = 0, unavailable = true
+  const { exports: api } = await loadTs(path.resolve(__dirname, '../src/api/http.ts'), {
+    Headers, sessionStorage: saved, localStorage: storage(), window: { location: {} },
+    fetch: async url => {
+      if (!url.endsWith('/auth/refresh')) return response(200, { code: 1006 })
+      calls++; await new Promise(resolve => setTimeout(resolve, 10))
+      return unavailable ? response(503, {}) : response(200, { code: 0, data: { accessToken: 'new-A', refreshToken: 'new-refresh' } })
+    }
+  }, { '../store': { default: store } })
+  await Promise.all([api.safeFetch('/expired'), api.refreshSession('expired')])
+  assert.equal(calls, 1); assert.equal(store.state.token, 'expired'); assert.equal(store.state.accountId, 'A')
+  unavailable = false
+  assert.equal(await api.refreshSession('expired'), 'ready')
+  assert.equal(store.state.token, 'new-A')
+  assert.equal(await api.refreshSession('expired'), 'ready', 'late realtime rejection of the old token reuses the rotated one')
+  assert.equal(calls, 2, 'late rejection must not rotate the fresh token again')
+})
+
+test('a second 401 after rotation clears the rejected session without another rotation', async () => {
+  const store = fixtureStore(); let rotations = 0
+  const { exports: api } = await loadTs(path.resolve(__dirname, '../src/api/http.ts'), {
+    Headers, sessionStorage: storage(), localStorage: storage(), window: { location: {} },
+    fetch: async url => url.endsWith('/auth/refresh') ? (rotations++, response(200, { data: { accessToken: 'new-A', refreshToken: 'new-refresh' } })) : response(401, {})
+  }, { '../store': { default: store } })
+  assert.equal((await api.safeFetch('/revoked')).status, 401)
+  assert.equal(rotations, 1); assert.equal(store.state.token, '')
+})

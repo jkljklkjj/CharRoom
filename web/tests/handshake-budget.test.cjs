@@ -1,0 +1,13 @@
+const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path')
+const { loadTs } = require('./helpers.cjs')
+test('six client attempts then wait for the rolling window and server cooldown', async () => {
+  const { exports: { HandshakeBudget, handshakeRetryAfter } } = await loadTs(path.resolve(__dirname, '../src/services/handshakeBudget.ts'))
+  const budget = new HandshakeBudget()
+  for (let i = 0; i < 6; i++) assert.equal(budget.reserve(1000 + i), 0)
+  assert.equal(budget.reserve(1006), 59994)
+  assert.equal(budget.reserve(61000), 0)
+  budget.block(60000, 61000)
+  assert.equal(budget.reserve(61001), 59999)
+  assert.equal(handshakeRetryAfter('HANDSHAKE_RATE_LIMITED:2500'), 2500)
+  assert.equal(handshakeRetryAfter('token invalid'), null)
+})

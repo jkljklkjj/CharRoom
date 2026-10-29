@@ -12,7 +12,7 @@
           <div class="home-cta"><router-link to="/app" class="paper-button primary">{{ $t('product.open') }} <span aria-hidden="true">↗</span></router-link><a href="#downloads" class="paper-button secondary">{{ $t('home.hero.downloadClient') }}</a></div>
           <p class="hero-footnote">{{ $t('product.browserNote') }}</p>
         </div>
-        <div class="hero-conversation"><ConversationPreview /></div>
+        <div class="hero-conversation"><ConversationPreview :animate="false" /></div>
       </section>
       <section id="moments" class="home-moments home-container">
         <div class="section-heading"><span class="home-eyebrow">{{ $t('product.moments') }}</span><h2>{{ $t('product.momentsTitle') }}</h2><p>{{ $t('product.momentsLead') }}</p></div>

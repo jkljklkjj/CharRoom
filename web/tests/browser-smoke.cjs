@@ -9,15 +9,24 @@ const dist = path.resolve(__dirname, '../dist')
 const root = protobuf.loadSync(path.resolve(__dirname, '../src/proto/message.proto'))
 const Wrapper = root.lookupType('com.chatlite.proto.MessageWrapper')
 const peers = new Map()
+let validationRequests = 0
+let refreshRequests = 0
+let stage = 'startup'
 const mime = { '.js': 'application/javascript', '.css': 'text/css', '.html': 'text/html', '.proto': 'text/plain', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' }
 const server = http.createServer((request, response) => {
   const pathname = new URL(request.url, 'http://localhost').pathname
-  const file = path.resolve(dist, pathname === '/app' || pathname === '/' ? 'index.html' : pathname.slice(1))
+  const file = path.resolve(dist, pathname === '/app' ? 'app/index.html' : pathname === '/' ? 'index.html' : pathname.slice(1))
   if (!file.startsWith(dist + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return }
   response.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'application/octet-stream' })
   response.end(fs.readFileSync(file))
 })
-const encode = object => Array.from(Wrapper.encode(Wrapper.fromObject(object)).finish())
+const encode = object => {
+  const body = Wrapper.encode(Wrapper.fromObject(object)).finish()
+  const framed = Buffer.alloc(body.length + 4)
+  framed.writeUInt32BE(body.length)
+  framed.set(body, 4)
+  return Array.from(framed)
+}
 const deliver = (page, object) => page.evaluate(bytes => window.__fixtureIncoming.enqueue(new Uint8Array(bytes)), encode(object))
 
 async function main() {
@@ -37,8 +46,9 @@ async function main() {
       await page.setBypassServiceWorker(true)
       page.on('pageerror', error => errors.push(error.message))
       await page.evaluateOnNewDocument(id => {
-        sessionStorage.setItem('charroom_token', 'fixture-access-' + id)
-        localStorage.setItem('charroom_accountId', String(id))
+        sessionStorage.setItem('charroom_token', 'fixture.' + btoa(JSON.stringify({ uid: id, sub: String(id), exp: Math.floor(Date.now() / 1000) + (id === 91002 ? -60 : 3600) })).replace(/=/g, '') + '.signature')
+        sessionStorage.setItem('charroom_tokenExpiresAt', String(Date.now() + 86400000)) // cannot extend JWT exp
+        localStorage.setItem('charroom_accountId', id === 91001 ? '99999' : String(id)) // JWT identity wins
         localStorage.setItem('charroom_refreshToken', 'fixture-refresh-' + id)
         // Keep a real Worker and real IndexedDB; only the remote transport is simulated.
         const BrowserWorker = globalThis.Worker
@@ -64,7 +74,7 @@ async function main() {
         }
       }, id)
       await page.exposeFunction('__fixtureSend', async bytes => {
-        const object = Wrapper.toObject(Wrapper.decode(new Uint8Array(bytes)), { longs: String, enums: Number })
+        const object = Wrapper.toObject(Wrapper.decode(new Uint8Array(bytes).subarray(4)), { longs: String, enums: Number })
         if (object.type === 1) {
           peers.set(id, page)
           await deliver(page, { type: 10, response: { success: true, clientId: String(id) } })
@@ -75,28 +85,43 @@ async function main() {
           await deliver(page, { type: 9, ack: { messageId: object.chat.messageId, success: true } })
         }
       })
+      let releaseOwner
+      const ownerGate = new Promise(resolve => { releaseOwner = resolve })
       await page.setRequestInterception(true)
-      page.on('request', request => {
+      page.on('request', async request => {
         const url = new URL(request.url())
         if (url.origin === origin) { request.continue(); return }
         if (!url.pathname.startsWith('/api/')) { request.abort(); return }
         let data = []
-        if (url.pathname === '/api/auth/validate') data = { valid: true }
+        if (url.pathname === '/api/auth/validate') { validationRequests++; data = { valid: true } }
+        if (url.pathname === '/api/auth/refresh') {
+          if (request.method() === 'POST') refreshRequests++
+          data = { accessToken: 'fixture.' + Buffer.from(JSON.stringify({ uid: id, sub: String(id), exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url') + '.signature', refreshToken: 'rotated-' + id }
+        }
+        if (url.pathname === '/api/cluster/owner') { await ownerGate; data = { gateways: [] } }
         if (url.pathname === '/api/users/me') data = { id, username: 'Fixture ' + id }
         if (url.pathname === '/api/friends') data = [{ id: other, username: 'Fixture ' + other, online: true }]
+        if (url.pathname === '/api/contacts/snapshot') data = { version: 'fixture-1', unchanged: false, users: [{ id: other, username: 'Fixture ' + other, online: true }], groups: [] }
         if (url.pathname === '/api/users/online-status') data = { [other]: true }
         request.respond({ status: 200, contentType: 'application/json', headers: {
           'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*'
         }, body: JSON.stringify({ code: 0, data }) })
       })
       await page.goto(origin + '/app')
-      await page.waitForSelector('.users-list li', { timeout: 15000 })
-      await page.click('.users-list li')
+      await page.waitForSelector('.app-main', { visible: true, timeout: 15000 })
+      assert.equal(peers.has(id), false, 'the app must render before owner discovery and LOGIN finish')
+      releaseOwner()
+      stage = `account ${id} directory`
+      await page.waitForSelector('.users-list li[role="button"]', { visible: true, timeout: 15000 })
+      await page.click('.users-list li[role="button"]')
+      stage = `account ${id} composer`
       await page.waitForSelector('textarea')
       pages.push(page)
     }
-    for (const page of pages) await page.waitForFunction(() => globalThis.__workerReplies.includes('init'))
+    for (const page of pages) await page.waitForFunction(() => globalThis.__workerReplies.includes('init')).catch(error => { throw new Error('Worker initialization: ' + error.message) })
     assert.equal(peers.size, 2)
+    assert.equal(validationRequests, 0, 'unexpired local JWT must restore without a validate request')
+    assert.equal(refreshRequests, 1, 'expired JWT refreshes once despite a forged cached expiry date')
     // Confirming a Chinese/Japanese IME candidate must not send the message.
     await pages[0].type('.composer textarea', '输入法候选')
     await pages[0].$eval('.composer textarea', element => element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true })))
@@ -105,25 +130,33 @@ async function main() {
     await pages[0].$eval('.composer textarea', element => { element.value = ''; element.dispatchEvent(new Event('input', { bubbles: true })) })
     assert.equal(await pages[0].$eval('button.send', element => element.disabled), true)
     // A keyboard user can search, recover from no results, and select a contact.
+    stage = 'contact search'
     await pages[0].type('.search-bar input', 'no-such-fixture')
     await pages[0].waitForSelector('.contacts-empty')
     await pages[0].click('.contacts-empty button')
     assert.equal(await pages[0].$eval('.search-bar input', element => element.value), '')
-    await pages[0].focus('.users-list li')
+    await pages[0].focus('.users-list li[role="button"]')
     await pages[0].keyboard.press('Enter')
     for (let index = 0; index < 2; index++) {
+      stage = `message ${index}`
       const text = 'typescript-browser-' + index
       await pages[index].type('textarea', text)
       await pages[index].click('button.send')
-      await pages[1 - index].waitForFunction(text => [...document.querySelectorAll('.text-content')].some(element => element.textContent === text), {}, text)
-      await pages[index].waitForFunction(() => !document.querySelector('.status.sending') && !document.querySelector('.status.failed'))
+      await pages[1 - index].waitForFunction(text => [...document.querySelectorAll('.text-content')].some(element => element.textContent === text), {}, text).catch(error => { throw new Error('Message delivery: ' + error.message) })
+      await pages[index].waitForFunction(() => !document.querySelector('.status.sending') && !document.querySelector('.status.failed')).catch(error => { throw new Error('Message ACK: ' + error.message) })
     }
     for (const page of pages) {
       const replies = await page.evaluate(() => globalThis.__workerReplies)
       assert.ok(replies.includes('encode') && replies.includes('decode'), 'real bundled Worker must encode and decode')
       assert.ok(!replies.includes('error'))
     }
+    if (process.argv.includes('--startup-only')) {
+      assert.deepEqual(errors, [])
+      console.log('PASS: SSR app startup, two validated accounts, bidirectional messages, ACKs and real Worker; remote services mocked')
+      return
+    }
     // Reading old messages keeps the scroll position and offers an explicit jump.
+    stage = 'scroll anchor'
     await pages[1].$eval('.composer textarea', element=>{element.value=Array.from({length:65},(_,i)=>'fixture long line '+i).join('\n');element.dispatchEvent(new Event('input',{bubbles:true}))})
     await pages[1].click('button.send')
     await pages[0].waitForFunction(()=>document.querySelector('.messages').scrollHeight>document.querySelector('.messages').clientHeight+400).catch(error=>{throw new Error('Long fixture did not create scrollable content: '+error.message)})
@@ -137,6 +170,7 @@ async function main() {
     const position=await pages[0].$eval('.messages',element=>({top:element.scrollTop,height:element.scrollHeight,viewport:element.clientHeight}))
     assert.ok(position.top<100,JSON.stringify(position))
     await pages[0].click('.jump-latest')
+    stage = 'jump to latest'
     await pages[0].waitForFunction(()=>{const el=document.querySelector('.messages');return el.scrollHeight-el.scrollTop-el.clientHeight<64})
     if(process.env.CLIENT_SCREENSHOT_DIR)fs.mkdirSync(process.env.CLIENT_SCREENSHOT_DIR,{recursive:true})
     for(const theme of ['light','dark']){
@@ -148,4 +182,4 @@ async function main() {
     console.log('PASS: built app, two isolated accounts, bidirectional messages, ACKs, real Worker; mocked remote APIs/transport')
   } finally { await browser.close() }
 }
-main().catch(error => { console.error(error); process.exitCode = 1 }).finally(() => server.close())
+main().catch(error => { console.error(`Failed during ${stage}:`, error); process.exitCode = 1 }).finally(() => server.close())

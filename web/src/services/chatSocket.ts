@@ -9,7 +9,7 @@ interface SocketHandlers {
   onmessage?: (message: MessageWrapper) => void | Promise<void>
   onclose?: (event?: unknown) => void
   onerror?: (error: unknown) => void
-  onAuthFailed?: (reason: string) => void
+  onAuthFailed?: (reason: string, rejectedToken?: string) => void | boolean | Promise<boolean>
   onFriendAccepted?: (userId: number) => void
 }
 import { encodeMessage, decodeMessage } from '../proto'
@@ -20,10 +20,15 @@ import { saveToQueue, getPending, getDuePending, removeMessage, markAttempt, mar
 import type { QueueEntry } from './offlineQueue'
 import { getDeviceId, getDeviceType } from '../utils/device'
 import { MSG_TYPE, DEVICE_TYPE_NUM, PROTO_DEVICE_TYPE } from '../proto/constants'
+import { HandshakeBudget, handshakeRetryAfter } from './handshakeBudget'
 
 // ── 内部变量 ────────────────────────────────────
 
 let authenticated = false
+let loginToken = ''
+const handshakeBudgets = new Map<string, HandshakeBudget>()
+let handshakeBudget: HandshakeBudget | null = null
+let reconnectTarget: { hostname: string; port: number; userId: string } | null = null
 let connectionGeneration = 0
 let transport: ChatTransport | null = null          // ChatTransport 实例
 let handlers: SocketHandlers = { onopen: () => {}, onmessage: () => {}, onclose: () => {}, onerror: () => {} }
@@ -123,6 +128,11 @@ export async function connect(hostname: string, port: number, token: string, use
   const generation = ++connectionGeneration
   stopReconnect = false
   currentUserId = userId
+  reconnectTarget = { hostname, port, userId }
+  const budgetKey = `${userId}:${getDeviceId()}`
+  handshakeBudget = handshakeBudgets.get(budgetKey) || new HandshakeBudget()
+  handshakeBudgets.set(budgetKey, handshakeBudget)
+  if (handshakeBudgets.size > 32) handshakeBudgets.delete(handshakeBudgets.keys().next().value!)
   handlers = {
     onopen: onopen || handlers.onopen,
     onmessage: onmessage || handlers.onmessage,
@@ -138,6 +148,9 @@ export async function connect(hostname: string, port: number, token: string, use
     transport.close()
     transport = null
   }
+
+  const wait = handshakeBudget.reserve()
+  if (wait > 0) { scheduleReconnect(hostname, port, token, userId, wait); return null }
 
   // 创建 WebTransport 传输层
   const connection = createTransport()
@@ -198,6 +211,7 @@ export async function connect(hostname: string, port: number, token: string, use
 }
 
 async function sendLogin(token: string) {
+  loginToken = token
   try {
     const result = await sendWrapper({
       type: MSG_TYPE.LOGIN,
@@ -412,10 +426,11 @@ function stopHeartbeat() {
 
 // ── 重连 ────────────────────────────────────────
 
-function scheduleReconnect(hostname: string, port: number, token: string, userId: string) {
+function scheduleReconnect(hostname: string, port: number, token: string, userId: string, minimumDelay = 0) {
   if (reconnectTimer) clearTimeout(reconnectTimer)
 
-  console.debug(`将在 ${currentReconnectDelay}ms 后尝试重连...`)
+  const delayMs = Math.max(currentReconnectDelay, minimumDelay)
+  console.debug(`将在 ${delayMs}ms 后尝试重连...`)
 
   reconnectTimer = setTimeout(() => {
     if (!stopReconnect) {
@@ -428,7 +443,7 @@ function scheduleReconnect(hostname: string, port: number, token: string, userId
         maxReconnectDelay
       )
     }
-  }, currentReconnectDelay)
+  }, delayMs)
 }
 
 // ── 消息处理 ────────────────────────────────────
@@ -449,6 +464,20 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
   if (processedData && typeof processedData === 'object') {
     lastHeartbeatResponseTime = Date.now()
 
+    if (processedData.type === MSG_TYPE.RESPONSE && processedData.response?.success === false) {
+      const retry = handshakeRetryAfter(processedData.response.message || '')
+      if (retry != null) {
+        authenticated = false
+        stopHeartbeat()
+        handshakeBudget?.block(retry)
+        // Close invokes the ordinary reconnect callback; override its timer with the server cooldown.
+        transport?.close()
+        if (reconnectTarget && !stopReconnect) scheduleReconnect(reconnectTarget.hostname, reconnectTarget.port,
+          String(storeRef?.state.token || ''), reconnectTarget.userId, retry)
+        return
+      }
+    }
+
     if (processedData.type === MSG_TYPE.RESPONSE && processedData.response &&
       ['OWNER_REDIRECT', 'OWNER_UNAVAILABLE', 'SERVER_BUSY'].includes(processedData.response.message || '')) {
     transport?.close()
@@ -463,7 +492,14 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
         if (msg.includes('登录失败') || msg.includes('token无效') || msg.includes('token过期') || msg.includes('未授权') || msg.includes('unauthorized')) {
           console.debug('🔑 认证失败，停止重连')
           stopReconnect = true
-          handlers.onAuthFailed?.(msg)
+          authenticated = false
+          stopHeartbeat()
+          transport?.close()
+          const recover = await handlers.onAuthFailed?.(msg, loginToken)
+          if (generation === connectionGeneration && recover && reconnectTarget) {
+            stopReconnect = false
+            scheduleReconnect(reconnectTarget.hostname, reconnectTarget.port, String(storeRef?.state.token || ''), reconnectTarget.userId)
+          }
         }
         return
       }

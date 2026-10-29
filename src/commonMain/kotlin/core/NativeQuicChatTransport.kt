@@ -26,6 +26,7 @@ class NativeQuicChatTransport(
         val stopped = AtomicBoolean(false)
         val commands = ArrayBlockingQueue<Outgoing>(256)
         @Volatile var online = false
+        var retryNotBefore = 0L
         var queuedBytes = 0
         lateinit var thread: Thread
     }
@@ -139,7 +140,7 @@ class NativeQuicChatTransport(
                     failQueued(run)
                 }
                 if (active(run)) {
-                    Thread.sleep(retry)
+                    Thread.sleep(maxOf(retry, run.retryNotBefore - now()))
                     retry = (retry * 2).coerceAtMost(30_000)
                 }
             }
@@ -235,6 +236,7 @@ class NativeQuicChatTransport(
             if (!run.online) {
                 if (!handshaken || stream != 0L || wrapper.type != MsgType.RESPONSE || !wrapper.hasResponse()) return
                 val response = wrapper.response
+                handshakeRetryAfterMillis(response.message)?.let { run.retryNotBefore = now() + it }
                 if (isTransientGatewayResponse(response.message)) throw IOException("Gateway temporarily unavailable: ${response.message}")
                 val id = response.clientId.toIntOrNull()
                 if (!response.success || id == null || id <= 0 || (credentials.userId != null && id != credentials.userId)) {

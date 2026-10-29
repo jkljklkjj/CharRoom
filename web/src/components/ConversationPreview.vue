@@ -27,7 +27,7 @@
 </template>
 <script setup lang="ts">
 import {ref,nextTick,watch,onMounted,onBeforeUnmount} from 'vue'
-const props=withDefaults(defineProps<{scene?:'friends'|'assistant';compact?:boolean}>(),{scene:'friends',compact:false})
+const props=withDefaults(defineProps<{scene?:'friends'|'assistant';compact?:boolean;animate?:boolean}>(),{scene:'friends',compact:false,animate:true})
 const preview=ref<HTMLElement|null>(null),entered=ref(false)
 const thread=ref<HTMLElement|null>(null)
 const draft=ref('')
@@ -36,6 +36,7 @@ const sent=ref<SentMessage[]>([])
 let sentSeq=0
 let observer:IntersectionObserver|undefined
 onMounted(()=>{
+  if(!props.animate)return
   observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){entered.value=true;observer?.disconnect()}},{threshold:.15})
   if(preview.value)observer.observe(preview.value)
 })

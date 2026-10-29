@@ -19,6 +19,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * - Stream N (N>=1): 会话流（私聊/群聊/Agent），每个会话独立一条流
  */
 class QuicClientImpl : ChatTransport {
+    @Volatile private var reconnectNotBefore = 0L
 
     private val log = LoggerFactory.getLogger(QuicClientImpl::class.java)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -64,6 +65,7 @@ class QuicClientImpl : ChatTransport {
                     authenticated.set(true)
                     loginConfirmation?.complete(Unit)
                 } else if (!response.success) {
+                    handshakeRetryAfterMillis(response.message)?.let { reconnectNotBefore = System.nanoTime() / 1_000_000 + it }
                     val routing = isTransientGatewayResponse(response.message)
                     if (!routing) {
                         manualStop.set(true)
@@ -154,7 +156,7 @@ class QuicClientImpl : ChatTransport {
                     var delayMs = 1000L
                     while (!connected.get() && !manualStop.get()) {
                         log.info("{}ms 后尝试重连...", delayMs)
-                        delay(delayMs)
+                        delay(maxOf(delayMs, reconnectNotBefore - System.nanoTime() / 1_000_000))
                         if (manualStop.get()) break
                         try {
                             start(this@QuicClientImpl.host, this@QuicClientImpl.port)
