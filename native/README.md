@@ -25,7 +25,7 @@ python scripts/build-android-quic.py --ndk "$ANDROID_NDK_HOME" --output androidA
 ./gradlew :androidApp:assembleDebug
 ```
 
-Gradle 的 `buildQuicNative` 在 preBuild 前调用同一脚本。可用 `-PquicNdkDir=<NDK目录>`、`-PquicPython=<Python命令>` 指定工具；脚本不安装工具、不下载 SDK。输出 arm64-v8a 和 x86_64；release APK 只保留 arm64-v8a。同时打包 NDK 的 `libc++_shared.so`，不能只复制 JNI 主库。最终链接设置 16 KiB 页对齐，适配新 Android 设备。
+Gradle 的 `buildQuicNative` 在 preBuild 前调用同一脚本。可用 `-PquicNdkDir=<NDK目录>`、`-PquicPython=<Python命令>` 指定工具；脚本不安装工具、不下载 SDK。输出 arm64-v8a 和 x86_64，Debug/Release APK 均包含这两个 ABI。同时打包 NDK 的 `libc++_shared.so`，不能只复制 JNI 主库。最终链接设置 16 KiB 页对齐，适配新 Android 设备。2026-10-29 实测原 Release APK 已包含双 ABI，现已删除与实际合并结果不符的 Release 过滤注释和冗余配置；APK 优化不通过减少架构支持实现。
 
 也可以在 Linux CI 生成，再在另一台机器打包：
 

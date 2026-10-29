@@ -50,7 +50,9 @@
 
 安装包、签名与发布另见 [packaging/README.md](packaging/README.md) 和工作流，不以发版任务替代 PR 检查。Wrapper 缺失时报告阻断并确认已有删除意图，不自动还原用户删除或下载不明版本。
 
-桌面发布使用 `stageDesktopReleaseArtifacts`，只收集当前系统的 `main-release` 安装器；打包前执行 `verifyDesktopRuntime`，体积用 `desktopSizeReport` 测量。QUIC/Skiko 原生依赖只允许目标平台各一份，不给桌面重新引入 CLI 或已排除通话模块的依赖。
+桌面发布使用 `stageDesktopReleaseArtifacts`，收集当前系统的 `main-release` 安装器及 `packageDesktopArchive` 生成的免安装包（Windows/macOS ZIP、Linux tar.gz）；Android 不增加压缩包。Windows 经 `packageCompactReleaseMsi` 生成高压缩 MSI，各桌面包仍内置 Java。打包前执行 `verifyDesktopRuntime`，体积用 `desktopSizeReport` 测量。QUIC/Skiko 原生依赖只允许目标平台各一份，不给桌面重新引入 CLI 或已排除通话模块的依赖。
+
+Android APK 优化同见打包说明：Release 保留 arm64-v8a/x86_64，启用 R8 联合资源裁剪；不要恢复全量 Material Icons 保留规则。验证 `:androidApp:assembleRelease :androidApp:testReleaseUnitTest`，发布时保存与 APK 配套的 R8 `mapping.txt`；构建与静态 APK 检查不能代替真机回归。
 
 橙色纸感 UI 的离线 Compose 预览见 [设计与预览说明](docs/design/ORANGE-PAPER.md)；使用虚构数据，不启动应用连接。
 

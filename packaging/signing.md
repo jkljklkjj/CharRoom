@@ -31,6 +31,8 @@ python scripts/tests/test_windows_signing.py
 
 需要 macOS、Xcode 命令行工具及 Apple Developer 凭据。应用签名可用 `scripts/sign-macos.sh /path/to/App.app`；DMG 公证可用 `scripts/notarize-macos.sh /path/to/App.dmg`。现有 macOS 工作流需要在 macOS 上单独验证，Windows 的假签名测试不覆盖它。
 
+免安装 ZIP 是独立分发产物，不能仅凭 DMG 的公证推定 ZIP 已公证。工作流在上述凭据与 `MACOS_IDENTITY` 均提供时，签名发布镜像的 `.app` 并校验，使用 `ditto` 创建 ZIP 后提交公证；成功后将票据 staple 到 `.app`，再重建最终 ZIP。ZIP 本身不能 staple。缺少凭据时保留未签名/未公证 ZIP；Windows ZIP 内的启动器也不会被现有 MSI 签名步骤签名。详见 [Apple 官方流程](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)。
+
 ## 本轮验证
 
 2026-10-28：六项 Windows 离线签名回归通过，包含带空格的工具/安装器路径。未使用真实代码签名证书，也未执行真实签名、公证或联网时间戳验证。

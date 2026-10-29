@@ -1,5 +1,20 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.gradle.api.tasks.Copy
+import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
+import java.util.zip.ZipFile
+
+// Compose 1.10.3 clears its own jpackage resource directory during execution.
+// Append our separate override after its arguments instead of modifying that directory.
+abstract class CompactMsiTask : AbstractJPackageTask(TargetFormat.Msi) {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val compressionResources: DirectoryProperty
+
+    override fun makeArgs(tmpDir: java.io.File): MutableList<String> =
+        super.makeArgs(tmpDir).toMutableList().apply {
+            addAll(listOf("--resource-dir", compressionResources.get().asFile.absolutePath))
+        }
+}
 
 buildscript {
     repositories {
@@ -35,6 +50,8 @@ val desktopNativeClassifier = when {
 // Rich-text dependencies can transitively bring a foreign Skiko runtime.
 val desktopSkikoPlatform = desktopNativeClassifier.replace("windows-x86_64", "windows-x64")
     .replace("linux-x86_64", "linux-x64").replace("osx-x86_64", "macos-x64").replace("osx-aarch_64", "macos-arm64")
+val desktopArchiveExtension = if (desktopOs.contains("linux")) "tar.gz" else "zip"
+val desktopArchiveName = "chatlite-$releaseVersion-$desktopSkikoPlatform.$desktopArchiveExtension"
 configurations.configureEach {
     listOf("windows-x64", "windows-arm64", "linux-x64", "linux-arm64", "macos-x64", "macos-arm64")
         .filter { it != desktopSkikoPlatform }
@@ -204,12 +221,103 @@ compose.desktop {
     }
 }
 
+afterEvaluate {
+    val imageName = if (desktopOs.contains("mac")) "chatlite.app" else "chatlite"
+    val imageParent = layout.buildDirectory.dir("compose/binaries/main-release/app")
+    val image = imageParent.map { it.dir(imageName) }
+    val archiveDir = layout.buildDirectory.dir("compose/binaries/main-release/archive")
+    if (desktopOs.contains("win")) {
+        tasks.register<Zip>("packageDesktopArchive") {
+            group = "distribution"
+            description = "Archive the self-contained release application for Windows"
+            dependsOn("createReleaseDistributable")
+            archiveFileName.set(desktopArchiveName)
+            destinationDirectory.set(archiveDir)
+            from(image) { into(imageName) }
+            isPreserveFileTimestamps = false
+            isReproducibleFileOrder = true
+            doFirst { check(image.get().asFile.isDirectory) { "Release application image is missing" } }
+        }
+    } else {
+        tasks.register<Exec>("packageDesktopArchive") {
+            group = "distribution"
+            description = "Archive the release application preserving native permissions and symlinks"
+            dependsOn("createReleaseDistributable")
+            inputs.dir(image)
+            val archive = archiveDir.map { it.file(desktopArchiveName) }
+            outputs.file(archive)
+            doFirst {
+                check(image.get().asFile.isDirectory) { "Release application image is missing" }
+                val output = archive.get().asFile
+                output.parentFile.mkdirs()
+                check(!output.exists() || output.delete()) { "Cannot replace archive: $output" }
+                if (desktopOs.contains("mac")) {
+                    commandLine("/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent",
+                        image.get().asFile.absolutePath, output.absolutePath)
+                } else {
+                    commandLine("tar", "-czf", output.absolutePath, "-C",
+                        imageParent.get().asFile.absolutePath, imageName)
+                }
+            }
+        }
+    }
+    if (desktopOs.contains("win")) {
+        val msiResources = layout.buildDirectory.dir("packaging/msi-resources")
+        val prepareMsiCompression = tasks.register("prepareMsiCompression") {
+            val jpackageModule = file("${System.getProperty("java.home")}/jmods/jdk.jpackage.jmod")
+            inputs.file(jpackageModule)
+            outputs.file(msiResources.map { it.file("main.wxs") })
+            doLast {
+                // Use the active JDK's full template, preserving its installer behavior.
+                val template = ZipFile(jpackageModule).use { archive ->
+                    archive.getInputStream(archive.getEntry("classes/jdk/jpackage/internal/resources/main.wxs"))
+                        .bufferedReader().use { it.readText() }
+                }
+                val media = "<Media Id=\"1\" Cabinet=\"Data.cab\" EmbedCab=\"yes\" />"
+                check(template.split(media).size == 2) { "JDK MSI template changed; review compression override" }
+                msiResources.get().file("main.wxs").asFile.apply {
+                    parentFile.mkdirs()
+                    writeText(template.replace(media, media.replace(" />", " CompressionLevel=\"high\" />")))
+                }
+            }
+        }
+        val originalMsi = tasks.named<AbstractJPackageTask>("packageReleaseMsi")
+        val releaseImage = tasks.named<AbstractJPackageTask>("createReleaseDistributable")
+        tasks.register<CompactMsiTask>("packageCompactReleaseMsi") {
+            group = "distribution"
+            description = "Package the release application as a high-compression MSI"
+            dependsOn(releaseImage, "downloadWix", prepareMsiCompression)
+            compressionResources.set(msiResources)
+            javaHome.set(originalMsi.flatMap { it.javaHome })
+            wixToolsetDir.set(originalMsi.flatMap { it.wixToolsetDir })
+            launcherMainClass.set(originalMsi.flatMap { it.launcherMainClass })
+            launcherMainJar.set(originalMsi.flatMap { it.launcherMainJar })
+            javaRuntimePropertiesFile.set(originalMsi.flatMap { it.javaRuntimePropertiesFile })
+            appImage.set(releaseImage.flatMap { it.destinationDir }.map { it.dir("chatlite") })
+            destinationDir.set(originalMsi.flatMap { it.destinationDir })
+            packageName.set(originalMsi.flatMap { it.packageName })
+            packageVersion.set(originalMsi.flatMap { it.packageVersion })
+            packageDescription.set(originalMsi.flatMap { it.packageDescription })
+            packageCopyright.set(originalMsi.flatMap { it.packageCopyright })
+            packageVendor.set(originalMsi.flatMap { it.packageVendor })
+            licenseFile.set(originalMsi.flatMap { it.licenseFile })
+            installationPath.set(originalMsi.flatMap { it.installationPath })
+            winDirChooser.set(originalMsi.flatMap { it.winDirChooser })
+            winPerUserInstall.set(originalMsi.flatMap { it.winPerUserInstall })
+            winShortcut.set(originalMsi.flatMap { it.winShortcut })
+            winMenu.set(originalMsi.flatMap { it.winMenu })
+            winMenuGroup.set(originalMsi.flatMap { it.winMenuGroup })
+            winUpgradeUuid.set(originalMsi.flatMap { it.winUpgradeUuid })
+        }
+    }
+}
+
 tasks.register("buildInstallers") {
     group = "distribution"
     description = "Build native installers (DMG / MSI / DEB)"
 
     dependsOn(when {
-        desktopOs.contains("win") -> "packageReleaseMsi"
+        desktopOs.contains("win") -> "packageCompactReleaseMsi"
         desktopOs.contains("mac") -> "packageReleaseDmg"
         else -> "packageReleaseDeb"
     })
@@ -217,8 +325,8 @@ tasks.register("buildInstallers") {
 
 tasks.register<Sync>("stageDesktopReleaseArtifacts") {
     group = "distribution"
-    description = "Stage desktop release installers with fixed filenames"
-    dependsOn("buildInstallers")
+    description = "Stage desktop release installers and self-contained application archives"
+    dependsOn("buildInstallers", "packageDesktopArchive")
     into(layout.buildDirectory.dir("release-artifacts/desktop"))
 
     val format = when {
@@ -230,10 +338,16 @@ tasks.register<Sync>("stageDesktopReleaseArtifacts") {
         include("*.$format")
         rename { "chatlite.$format" }
     }
+    from(layout.buildDirectory.dir("compose/binaries/main-release/archive")) {
+        include(desktopArchiveName)
+    }
     doFirst {
         val installers = layout.buildDirectory.dir("compose/binaries/main-release/$format").get().asFile
             .listFiles { f -> f.extension == format }.orEmpty()
         check(installers.size == 1) { "Expected one release installer, found ${installers.size}; clean stale installers first" }
+        check(layout.buildDirectory.file("compose/binaries/main-release/archive/$desktopArchiveName").get().asFile.isFile) {
+            "Release application archive is missing: $desktopArchiveName"
+        }
     }
 }
 
@@ -305,6 +419,7 @@ tasks.register("desktopSizeReport") {
     group = "distribution"
     description = "Report runtime JAR sizes and generated desktop image/installer sizes"
     dependsOn(verifyDesktopRuntime)
+    mustRunAfter("stageDesktopReleaseArtifacts", "packageDesktopArchive")
     doLast {
         val artifacts = configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
         val report = buildString {

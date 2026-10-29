@@ -168,16 +168,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
 
-            // 资源混淆（noCompress 保留 png/jpg/jpeg 不压缩）
-            androidResources {
-                noCompress 'png', 'jpg', 'jpeg'
-            }
-
-            // 只保留 arm64-v8a 架构，减小 APK 体积
-            ndk {
-                abiFilters.clear()
-                abiFilters 'arm64-v8a'
-            }
+            // Keep the default ABI set for phones and x86_64 devices/emulators.
+            // APK resource compression uses AGP defaults; JNI remains directly
+            // loadable and page-aligned instead of forcing legacy extraction.
 
             debuggable false
             jniDebuggable false

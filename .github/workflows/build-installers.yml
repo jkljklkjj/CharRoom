@@ -13,7 +13,7 @@ on:
 
 jobs:
   build-windows:
-    name: Build MSI (Windows)
+    name: Build MSI + ZIP (Windows)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -106,7 +106,7 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    name: Build DMG (macOS)
+    name: Build DMG + ZIP (macOS)
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -188,6 +188,7 @@ jobs:
             exit 0
           fi
           echo "Decoding Apple API key"
+          trap 'rm -f apple_api_key.p8' EXIT
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > apple_api_key.p8
           ARTIFACT=$(find build/release-artifacts/desktop -type f -name "*.dmg" | head -n 1 || true)
           if [ -n "$ARTIFACT" ]; then
@@ -208,6 +209,26 @@ jobs:
             xcrun stapler staple "$ARTIFACT" || true
           else
             echo "No DMG found to notarize"
+          fi
+
+          # ZIP is a separate distribution: sign/notarize its .app too.
+          # ZIP files cannot be stapled; staple the app and recreate the ZIP.
+          if [ -n "$MACOS_IDENTITY" ]; then
+            APP_IMAGE="build/compose/binaries/main-release/app/chatlite.app"
+            ARCHIVES=(build/release-artifacts/desktop/chatlite-*-macos-*.zip)
+            [ "${#ARCHIVES[@]}" -eq 1 ] && [ -f "${ARCHIVES[0]}" ]
+            ZIP_PATH="${ARCHIVES[0]}"
+            bash scripts/sign-macos.sh "$APP_IMAGE"
+            codesign --verify --deep --strict "$APP_IMAGE"
+            rm -f "$ZIP_PATH"
+            /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_IMAGE" "$ZIP_PATH"
+            xcrun notarytool submit "$ZIP_PATH" --key apple_api_key.p8 --key-id "$APPLE_KEY_ID" --issuer "$APPLE_ISSUER_ID" --wait
+            xcrun stapler staple "$APP_IMAGE"
+            xcrun stapler validate "$APP_IMAGE"
+            rm -f "$ZIP_PATH"
+            /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_IMAGE" "$ZIP_PATH"
+          else
+            echo "ZIP remains unsigned: MACOS_IDENTITY was not provided."
           fi
 
       - name: Upload size report
@@ -234,7 +255,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    name: Build DEB (Linux)
+    name: Build DEB + tar.gz (Linux)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -356,7 +377,7 @@ jobs:
         shell: bash
 
       - name: Build Android release APK
-        run: ./gradlew :androidApp:clean :androidApp:assembleRelease --no-daemon
+        run: ./gradlew :androidApp:clean :androidApp:assembleRelease :androidApp:testReleaseUnitTest --no-daemon
         shell: bash
 
       - name: Stage release artifact
@@ -368,6 +389,14 @@ jobs:
         with:
           name: android-apk
           path: build/release-artifacts/android/**
+
+      - name: Upload Android R8 mapping
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-r8-mapping
+          path: androidApp/build/outputs/mapping/release/mapping.txt
+          compression-level: 6
+          if-no-files-found: error
 
   publish-release:
     name: Publish Release
@@ -413,4 +442,6 @@ jobs:
             artifacts/**/*.msi
             artifacts/**/*.dmg
             artifacts/**/*.deb
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz
             artifacts/**/*.apk

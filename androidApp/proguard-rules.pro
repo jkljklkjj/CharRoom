@@ -46,7 +46,9 @@
 # ============================================
 # Compose 相关保留
 # ============================================
--keep class androidx.compose.** { *; }
+# Retain framework reflection behavior, but let R8 remove unused icon vectors.
+# Keep both patterns: a standalone negative pattern would keep all other code.
+-keep class !androidx.compose.material.icons.**,androidx.compose.** { *; }
 -keep class org.jetbrains.compose.** { *; }
 -keepclassmembers class * {
     @androidx.compose.runtime.Composable <methods>;
@@ -55,8 +57,7 @@
     @androidx.compose.runtime.Composable <init>(...);
 }
 
-# Material Icons 保留用到的图标
--keep class androidx.compose.material.icons.** { *; }
+# Referenced Material Icons remain reachable from application code.
 
 # ============================================
 # 网络相关保留
@@ -167,9 +168,8 @@
 # ============================================
 # 移除无用代码
 # ============================================
-# 移除测试代码
--assumenosideeffects class org.junit.Test { *; }
--assumenosideeffects class junit.framework.TestCase { *; }
+# Test libraries belong to testImplementation; do not mark inherited Object
+# methods as side-effect-free through wildcard rules on JUnit classes.
 
 # 移除调试代码
 -assumenosideeffects class kotlin.io.ConsoleKt {
