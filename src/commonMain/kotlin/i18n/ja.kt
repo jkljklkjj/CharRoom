@@ -215,7 +215,7 @@ val jaStrings = Strings(
         "profile.send.failed" to "送信に失敗しました: %s",
         "profile.password.required" to "現在のパスワードを入力してください",
         "profile.password.mismatch" to "新しいパスワードが一致しません",
-        "profile.password.too.short" to "新しいパスワードは6文字以上必要です",
+        "profile.password.too.short" to "新しいパスワードは8文字以上必要です",
         "profile.username.required" to "ユーザー名を入力してください",
         "profile.code.required" to "メール認証コードを入力してください",
         "profile.email.update.failed" to "メールアドレスの更新に失敗しました。認証コードをご確認ください",

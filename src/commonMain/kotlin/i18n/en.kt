@@ -217,7 +217,7 @@ val enStrings = Strings(
         "profile.send.failed" to "Failed to send: %s",
         "profile.password.required" to "Please enter current password",
         "profile.password.mismatch" to "New passwords do not match",
-        "profile.password.too.short" to "New password must be at least 6 characters",
+        "profile.password.too.short" to "New password must be at least 8 characters",
         "profile.username.required" to "Username cannot be empty",
         "profile.code.required" to "Please enter the email verification code",
         "profile.email.update.failed" to "Email update failed, please check the verification code",

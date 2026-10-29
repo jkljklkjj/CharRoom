@@ -165,7 +165,8 @@ class ProfileViewModel(
                         errorMessage.value = currentStrings["profile.password.mismatch"]
                         return@launch
                     }
-                    if (newPassword.value.length < 6) {
+                    // 与后端 PasswordValidator / Web 保持一致：只要求长度 8–64，不要求字符种类
+                    if (newPassword.value.length < 8) {
                         errorMessage.value = currentStrings["profile.password.too.short"]
                         return@launch
                     }

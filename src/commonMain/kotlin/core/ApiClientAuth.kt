@@ -138,6 +138,11 @@ suspend fun sendRegisterVerifyCode(email: String): Boolean {
         body = requestBody
     )
 
+    // 后端业务失败是 HTTP 200 + code != 0（如"该邮箱已被注册"、"邮件服务未配置"）。
+    // 只判断 data 会丢掉原因，UI 只能显示笼统的"发送失败"。
+    if (!response.isSuccess) {
+        throw IllegalStateException(response.message ?: "verification code send failed")
+    }
     return response.data == true
 }
 

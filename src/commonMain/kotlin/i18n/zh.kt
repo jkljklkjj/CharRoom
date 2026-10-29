@@ -219,7 +219,7 @@ val zhStrings = Strings(
         "profile.send.failed" to "发送失败：%s",
         "profile.password.required" to "请输入当前密码",
         "profile.password.mismatch" to "两次输入的新密码不一致",
-        "profile.password.too.short" to "新密码长度不能少于6位",
+        "profile.password.too.short" to "新密码长度不能少于8位",
         "profile.username.required" to "用户名不能为空",
         "profile.code.required" to "请输入邮箱验证码",
         "profile.email.update.failed" to "邮箱更新失败，请检查验证码是否正确",
