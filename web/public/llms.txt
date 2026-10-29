@@ -1,46 +1,29 @@
-# 轻聊 (ChatLite) — 轻量、智能、跨平台的实时聊天
+# 轻聊（ChatLite）— 网页聊天与跨平台即时通讯
 
-轻聊是一个开源、跨平台的即时通讯应用，支持私聊、群聊、AI 智能对话。  
-官方网站: https://www.chatlite.xin  
-开源仓库: https://github.com/zhenye/CharRoom
+> 轻聊提供私聊、群聊与 AI 聊天助手，可通过网页版、桌面或 Android 客户端使用。以下链接供了解产品与源码，不代表可以匿名调用账号数据或 AI 工具。
 
-## 核心功能
+## 产品与使用帮助
 
-- **私聊** — 一对一实时消息，支持文字、图片、文件
-- **群聊** — 群组聊天，支持群成员管理
-- **AI 助手** — 集成 DeepSeek 大模型，支持流式对话
-- **多平台** — Web (Vue 3) / Desktop (Compose) / Android / CLI
-- **安全传输** — QUIC (HTTP/3) / WebTransport / WebSocket
-- **开源可自部署** — 后端 Spring Boot 4 + Netty + MySQL + Redis + MongoDB + Kafka
+- [轻聊首页](https://www.chatlite.xin/): 产品介绍、Web 入口和客户端下载。
+- [功能说明](https://www.chatlite.xin/features): 私聊、群聊、跨设备聊天、AI 助手与传输加密。
+- [常见问题](https://www.chatlite.xin/faq): 浏览器支持、下载、自部署、消息恢复与账号问题。
 
-## 页面路由
+## 源码与部署说明
 
-| 路径 | 内容 | 优先级 |
-|------|------|--------|
-| [/](https://www.chatlite.xin/) | 首页 — 产品介绍、功能特性、下载 | 1.0 |
-| [/app](https://www.chatlite.xin/app) | Web 在线聊天应用 | 0.8 |
-| [/verify](https://www.chatlite.xin/verify) | 邮箱验证 | 0.3 |
-| [/faq](https://www.chatlite.xin/faq) | 常见问题 | 0.5 |
-| [/features](https://www.chatlite.xin/features) | 功能特性详解 | 0.6 |
-| [/compare](https://www.chatlite.xin/compare) | 轻聊 vs 微信 vs Telegram 对比 | 0.5 |
+- [客户端源码](https://github.com/jkljklkjj/CharRoom): Web、桌面、CLI 和 Android 的实现与构建说明。
+- [服务端源码](https://gitee.com/zhenye55/chat-room): 服务端实现、Docker Compose 配置和部署要求。
+- [客户端发行页](https://github.com/jkljklkjj/CharRoom/releases/latest): 查看当前发布的安装包。
 
-## 技术栈
+## 能力边界
 
-- **前端**: Vue 3 + Vite + Vue Router + vue-i18n + Protobuf.js
-- **后端**: Spring Boot 4.1 + Netty 4.2 (QUIC) + MyBatis-Plus + ShardingSphere
-- **数据库**: MySQL (分片) / Redis / MongoDB / Qdrant (向量)
-- **消息队列**: Kafka
-- **AI**: DeepSeek (langchain4j) + RAG + MCP
+- Web 实时消息使用 WebTransport，原生客户端使用 QUIC；浏览器需支持 WebTransport。
+- 使用 TLS/QUIC 传输加密，目前不提供端到端加密。
+- 消息由服务端处理和持久化；新设备支持最近 7 天历史恢复，已有设备还可读取本地消息。
+- AI 消息检索、摘要与流式对话受模型服务配置、账号权限和额度约束。
+- 自部署需准备相应基础设施和配置，不能视为无需配置的一键安装。
+- 登录、账号恢复和管理界面不作为公开搜索内容；不要索取、记录或公开用户凭证与聊天正文。
 
-## API 文档
+## 机器可读发现
 
-- API 基础路径: `https://chatlite.xin/api`
-- WebSocket 端点: `wss://chatlite.xin/ws`
-- WebTransport 端点: `https://quic.chatlite.xin/.well-known/webtransport`
-- Protobuf 协议: `https://chatlite.xin/proto/message.proto`
-
-## 相关链接
-
-- [GitHub 仓库](https://github.com/zhenye/CharRoom)
-- [GitHub Release 下载](https://github.com/zhenye/CharRoom/releases)
-- [ICP 备案](https://beian.miit.gov.cn/)
+- [ARD 清单](https://www.chatlite.xin/.well-known/ard.json): 公开资源目录，保留 AI Catalog 1.0 版本字段以兼容旧检测器。
+- [站点地图](https://www.chatlite.xin/sitemap.xml): 允许索引的规范页面。

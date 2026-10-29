@@ -1,4 +1,3 @@
 User-agent: *
 Allow: /
 Sitemap: https://www.chatlite.xin/sitemap.xml
-Agentmap: https://www.chatlite.xin/.well-known/ard.json

@@ -1,6 +1,7 @@
 <template>
   <div class="seo-page">
-    <div class="seo-container">
+    <main class="seo-container">
+      <PublicBreadcrumbs :title="$t('faq.title')" />
       <h1>{{ $t('faq.title') }}</h1>
       <p class="seo-lead">{{ $t('faq.lead') }}</p>
 
@@ -10,10 +11,13 @@
           <div class="faq-a">{{ item.a }}</div>
         </details>
       </div>
-    </div>
+    </main>
     <footer class="seo-footer">
       <router-link to="/">{{ $t('nav.intro') }}</router-link>
+      <router-link to="/features">{{ $t('features.title') }}</router-link>
+      <a href="/#downloads">{{ $t('home.hero.downloadClient') }}</a>
       <router-link to="/app">{{ $t('nav.webApp') }}</router-link>
+      <PublicSourceLinks />
     </footer>
   </div>
 </template>
@@ -21,6 +25,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PublicBreadcrumbs from '../components/PublicBreadcrumbs.vue'
+import PublicSourceLinks from '../components/PublicSourceLinks.vue'
 
 const { t } = useI18n()
 
@@ -84,6 +90,7 @@ h1 { font-size: 28px; margin-bottom: 8px; color: var(--text-primary); }
   padding-top: 24px;
   border-top: 1px solid var(--surface-border);
   display: flex;
+  flex-wrap: wrap;
   gap: 24px;
   justify-content: center;
 }

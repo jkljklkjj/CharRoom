@@ -1,5 +1,15 @@
 import config from '../../site.routes.json'
 
+/** Same canonical trail is used by the static renderer and client navigation. */
+export function pageBreadcrumb(path: string, t: (key: string) => string) {
+  const route = config.routes.find(route => route.path === (path === '/' ? path : path.replace(/\/+$/, '')))
+  if (!route?.index || route.path === '/') return null
+  return { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+    { '@type': 'ListItem', position: 1, name: t('seo.breadcrumb.home'), item: new URL('/', config.baseUrl).href },
+    { '@type': 'ListItem', position: 2, name: t(`${route.key}.title`), item: new URL(route.path, config.baseUrl).href }
+  ] }
+}
+
 export function applyPageSeo(path: string, locale: string, t: (key: string) => string): void {
   // SSR 渲染阶段没有 document；标题/描述由构建期的 build-route-heads 写死在各路由 HTML 里
   if (typeof document === 'undefined') return
@@ -30,6 +40,15 @@ export function applyPageSeo(path: string, locale: string, t: (key: string) => s
   meta('name', 'twitter:description', description)
   document.head.querySelector('link[rel="canonical"]')?.setAttribute('href', canonical)
   document.head.querySelector('#site-schema')?.remove()
+  document.head.querySelector('#breadcrumb-schema')?.remove()
+  const breadcrumb = pageBreadcrumb(normalizedPath, t)
+  if (breadcrumb) {
+    const script = document.createElement('script')
+    script.id = 'breadcrumb-schema'
+    script.type = 'application/ld+json'
+    script.textContent = JSON.stringify(breadcrumb)
+    document.head.append(script)
+  }
   if (normalizedPath === '/') {
     const script = document.createElement('script')
     script.id = 'site-schema'

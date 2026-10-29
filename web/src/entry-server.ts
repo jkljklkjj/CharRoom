@@ -12,6 +12,7 @@ import type { SSRContext } from '@vue/server-renderer'
 import App from './App.vue'
 import { routes } from './router/routes'
 import i18n from './i18n'
+import { pageBreadcrumb } from './services/pageSeo'
 
 export async function render(url: string, context: SSRContext = {}): Promise<string> {
   const app = createSSRApp(App)
@@ -20,5 +21,6 @@ export async function render(url: string, context: SSRContext = {}): Promise<str
   app.use(i18n)
   await router.push(url)
   await router.isReady()
+  context.breadcrumb = pageBreadcrumb(router.currentRoute.value.path, key => i18n.global.t(key))
   return await renderToString(app, context)
 }

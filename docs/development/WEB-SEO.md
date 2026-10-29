@@ -40,7 +40,7 @@ Google Search Console / 百度站长平台的站点验证、sitemap 提交、实
 - `/.well-known/ai-catalog.json`：兼容旧版消费者。
 - `/ai-catalog.json`：兼容直接请求根路径的扫描器。
 
-HTML head 提供 `rel="ard"` 和旧版 `rel="ai-catalog"` 链接，robots.txt 提供 Agentmap。目录只列出首页、功能和 FAQ 的公开文档，类型为真实的 `text/html`，不将登录入口或内部聊天 Agent 冒充公开 MCP/A2A 服务，也不声明未经验证的信任签名。
+HTML head 提供 `rel="ard"` 和旧版 `rel="ai-catalog"` 链接。robots.txt 只保留标准指令，不使用会触发 Lighthouse Unknown directive 的 Agentmap；ARD 仍通过 HTML 链接及 well-known URI 发现。目录只列出首页、功能和 FAQ 的公开文档，类型为真实的 `text/html`，不将登录入口或内部聊天 Agent 冒充公开 MCP/A2A 服务，也不声明未经验证的信任签名。
 
 兼容旧版 Lighthouse：根部保留 `specVersion: "1.0"`。现行 ARD 的 ArdManifest 只要求 entries 并允许额外字段，但旧版 AI Catalog schema 还要求 specVersion 为字符串 1.0；只通过现行官方校验不能证明旧版 Lighthouse 通过。三个地址使用同一份兼容格式，并已用两份官方 JSON Schema 逐一验证。新增回归锁定根部版本字段；本轮 139 项测试串行通过、生产构建和 SEO HTTP 回归通过。text/html 的低级别类型提示仍保留真实语义，旧版检测器可能因此轻微扣分，不能承诺部署后 SEO 一定是 100。参见 [旧版 AI Catalog Schema](https://github.com/ards-project/ard-spec/blob/main/spec/schemas/ai-catalog.schema.json) 与 [Lighthouse 的 ARD 兼容问题](https://github.com/GoogleChrome/lighthouse/issues/17251)。
 

@@ -1,6 +1,7 @@
 <template>
   <div class="seo-page">
-    <div class="seo-container">
+    <main class="seo-container">
+      <PublicBreadcrumbs :title="$t('features.title')" />
       <h1>{{ $t('features.title') }}</h1>
       <p class="seo-lead">{{ $t('features.lead') }}</p>
 
@@ -12,10 +13,13 @@
           <li v-for="(d, j) in feat.details" :key="j">{{ d }}</li>
         </ul>
       </div>
-    </div>
+    </main>
     <footer class="seo-footer">
       <router-link to="/">{{ $t('nav.intro') }}</router-link>
+      <router-link to="/faq">{{ $t('faq.title') }}</router-link>
+      <a href="/#downloads">{{ $t('home.hero.downloadClient') }}</a>
       <router-link to="/app">{{ $t('nav.webApp') }}</router-link>
+      <PublicSourceLinks />
     </footer>
   </div>
 </template>
@@ -23,6 +27,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PublicBreadcrumbs from '../components/PublicBreadcrumbs.vue'
+import PublicSourceLinks from '../components/PublicSourceLinks.vue'
 
 const { t } = useI18n()
 const featureList = computed(() => [
@@ -53,7 +59,7 @@ h1 { font-size: 28px; margin-bottom: 8px; }
 h2 { font-size: 20px; margin: 0 0 8px; color: var(--text-primary); }
 p { color: var(--text-secondary, #666); line-height: 1.6; margin: 0 0 12px; }
 .feat-details { margin: 0; padding-left: 20px; color: var(--text-secondary, #666); line-height: 1.8; }
-.seo-footer { max-width: 720px; margin: 48px auto 0; padding-top: 24px; border-top: 1px solid var(--surface-border); display: flex; gap: 24px; justify-content: center; }
+.seo-footer { max-width: 720px; margin: 48px auto 0; padding-top: 24px; border-top: 1px solid var(--surface-border); display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; }
 .seo-footer a { color: var(--accent-1); text-decoration: none; }
 .seo-footer a:hover { text-decoration: underline; }
 </style>

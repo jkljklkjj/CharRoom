@@ -30,7 +30,7 @@
       </section>
       <section class="home-goodbye home-container"><h2>{{ $t('product.goodbye') }}</h2><router-link to="/app" class="paper-button primary">{{ $t('product.open') }} →</router-link></section>
     </main>
-    <footer class="home-footer home-container"><BrandMark /><p>{{ $t('product.footerNote') }}</p><div class="footer-actions"><router-link to="/features">{{ $t('features.title') }}</router-link><router-link to="/faq">{{ $t('product.help') }}</router-link><button @click="showReward=true">{{ $t('header.reward') }}</button><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">{{ siteConfig.ICP_NUMBER }}</a></div><small>{{ $t('footer.copyright') }} · {{ $t('footer.policeRecord') }}</small></footer>
+    <footer class="home-footer home-container"><BrandMark /><p>{{ $t('product.footerNote') }}</p><div class="footer-actions"><PublicSourceLinks /><router-link to="/features">{{ $t('features.title') }}</router-link><router-link to="/faq">{{ $t('product.help') }}</router-link><button @click="showReward=true">{{ $t('header.reward') }}</button><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">{{ siteConfig.ICP_NUMBER }}</a></div><small>{{ $t('footer.copyright') }} · {{ $t('footer.policeRecord') }}</small></footer>
     <!-- reward modal -->
     <div v-if="showReward" class="reward-modal">
       <div class="reward-mask" @click="closeReward"></div>
@@ -68,6 +68,7 @@ import ConversationPreview from '../components/ConversationPreview.vue'
 import DailyQuestionPreview from '../components/DailyQuestionPreview.vue'
 import siteConfig from '../siteConfig'
 import {useDialog} from '../composables/useDialog'
+import PublicSourceLinks from '../components/PublicSourceLinks.vue'
 const {t}=useI18n()
 const scenes=['friends','discover','assistant'] as const
 const selected=ref<typeof scenes[number]>('discover')

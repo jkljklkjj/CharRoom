@@ -4,8 +4,8 @@
     {
       "@context": "https://agenticresourcediscovery.org/context/v1",
       "identifier": "urn:air:www.chatlite.xin:docs:home",
-      "displayName": "轻聊 · 和朋友接着聊，遇见新鲜事",
-      "description": "和朋友接着聊，遇见有趣的人，也让小助手搭把手。了解轻聊，使用网页版，或下载 Windows、macOS、Linux 和 Android 客户端。",
+      "displayName": "轻聊 - 网页聊天与跨平台即时通讯",
+      "description": "轻聊提供私聊、群聊与 AI 聊天助手，支持 Web、Windows、macOS、Linux 和 Android。使用网页版开始聊天，或查看客户端与服务端源码、下载和使用帮助。",
       "type": "text/html",
       "url": "https://www.chatlite.xin/",
       "representativeQueries": [
@@ -17,7 +17,7 @@
       "@context": "https://agenticresourcediscovery.org/context/v1",
       "identifier": "urn:air:www.chatlite.xin:docs:features",
       "displayName": "轻聊功能 · 私聊、群聊与聊天助手",
-      "description": "了解轻聊的私聊、群聊、跨设备聊天与助手功能，找到适合日常交流的使用方式。",
+      "description": "了解轻聊的私聊、群聊、AI 消息检索与摘要、跨设备聊天和 TLS/QUIC 传输加密。查看功能说明，再选择网页版或客户端。",
       "type": "text/html",
       "url": "https://www.chatlite.xin/features",
       "representativeQueries": [
@@ -29,7 +29,7 @@
       "@context": "https://agenticresourcediscovery.org/context/v1",
       "identifier": "urn:air:www.chatlite.xin:docs:faq",
       "displayName": "轻聊常见问题 · 使用与下载帮助",
-      "description": "查看轻聊支持的平台、下载安装、聊天与账号相关常见问题。",
+      "description": "查阅轻聊支持的平台与浏览器、客户端下载、自部署、最近 7 天历史恢复和 AI 助手常见问题，了解传输加密与端到端加密的区别。",
       "type": "text/html",
       "url": "https://www.chatlite.xin/faq",
       "representativeQueries": [

@@ -55,9 +55,11 @@ for (const route of targets) {
     }
   }
   const css = [...styles].map(asset => fs.readFileSync(path.join(dist, asset.replace(/^\//, '')), 'utf8')).join('\n')
+  const breadcrumb = context.breadcrumb
+    ? `<script id="breadcrumb-schema" type="application/ld+json">${JSON.stringify(context.breadcrumb).replace(/</g, '\\u003c')}</script>` : ''
   if (/<\/style/i.test(css)) throw new Error(`[ssr] ${route.path} 的样式含有非法结束标签`)
   const result = shell.replace(empty, `<div id="app" data-ssr>${html}</div>`)
-    .replace('</head>', `${[...scripts].map(asset => `<link rel="modulepreload" crossorigin data-ssr-preload href="${asset}">`).join('')}<style data-ssr-styles>${css}</style></head>`)
+    .replace('</head>', `${[...scripts].map(asset => `<link rel="modulepreload" crossorigin data-ssr-preload href="${asset}">`).join('')}<style data-ssr-styles>${css}</style>${breadcrumb}</head>`)
   fs.writeFileSync(file, result, 'utf8')
   rendered += 1
   console.log(`[ssr] rendered ${route.path} (${Buffer.byteLength(html)} bytes)`)

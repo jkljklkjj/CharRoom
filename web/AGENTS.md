@@ -24,6 +24,7 @@
 - PWA/构建：`vite.config.ts`、`scripts/generate-static-site-files.cjs`；文案在 `src/locales/` 三份语言文件。
 - SEO 路由与索引范围在 `site.routes.json`，运行时由 `services/pageSeo.ts` 同步；正式 SEO 产物用 `npm run build:seo`（需 `CHROME_BIN`），部署与验证见 [Web SEO](../docs/development/WEB-SEO.md)。私有入口保持 noindex，不能重新放入 sitemap。
 - ARD 清单由 `scripts/resource-catalog.cjs` 经静态资源生成脚本输出到 `/.well-known/ard.json` 及旧版 ai-catalog 地址；仅描述真实公开资源，部署必须保留 `.well-known`，清单路由不得回退 HTML。
+- robots.txt 只保留标准指令，ARD 用 HTML 链接发现，不添加会令 Lighthouse 扣分的 Agentmap。公开子页面包屑由 `pageSeo.ts` 同时供 SSR 与客户端生成，导航到私有页须清除；验证与 skill 审查见 [SEO Guide 实施](../docs/development/SEO-GUIDE-AUDIT-2026-10-29.md)。
 - 生产聚合网关也需同步 `chat-room/docker/nginx/nginx.conf.template`。本地冷启动测量用 `node scripts/measure-page-performance.cjs <浏览器路径> <report.json>`；指标条件、Worker 降级和聊天回归门槛见 [SEO 与性能续改](../docs/development/WEB-SEO-PERFORMANCE-2026-10-29.md)。
 - `npm run build` 已对公开索引页和 `/app` 真实认证入口执行构建期 SSR；`render-ssr.mjs` 根据客户端 SSR manifest 内联路由 CSS，`main.ts` 复用 DOM。首屏回归用 `node tests/app-ssr-browser.cjs <浏览器路径>`；首页不做认证，静态 HTML 不得写入账号数据。
 
