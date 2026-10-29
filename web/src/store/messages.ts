@@ -126,10 +126,14 @@ function peerIdentity(message: ChatMessage) {
 function sendText(message: ChatMessage) { return message.text || '' }
 function sendTime(message: ChatMessage) { return normalizeTimeValue(message.time ?? message.timestamp) }
 /**
- * The server timestamp may be truncated to seconds, so match the exact peer/text
- * plus a small window. Only still-pending/failed local placeholder rows are dropped;
- * real server rows are never removed.
+ * A local row is only a placeholder until its server copy exists. Every own row
+ * without the `local_` prefix is the canonical copy, whatever its send status:
+ * an ACK that never renamed its placeholder still leaves exactly one bubble.
+ * Matching is nearest-in-time within a generous window because a group history
+ * row carries the server clock instead of the client timestamp, and consume-once
+ * keeps repeated sends of the same text on their own placeholders.
  */
+const RECONCILE_WINDOW_MS = 5 * 60 * 1000
 function reconcileOptimistic(rows: ChatMessage[]): ChatMessage[] {
   const server = new Map<string, number[]>()
   for (const row of rows) {
@@ -140,9 +144,18 @@ function reconcileOptimistic(rows: ChatMessage[]): ChatMessage[] {
   }
   if (!server.size) return rows
   return rows.filter(row => {
-    if (!row.messageId?.startsWith('local_') || (row.isSent !== 'sending' && row.isSent !== 'failed')) return true
+    if (!row.messageId?.startsWith('local_') || !isOwnMessage(row)) return true
     const times = server.get(`${peerIdentity(row)}|${sendText(row)}`)
-    return !times?.some(time => Math.abs(time - sendTime(row)) <= 2000)
+    if (!times?.length) return true
+    const at = sendTime(row)
+    let nearest = -1, distance = RECONCILE_WINDOW_MS
+    for (let index = 0; index < times.length; index++) {
+      const delta = Math.abs(times[index] - at)
+      if (delta <= distance) { distance = delta; nearest = index }
+    }
+    if (nearest < 0) return true
+    times.splice(nearest, 1)
+    return false
   })
 }
 export function setHistoryFollowingLatest(value:boolean){state.historyFollowingLatest=value}
@@ -172,7 +185,7 @@ export async function loadLatestMessages(){
     if(target.isGroup)state.hasMoreGroupMessages=page.hasMore
     else state.hasMoreMessages=page.hasMore
     pageCursors.set(target.historyKey,page.beforeIndex)
-    await installWindow(page.messages,'latest')
+    await installWindow(reconcileOptimistic(page.messages),'latest')
   }finally{if(view.isCurrent())state.historyLoading=false}
 }
 export async function loadConversation(id: ConversationKey | null) {

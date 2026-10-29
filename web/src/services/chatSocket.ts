@@ -563,10 +563,12 @@ async function handleMessage(rawData: ArrayBuffer | Blob | MessageWrapper, gener
           }
           await removeMessage(pending.accountId, ackedMsgId)
         }
-        if (generation !== connectionGeneration) return
+        // The store rename must land even if the transport was replaced mid-await:
+        // otherwise the visible placeholder keeps its local id while its history copy arrives.
         pendingAcks.delete(ackedMsgId)
         if (ack.success === true && ack.serverMessageId) storeRef?.confirmMessageId(ackedMsgId, ack.serverMessageId, String(ack.seqId))
         else storeRef?.updateMessageStatus(ackedMsgId, ack.success !== true ? 'failed' : 'sent')
+        if (generation !== connectionGeneration) return
       }
       if (ack.success === true && ack.seqId != null && ack.conversationId) {
         handlers.onmessage?.({ type: MSG_TYPE.SYNC_HINT,

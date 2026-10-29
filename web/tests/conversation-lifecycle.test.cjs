@@ -169,3 +169,47 @@ test('a late echo carrying an ACK-confirmed server id never adds a second row', 
   await messages.addMessage({ messageId: '9003', targetId: '42', user: 'you', text: 'ack', time: 1000 })
   assert.deepEqual(Array.from(state.messages, row => [row.messageId, row.isSent]), [['9003', 'sent']])
 })
+
+test('legacy ACK followed by history reconciles one sent placeholder per server row', async () => {
+  const { messages, state } = await fixture(async () => ({ messages: [], beforeIndex: null, hasMore: false }))
+  await messages.loadConversation('user:42')
+  for (const id of ['local_a', 'local_b']) await messages.addMessage({ messageId: id, targetId: '42', user: 'you', text: 'same', time: 1000, isSent: 'sending' })
+  messages.updateMessageStatus('local_a', 'sent')
+  messages.updateMessageStatus('local_b', 'sent')
+  await messages.restoreHistoryPage('A', [{ messageId: '9001', targetId: '42', user: 'you', text: 'same', time: 1500 }])
+  assert.equal(state.messages.length, 2)
+  assert.equal(state.messages.filter(row => row.messageId.startsWith('local_')).length, 1)
+})
+
+test('a history copy stamped by the server clock still replaces its placeholder', async () => {
+  const { messages, state } = await fixture(async () => ({ messages: [], beforeIndex: null, hasMore: false }))
+  await messages.loadConversation('group:9')
+  await messages.addGroupMessage({ messageId: 'local_g', groupId: '9', user: 'you', text: 'skewed', time: 1_000_000, isSent: 'sent' })
+  // Group history rows carry the server timestamp (new Date()), not the client one.
+  await messages.restoreHistoryPage('A', [{ messageId: '9101', groupId: '9', user: 'A', text: 'skewed', time: 1_090_000 }])
+  assert.deepEqual(Array.from(state.groupMessages, row => row.messageId), ['9101'])
+})
+
+test('one placeholder per unmatched send survives history reconciliation', async () => {
+  const { messages, state } = await fixture(async () => ({ messages: [], beforeIndex: null, hasMore: false }))
+  await messages.loadConversation('user:42')
+  for (const id of ['local_1', 'local_2', 'local_3']) await messages.addMessage({ messageId: id, targetId: '42', user: 'you', text: 'ok', time: 5000, isSent: 'sent' })
+  await messages.restoreHistoryPage('A', [
+    { messageId: '9201', targetId: '42', user: 'you', text: 'ok', time: 5100 },
+    { messageId: '9202', targetId: '42', user: 'you', text: 'ok', time: 5300 }
+  ])
+  const ids = Array.from(state.messages, row => row.messageId)
+  assert.equal(ids.filter(id => id.startsWith('local_')).length, 1)
+  assert.equal(ids.filter(id => !id.startsWith('local_')).length, 2)
+})
+
+test('reloading a stored window hides a placeholder already stored under its server id', async () => {
+  const stored = [
+    { messageId: 'local_x', targetId: '42', user: 'you', text: 'persisted', time: 7000, isSent: 'sent' },
+    { messageId: '9301', targetId: '42', user: 'you', text: 'persisted', time: 7050 }
+  ]
+  const { messages, state } = await fixture(async () => ({ messages: stored, beforeIndex: [7050, '9301', 'A:42:1'], hasMore: false }))
+  await messages.loadConversation('user:42')
+  await messages.loadLatestMessages()
+  assert.deepEqual(Array.from(state.messages, row => row.messageId), ['9301'])
+})
