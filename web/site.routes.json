@@ -7,6 +7,7 @@
     { "path": "/compare", "key": "compare", "index": false },
     { "path": "/app", "key": "app", "index": false },
     { "path": "/verify", "key": "verify", "index": false },
+    { "path": "/reset", "key": "reset", "index": false },
     { "path": "/admin", "key": "admin", "index": false },
     { "path": "/copilot", "key": "copilot", "index": false }
   ]

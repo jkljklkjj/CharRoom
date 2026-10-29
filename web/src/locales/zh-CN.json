@@ -243,7 +243,7 @@
   "faq.q1": "轻聊与微信/Telegram 有什么不同？",
   "faq.a1": "轻聊专注于轻量级、跨平台和开源。与微信相比，轻聊无广告、无推送骚扰、数据可自部署；与 Telegram 相比，轻聊提供更简洁的 Web 端体验和 AI 智能对话集成。",
   "faq.q2": "轻聊支持端到端加密吗？",
-  "faq.a2": "轻聊采用二进制 Protobuf 协议传输，通信链路使用 TLS/QUIC 加密。消息在服务端持久化存储，支持 7 天离线消息拉取。如需更高安全级别的端到端加密，建议配合自部署方案使用。",
+  "faq.a2": "轻聊使用 TLS/QUIC 加密传输链路，消息会在服务端处理和持久化，并支持最近 7 天历史恢复。目前不提供端到端加密；自部署可以自行管理服务和数据，不会自动增加端到端加密能力。",
   "faq.q3": "轻聊可以自部署吗？",
   "faq.a3": "可以。轻聊完全开源，提供 Docker 一键部署脚本。你可以在自己的服务器上运行完整服务，包括 MySQL、Redis、MongoDB、Kafka、Qdrant 等全套基础设施。",
   "faq.q4": "支持哪些平台？",
@@ -266,7 +266,7 @@
   "features.f2Title": "安全与隐私",
   "features.f2Desc": "多重安全保障，守护你的每一次对话。",
   "features.f2d1": "TLS/QUIC 传输层加密",
-  "features.f2d2": "二进制 Protobuf 协议，防篡改",
+  "features.f2d2": "服务端身份认证与访问校验",
   "features.f2d3": "开源透明，支持自部署",
   "features.f3Title": "AI 智能助手",
   "features.f3Desc": "内置 AI Agent，让聊天更高效。",
@@ -638,6 +638,8 @@
   "seo.admin.description": "轻聊版本发布与管理入口。",
   "seo.copilot.title": "轻聊 · 助手控制台",
   "seo.copilot.description": "轻聊助手管理入口。",
+  "seo.reset.title": "轻聊 · 找回密码",
+  "seo.reset.description": "通过邮箱验证码重置轻聊账号密码。",
   "seo.missing.title": "轻聊 · 页面不存在",
   "seo.missing.description": "请返回轻聊首页继续浏览。"
 }

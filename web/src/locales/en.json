@@ -243,7 +243,7 @@
   "faq.q1": "How is ChatLite different from WeChat / Telegram?",
   "faq.a1": "ChatLite focuses on being lightweight, cross-platform, and open source. Unlike WeChat, ChatLite has no ads or tracking, and can be self-hosted. Compared to Telegram, ChatLite offers a cleaner web experience and built-in AI agent integration.",
   "faq.q2": "Does ChatLite support end-to-end encryption?",
-  "faq.a2": "ChatLite uses binary Protobuf protocol with TLS/QUIC encryption for transmission. Messages are persistently stored on the server with 7-day offline message retrieval. For higher security, self-hosting is recommended.",
+  "faq.a2": "ChatLite encrypts transport with TLS/QUIC. Messages are processed and stored on the server, with recovery of the last 7 days of history. End-to-end encryption is currently unavailable. Self-hosting lets you manage the service and data; it does not add end-to-end encryption.",
   "faq.q3": "Can I self-host ChatLite?",
   "faq.a3": "Yes. ChatLite is fully open source with one-click Docker deployment. You can run the complete service on your own server, including MySQL, Redis, MongoDB, Kafka, and Qdrant.",
   "faq.q4": "What platforms are supported?",
@@ -266,7 +266,7 @@
   "features.f2Title": "Security & Privacy",
   "features.f2Desc": "Multiple layers of protection for every conversation.",
   "features.f2d1": "TLS/QUIC transport encryption",
-  "features.f2d2": "Binary Protobuf protocol, tamper-proof",
+  "features.f2d2": "Server-side authentication and access checks",
   "features.f2d3": "Open source, self-hostable",
   "features.f3Title": "AI Assistant",
   "features.f3Desc": "Built-in AI Agent for smarter conversations.",
@@ -638,6 +638,8 @@
   "seo.admin.description": "ChatLite release administration.",
   "seo.copilot.title": "ChatLite · Assistant console",
   "seo.copilot.description": "ChatLite assistant management.",
+  "seo.reset.title": "ChatLite · Reset password",
+  "seo.reset.description": "Reset your ChatLite account password using email verification.",
   "seo.missing.title": "ChatLite · Page not found",
   "seo.missing.description": "Return to the ChatLite homepage."
 }

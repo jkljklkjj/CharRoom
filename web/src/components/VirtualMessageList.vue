@@ -21,6 +21,7 @@ const emit = defineEmits<{ scroll: [event: Event] }>()
 const element = ref<HTMLElement | null>(null)
 const heights = new Map<string, number>(), nodes = new Map<HTMLElement, string>()
 const revision = shallowRef(0), top = ref(0), viewport = ref(600)
+let followingBottom = false
 const keys = computed(() => {
   const occurrences = new Map<string, number>()
   return props.items.map(item => {
@@ -51,7 +52,7 @@ function restore(saved: ReturnType<typeof anchor>, followBottom = false) {
   const el = element.value
   if (!el || !saved) return
   const index = keys.value.indexOf(saved.key)
-  if (followBottom && saved.bottom) el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
+  if (followBottom && (saved.bottom || followingBottom)) el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
   else if (index >= 0) el.scrollTop = layout.value.offsetAt(index) + saved.delta
   top.value = el.scrollTop
 }
@@ -90,7 +91,10 @@ function observe(node: Element | ComponentPublicInstance | null, key: string) {
   observer?.observe(node, { box: 'border-box' })
 }
 function scrolled(event: Event) {
-  if (element.value) { top.value = element.value.scrollTop; viewport.value = element.value.clientHeight }
+  if (element.value) {
+    top.value = element.value.scrollTop; viewport.value = element.value.clientHeight
+    followingBottom = element.value.scrollHeight - element.value.scrollTop - element.value.clientHeight <= 2
+  }
   // Vue function refs receive null on removal. Release detached nodes here and after updates.
   for (const node of nodes.keys()) if (!node.isConnected) { observer?.unobserve(node); nodes.delete(node) }
   emit('scroll', event)
@@ -111,6 +115,7 @@ function captureReading(): ReadingPosition | null {
   return {...saved,height:layout.value.offsetAt(index+1)-layout.value.offsetAt(index)}
 }
 async function restoreReading(position:ReadingPosition) {
+  followingBottom = position.bottom
   // A tall row's saved offset can exceed the default estimate. Seed its height
   // before scrolling so the first measurement keeps this row as the anchor.
   if(position.height && Number.isFinite(position.height) && position.height>0) {
@@ -119,7 +124,14 @@ async function restoreReading(position:ReadingPosition) {
   await nextTick()
   restore(position,position.bottom)
 }
-defineExpose({ element, captureReading, restoreReading })
+function scrollToBottom() {
+  const el = element.value
+  if (!el) return
+  followingBottom = true
+  el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
+  top.value = el.scrollTop
+}
+defineExpose({ element, captureReading, restoreReading, scrollToBottom })
 </script>
 
 <style scoped>

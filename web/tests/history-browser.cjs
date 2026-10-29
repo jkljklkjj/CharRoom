@@ -5,7 +5,7 @@ const dist = path.resolve(__dirname, '../dist')
 const mime = { '.js': 'application/javascript', '.css': 'text/css', '.html': 'text/html', '.proto': 'text/plain', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' }
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, 'http://localhost')
-  const file = path.resolve(dist, url.pathname === '/app' ? 'index.html' : url.pathname.slice(1))
+  const file = path.resolve(dist, url.pathname === '/app' ? 'app/index.html' : url.pathname.slice(1))
   if (!file.startsWith(dist + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return }
   response.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'application/octet-stream' }); response.end(fs.readFileSync(file))
 })
@@ -22,7 +22,7 @@ async function main() {
     await page.setViewport({ width: 1180, height: 850 }); await page.setBypassServiceWorker(true)
     page.on('pageerror', error => errors.push(error.message))
     await page.evaluateOnNewDocument(() => {
-      sessionStorage.setItem('charroom_token', 'fixture-token')
+      sessionStorage.setItem('charroom_token', 'fixture.' + btoa(JSON.stringify({ uid:91001, sub:'91001', exp:Math.floor(Date.now()/1000)+3600 })).replace(/=/g,'') + '.signature')
       localStorage.setItem('charroom_accountId', '91001')
       globalThis.WebTransport = class {
         constructor() { this.ready = Promise.resolve(); this.closed = new Promise(() => {}); this.incomingBidirectionalStreams = new ReadableStream() }

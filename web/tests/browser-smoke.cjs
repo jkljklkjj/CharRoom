@@ -30,6 +30,7 @@ const encode = object => {
 const deliver = (page, object) => page.evaluate(bytes => window.__fixtureIncoming.enqueue(new Uint8Array(bytes)), encode(object))
 
 async function main() {
+  const forceFallback = process.argv.includes('--fallback-codec')
   const executablePath = process.argv[2] || process.env.BROWSER_EXECUTABLE
   if (!executablePath) throw new Error('Pass a Chromium/Edge executable path or set BROWSER_EXECUTABLE')
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -45,7 +46,7 @@ async function main() {
       await page.setViewport({width:1180,height:900})
       await page.setBypassServiceWorker(true)
       page.on('pageerror', error => errors.push(error.message))
-      await page.evaluateOnNewDocument(id => {
+      await page.evaluateOnNewDocument((id, forceFallback) => {
         sessionStorage.setItem('charroom_token', 'fixture.' + btoa(JSON.stringify({ uid: id, sub: String(id), exp: Math.floor(Date.now() / 1000) + (id === 91002 ? -60 : 3600) })).replace(/=/g, '') + '.signature')
         sessionStorage.setItem('charroom_tokenExpiresAt', String(Date.now() + 86400000)) // cannot extend JWT exp
         localStorage.setItem('charroom_accountId', id === 91001 ? '99999' : String(id)) // JWT identity wins
@@ -53,7 +54,7 @@ async function main() {
         // Keep a real Worker and real IndexedDB; only the remote transport is simulated.
         const BrowserWorker = globalThis.Worker
         globalThis.__workerReplies = []
-        globalThis.Worker = class extends BrowserWorker {
+        globalThis.Worker = forceFallback ? class { constructor() { throw new Error('fixture Worker unavailable') } } : class extends BrowserWorker {
           constructor(...args) {
             super(...args)
             this.addEventListener('message', event => globalThis.__workerReplies.push(event.data.type))
@@ -72,7 +73,7 @@ async function main() {
           }
           close() {}
         }
-      }, id)
+      }, id, forceFallback)
       await page.exposeFunction('__fixtureSend', async bytes => {
         const object = Wrapper.toObject(Wrapper.decode(new Uint8Array(bytes).subarray(4)), { longs: String, enums: Number })
         if (object.type === 1) {
@@ -118,7 +119,7 @@ async function main() {
       await page.waitForSelector('textarea')
       pages.push(page)
     }
-    for (const page of pages) await page.waitForFunction(() => globalThis.__workerReplies.includes('init')).catch(error => { throw new Error('Worker initialization: ' + error.message) })
+    if (!forceFallback) for (const page of pages) await page.waitForFunction(() => globalThis.__workerReplies.includes('init')).catch(error => { throw new Error('Worker initialization: ' + error.message) })
     assert.equal(peers.size, 2)
     assert.equal(validationRequests, 0, 'unexpired local JWT must restore without a validate request')
     assert.equal(refreshRequests, 1, 'expired JWT refreshes once despite a forged cached expiry date')
@@ -147,12 +148,15 @@ async function main() {
     }
     for (const page of pages) {
       const replies = await page.evaluate(() => globalThis.__workerReplies)
-      assert.ok(replies.includes('encode') && replies.includes('decode'), 'real bundled Worker must encode and decode')
+      if (forceFallback) {
+        assert.equal(replies.length, 0)
+        assert.ok(await page.evaluate(() => performance.getEntriesByType('resource').some(entry => /\/proto-[^/]+\.js$/.test(entry.name))), 'Worker failure must load the real production fallback chunk')
+      } else assert.ok(replies.includes('encode') && replies.includes('decode'), 'real bundled Worker must encode and decode')
       assert.ok(!replies.includes('error'))
     }
     if (process.argv.includes('--startup-only')) {
       assert.deepEqual(errors, [])
-      console.log('PASS: SSR app startup, two validated accounts, bidirectional messages, ACKs and real Worker; remote services mocked')
+      console.log(`PASS: SSR app startup, two validated accounts, bidirectional messages, ACKs and ${forceFallback ? 'lazy main-thread codec fallback' : 'real Worker'}; remote services mocked`)
       return
     }
     // Reading old messages keeps the scroll position and offers an explicit jump.

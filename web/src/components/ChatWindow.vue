@@ -317,17 +317,12 @@ let _scrollInit = false
 const newMessageCount = ref(0)
 
 // QQ 式滚动：首次定位到底部（无动画），后续仅当接近底部时跟随
-function scrollToBottom(animate = false) {
+function scrollToBottom() {
   newMessageCount.value = 0
   nextTick(() => {
     const el = msgList.value
     if (!el) return
-    const target = el.scrollHeight - el.clientHeight
-    if (animate) {
-      el.scrollTo({ top: target, behavior: 'smooth' })
-    } else {
-      el.scrollTop = target
-    }
+    virtualList.value?.scrollToBottom()
   })
 }
 
@@ -347,12 +342,12 @@ watch(readingKey,async (key,previous)=>{
   const saved=conversationViews.position(key)
   if(saved && currentMessages.value.length) {
     await virtualList.value?.restoreReading(saved);_scrollInit=true
-  } else if(currentMessages.value.length) {scrollToBottom(false);_scrollInit=true}
+  } else if(currentMessages.value.length) {scrollToBottom();_scrollInit=true}
   restoringReading=false
 },{immediate:true})
 onBeforeUnmount(()=>saveReading(readingKey.value))
 
-async function jumpLatest(){try{if(store.state.historyHasNewer)await store.loadLatestMessages();await nextTick();scrollToBottom(true)}catch{toast.error(t('social.failed'))}}
+async function jumpLatest(){try{if(store.state.historyHasNewer)await store.loadLatestMessages();await nextTick();scrollToBottom()}catch{toast.error(t('social.failed'))}}
 
 // 向上滚动加载更多历史消息
 let _loadingOlder = false
@@ -390,13 +385,13 @@ watch(() => [currentMessages.value.at(-1)?.messageId || currentMessages.value.at
   if (!el) return
   if (!_scrollInit) {
     _scrollInit = true
-    scrollToBottom(false)
+    scrollToBottom()
     return
   }
   // 在底部附近才跟随
   const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200
   if (nearBottom) {
-    scrollToBottom(false)
+    scrollToBottom()
   } else {
     newMessageCount.value += Math.max(1, count - previous)
   }

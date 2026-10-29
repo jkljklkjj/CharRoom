@@ -23,6 +23,7 @@
 - 协议常量：`src/proto/constants.ts`，由 `scripts/generate-protocol-constants.cjs` 生成；组件从这里导入，不再从 chatSocket 服务导入类型常量。业务常量仍在 `src/constants.ts`；wire 接口 `src/proto/messages.ts` 同时生成，store/UI 类型放 `src/types/`。
 - PWA/构建：`vite.config.ts`、`scripts/generate-static-site-files.cjs`；文案在 `src/locales/` 三份语言文件。
 - SEO 路由与索引范围在 `site.routes.json`，运行时由 `services/pageSeo.ts` 同步；正式 SEO 产物用 `npm run build:seo`（需 `CHROME_BIN`），部署与验证见 [Web SEO](../docs/development/WEB-SEO.md)。私有入口保持 noindex，不能重新放入 sitemap。
+- 生产聚合网关也需同步 `chat-room/docker/nginx/nginx.conf.template`。本地冷启动测量用 `node scripts/measure-page-performance.cjs <浏览器路径> <report.json>`；指标条件、Worker 降级和聊天回归门槛见 [SEO 与性能续改](../docs/development/WEB-SEO-PERFORMANCE-2026-10-29.md)。
 - `npm run build` 已对公开索引页和 `/app` 真实认证入口执行构建期 SSR；`render-ssr.mjs` 根据客户端 SSR manifest 内联路由 CSS，`main.ts` 复用 DOM。首屏回归用 `node tests/app-ssr-browser.cjs <浏览器路径>`；首页不做认证，静态 HTML 不得写入账号数据。
 
 ## 开发命令（工作目录：CharRoom/web）

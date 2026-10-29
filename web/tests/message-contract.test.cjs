@@ -37,7 +37,7 @@ async function client() {
   const shared = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/codec.ts')), { context })
   await shared.link(() => proto)
   await shared.evaluate()
-  const codec = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/index.ts')), { context })
+  const codec = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/index.ts')), { context, importModuleDynamically: async () => shared })
   await codec.link(() => shared)
   await codec.evaluate()
   const constantsModule = new vm.SourceTextModule(readTs(path.join(web, 'src/proto/constants.ts')), { context })

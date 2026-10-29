@@ -47,15 +47,17 @@ for (const route of targets) {
   }
   // 懒加载路由的 CSS 不在入口样式里；首帧必须连同真实组件样式一起输出。
   const styles = new Set()
+  const scripts = new Set()
   for (const id of context.modules || []) {
     for (const asset of manifest[id] || []) {
       if (asset.endsWith('.css')) styles.add(asset)
+      if (route.index && asset.endsWith('.js') && !shell.includes(`href="${asset}"`)) scripts.add(asset)
     }
   }
   const css = [...styles].map(asset => fs.readFileSync(path.join(dist, asset.replace(/^\//, '')), 'utf8')).join('\n')
   if (/<\/style/i.test(css)) throw new Error(`[ssr] ${route.path} 的样式含有非法结束标签`)
   const result = shell.replace(empty, `<div id="app" data-ssr>${html}</div>`)
-    .replace('</head>', `<style data-ssr-styles>${css}</style></head>`)
+    .replace('</head>', `${[...scripts].map(asset => `<link rel="modulepreload" crossorigin data-ssr-preload href="${asset}">`).join('')}<style data-ssr-styles>${css}</style></head>`)
   fs.writeFileSync(file, result, 'utf8')
   rendered += 1
   console.log(`[ssr] rendered ${route.path} (${Buffer.byteLength(html)} bytes)`)

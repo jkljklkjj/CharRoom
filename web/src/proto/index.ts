@@ -1,7 +1,11 @@
-import { loadProto, encode, decode } from './codec'
 import type { MessageWrapper } from './messages'
 import type { WorkerRequest, WorkerReply } from './workerMessages'
-export { loadProto }
+let mainCodec: Promise<typeof import('./codec')> | null = null
+function fallbackCodec() {
+  mainCodec ??= import('./codec').catch(error => { mainCodec = null; throw error })
+  return mainCodec
+}
+export async function loadProto() { return (await fallbackCodec()).loadProto() }
 
 const WORKER_TIMEOUT_MS = 5000
 let protoWorker: Worker | null = null
@@ -65,7 +69,7 @@ export async function encodeMessage(wrapper: MessageWrapper): Promise<ArrayBuffe
       throw new Error('Invalid encoded result')
     } catch { /* use the shared codec on the main thread */ }
   }
-  return encode(wrapper)
+  return (await fallbackCodec()).encode(wrapper)
 }
 export async function decodeMessage(buffer: ArrayBuffer): Promise<MessageWrapper> {
   if (workerReady) {
@@ -77,7 +81,7 @@ export async function decodeMessage(buffer: ArrayBuffer): Promise<MessageWrapper
       throw new Error('Invalid decoded result')
     } catch { /* use the retained input on the main thread */ }
   }
-  return decode(buffer)
+  return (await fallbackCodec()).decode(buffer)
 }
 export function getWorkerStatus() { return { ready: workerReady, failed: workerInitFailed } }
 export default { loadProto, encodeMessage, decodeMessage, getWorkerStatus }

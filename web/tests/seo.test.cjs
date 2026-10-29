@@ -6,6 +6,22 @@ const config = require('../site.routes.json')
 const { renderHead, sitemap } = require('../scripts/site-seo.cjs')
 const html = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8')
 
+test('every known application route has explicit initial SEO metadata', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/router/routes.ts'), 'utf8')
+  const paths = [...source.matchAll(/path:\s*'([^']+)'/g)].map(match => match[1]).filter(p => !p.includes(':'))
+  assert.deepEqual(config.routes.map(route => route.path).sort(), paths.sort())
+})
+
+test('static Nginx routes include account recovery and unknown URLs cannot fall back to the homepage', () => {
+  for (const file of [path.resolve(__dirname, '../nginx.conf'), path.resolve(__dirname, '../../../chat-room/docker/nginx/nginx.conf.template')]) {
+    const source = fs.readFileSync(file, 'utf8')
+    assert.ok(source.includes('verify|reset|admin'))
+    assert.ok(source.includes('try_files $uri/index.html =404;'))
+    assert.ok(!/try_files[^;]*\/index\.html;/.test(source), 'unknown URLs must return a real 404')
+    assert.ok(source.includes('internal;'))
+  }
+})
+
 test('sitemap contains only public landing, features and FAQ with no fabricated modification date', () => {
   const xml = sitemap()
   assert.equal((xml.match(/<loc>/g) || []).length, 3)
