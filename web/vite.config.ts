@@ -59,8 +59,28 @@ export default defineConfig(({ isSsrBuild }) => ({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{html,js,css,ico,png,svg,woff,woff2}'],
+        // HTML is finalized by the SSR scripts after Vite writes its bundle.
+        // Never precache an earlier shell or use the home document for other routes.
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}'],
+        navigateFallback: null,
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
+          {
+            // Only static SSR documents, without account/code query parameters.
+            // This callback is serialized into the worker: keep it self-contained.
+            urlPattern: ({ request, url }) => request.mode === 'navigate'
+              && url.origin === self.location.origin
+              && url.search === ''
+              && /^(?:\/|\/(?:app|features|faq)\/?)$/.test(url.pathname),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'route-documents-v1',
+              networkTimeoutSeconds: 2,
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 16, maxAgeSeconds: 7 * 24 * 60 * 60 }
+            }
+          },
           {
             urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|gif|svg|webp)$/i,
             handler: 'CacheFirst',

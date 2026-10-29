@@ -16,6 +16,18 @@ SEO 配置由 `web/site.routes.json` 管理；`src/services/pageSeo.ts` 更新�
 
 ## 构建与验证
 
+### PWA 导航与首帧
+
+首页 SSR 上线后，旧 PWA 默认 `navigateFallback: 'index.html'` 会让已安装 Worker 的 `/app` 导航先拿到首页正文，再由 Vue 路由替换，产生首页闪现。此前首屏测试设置了 bypassServiceWorker，未覆盖该场景。
+
+`vite.config.ts` 现在禁用统一首页回退，HTML 不进入 Vite 阶段预缓存（HTML 还会被后续 SSR 脚本改写）。`/`、`/features`、`/faq` 和 `/app` 的无查询参数导航按实际请求 URL 使用 NetworkFirst：正常在线读取服务器当前 HTML，网络失败或超过两秒后可用该 URL 已缓存的静态页面。页面缓存只含构建期无账号数据的 HTML，最多16项、7天；不缓存带查询参数的验证码地址，也不把 API 响应放入此页面缓存。未访问过的页面不保证离线可打开，未知路由不会被首页掩盖。
+
+显式配置 skipWaiting/clientsClaim，使更新后的 Worker 能接管旧的导航规则。部署必须同时发布新 `sw.js` 与对应 Workbox 文件，并保留 `sw.js` 不长期缓存的网关配置；客户端仍须先成功下载并激活新版 Worker。不要以清除全部站点数据解决这一问题，避免误删本地会话和消息。
+
+回归：构建后运行 `node tests/pwa-navigation-browser.cjs <browser>`，使用真实 Service Worker，并在应用 JavaScript 禁用时检查 `/app` 的原始 HTML，覆盖旧首页回退升级、在线新版本、离线同路由、404、API及查询参数隔离。普通首屏和SEO回归分别继续运行 `app-ssr-browser.cjs`、`seo-browser.cjs`。
+
+这属于 Web PWA 静态文档缓存修复；桌面/CLI/Android 没有该 Service Worker 链路，无需同步原生代码，认证握手与聊天消息协议不变。
+
 在 `CharRoom/web` 执行：
 
 ```text

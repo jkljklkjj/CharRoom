@@ -22,6 +22,7 @@
 - protobuf：`src/proto/index.ts` / `worker.ts`（通过共享 `codec.ts` 编解码），运行时 URL `/proto/message.proto`；公共资源在 `public/proto/`。
 - 协议常量：`src/proto/constants.ts`，由 `scripts/generate-protocol-constants.cjs` 生成；组件从这里导入，不再从 chatSocket 服务导入类型常量。业务常量仍在 `src/constants.ts`；wire 接口 `src/proto/messages.ts` 同时生成，store/UI 类型放 `src/types/`。
 - PWA/构建：`vite.config.ts`、`scripts/generate-static-site-files.cjs`；文案在 `src/locales/` 三份语言文件。
+- PWA 不将所有导航回退到首页，也不预缓存尚未完成 SSR 的 HTML；已渲染静态入口按路由 NetworkFirst 缓存。改 SSR 路由须评估对应导航规则，回归用 `tests/pwa-navigation-browser.cjs`（真实 Worker）和首屏测试，不能仅测 bypassServiceWorker。
 - SEO 路由与索引范围在 `site.routes.json`，运行时由 `services/pageSeo.ts` 同步；正式 SEO 产物用 `npm run build:seo`（需 `CHROME_BIN`），部署与验证见 [Web SEO](../docs/development/WEB-SEO.md)。私有入口保持 noindex，不能重新放入 sitemap。
 - ARD 清单由 `scripts/resource-catalog.cjs` 经静态资源生成脚本输出到 `/.well-known/ard.json` 及旧版 ai-catalog 地址；仅描述真实公开资源，部署必须保留 `.well-known`，清单路由不得回退 HTML。
 - robots.txt 只保留标准指令，ARD 用 HTML 链接发现，不添加会令 Lighthouse 扣分的 Agentmap。公开子页面包屑由 `pageSeo.ts` 同时供 SSR 与客户端生成，导航到私有页须清除；验证与 skill 审查见 [SEO Guide 实施](../docs/development/SEO-GUIDE-AUDIT-2026-10-29.md)。

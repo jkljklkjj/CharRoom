@@ -71,6 +71,8 @@
 
 ## 实际验证
 
+后续真实 Worker 实测补充：用户反馈 `/app` 刷新短暂出现首页，复现为旧 PWA 的统一首页导航回退。已禁用该回退、排除未完成SSR的HTML预缓存，并按路由 NetworkFirst。新增 `pwa-navigation-browser.cjs` 已通过旧Worker升级接管、禁JS首份HTML、在线更新、离线同路由、404和API/查询参数隔离。原首屏测试 bypassServiceWorker 的覆盖不足已明确，详见 [PWA导航与首帧](WEB-SEO.md#pwa-导航与首帧)。
+
 - **通过**：`charroom-client-check/scripts/doctor.py --client CharRoom --target web` 前置条件（未声明lint，未冒充执行lint）。
 - **通过**：`npm run build`，包含严格类型检查、客户端打包、路由head生成、4个入口SSR。
 - **通过**：`node --experimental-vm-modules --test --test-concurrency=1 tests/*.test.cjs`，145项通过、0失败。新增2项回归在修复前失败、修复后通过。
