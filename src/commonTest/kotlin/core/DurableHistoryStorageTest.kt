@@ -55,6 +55,29 @@ class DurableHistoryStorageTest {
         } finally { System.setProperty("user.home", previous); folder.deleteRecursively() }
     }
 
+    @Test fun aRowLeftUnderItsClientIdResolvesOnReadAfterAnInterruptedAck() {
+        val previous = System.getProperty("user.home")
+        val folder = Files.createTempDirectory("history-id-alias-crash").toFile()
+        try {
+            System.setProperty("user.home", folder.absolutePath)
+            val pending = Message(42, "fixture", sender = true, receiverId = 1,
+                timestamp = 1, isSent = false, messageId = "local_crash")
+            DesktopLocalChatHistoryStore.save("42", listOf(pending), emptyList())
+            // ACK recorded the alias, then the process died before the row could be renamed.
+            val ack = com.chatlite.proto.MessageProtos.AckMessage.newBuilder().setMessageId("local_crash")
+                .setServerMessageId("9007199254740997").setSeqId(23).setConversationId("1:42").build()
+            core.MessageIdAliases.confirm(java.io.File(folder, ".qingliao/history/42"), "42", ack)
+            val restored = DesktopLocalChatHistoryStore.restore("42").privateMessages
+            assertEquals(1, restored.size)
+            assertEquals("9007199254740997", restored.single().messageId)
+            assertEquals(23L, restored.single().seqId)
+            assertTrue(restored.single().isSent)
+            val page = DesktopLocalChatHistoryStore.getPrivateMessagesPage("42", 1, 0, 20)
+            assertEquals(1, page.size)
+            assertEquals("9007199254740997", page.single().messageId)
+        } finally { System.setProperty("user.home", previous); folder.deleteRecursively() }
+    }
+
     @Test fun cursorFilesAreAccountScopedAndDiskWriteFailureIsObservable() {
         val previous = System.getProperty("user.home")
         val folder = Files.createTempDirectory("history-durability").toFile()

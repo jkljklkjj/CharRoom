@@ -3,10 +3,12 @@ import { conversationPreviewText } from './format'
 
 const DB_NAME = 'charroom_messages'
 // Current indexed schema; older row formats are not imported.
-const DB_VERSION = 7
+const DB_VERSION = 8
 const STORE_NAME = 'messages'
 const META_STORE_NAME = 'conversation_meta'
 const CURSOR_STORE_NAME = 'sync_cursors'
+/** Durable clientId -> serverId map, so an ACK lost after persistence still dedupes by identity. */
+const ALIAS_STORE_NAME = 'message_id_aliases'
 const ORDER_INDEX = 'account_conversation_index'
 const TIME_INDEX = 'account_conversation_time_id'
 const MESSAGE_ID_INDEX = 'account_conversation_message_id'
@@ -22,6 +24,19 @@ export interface ConversationMeta {
 }
 export type MessageCursor = [number, string, string]
 export interface MessagePage { messages: ChatMessage[]; beforeIndex: MessageCursor | null; hasMore: boolean }
+/**
+ * Acknowledged client IDs mapped to their persisted row. The ACK is the only place
+ * both IDs appear, so it is also the only place this mapping can be recorded; keeping
+ * it durable means a later history copy is matched by identity instead of by content.
+ */
+interface AliasRecord { id: string; accountId: string; conversationId: string; clientId: string; serverId: string; seqId: string }
+const ALIAS_SERVER_INDEX = 'account_conversation_server_id'
+function aliasRecord(accountId: Id, conversationId: Id, clientId: string, serverId: string, seqId: Id): AliasRecord {
+  return { id: `${accountId}:${conversationId}:${clientId}`, accountId: String(accountId),
+    conversationId: String(conversationId), clientId, serverId: String(serverId), seqId: String(seqId) }
+}
+/** Aliases only ever start at a client ID, so server rows never need a lookup. */
+function aliasCandidate(message: ChatMessage) { return !!message.messageId?.startsWith('local_') }
 let databasePromise: Promise<IDBDatabase> | null = null
 function openDB(): Promise<IDBDatabase> {
   databasePromise ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -51,6 +66,12 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(META_STORE_NAME)) {
         const meta = db.createObjectStore(META_STORE_NAME, { keyPath: 'id' })
         meta.createIndex('accountId', 'accountId', { unique: false })
+      }
+      // v8: 客户端消息 ID 到服务端主键的持久映射（按账号/会话隔离）
+      if (!db.objectStoreNames.contains(ALIAS_STORE_NAME)) {
+        const aliases = db.createObjectStore(ALIAS_STORE_NAME, { keyPath: 'id' })
+        aliases.createIndex('accountId', 'accountId', { unique: false })
+        aliases.createIndex(ALIAS_SERVER_INDEX, ['accountId', 'conversationId', 'serverId'])
       }
 
     }
@@ -160,23 +181,55 @@ export async function getMessagesPage(accountId: Id, conversationId: Id, beforeI
   const db = await openDB()
   return new Promise((resolve, reject) => {
     const rows: StoredMessage[] = []
-    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).index(TIME_INDEX).openCursor(orderedRange(accountId, conversationId, beforeIndex), 'prev')
+    const tx = db.transaction([STORE_NAME, ALIAS_STORE_NAME])
+    const request = tx.objectStore(STORE_NAME).index(TIME_INDEX).openCursor(orderedRange(accountId, conversationId, beforeIndex), 'prev')
     request.onerror = () => reject(request.error)
     request.onsuccess = () => {
       const cursor = request.result
       if (cursor && rows.length < limit) { rows.push(cursor.value as StoredMessage); cursor.continue(); return }
       rows.reverse()
-      resolve({ messages: rows.map(row => row.message), beforeIndex: rows[0] ? [rows[0].timestamp, rows[0].sortId, rows[0].id] : null, hasMore: !!cursor })
+      // Rows written before their alias was recorded still resolve to the persisted copy.
+      const pending = rows.filter(row => aliasCandidate(row.message))
+      if (!pending.length) {
+        resolve({ messages: rows.map(row => row.message), beforeIndex: cursorStart(rows), hasMore: !!cursor })
+        return
+      }
+      const aliases = tx.objectStore(ALIAS_STORE_NAME)
+      let remaining = pending.length
+      const canonical = new Map<string, {serverId:string;seqId:string}>()
+      pending.forEach(row => {
+        const lookup = aliases.get(`${String(accountId)}:${String(conversationId)}:${row.message.messageId}`)
+        lookup.onsuccess = () => {
+          const alias = lookup.result as AliasRecord | undefined
+          if (alias) canonical.set(String(row.message.messageId), { serverId: alias.serverId, seqId: alias.seqId })
+          if (--remaining === 0) {
+            const seen = new Set<string>()
+            const messages = rows.map(row => {
+              const alias = canonical.get(String(row.message.messageId))
+              return alias ? { ...row.message, messageId: alias.serverId, seqId: alias.seqId, isSent: 'sent' as const } : row.message
+            }).filter(message => {
+              if (!message.messageId) return true
+              if (seen.has(message.messageId)) return false
+              seen.add(message.messageId)
+              return true
+            })
+            resolve({ messages, beforeIndex: cursorStart(rows), hasMore: !!cursor })
+          }
+        }
+      })
     }
   })
+}
+function cursorStart(rows: StoredMessage[]): MessageCursor | null {
+  return rows[0] ? [rows[0].timestamp, rows[0].sortId, rows[0].id] : null
 }
 export function appendMessage(accountId: Id, conversationId: Id, message: ChatMessage) {
   const db = openDB()
   return db.then(database => new Promise<void>((resolve, reject) => {
-    const tx = database.transaction([STORE_NAME, META_STORE_NAME], 'readwrite')
+    const tx = database.transaction([STORE_NAME, META_STORE_NAME, ALIAS_STORE_NAME], 'readwrite')
     tx.oncomplete = () => resolve()
     tx.onerror = tx.onabort = () => reject(tx.error)
-    const store = tx.objectStore(STORE_NAME)
+    const store = tx.objectStore(STORE_NAME), aliases = tx.objectStore(ALIAS_STORE_NAME)
     const append = () => {
       const request = store.index(ORDER_INDEX).openCursor(allocationRange(accountId, conversationId), 'prev')
       request.onsuccess = () => {
@@ -184,15 +237,26 @@ export function appendMessage(accountId: Id, conversationId: Id, message: ChatMe
         store.put(record(accountId, conversationId, message, last ? last.index + 1 : 0))
       }
     }
-    if (message.messageId) {
-      const existing = store.index(MESSAGE_ID_INDEX).get([String(accountId), String(conversationId), message.messageId])
-      existing.onsuccess = () => {
-        const row = existing.result as StoredMessage | undefined
-        if (row) store.put(record(accountId, conversationId, { ...row.message, ...message }, row.index, row.timestamp))
-        else append()
+    const write = (row?: StoredMessage) => {
+      if (row) store.put(record(accountId, conversationId, { ...row.message, ...message }, row.index, row.timestamp))
+      else append()
+    }
+    const resolveAlias = (next: (message: ChatMessage) => void) => {
+      if (!aliasCandidate(message)) return next(message)
+      const lookup = aliases.get(`${String(accountId)}:${String(conversationId)}:${message.messageId}`)
+      lookup.onsuccess = () => {
+        const alias = lookup.result as AliasRecord | undefined
+        next(alias ? { ...message, messageId: alias.serverId, seqId: alias.seqId, isSent: 'sent' as const } : message)
       }
-    } else append()
-    touchConversationMeta(tx, accountId, conversationId, message)
+    }
+    resolveAlias(canonical => {
+      message = canonical
+      if (message.messageId) {
+        const existing = store.index(MESSAGE_ID_INDEX).get([String(accountId), String(conversationId), message.messageId])
+        existing.onsuccess = () => write(existing.result as StoredMessage | undefined)
+      } else append()
+      touchConversationMeta(tx, accountId, conversationId, message)
+    })
   }))
 }
 
@@ -213,34 +277,77 @@ export async function mergeHistoryMessages(accountId: Id, conversationId: Id, me
   if (!batch.size) return
   const db = await openDB()
   return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction([STORE_NAME, META_STORE_NAME, CURSOR_STORE_NAME], 'readwrite')
+    const tx = db.transaction([STORE_NAME, META_STORE_NAME, CURSOR_STORE_NAME, ALIAS_STORE_NAME], 'readwrite')
     tx.oncomplete = () => resolve()
     tx.onerror = tx.onabort = () => reject(tx.error)
-    const store = tx.objectStore(STORE_NAME)
-    const last = store.index(ORDER_INDEX).openCursor(allocationRange(accountId, conversationId), 'prev')
-    last.onsuccess = () => {
-      let index = ((last.result?.value as StoredMessage | undefined)?.index ?? -1) + 1
-      let remaining = batch.size, newest: ChatMessage | null = null
-      for (const [id, message] of batch) {
-        const request = store.index(MESSAGE_ID_INDEX).get([String(accountId), String(conversationId), id])
-        request.onsuccess = () => {
-          const old = request.result as StoredMessage | undefined
-          // Local send status/live edits win over a bootstrap copy of the same ID.
-          const merged = { ...message, ...old?.message }
-          const row = record(accountId, conversationId, merged, old ? old.index : index++, old?.timestamp)
-          store.put(row)
-          if (!newest || row.timestamp >= messageTimestamp(newest)) newest = merged
-          if (--remaining === 0 && newest) {
-            touchConversationMeta(tx,accountId,conversationId,newest)
-            if(applied) {
-              const cursors=tx.objectStore(CURSOR_STORE_NAME),key=[String(accountId),applied.conversationId]
-              const request=cursors.get(key)
-              request.onsuccess=()=>{
-                if(BigInt(request.result?.seqId||'0')<BigInt(applied.seqId))cursors.put({accountId:String(accountId),conversationId:applied.conversationId,seqId:String(applied.seqId)})
+    const store = tx.objectStore(STORE_NAME), aliases = tx.objectStore(ALIAS_STORE_NAME)
+    const scope = [String(accountId), String(conversationId)]
+    // A history copy may still carry the client ID (or arrive after an ACK whose rename
+    // never landed), so resolve identity first: canonical key in, superseded rows out.
+    let resolving = batch.size
+    const superseded: string[] = []
+    const resolved: Array<[string, ChatMessage]> = []
+    const settle = () => {
+      if (--resolving > 0) return
+      write(resolved)
+    }
+    const write = (rows: Array<[string, ChatMessage]>) => {
+      const last = store.index(ORDER_INDEX).openCursor(allocationRange(accountId, conversationId), 'prev')
+      last.onsuccess = () => {
+        let index = ((last.result?.value as StoredMessage | undefined)?.index ?? -1) + 1
+        let remaining = rows.length, newest: ChatMessage | null = null
+        const upsert = () => {
+          for (const [id, message] of rows) {
+            const request = store.index(MESSAGE_ID_INDEX).get([...scope, id])
+            request.onsuccess = () => {
+              const old = request.result as StoredMessage | undefined
+              // Local send status/live edits win over a bootstrap copy of the same ID.
+              const merged = { ...message, ...old?.message }
+              const row = record(accountId, conversationId, merged, old ? old.index : index++, old?.timestamp)
+              store.put(row)
+              if (!newest || row.timestamp >= messageTimestamp(newest)) newest = merged
+              if (--remaining === 0 && newest) {
+                touchConversationMeta(tx, accountId, conversationId, newest)
+                if (applied) {
+                  const cursors = tx.objectStore(CURSOR_STORE_NAME), key = [String(accountId), applied.conversationId]
+                  const cursor = cursors.get(key)
+                  cursor.onsuccess = () => {
+                    if (BigInt(cursor.result?.seqId || '0') < BigInt(applied.seqId)) {
+                      cursors.put({ accountId: String(accountId), conversationId: applied.conversationId, seqId: String(applied.seqId) })
+                    }
+                  }
+                }
               }
             }
           }
         }
+        const cleanups = superseded.map(clientId => store.index(MESSAGE_ID_INDEX).get([...scope, clientId]))
+        let pendingCleanups = cleanups.length
+        if (!pendingCleanups) { upsert(); return }
+        for (const request of cleanups) request.onsuccess = () => {
+          const row = request.result as StoredMessage | undefined
+          if (row) store.delete(row.id)
+          if (--pendingCleanups === 0) upsert()
+        }
+      }
+    }
+    for (const [id, message] of batch) {
+      if (aliasCandidate(message)) {
+        const lookup = aliases.get(`${scope[0]}:${scope[1]}:${id}`)
+        lookup.onsuccess = () => {
+          const alias = lookup.result as AliasRecord | undefined
+          if (alias) { superseded.push(id); resolved.push([alias.serverId, { ...message, messageId: alias.serverId, seqId: alias.seqId, isSent: 'sent' as const }]) }
+          else resolved.push([id, message])
+          settle()
+        }
+        continue
+      }
+      // A persisted row proves every placeholder of that send is redundant.
+      const reverse = aliases.index(ALIAS_SERVER_INDEX).getAll([scope[0], scope[1], id])
+      reverse.onsuccess = () => {
+        for (const alias of (reverse.result || []) as AliasRecord[]) if (alias.clientId !== id) superseded.push(alias.clientId)
+        resolved.push([id, message])
+        settle()
       }
     }
   })
@@ -258,10 +365,13 @@ export async function confirmMessageId(accountId: Id, conversationId: Id, client
                                        serverId: string, seqId: Id): Promise<void> {
   const db = await openDB()
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const tx = db.transaction([STORE_NAME, ALIAS_STORE_NAME], 'readwrite')
     tx.oncomplete = () => resolve()
     tx.onerror = tx.onabort = () => reject(tx.error)
     const store = tx.objectStore(STORE_NAME)
+    // The ACK is the only place both IDs exist: record the mapping before anything else,
+    // so a send whose visible row is missing still resolves from later history copies.
+    tx.objectStore(ALIAS_STORE_NAME).put(aliasRecord(accountId, conversationId, clientId, serverId, seqId))
     const index = store.index(MESSAGE_ID_INDEX)
     const oldRequest = index.get([String(accountId), String(conversationId), clientId])
     oldRequest.onsuccess = () => {
@@ -299,9 +409,9 @@ export async function clearConversation(accountId: Id, conversationId: Id) {
 export async function clearAllMessages(accountId: Id) {
   const db=await openDB()
   return new Promise<void>((resolve,reject)=>{
-    const tx=db.transaction([STORE_NAME,META_STORE_NAME,CURSOR_STORE_NAME],'readwrite')
+    const tx=db.transaction([STORE_NAME,META_STORE_NAME,CURSOR_STORE_NAME,ALIAS_STORE_NAME],'readwrite')
     tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(tx.error)
-    for(const name of [STORE_NAME,META_STORE_NAME,CURSOR_STORE_NAME]) {
+    for(const name of [STORE_NAME,META_STORE_NAME,CURSOR_STORE_NAME,ALIAS_STORE_NAME]) {
       deleteKeys(tx.objectStore(name), 'accountId', IDBKeyRange.only(String(accountId)))
     }
   })

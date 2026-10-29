@@ -16,12 +16,12 @@
 - 实时：`src/services/chatSocket.ts` → `src/services/transport/TransportFactory.ts` / `WebTransport.ts`。文件名 chatSocket 不代表 WebSocket。
 - 草稿：`services/composerDrafts.ts` 定义按账号/会话的版本状态，`composables/useComposerDrafts.ts` 跨布局共享；附件经 `api/attachments.ts` 上传，发送前捕获账号与目标。
 - 本地存储：`src/utils/messageDB.ts`；待发消息：`src/services/offlineQueue.ts`。新设备七天历史入口与 IndexedDB 合并规则见 [历史恢复](../docs/development/RECENT-HISTORY.md)。
-- 联系人和群组由 `store/contactDirectory.ts` 统一同步，先读账号快照再校验版本；组件不直接拉取完整列表。`services/conversationViews.ts` 保存有上限的会话页面与阅读位置。消息库 v7 将增量消息和游标同事务提交，详见 [本地优先加载](../docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)。
+- 联系人和群组由 `store/contactDirectory.ts` 统一同步，先读账号快照再校验版本；组件不直接拉取完整列表。`services/conversationViews.ts` 保存有上限的会话页面与阅读位置。消息库 v8 将增量消息、游标和 ACK 别名同事务提交，详见 [本地优先加载](../docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)。
 - 会话列表支持右键/长按置顶和删除；删除只隐藏会话行、不删历史，新消息由 `updateConversationState` 自动恢复。偏好按账号存 localStorage，见 [会话列表动作](../docs/development/CONVERSATION-LIST-ACTIONS.md)。
 - 联系人远程搜索延迟3秒，Enter/表单立即提交；只按昵称模糊匹配，账号/ID 不参与；每页6条最多4页，滚动接近底部加载下一页。每账号滚动60秒8次，前端预算与后端429冷却配合，不按IP或token分桶。名片与跨端验证见 [搜索与名片](../docs/development/CONTACT-SEARCH-AND-PROFILE.md)。
 - 发现页短时缓存由 `services/socialViewCache.ts` 按登录代次管理；资料、关系与回答修改后失效，不将他人资料落盘。本人名片与今日一问草稿分别在 `utils/socialProfileCache.ts` / `dailyAnswerDraft.ts`，账号切换、退出和异步完成必须核对所有者。
 - `services/gatewayOwner.ts` 在每次实时连接前解析 `/cluster/owner`；outbox v3 按账号和重试时间索引分批读取，发送成功只能由匹配的服务端 ACK 确认。
-- 增量补拉：`src/services/conversationSync.ts`；登录生命周期：`sessionEpoch.ts` / `sessionBootstrap.ts`（同目录）；消息虚拟列表：`src/components/VirtualMessageList.vue`。游标落库边界、IndexedDB v7 见 [本地优先加载](../docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)，其他验证命令见 [客户端优化](../docs/development/CLIENT-SYNC-AND-PERFORMANCE.md)。
+- 增量补拉：`src/services/conversationSync.ts`；登录生命周期：`sessionEpoch.ts` / `sessionBootstrap.ts`（同目录）；消息虚拟列表：`src/components/VirtualMessageList.vue`。游标落库边界、IndexedDB v8 见 [本地优先加载](../docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)，其他验证命令见 [客户端优化](../docs/development/CLIENT-SYNC-AND-PERFORMANCE.md)。
 - protobuf：`src/proto/index.ts` / `worker.ts`（通过共享 `codec.ts` 编解码），运行时 URL `/proto/message.proto`；公共资源在 `public/proto/`。
 - 协议常量：`src/proto/constants.ts`，由 `scripts/generate-protocol-constants.cjs` 生成；组件从这里导入，不再从 chatSocket 服务导入类型常量。业务常量仍在 `src/constants.ts`；wire 接口 `src/proto/messages.ts` 同时生成，store/UI 类型放 `src/types/`。
 - PWA/构建：`vite.config.ts`、`scripts/generate-static-site-files.cjs`；文案在 `src/locales/` 三份语言文件。

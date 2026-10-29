@@ -2,6 +2,7 @@ package core
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import model.ChatMessage
 import model.GroupMessage
 import model.Message
 import model.MessageType
@@ -74,10 +75,10 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
 
     override fun restorePage(accountId: String, page: Int, pageSize: Int): RestoredChatHistory {
         if (accountId.isBlank()) return RestoredChatHistory()
-        val privateRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
-            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, false) as Message }
-        val groupRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
-            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, true) as GroupMessage }
+        val privateRows = distinctById(core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
+            .asReversed().map { row -> decodeMessage(accountId, false, row.body!!) as Message })
+        val groupRows = distinctById(core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
+            .asReversed().map { row -> decodeMessage(accountId, true, row.body!!) as GroupMessage })
         return RestoredChatHistory(privateRows, groupRows)
     }
 
@@ -89,6 +90,7 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
         return loadMessages(accountId, userId.toString(), false, startTime, endTime)
             .filterIsInstance<Message>()
             .filter { it.timestamp in startTime..endTime }
+            .let { distinctById(it) }
             .sortedBy { it.timestamp }
     }
 
@@ -100,21 +102,22 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
         return loadMessages(accountId, groupId.toString(), true, startTime, endTime)
             .filterIsInstance<GroupMessage>()
             .filter { it.timestamp in startTime..endTime }
+            .let { distinctById(it) }
             .sortedBy { it.timestamp }
     }
 
     override fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int, pageSize: Int): List<Message> {
         if (accountId.isBlank()) return emptyList()
         require(page >= 0 && pageSize in 1..10000)
-        return journal(accountId, userId.toString(), false).page(Math.multiplyExact(page, pageSize), pageSize)
-            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, false) as Message }
+        return distinctById(journal(accountId, userId.toString(), false).page(Math.multiplyExact(page, pageSize), pageSize)
+            .asReversed().map { row -> decodeMessage(accountId, false, row.body!!) as Message })
     }
 
     override fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int, pageSize: Int): List<GroupMessage> {
         if (accountId.isBlank()) return emptyList()
         require(page >= 0 && pageSize in 1..10000)
-        return journal(accountId, groupId.toString(), true).page(Math.multiplyExact(page, pageSize), pageSize)
-            .asReversed().map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, true) as GroupMessage }
+        return distinctById(journal(accountId, groupId.toString(), true).page(Math.multiplyExact(page, pageSize), pageSize)
+            .asReversed().map { row -> decodeMessage(accountId, true, row.body!!) as GroupMessage })
     }
 
     override fun clear(accountId: String): Boolean {
@@ -175,6 +178,34 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
         }.getOrDefault(emptyMap())
     }
 
+    private fun decodeMessage(accountId: String, isGroup: Boolean, body: String): Any {
+        val decoded = jsonToMessage(objectMapper.readTree(body) as ObjectNode, isGroup)
+        // The ACK records the alias before it renames the row, so a crash in between leaves a
+        // row stored under its client ID. Resolve it on read: identity, not content, decides.
+        val (targetId, group) = when (decoded) {
+            is Message -> (if (decoded.senderId.toString() == accountId) decoded.receiverId
+                else decoded.senderId).toString() to false
+            is GroupMessage -> decoded.groupId.toString() to true
+            else -> return decoded
+        }
+        val clientId = (decoded as ChatMessage).chatMessageId
+        val alias = core.MessageIdAliases.resolve(getAccountDir(accountId), targetId, group, clientId) ?: return decoded
+        val conversation = if (alias.conversation.isBlank()) (if (group) "group:$targetId" else "") else alias.conversation
+        return when (decoded) {
+            is Message -> decoded.copy(messageId = alias.serverId, seqId = alias.seq, conversationId = conversation,
+                isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+            is GroupMessage -> decoded.copy(messageId = alias.serverId, seqId = alias.seq, conversationId = conversation,
+                isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+            else -> decoded
+        }
+    }
+
+    /** Canonical rows and a stale client-ID copy describe one send, so keep one bubble. */
+    private fun <T : ChatMessage> distinctById(messages: List<T>): List<T> {
+        val seen = HashSet<String>(messages.size)
+        return messages.filter { seen.add(it.chatMessageId) }
+    }
+
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
         val rows = messages.map { message ->
             val alias = core.MessageIdAliases.resolve(getAccountDir(accountId), targetId, isGroup, message.messageId)
@@ -187,7 +218,7 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
 
     private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean,
                              from: Long = Long.MIN_VALUE, through: Long = Long.MAX_VALUE): List<Any> =
-        journal(accountId, targetId, isGroup).range(from, through).map { row -> jsonToMessage(objectMapper.readTree(row.body) as ObjectNode, isGroup) }
+        journal(accountId, targetId, isGroup).range(from, through).map { row -> decodeMessage(accountId, isGroup, row.body!!) }
 
     private fun journal(accountId: String, targetId: String, isGroup: Boolean): core.IndexedHistoryJournal =
         core.IndexedHistoryJournal.open(core.IndexedHistoryJournal.conversation(getAccountDir(accountId), targetId, isGroup))
