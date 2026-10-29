@@ -549,9 +549,6 @@ onMounted(() => {
   directoryTimer=setInterval(()=>{if(document.visibilityState==='visible')revalidateContacts()},60000)
   window.addEventListener('resize', handleResize)
 
-  // 应用视图锁定文档滚动：保留顶部安全区留白，但页面整体不参与拖拽/橡皮筋
-  document.body.classList.add('app-viewport')
-
   // 主题由 App.vue 全局初始化；这里确保本页也已应用（幂等）
   initTheme()
 
@@ -649,12 +646,11 @@ onUnmounted(() => {
   stopFriendRequestPolling()
   sessionEpoch.renew()
   chatSocket.close()
-  document.body.classList.remove('app-viewport')
 })
 </script>
 
 <style scoped>
-/* 高度跟随 body 内容盒（已扣掉顶部/底部安全区留白），避免多出可拖拽的溢出区域 */
+/* 高度跟随 body 内容盒；文档滚动由初始 HTML 和 App.vue 统一管理。 */
 .app-wrap{height:100%;display:flex;flex-direction:column}
 .app-main{display:flex;flex:1;min-height:0}
 .sidebar{width:300px;flex-shrink:0;border-right:1px solid var(--surface-border);background:var(--bg)}
@@ -678,9 +674,9 @@ onUnmounted(() => {
 
   /* 移动端聊天视图 */
   .app-main.mobile-view .chat-view {
-    position: fixed;
-    /* 固定在视口上时同样让开顶部安全区，保持与侧边栏一致的留白 */
-    top: env(safe-area-inset-top, 0);
+    position: absolute;
+    /* Share the sidebar's content box instead of reserving a second top inset. */
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;

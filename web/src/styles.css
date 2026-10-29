@@ -6,6 +6,7 @@
   --surface-border:#E8DED3;--surface-border-strong:#DBCDBF;--surface-2:#F1E8DC;--hover:#F3EBE1;
   --input-bg:#FFFDF9;--input-border:#DBCDBF;--input-placeholder:#89796B;--bubble-bg:#FFFDF9;
   --sage-soft:#E9EEE7;--sage-ink:#476456;--bubble-radius:17px;--avatar-radius:14px;
+  --page-safe-top:0px;
 }
 [data-theme="dark"]{
   --bg:#211D1A;--panel:#2D2722;--text-primary:#F4EAE0;--text-secondary:#C2B2A4;--muted:#C2B2A4;
@@ -21,10 +22,17 @@ body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",
    移动端原生体验适配
    ========================================== */
 
-/* 1. 安全区域适配：刘海屏、灵动岛、底部手势条 */
+/* Stop root rubber-banding at the actual page boundary without blocking content scroll. */
+html { overscroll-behavior-y: none; }
+/* Browser chrome already owns its top region. Only installed/fullscreen windows
+   need a separate top inset for the physical cutout/status area. */
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  :root { --page-safe-top:env(safe-area-inset-top, 0px); }
+}
+/* 1. 安全区域适配：侧边刘海、底部手势条不占用额外顶部浏览器栏 */
 body {
-  /* 顶部安全区域（刘海/灵动岛） */
-  padding-top: env(safe-area-inset-top, 0);
+  box-sizing: border-box;
+  padding-top: var(--page-safe-top);
   /* 底部安全区域（手势条） */
   padding-bottom: env(safe-area-inset-bottom, 0);
   /* 左右安全区域（曲面屏圆角） */
@@ -32,16 +40,19 @@ body {
   padding-right: env(safe-area-inset-right, 0);
 }
 
-/* 应用视图锁定文档滚动：顶部安全区留白仍然保留，但文档本身不再可滚动，
-   下拉拖拽/橡皮筋时不会把这块留白拖出来，也不会把整体页面拉下去。 */
-body.app-viewport {
+/* The marker is present in /app's initial HTML, before hydration or auth restoration. */
+html[data-app-viewport] {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html[data-app-viewport] body, body.app-viewport {
   box-sizing: border-box;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
 }
-body.app-viewport #app {
+html[data-app-viewport] #app, body.app-viewport #app {
   height: 100%;
 }
 

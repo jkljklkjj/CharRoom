@@ -165,7 +165,10 @@ async function main(){
     assert.equal(await a.evaluate(()=>document.querySelector('.social-hub').contains(document.activeElement)),true,'Tab remains inside dialog')
     assert.equal(await a.evaluate(()=>document.body.style.overflow),'hidden')
     // Android-like narrow viewport, then a visual viewport reduced by a keyboard.
+    const mobileViewport = await a.target().createCDPSession()
+    await mobileViewport.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:64,bottom:24,left:0,right:0}})
     await a.setViewport({width:390,height:720})
+    assert.equal(await a.$eval('.social-overlay',el=>getComputedStyle(el).paddingTop),'0px','browser dialogs do not reserve a second top bar')
     await click(a,'.social-nav button','我的名片');await a.waitForSelector('.social-profile h2')
     await a.evaluate(()=>{
       Object.defineProperty(window.visualViewport,'height',{configurable:true,value:410})

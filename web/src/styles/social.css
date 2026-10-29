@@ -97,7 +97,7 @@
 .room-mode .social-room .social-room-messages { flex:1 1 120px; min-height:100px; height:auto; max-height:none; }
 .room-mode .social-room > .social-form { margin:8px 0; }
 .social-room-message p { margin:5px 0 0; user-select:text; }
-@media(max-width:699px) { .social-overlay{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);} .social-hub{width:100%;max-height:100%;height:100%;border-radius:0;} .social-layout.has-profile{grid-template-columns:minmax(0,1fr);} .social-detail{border-left:0;} .social-nav{max-width:calc(100% - 28px); margin:8px 14px 10px;} .social-nav button{padding:8px 9px;font-size:12px;} .social-hub .profile-input{font-size:16px;} .social-actions .profile-input{min-width:100%;width:100%;} }
+@media(max-width:699px) { .social-overlay{padding:var(--page-safe-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);} .social-hub{width:100%;max-height:100%;height:100%;border-radius:0;} .social-layout.has-profile{grid-template-columns:minmax(0,1fr);} .social-detail{border-left:0;} .social-nav{max-width:calc(100% - 28px); margin:8px 14px 10px;} .social-nav button{padding:8px 9px;font-size:12px;} .social-hub .profile-input{font-size:16px;} .social-actions .profile-input{min-width:100%;width:100%;} }
 
 /* The public name card contains no controls; editing and relationship tools are below it. */
 .social-profile { min-width:0; color:var(--text-primary); }

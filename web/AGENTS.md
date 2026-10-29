@@ -9,6 +9,7 @@
 - 发布须填写安装包类型、架构、字节数、SHA-256 和 Android versionCode；同步契约与校验边界见 [可靠更新](../docs/development/RELIABLE-UPDATES.md)。
 - 产品介绍页：`src/views/Home.vue` 等；聊天入口：`src/views/WebApp.vue`。
 - Web 纸感品牌在 `styles.css`，与原生 `QingliaoPalette` 对齐；`BrandMark.vue` / `ConversationPreview.vue` 共享首页和登录的视觉元素。产品范围与跨页验证见 [Web 产品设计](../docs/design/WEB-PAPER-PRODUCT.md)。
+- 普通浏览器不额外预留顶部栏高度；独立应用保留真实刘海安全区。`/app` 根滚动锁由初始HTML标记与 `pageViewport.ts` 管理，不能只等WebApp挂载；改动验证见 [手机视口](../docs/development/MOBILE-VIEWPORT.md)。
 - 聊天 UI：`src/components/ChatWindow.vue`、`SidebarUsers.vue`、`LoginRegister.vue`。
 - REST：`src/api/index.ts`（请求与刷新在 `http.ts`）；状态：`src/store/{state,auth,users,messages,storage}.ts`。
 - `/app` 使用 JWT 账号/exp 恢复本地 UI，未到期不请求 `/auth/validate`，后台握手与 REST 拒绝共用懒刷新；握手滚动一分钟每设备最多 6 次、每账号合计最多 12 次，冷却不可当作登出。入口、存储和验证见 [会话恢复](../docs/development/SESSION-RESTORATION.md)。
