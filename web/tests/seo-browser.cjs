@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const puppeteer = require('puppeteer-core');
 const config = require('../site.routes.json');
+const { catalogPaths, resourceCatalog } = require('../scripts/resource-catalog.cjs');
 const root = path.resolve(__dirname, '../dist');
 (async () => {
   const server = http.createServer(async (req, res) => {
@@ -20,6 +21,14 @@ const root = path.resolve(__dirname, '../dist');
   let browser;
   try {
     const origin = `http://127.0.0.1:${server.address().port}`;
+    // Check actual build output over HTTP, including scanners asking for Markdown.
+    for (const uri of catalogPaths) {
+      const response = await fetch(origin + uri, { headers:{ Accept:'text/markdown' } });
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get('content-type'), /^application\/json/);
+      assert.deepEqual(await response.json(), resourceCatalog());
+    }
+    assert.match(await (await fetch(origin + '/robots.txt')).text(), /Agentmap: .*\/\.well-known\/ard\.json/);
     browser = await puppeteer.launch({ executablePath:process.env.CHROME_BIN || process.argv[2], headless:'new', args:['--no-sandbox'] });
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(false);

@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:www.chatlite.xin:docs:home",
+      "displayName": "轻聊 · 和朋友接着聊，遇见新鲜事",
+      "description": "和朋友接着聊，遇见有趣的人，也让小助手搭把手。了解轻聊，使用网页版，或下载 Windows、macOS、Linux 和 Android 客户端。",
+      "type": "text/html",
+      "url": "https://www.chatlite.xin/",
+      "representativeQueries": [
+        "轻聊是什么，在哪里使用？",
+        "有没有支持网页聊天的开源即时通讯应用？"
+      ]
+    },
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:www.chatlite.xin:docs:features",
+      "displayName": "轻聊功能 · 私聊、群聊与聊天助手",
+      "description": "了解轻聊的私聊、群聊、跨设备聊天与助手功能，找到适合日常交流的使用方式。",
+      "type": "text/html",
+      "url": "https://www.chatlite.xin/features",
+      "representativeQueries": [
+        "轻聊支持哪些聊天功能和平台？",
+        "轻聊的群聊和 AI 助手有什么功能？"
+      ]
+    },
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:www.chatlite.xin:docs:faq",
+      "displayName": "轻聊常见问题 · 使用与下载帮助",
+      "description": "查看轻聊支持的平台、下载安装、聊天与账号相关常见问题。",
+      "type": "text/html",
+      "url": "https://www.chatlite.xin/faq",
+      "representativeQueries": [
+        "轻聊是否提供端到端加密？",
+        "轻聊支持哪些平台，消息如何保存？"
+      ]
+    }
+  ]
+}

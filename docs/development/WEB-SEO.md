@@ -32,6 +32,22 @@ Google Search Console / 百度站长平台的站点验证、sitemap 提交、实
 
 参考：[Google JavaScript SEO](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics)、[sitemap 与 lastmod](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)、[noindex](https://developers.google.com/search/docs/crawling-indexing/block-indexing)。
 
+## ARD 资源发现清单
+
+`scripts/resource-catalog.cjs` 从同一索引路由配置与中文元信息生成清单，`generate-static-site-files.cjs` 在构建时写出三个内容相同的 JSON：
+
+- `/.well-known/ard.json`：现行 ARD 规范入口。
+- `/.well-known/ai-catalog.json`：兼容旧版消费者。
+- `/ai-catalog.json`：兼容直接请求根路径的扫描器。
+
+HTML head 提供 `rel="ard"` 和旧版 `rel="ai-catalog"` 链接，robots.txt 提供 Agentmap。目录只列出首页、功能和 FAQ 的公开文档，类型为真实的 `text/html`，不将登录入口或内部聊天 Agent 冒充公开 MCP/A2A 服务，也不声明未经验证的信任签名。
+
+两份 Nginx 配置都为清单提供独立 JSON 路由，绕过首页和 Markdown 回退；文件缺失返回 JSON 404。部署必须包含 dist 的隐藏目录 `.well-known`，不能只复制 `dist/*`。当前 Docker COPY 和共享卷 `cp -a .../.` 会保留该目录。发布时同时更新前端镜像和生产网关配置；仅推送代码不会改变在线响应。如 CDN 缓存了旧的 HTML 回退，需要刷新这三个精确 URL，再检查状态码、Content-Type 与 JSON 正文。
+
+2026-10-29 实测修复前线上三个清单 URL 均为 `200 text/html`，返回首页 doctype；本地修复后生产构建和 HTTP 浏览器测试确认三个地址均为 `application/json`，包括请求 Accept 为 text/markdown 的场景。官方 ARD conformance CLI 使用其 JSON Schema 校验 ArdManifest 与三个 ArdEntry 均通过，无错误；三条提示是 text/html 不在该工具内置的 Agent 类型列表中，不是 schema 失败。现行规范允许按真实 IANA 媒体类型描述资源，见 [ARD §3.3、§4、§5.1](https://agenticresourcediscovery.org/spec/)。
+
+138 项隔离测试串行运行通过；默认并发运行曾遇到 Node 测试运行器 IPC 反序列化错误，串行全量复跑通过。生产构建与 SEO 浏览器回归通过。本机没有 Nginx/Docker，未执行真实 Nginx 联调；HTTP 回归使用 dist 静态服务器，Nginx 分流另有配置断言。跨端评估：只新增 Web 静态发现资源与路由，不改变聊天运行时和协议，桌面/CLI/Android 无对应修改。
+
 跨端评估：本轮只改变 Web 搜索、链接分享和部署输出，原生桌面、CLI、Android 不被网页搜索抓取，无需移植 SEO 元信息；聊天、ACK、本地缓存和接口协议未变更。
 
 ## 首页与 /app 首屏（2026-10-29）
