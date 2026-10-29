@@ -21,6 +21,7 @@
   "sidebar.friends": "友だち",
   "sidebar.groups": "グループ",
   "sidebar.userSearchSearching": "ユーザーを検索中…",
+  "sidebar.userSearchCooldown": "検索は1分に8回までです。{seconds}秒後に再試行してください。",
   "sidebar.userSearchFailed": "検索に失敗しました。再試行してください",
   "sidebar.userSearchRemote": "その他のユーザー",
   "sidebar.userSearchViewCard": "タップしてプロフィールを見る",

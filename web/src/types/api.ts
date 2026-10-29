@@ -1,6 +1,6 @@
 import type { Id, TimeValue, User } from './chat'
 export interface ApiBody<T> { data?: T; code?: number; message?: string }
-export interface FetchResult<T> { ok: boolean; status: number; body: ApiBody<T> | null }
+export interface FetchResult<T> { ok: boolean; status: number; body: ApiBody<T> | null; retryAfterSeconds?: number }
 export interface Tokens { accessToken: string; refreshToken: string }
 export type LoginResult = ({ ok: true } & Tokens) | { ok: false; error: string }
 export interface OfflineMessage {

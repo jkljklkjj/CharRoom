@@ -21,6 +21,7 @@
   "sidebar.friends": "好友",
   "sidebar.groups": "群聊",
   "sidebar.userSearchSearching": "正在找人…",
+  "sidebar.userSearchCooldown": "每分钟最多搜索 8 次，请 {seconds} 秒后重试。",
   "sidebar.userSearchFailed": "搜索失败，请重试",
   "sidebar.userSearchRemote": "其他人",
   "sidebar.userSearchViewCard": "点击查看名片",

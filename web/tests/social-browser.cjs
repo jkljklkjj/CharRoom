@@ -58,7 +58,7 @@ function api(url,method,body,id) {
 const mime={'.js':'application/javascript','.css':'text/css','.html':'text/html','.proto':'text/plain','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.webmanifest':'application/manifest+json'}
 const server=http.createServer((request,response)=>{
   const pathname=new URL(request.url,'http://localhost').pathname
-  const file=path.resolve(dist,pathname==='/app'||pathname==='/'?'index.html':pathname.slice(1))
+  const file=path.resolve(dist,pathname==='/app'?'app/index.html':pathname==='/'?'index.html':pathname.slice(1))
   if(!file.startsWith(dist+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){response.writeHead(404).end();return}
   response.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream'});response.end(fs.readFileSync(file))
 })
@@ -78,7 +78,7 @@ async function main(){
       await page.setViewport({width:1180,height:900});await page.setBypassServiceWorker(true)
       page.on('pageerror',failure=>errors.push(failure.message))
       await page.evaluateOnNewDocument(id=>{
-        sessionStorage.setItem('charroom_token','fixture-'+id);localStorage.setItem('charroom_accountId',String(id));localStorage.setItem('locale','zh-CN')
+        sessionStorage.setItem('charroom_token',btoa('{}')+'.'+btoa(JSON.stringify({uid:String(id),exp:Math.floor(Date.now()/1000)+3600}))+'.fixture');localStorage.setItem('charroom_accountId',String(id));localStorage.setItem('locale','zh-CN')
         globalThis.WebTransport=class{constructor(){this.ready=Promise.resolve();this.closed=new Promise(()=>{});this.incomingBidirectionalStreams=new ReadableStream()}async createBidirectionalStream(){return {readable:new ReadableStream(),writable:new WritableStream({write(){}})}}close(){}}
       },id)
       await page.setRequestInterception(true)
@@ -176,6 +176,17 @@ async function main(){
     assert.equal(await a.$('.social-profile-card button, .social-profile-card input, .social-profile-card select, .social-profile-card textarea'),null,'the name card is presentation only')
     assert.equal(await a.$('.social-detail-header'),null,'My card has no redundant back button above it')
     await a.evaluate(()=>{delete window.visualViewport.height;delete window.visualViewport.offsetTop;window.visualViewport.dispatchEvent(new Event('resize'))})
+    for (const theme of ['light','dark']) {
+      await a.setViewport({width:320,height:720})
+      await a.evaluate(theme=>{document.documentElement.dataset.theme=theme},theme)
+      assert.equal(await a.$eval('.social-profile-card',card=>card.scrollWidth<=card.clientWidth),true,'long card content fits a narrow screen')
+      assert.equal(await a.$eval('.social-profile-content',content=>{
+        const avatar=content.querySelector('.social-avatar').getBoundingClientRect(),title=content.querySelector('h2').getBoundingClientRect()
+        return avatar.bottom<=title.top
+      }),true,'avatar and name never overlap')
+      if(process.env.SOCIAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.SOCIAL_SCREENSHOT_DIR,{recursive:true});await a.screenshot({path:path.join(process.env.SOCIAL_SCREENSHOT_DIR,`profile-320-${theme}.png`)})}
+    }
+    await a.setViewport({width:390,height:720});await a.evaluate(()=>{document.documentElement.dataset.theme='light'})
     // Editing is a separate surface; cancel preserves saved data, privacy preview remains accurate.
     await click(a,'.social-profile-primary button','编辑资料');await a.waitForSelector('.social-profile-editor')
     assert.equal(await a.$('.social-profile-card'),null)
@@ -202,6 +213,7 @@ async function main(){
     assert.equal(await a.evaluate(()=>document.activeElement.tagName),'SUMMARY','preview disclosure remains in keyboard focus loop')
     await a.keyboard.press('Enter');await a.select('.social-profile-secondary select','stranger')
     assert.equal(await a.$('.social-profile-card .social-intent'),null,'stranger preview respects FRIENDS visibility')
+    assert.equal(await a.$('.social-profile-city'),null,'city metadata respects the same privacy preview')
     await a.select('.social-profile-secondary select','friend')
     assert.ok(await a.$('.social-profile-card .social-intent'))
     await a.select('.social-profile-secondary select','self')

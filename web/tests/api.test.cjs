@@ -9,6 +9,16 @@ function fixtureStore() {
 }
 const response = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 const storage = () => { const data = new Map(); return { setItem: (k, v) => data.set(k, v), getItem: k => data.get(k), removeItem: k => data.delete(k) } }
+
+test('search rate limits preserve the session and read server cooldown even without exposed CORS headers', async () => {
+  const store = fixtureStore()
+  const { exports: api } = await loadTs(path.resolve(__dirname, '../src/api/index.ts'), {
+    fetch: async () => response(429, { code: 5001, data: { retryAfterSeconds: 17 } }), Headers,
+    sessionStorage: storage(), localStorage: storage(), window: { location: {} }
+  }, { '../store': { default: store } })
+  await assert.rejects(api.searchUsers('friend'), error => error instanceof api.UserSearchRateLimitError && error.retryAfterSeconds === 17)
+  assert.equal(store.state.token, 'expired')
+})
 test('concurrent 401 requests refresh once and retry with the new bearer token', async () => {
   const store = fixtureStore(), sessionStorage = storage()
   let refreshCalls = 0

@@ -21,6 +21,7 @@
   "sidebar.friends": "Friends",
   "sidebar.groups": "Groups",
   "sidebar.userSearchSearching": "Searching people…",
+  "sidebar.userSearchCooldown": "Up to 8 searches per minute. Try again in {seconds}s.",
   "sidebar.userSearchFailed": "Search failed, please retry",
   "sidebar.userSearchRemote": "Other people",
   "sidebar.userSearchViewCard": "Tap to view profile",

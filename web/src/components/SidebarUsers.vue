@@ -18,13 +18,16 @@
         :aria-selected="tab === item" :tabindex="tab === item ? 0 : -1" aria-controls="sidebar-panel"
         @click="emit('update:tab', item)" @keydown="onTabKeydown($event, item)">{{ $t(`sidebar.${item}`) }}</button>
     </div>
-    <div class="search-bar">
-      <input type="search" :value="query" :aria-label="$t(tab === 'contacts' ? 'sidebar.searchContacts' : 'sidebar.searchMessages')"
+    <form class="search-bar" role="search" @submit.prevent="submitSearch">
+      <input ref="searchInput" type="search" enterkeyhint="search" :value="query" :aria-label="$t(tab === 'contacts' ? 'sidebar.searchContacts' : 'sidebar.searchMessages')"
+        @compositionstart="searchComposing = true" @compositionend="finishSearchComposition"
         :placeholder="$t(tab === 'contacts' ? 'sidebar.searchContacts' : 'sidebar.searchMessages')" @input="emit('update:query', ($event.target as HTMLInputElement).value)" />
-      <button v-if="query" class="clear-search" :aria-label="$t('sidebar.clearSearch')" @click="emit('update:query', '')">×</button>
-    </div>
+      <button v-if="query" type="button" class="clear-search" :aria-label="$t('sidebar.clearSearch')" @click="emit('update:query', '')">×</button>
+      <button type="submit" class="submit-search" :aria-label="$t('polish.searchAction')"><AppIcon name="search" /></button>
+    </form>
     <!-- 联系人搜索会同时找"还不是好友的人"：找到后点一下即可发申请，不需要额外的加好友入口 -->
     <span v-if="remoteSearching" class="user-search-feedback" role="status">{{ $t('sidebar.userSearchSearching') }}</span>
+    <span v-else-if="searchCooldown > 0" class="user-search-feedback" role="status">{{ $t('sidebar.userSearchCooldown', { seconds: searchCooldown }) }}</span>
     <span v-else-if="remoteError" class="user-search-feedback error" role="alert">{{ remoteError }}</span>
 
     <!-- 好友申请弹窗 -->
@@ -120,7 +123,7 @@ import {contactRows,contactRowHeight} from '../utils/virtualContacts'
 import {virtualLayout} from '../utils/virtualLayout'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
-import api from '../api'
+import api, { UserSearchRateLimitError } from '../api'
 import AppIcon from './AppIcon.vue'
 import SocialProfileCard from './SocialProfileCard.vue'
 import BrandMark from './BrandMark.vue'
@@ -130,6 +133,8 @@ import { MSG_TYPE, CONVERSATION_TYPE } from '../proto/constants'
 
 import { contactDirectory, contactName, filterContacts, filterContactDirectory, sortConversationUsers, sidebarUsers, chatTargetId, type SidebarTab } from '../utils/contactDirectory'
 import { pickDailyGreeting } from '../utils/dailyGreeting'
+import { sessionEpoch } from '../services/sessionEpoch'
+import { contactSearchBudget } from '../services/contactSearchBudget'
 
 const props = defineProps<{ tab: SidebarTab; query: string }>()
 const emit = defineEmits<{ 'user-selected': [user: User]; 'open-settings': []; 'open-discovery': []; 'update:tab': [tab: SidebarTab]; 'update:query': [query: string] }>()
@@ -159,8 +164,22 @@ const directory = computed(() => filterContactDirectory(sortedDirectory.value, p
 const remoteHits = ref<UserSearchHit[]>([])
 const remoteSearching = ref(false)
 const remoteError = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
+const searchComposing = ref(false)
 let remoteController: AbortController | undefined
 let remoteTimer: ReturnType<typeof setTimeout> | undefined
+let remoteKeyword = ''
+const searchRetryAt = ref(0), searchClock = ref(Date.now())
+const searchCooldown = computed(() => Math.max(0, Math.ceil((searchRetryAt.value - searchClock.value) / 1000)))
+let cooldownTimer: ReturnType<typeof setInterval> | undefined
+function showSearchCooldown(millis: number) {
+  searchClock.value = Date.now(); searchRetryAt.value = searchClock.value + millis
+  clearInterval(cooldownTimer)
+  cooldownTimer = setInterval(() => {
+    searchClock.value = Date.now()
+    if (!searchCooldown.value) clearInterval(cooldownTimer)
+  }, 1000)
+}
 const contactKeys = computed(() => new Set(allUsers.value.map(u => ConversationId.forContact(u).key)))
 const remoteState = computed(() => new Map(remoteHits.value.map(hit => [String(hit.id), hit])))
 const remoteUsers = computed<User[]>(() => remoteHits.value
@@ -180,29 +199,64 @@ function resetRemoteSearch() {
   clearTimeout(remoteTimer)
   remoteController?.abort()
   remoteController = undefined
+  remoteKeyword = ''
   remoteHits.value = []
   remoteSearching.value = false
   remoteError.value = ''
 }
-watch(() => [props.tab, props.query] as const, ([tab, query]) => {
+async function runRemoteSearch(force = false) {
+  clearTimeout(remoteTimer)
+  const keyword = props.query.trim()
+  if (searchComposing.value || props.tab !== 'contacts' || !keyword) return
+  if (!force && remoteSearching.value && remoteKeyword === keyword) return
+  remoteController?.abort()
+  const owner = String(store.state.accountId)
+  const cooldown = contactSearchBudget.reserve(owner)
+  if (cooldown > 0) { remoteSearching.value = false; showSearchCooldown(cooldown); return }
+  const controller = new AbortController(), session = sessionEpoch.capture()
+  remoteController = controller
+  remoteKeyword = keyword
+  remoteSearching.value = true
+  remoteError.value = ''
+  const active = () => remoteController === controller && !controller.signal.aborted
+    && session.isCurrent() && props.tab === 'contacts' && props.query.trim() === keyword
+  try {
+    const hits = await api.searchUsers(keyword, controller.signal)
+    if (active()) remoteHits.value = hits
+  } catch (error) {
+    if (active() && error instanceof UserSearchRateLimitError) {
+      contactSearchBudget.defer(owner, error.retryAfterSeconds * 1000)
+      showSearchCooldown(error.retryAfterSeconds * 1000)
+    } else if (active()) remoteError.value = t('sidebar.userSearchFailed')
+  } finally {
+    if (remoteController === controller) {
+      remoteSearching.value = false
+      remoteController = undefined
+    }
+  }
+}
+function finishSearchComposition() {
+  searchComposing.value = false
+  clearTimeout(remoteTimer)
+  remoteTimer = setTimeout(() => { void runRemoteSearch() }, 3000)
+}
+async function submitSearch() {
+  // A composing Enter confirms an IME candidate; it must not submit the search.
+  if (searchComposing.value) return
+  const value = searchInput.value?.value ?? props.query
+  if (value !== props.query) emit('update:query', value)
+  await nextTick() // Let the parent query update and its debounce watcher settle first.
+  void runRemoteSearch()
+  if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700) searchInput.value?.blur()
+}
+watch(() => [props.tab, props.query, store.state.accountId] as const, ([tab, query]) => {
   resetRemoteSearch()
   const keyword = query.trim()
   if (tab !== 'contacts' || !keyword) return
-  remoteTimer = setTimeout(async () => {
-    const controller = new AbortController()
-    remoteController = controller
-    remoteSearching.value = true
-    try {
-      remoteHits.value = await api.searchUsers(keyword, controller.signal)
-      remoteError.value = ''
-    } catch (error) {
-      if (!controller.signal.aborted) remoteError.value = t('sidebar.userSearchFailed')
-    } finally {
-      if (remoteController === controller) remoteSearching.value = false
-    }
-  }, 300)
+  remoteTimer = setTimeout(() => { void runRemoteSearch() }, 3000)
 })
-onUnmounted(resetRemoteSearch)
+onUnmounted(() => { resetRemoteSearch(); clearInterval(cooldownTimer) })
+watch(() => store.state.accountId, () => { clearInterval(cooldownTimer); searchRetryAt.value = 0 })
 
 function remoteHint(user: User): string | null {
   const hit = remoteState.value.get(String(user.id))
@@ -232,7 +286,7 @@ function onPreviewChat(profile: { id: string; username: string }) {
 async function onPreviewChanged() {
   await refreshContacts(true)
   if (props.query.trim() && props.tab === 'contacts') {
-    try { remoteHits.value = await api.searchUsers(props.query.trim()) } catch { /* 保留旧结果 */ }
+    await runRemoteSearch(true)
   }
 }
 const visibleCount = computed(() => sections.value.reduce((total, section) => total + section.users.length, 0))
@@ -428,6 +482,10 @@ function loadFriends() { return refreshContacts() }
 .search-bar input{width:100%;min-width:0;background:transparent;color:var(--text-primary);border:0;outline:0;padding:12px;font:inherit;font-size:13px}
 .search-bar input::-webkit-search-cancel-button{display:none}
 .clear-search{border:0;background:transparent;color:var(--text-secondary);font-size:20px;min-width:44px;min-height:44px;cursor:pointer}
+.submit-search{display:grid;place-items:center;flex:none;width:44px;min-height:44px;margin-right:2px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--action);cursor:pointer}
+.submit-search:hover{background:var(--hover)}
+.submit-search:focus-visible,.clear-search:focus-visible{outline:2px solid var(--accent-2);outline-offset:-3px}
+@media(max-width:699px){.search-bar input{font-size:16px}}
 .directory-panel{display:flex;flex-direction:column;min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}
 .section-heading h3{font-size:12px;font-weight:500;color:var(--text-secondary);margin:16px 24px 6px;display:flex;gap:8px}
 .section-heading span{font-variant-numeric:tabular-nums}

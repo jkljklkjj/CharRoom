@@ -16,7 +16,10 @@ async function parseResponse<T>(response: Response): Promise<FetchResult<T>> {
   const wrapped = value !== null && typeof value === 'object' && !Array.isArray(value) &&
     ('data' in value || 'code' in value || 'message' in value)
   const body = (wrapped ? value : { data: value }) as ApiBody<T>
-  return { ok: response.ok, status: response.status, body }
+  const retryAfter = response.headers.get('Retry-After')
+  const retryAfterSeconds = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) : undefined
+  return { ok: response.ok, status: response.status, body,
+    ...(retryAfterSeconds != null && Number.isFinite(retryAfterSeconds) ? { retryAfterSeconds } : {}) }
 }
 async function requestRefresh(token: string, signal: AbortSignal): Promise<RefreshReply> {
   if (!token) return { state: 'invalid' }

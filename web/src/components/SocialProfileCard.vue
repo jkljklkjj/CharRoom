@@ -10,15 +10,20 @@
       <article v-if="!editing" class="social-profile-card">
         <div class="social-cover" aria-hidden="true"></div>
         <div class="social-profile-content">
-          <img v-if="profile.avatarUrl" :src="profile.avatarUrl" class="social-avatar" alt="" />
-          <div v-else class="social-avatar social-initial">{{ profile.username.slice(0, 1) }}</div>
+          <div class="social-profile-identity">
+            <img v-if="profile.avatarUrl" :src="profile.avatarUrl" class="social-avatar" alt="" width="68" height="68" decoding="async" />
+            <div v-else class="social-avatar social-initial">{{ profile.username.slice(0, 1) }}</div>
+            <span class="social-profile-relation">{{ t(`social.relation.${profile.relation}`) }}</span>
+          </div>
           <h2 tabindex="-1">{{ profile.username }}</h2>
-          <p class="social-muted social-profile-account">{{ t('social.account') }} {{ profile.id }} · {{ t(`social.relation.${profile.relation}`) }}</p>
+          <div class="social-profile-meta">
+            <p class="social-muted social-profile-account">{{ t('social.account') }} {{ profile.id }}</p>
+            <p v-if="detailsVisible && profile.city" class="social-muted social-profile-city">{{ profile.city }}</p>
+          </div>
           <p v-if="profile.signature" class="social-profile-signature">{{ profile.signature }}</p>
           <template v-if="detailsVisible">
-            <section v-if="profile.bio"><h3>{{ t('social.bio') }}</h3><p>{{ profile.bio }}</p></section>
+            <section v-if="profile.bio" class="social-profile-bio"><h3>{{ t('social.bio') }}</h3><p>{{ profile.bio }}</p></section>
             <div v-if="profile.interests?.length" class="social-tags"><span v-for="tag in profile.interests" :key="tag">{{ tag }}</span></div>
-            <p v-if="profile.city" class="social-muted">{{ t('social.city') }} · {{ profile.city }}</p>
             <section v-if="profile.intent" class="social-intent"><h3>{{ t('social.intent') }}</h3><p>{{ profile.intent }}</p></section>
           </template>
           <p v-else class="social-muted">{{ t('social.hidden') }}</p>

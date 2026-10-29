@@ -9,7 +9,7 @@ const types = root.lookupEnum('com.chatlite.proto.MessageWrapperType').values
 const mime = { '.js': 'application/javascript', '.css': 'text/css', '.html': 'text/html', '.proto': 'text/plain', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' }
 const server = http.createServer((request, response) => {
   const pathname = new URL(request.url, 'http://localhost').pathname
-  const file = path.resolve(dist, pathname === '/app' || pathname === '/' ? 'index.html' : pathname.slice(1))
+  const file = path.resolve(dist, pathname === '/app' ? 'app/index.html' : pathname === '/' ? 'index.html' : pathname.slice(1))
   if (!file.startsWith(dist + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404).end(); return }
   response.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'application/octet-stream' }); response.end(fs.readFileSync(file))
 })
@@ -26,6 +26,8 @@ async function main() {
     const login = framed(Wrapper.encode(Wrapper.fromObject({ type: types.RESPONSE, response: { success: true, clientId: '91001' } })).finish())
     const context = await browser.createIncognitoBrowserContext(), page = await context.newPage()
     let directoryDelay=0,directoryRequests=0,directoryPending=0
+    const searches = []
+    page.searches = searches
     page.setDirectoryDelay=value=>{directoryDelay=value}
     page.directoryRequests=()=>directoryRequests
     page.directoryPending=()=>directoryPending
@@ -33,7 +35,7 @@ async function main() {
     await page.setViewport({ width: 1180, height: 850 }); await page.setBypassServiceWorker(true)
     page.on('pageerror', error => errors.push(error.message))
     await page.evaluateOnNewDocument(({ locale, login }) => {
-      sessionStorage.setItem('charroom_token', 'fixture-token')
+      sessionStorage.setItem('charroom_token', btoa('{}') + '.' + btoa(JSON.stringify({uid:'91001',exp:Math.floor(Date.now()/1000)+3600})) + '.fixture')
       localStorage.setItem('charroom_accountId', '91001'); localStorage.setItem('locale', locale)
       globalThis.fixtureWrites = []; globalThis.fixtureReaders = []
       globalThis.fixtureCollatorComparisons = 0
@@ -56,6 +58,15 @@ async function main() {
       if (url.origin === origin) { request.continue(); return }
       if (!url.pathname.startsWith('/api/')) { request.abort(); return }
       let data = []
+      if (url.pathname === '/api/users/search' && request.method() === 'GET') {
+        const keyword = url.searchParams.get('q')
+        searches.push(keyword)
+        if (keyword === 'server-cooldown') {
+          void request.respond({status:429,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({code:5001,data:{retryAfterSeconds:2}})})
+          return
+        }
+        if (keyword.startsWith('Remote fixture')) data = [{ id: 91020, username: keyword, relation: 'NONE' }]
+      }
       if (url.pathname === '/api/cluster/owner') data = { ownerGatewayId: 'fixture', ownerEndpoint: '', gateways: [{ gatewayId: 'fixture' }] }
       if (url.pathname === '/api/auth/validate') data = { valid: true }
       if (url.pathname === '/api/users/me') data = { id: 91001, username: 'Fixture self' }
@@ -120,6 +131,14 @@ async function main() {
     await page.focus('.composer textarea'); await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control'); await page.keyboard.press('Backspace')
     await page.click('.mobile-header .back-btn'); await page.waitForSelector('#sidebar-tab-contacts[aria-selected="true"]')
     assert.equal(await page.$eval('.search-bar input', element => element.value), ' ALI ')
+    await page.click('.clear-search')
+    await page.focus('.search-bar input')
+    await page.$eval('.search-bar input', input => { input.value = 'Remote fixture'; input.dispatchEvent(new Event('input', { bubbles: true })) })
+    await page.keyboard.press('Enter')
+    assert.equal(await page.$eval('.search-bar input', input => document.activeElement === input), false, 'mobile Search submits and dismisses the keyboard')
+    await page.waitForSelector('[data-contact-id="user:91020"]')
+    assert.equal(page.searches.filter(query => query === 'Remote fixture').length, 1, 'submit cancels the debounce instead of issuing two searches')
+    assert.equal(new URL(page.url()).pathname, '/app', 'search must not navigate away or reload')
     await page.click('.clear-search'); await page.type('.search-bar input', 'not-a-contact')
     await page.waitForSelector('#sidebar-panel [role="status"]')
     assert.equal(await page.$('.user-row'), null)
@@ -249,8 +268,53 @@ async function main() {
     await collision.waitForFunction(()=>document.querySelector('.messages')?.textContent.includes('private same ID'))
     assert.ok(!await collision.$eval('.messages',el=>el.textContent.includes('isolated group delivery')))
     await collision.close()
+    const searchPage = await fixturePage(true)
+    await searchPage.setViewport({width:390,height:844})
+    await searchPage.waitForSelector('.mobile-view #sidebar-tab-contacts')
+    await searchPage.click('#sidebar-tab-contacts')
+    async function submitKeyword(target, keyword) {
+      await target.focus('.search-bar input')
+      await target.$eval('.search-bar input', (input, value) => { input.value=value; input.dispatchEvent(new Event('input',{bubbles:true})) }, keyword)
+      await target.keyboard.press('Enter')
+    }
+    for (let i=0;i<8;i++) {
+      await submitKeyword(searchPage, `Remote fixture ${i}`)
+      await searchPage.waitForFunction(name => document.querySelector('[data-contact-id="user:91020"] .name')?.textContent===name, {}, `Remote fixture ${i}`)
+    }
+    await submitKeyword(searchPage,'Remote fixture ninth')
+    await searchPage.waitForFunction(() => document.querySelector('.user-search-feedback')?.textContent.includes('8 次'))
+    assert.equal(searchPage.searches.length,8,'the ninth submission is blocked locally')
+    await searchPage.close()
+    const automatic = await fixturePage(true)
+    await automatic.click('#sidebar-tab-contacts')
+    const started = Date.now()
+    await automatic.type('.search-bar input','Remote fixture automatic')
+    await new Promise(resolve=>setTimeout(resolve,1800))
+    assert.equal(automatic.searches.length,0,'typing does not search before the three-second pause')
+    await automatic.waitForSelector('[data-contact-id="user:91020"]')
+    assert.ok(Date.now()-started>=2800)
+    await automatic.$eval('.search-bar input', input => {
+      input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}))
+      input.value='Remote fixture composed';input.dispatchEvent(new Event('input',{bubbles:true}))
+      input.form.requestSubmit()
+    })
+    assert.equal(automatic.searches.length,1,'IME confirmation must not submit a second search')
+    await automatic.$eval('.search-bar input', input => input.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true})))
+    await automatic.click('.submit-search')
+    await automatic.waitForFunction(() => document.querySelector('[data-contact-id="user:91020"] .name')?.textContent==='Remote fixture composed')
+    assert.equal(automatic.searches.length,2,'the visible search button shares the immediate submit path')
+    await submitKeyword(automatic,'server-cooldown')
+    await automatic.waitForFunction(() => document.querySelector('.user-search-feedback')?.textContent.includes('秒后重试'))
+    assert.ok(await automatic.$('.users-wrap'),'server throttling does not log out the account')
+    await submitKeyword(automatic,'Remote fixture after cooldown')
+    assert.equal(automatic.searches.length,3,'server cooldown stops premature client retries')
+    await automatic.waitForFunction(() => !document.querySelector('.user-search-feedback')?.textContent.includes('秒后重试'))
+    await submitKeyword(automatic,'Remote fixture after cooldown')
+    await automatic.waitForFunction(() => document.querySelector('[data-contact-id="user:91020"] .name')?.textContent==='Remote fixture after cooldown')
+    assert.equal(automatic.searches.length,4,'server cooldown expires without an app reload')
+    await automatic.close()
     assert.deepEqual(errors, [])
-    console.log('PASS: typed same-ID private/group drafts, wire routing, unread and history isolation; 5000-contact bounded DOM, keyboard/mobile navigation, cache-first reload and delayed ACK lifecycle.')
+    console.log('PASS: mobile Enter/button, 3-second debounce, eight/minute quota, server cooldown, IME; same-ID private/group isolation, 5000-contact bounded DOM, cache-first reload and delayed ACK lifecycle.')
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)) }
 }
 main().catch(error => { console.error(error); server.close(); process.exitCode = 1 })

@@ -135,13 +135,20 @@ export interface UserSearchHit {
 }
 
 /** 按昵称/ID 搜人（加好友用）。发现页只含公开名片，这里覆盖全部用户。 */
+export class UserSearchRateLimitError extends Error {
+  constructor(public retryAfterSeconds: number) { super('User search rate limited') }
+}
 export async function searchUsers(q: string, signal?: AbortSignal): Promise<UserSearchHit[]> {
   const keyword = q.trim()
   if (!keyword) return []
-  const { ok, body } = await safeFetch<UserSearchHit[]>(`${API_BASE}/users/search?q=${encodeURIComponent(keyword)}`, { method: 'GET', signal })
+  const { ok, body, status, retryAfterSeconds } = await safeFetch<UserSearchHit[] | { retryAfterSeconds: number }>(`${API_BASE}/users/search?q=${encodeURIComponent(keyword)}`, { method: 'GET', signal })
+  if (status === 429 || body?.code === 5001) {
+    const cooldown = body?.data && !Array.isArray(body.data) ? body.data.retryAfterSeconds : retryAfterSeconds
+    throw new UserSearchRateLimitError(Number.isFinite(cooldown) && cooldown! > 0 ? Math.min(cooldown!, 60) : 60)
+  }
   const error = businessError(ok, body, '搜索失败')
   if (error) throw new Error(error)
-  return body?.data || []
+  return Array.isArray(body?.data) ? body.data : []
 }
 
 export async function addFriend(account: string): Promise<{ ok: boolean; message: string }> {

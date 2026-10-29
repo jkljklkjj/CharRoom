@@ -1,0 +1,16 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const path = require('node:path')
+const { loadTs } = require('./helpers.cjs')
+test('search shares eight rolling attempts per account, respects server cooldown and recovers at the boundary', async () => {
+  const { exports: { ContactSearchBudget } } = await loadTs(path.resolve(__dirname, '../src/services/contactSearchBudget.ts'))
+  let now = 1000
+  const budget = new ContactSearchBudget(() => now)
+  for (let i = 0; i < 8; i++) assert.equal(budget.reserve('A'), 0)
+  assert.equal(budget.reserve('A'), 60000)
+  assert.equal(budget.reserve('B'), 0)
+  now = 60999; assert.equal(budget.reserve('A'), 1)
+  now = 61000; assert.equal(budget.reserve('A'), 0)
+  budget.defer('A', 30000); assert.equal(budget.reserve('A'), 30000)
+  now += 30000; assert.equal(budget.reserve('A'), 0)
+})
