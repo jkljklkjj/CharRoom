@@ -2,6 +2,8 @@
 
 先执行 `git status --short`，保留已有修改。后端是相邻独立仓库 `../chat-room/`。修改 Web 时另读 [web/AGENTS.md](web/AGENTS.md)。
 
+AI 辅助文件存放在 `.agent/`，技能源目录是 `.agent/skills/`。聚合工作区的 `.agents/skills` 是发现入口，可运行相邻后端的 `scripts/link-project-skills.ps1` 创建或修复链接。
+
 ## 按实际构建理解项目
 
 - 根构建应用的是 Kotlin **JVM** 插件，不是 `kotlin("multiplatform")`。`commonMain` 是共享源码目录命名，不能据此假定 JS/iOS target 或 expect/actual 源集已经存在。
