@@ -12,6 +12,8 @@ export const state = reactive<ChatState>({
   groupMessages: [],
   conversationStates: {},
   conversationSeqIds: {},
+  pinnedConversations: [],
+  hiddenConversations: [],
   token: '',
   refreshToken: '',
   accountId: '',

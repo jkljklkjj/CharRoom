@@ -6,7 +6,7 @@ test('localStorage cursors are never accepted as committed IndexedDB cursors', a
   const { exports: auth } = await loadTs(path.resolve(__dirname, '../src/store/auth.ts'), {
     localStorage: { getItem: () => raw }
   }, { './state': { state }, './storage': { buildAccountPrefix: id => String(id) },
-    './messages': { resetConversationViews() {} }, './users': { rebuildConversationStates() {},clearConversationPreviewCache() {} }, '../services/sessionEpoch': { sessionEpoch: { renew() {} } } })
+    './messages': { resetConversationViews() {} }, './users': { rebuildConversationStates() {},clearConversationPreviewCache() {} }, './conversationPrefs': { loadConversationPrefs() {}, resetConversationPrefs() {} }, '../services/sessionEpoch': { sessionEpoch: { renew() {} } } })
   auth.setAccountId('1')
   assert.deepEqual({ ...state.conversationSeqIds }, {})
   raw = JSON.stringify({ version: 2, cursors: { good: '9007199254740993', invalid: -1, unsafe: Number('9007199254740993') } })
@@ -25,6 +25,7 @@ test('logout clears only the captured owner social snapshots/drafts and resets s
     localStorage:{getItem:key=>values.get(key),removeItem:key=>values.delete(key)}
   },{'./state':{state},'./storage':{buildAccountPrefix:id=>`history_${id}_`},
     './messages':{resetConversationViews(){}},'./users':{rebuildConversationStates(){},clearConversationPreviewCache(){}},
+    './conversationPrefs':{loadConversationPrefs(){},resetConversationPrefs(){}},
     '../services/sessionEpoch':{sessionEpoch:{renew(){}}},'../services/socialViewCache':{socialViewCache:{clear(){clears++}}}
   })
   auth.clearAll()

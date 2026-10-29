@@ -253,7 +253,7 @@ const currentChatId = computed(() => {
 // 当前选中的聊天用户
 const currentChatUser = computed(() => {
   if (currentChatId.value == null) return null
-  return sidebarUsers(store.state.users, store.state.groups).find(u => ConversationId.forContact(u).key === currentChatId.value) || null
+  return sidebarUsers(store.state.users, store.state.groups, store.state.accountId).find(u => ConversationId.forContact(u).key === currentChatId.value) || null
 })
 
 // 是否为群聊

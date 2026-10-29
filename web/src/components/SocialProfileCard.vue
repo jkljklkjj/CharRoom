@@ -155,10 +155,12 @@ async function perform(work: () => Promise<void>) {
 }
 const isDiscoverable = computed(() => Boolean(profile.value?.settings?.discoverable))
 const visibilityState = computed(() => {
-  if (!profile.value?.settings) return ''
-  if (!isDiscoverable.value) return t('social.stateHidden')
-  // 候选池要求“允许推荐 + 可见范围公开”，只勾推荐不改可见性依然进不去
-  return profile.value.settings.visibility === 'PUBLIC' ? t('social.statePublic') : t('social.stateNeedsPublic')
+  const settings = profile.value?.settings
+  if (!settings) return ''
+  // 发现页要求“允许推荐 + 可见范围公开”，两种条件缺一不可，提示要分别说清楚
+  if (settings.visibility === 'PUBLIC') return t(isDiscoverable.value ? 'social.statePublic' : 'social.stateNeedsDiscoverable')
+  if (settings.visibility === 'SELF') return t('social.stateSelf')
+  return t(isDiscoverable.value ? 'social.stateNeedsPublic' : 'social.stateHidden')
 })
 /** 一键公开名片：把可见性设为公开并打开推荐，省掉 5 个下拉框的配置成本 */
 function publishOwn() {

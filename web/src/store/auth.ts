@@ -4,6 +4,7 @@ import { state } from './state'
 import { buildAccountPrefix } from './storage'
 import { clearOwnProfileCache } from '../utils/socialProfileCache'
 import { rebuildConversationStates,clearConversationPreviewCache } from './users'
+import { loadConversationPrefs, resetConversationPrefs } from './conversationPrefs'
 import { sessionEpoch } from '../services/sessionEpoch'
 import {socialViewCache} from '../services/socialViewCache'
 import {clearDailyAnswerDraft} from '../utils/dailyAnswerDraft'
@@ -26,6 +27,7 @@ export function setAccountId(id: Id) {
   state.groupMessages = []
   state.conversationStates = {}
   state.conversationSeqIds = {}
+  loadConversationPrefs(state.accountId)
   rebuildConversationStates()
 }
 
@@ -56,4 +58,5 @@ export function clearAll() {
   state.groupMessages = []
   state.conversationStates = {}
   state.conversationSeqIds = {}
+  resetConversationPrefs()
 }

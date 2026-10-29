@@ -134,14 +134,20 @@ export interface UserSearchHit {
   relation: 'NONE' | 'PENDING' | 'FRIEND'
 }
 
-/** 按昵称/ID 搜人（加好友用）。发现页只含公开名片，这里覆盖全部用户。 */
+/** 联系人远程搜索每页 6 条，最多 4 页；账号/ID 不参与匹配。 */
+export const USER_SEARCH_PAGE_SIZE = 6
+export const USER_SEARCH_MAX_PAGE = 4
+
+/** 按昵称分页搜人（加好友用）。发现页只含公开名片，这里覆盖全部用户。 */
 export class UserSearchRateLimitError extends Error {
   constructor(public retryAfterSeconds: number) { super('User search rate limited') }
 }
-export async function searchUsers(q: string, signal?: AbortSignal): Promise<UserSearchHit[]> {
+export async function searchUsers(q: string, page = 1, signal?: AbortSignal): Promise<UserSearchHit[]> {
   const keyword = q.trim()
   if (!keyword) return []
-  const { ok, body, status, retryAfterSeconds } = await safeFetch<UserSearchHit[] | { retryAfterSeconds: number }>(`${API_BASE}/users/search?q=${encodeURIComponent(keyword)}`, { method: 'GET', signal })
+  const current = Math.min(Math.max(Math.trunc(page) || 1, 1), USER_SEARCH_MAX_PAGE)
+  const offset = (current - 1) * USER_SEARCH_PAGE_SIZE
+  const { ok, body, status, retryAfterSeconds } = await safeFetch<UserSearchHit[] | { retryAfterSeconds: number }>(`${API_BASE}/users/search?q=${encodeURIComponent(keyword)}&limit=${USER_SEARCH_PAGE_SIZE}&offset=${offset}`, { method: 'GET', signal })
   if (status === 429 || body?.code === 5001) {
     const cooldown = body?.data && !Array.isArray(body.data) ? body.data.retryAfterSeconds : retryAfterSeconds
     throw new UserSearchRateLimitError(Number.isFinite(cooldown) && cooldown! > 0 ? Math.min(cooldown!, 60) : 60)

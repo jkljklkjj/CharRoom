@@ -63,6 +63,9 @@ export interface ChatState {
   groupMessages: ChatMessage[]
   conversationStates: Record<string, ConversationState>
   conversationSeqIds: Record<string, Id>
+  /** 会话列表偏好：只影响展示，不删除 IndexedDB 中的聊天记录 */
+  pinnedConversations: string[]
+  hiddenConversations: string[]
   token: string
   refreshToken: string
   accountId: string

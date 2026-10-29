@@ -3,6 +3,7 @@ import {ConversationId} from '../utils/conversationId'
 import {sidebarUsers} from '../utils/contactDirectory'
 import { state } from './state'
 import { getConversationKey, sanitizeId } from './storage'
+import { revealConversation } from './conversationPrefs'
 import { getAllConversationMeta } from '../utils/messageDB'
 import { conversationPreviewText } from '../utils/format'
 import i18n from '../i18n'
@@ -96,7 +97,7 @@ export async function rebuildConversationStates(forceRefresh = false) {
 
   // 从当前 state 起步，保留重建期间的新 patch（unreadCount / 更新的时间）
   const nextStates: Record<string, ConversationState> = { ...state.conversationStates }
-  sidebarUsers(state.users,state.groups).forEach(user => {
+  sidebarUsers(state.users,state.groups,state.accountId).forEach(user => {
     if (!user || user.id == null) return
     const key = ConversationId.forContact(user).key
     const convId = normalizeConversationId(key)
@@ -128,6 +129,8 @@ export function invalidateConversationPreview(conversationId: Id) {
 export function updateConversationState(conversationId: Id, patch: ConversationPatch = {}) {
   const key = getConversationKey(conversationId)
   if (!key) return
+  // 发送/接收新消息时把“删除”过的会话重新放回消息列表；历史记录一直都在。
+  if (patch.lastMessagePreview !== undefined) revealConversation(conversationId)
   const current = state.conversationStates[key] || { lastIncomingMessageTime: 0, unreadCount: 0 }
   state.conversationStates[key] = {
     lastIncomingMessageTime: Math.max(current.lastIncomingMessageTime || 0, patch.lastIncomingMessageTime || 0),

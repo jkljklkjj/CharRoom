@@ -8,7 +8,7 @@ export const contactName = (user: User): string => user.name || user.username ||
 /** Read the raw server ID only at an API/transport boundary. */
 export const chatTargetId = (id: Id): string => ConversationId.parse(id).id
 
-export function sidebarUsers(users: readonly User[], groups: readonly Group[]): User[] {
+export function sidebarUsers(users: readonly User[], groups: readonly Group[], selfId?: Id): User[] {
   const merged = new Map(users.map(user => [ConversationId.forContact(user).key, user]))
   for (const group of groups) {
     const id = String(group.id)
@@ -16,7 +16,9 @@ export function sidebarUsers(users: readonly User[], groups: readonly Group[]): 
     const existing = merged.get(key)
     merged.set(key, { ...existing, id, conversationKind: 'group', username: group.name || group.groupName || existing?.username || String(group.id) })
   }
-  return [...merged.values()]
+  const self = selfId == null ? '' : String(selfId)
+  // 自己和群组可能数字同号：按会话类型区分，群组同名 ID 不能被当成本人过滤掉
+  return [...merged.values()].filter(user => user.conversationKind === 'group' || String(user.id) !== self)
 }
 
 /**
@@ -26,8 +28,12 @@ export function sidebarUsers(users: readonly User[], groups: readonly Group[]): 
  */
 const normalizeSearchText = (value: string): string => value.normalize('NFKC').toLocaleLowerCase().trim()
 
+/**
+ * 联系人搜索只匹配昵称（含群名），不再把账号/ID 当模糊关键字，
+ * 避免输入数字时意外命中一串无关账号。
+ */
 function matchesKeyword(user: User, keyword: string): boolean {
-  return !keyword || [user.name, user.username, user.account, String(user.id)]
+  return !keyword || [user.name, user.username]
     .some(value => value != null && normalizeSearchText(String(value)).includes(keyword))
 }
 
@@ -49,10 +55,12 @@ export function contactDirectory(users: readonly User[], selfId: Id, locale: str
   return { friends: sorted.filter(user => user.conversationKind!=='group'), groups: sorted.filter(user => user.conversationKind==='group') }
 }
 
-/** Compute identities and activity once, outside the O(n log n) comparator. */
-export function sortConversationUsers(users: readonly User[], activity: (key: string) => ConversationState | undefined): User[] {
+/** Compute identities and activity once, outside the O(n log n) comparator. Pinned rows always lead. */
+export function sortConversationUsers(users: readonly User[], activity: (key: string) => ConversationState | undefined,
+                                      pinned: (key: string) => boolean = () => false): User[] {
   return users.map(user => {
-    const summary = activity(ConversationId.forContact(user).key)
-    return { user, time: summary?.lastIncomingMessageTime || 0, unread: summary?.unreadCount || 0 }
-  }).sort((a, b) => b.time - a.time || b.unread - a.unread).map(row => row.user)
+    const key = ConversationId.forContact(user).key
+    const summary = activity(key)
+    return { user, pinned: pinned(key) ? 1 : 0, time: summary?.lastIncomingMessageTime || 0, unread: summary?.unreadCount || 0 }
+  }).sort((a, b) => b.pinned - a.pinned || b.time - a.time || b.unread - a.unread).map(row => row.user)
 }

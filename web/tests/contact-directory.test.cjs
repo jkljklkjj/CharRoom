@@ -16,12 +16,16 @@ test('directory excludes self/assistant, merges groups without ID collisions and
   assert.equal(api.contactDirectory(users.slice(0, 2), 7, 'en').friends.length, 0)
 })
 
-test('search trims input, matches names/accounts and group target stays positive on wire', async () => {
+test('search trims input and only matches nicknames, never the account/ID', async () => {
   const { exports: api } = await loadTs(file)
   const users = [{ id: 21, username: 'Alice', account: 'flower' }, { id: 21, username: 'Walking', conversationKind:'group' }]
-  assert.equal(api.filterContactDirectory(api.contactDirectory(users, 7, 'en'), ' ALI ').friends.length, 1)
-  assert.equal(api.filterContactDirectory(api.contactDirectory(users, 7, 'en'), 'flower').friends.length, 1)
-  assert.equal(api.filterContactDirectory(api.contactDirectory(users, 7, 'en'), '21').groups.length, 1)
+  const directory = api.contactDirectory(users, 7, 'en')
+  assert.equal(api.filterContactDirectory(directory, ' ALI ').friends.length, 1)
+  assert.equal(api.filterContactDirectory(directory, 'walk').groups.length, 1)
+  // 账号和数字 ID 都不再作为联系人的模糊关键字
+  assert.equal(api.filterContactDirectory(directory, 'flower').friends.length, 0)
+  assert.equal(api.filterContactDirectory(directory, '21').friends.length, 0)
+  assert.equal(api.filterContactDirectory(directory, '21').groups.length, 0)
   assert.equal(api.chatTargetId('group:21'), '21')
   assert.equal(api.chatTargetId('user:21'), '21')
   assert.equal(api.chatTargetId('user:0'), '0')
@@ -72,4 +76,24 @@ test('conversation ranking reads activity once per contact and preserves ties an
   assert.deepEqual(Array.from(calls), ['user:21', 'group:21', 'user:22'])
   assert.deepEqual(Array.from(sorted), [users[1], users[0], users[2]])
   assert.deepEqual(users.map(u => u.id), [21, 21, 22])
+})
+
+test('sidebar hides the signed-in account but keeps a same-numbered group', async () => {
+  const { exports: api } = await loadTs(file)
+  const users = [{ id: 7, username: 'Me' }, { id: 21, username: 'Other' }]
+  const merged = api.sidebarUsers(users, [{ id: '7', name: 'Room 7' }], 7)
+  assert.deepEqual(Array.from(merged.map(u => `${u.conversationKind || 'private'}:${u.id}`)), ['private:21', 'group:7'])
+  // 不传 selfId 时保持旧行为，调用方必须显式声明“我是谁”
+  assert.equal(api.sidebarUsers(users, []).length, 2)
+})
+
+test('pinned conversations lead regardless of activity and unread count', async () => {
+  const { exports: api } = await loadTs(file)
+  const users = [{ id: 21 }, { id: 22 }, { id: 23 }]
+  const sorted = api.sortConversationUsers(users, key => {
+    if (key === 'user:21') return { lastIncomingMessageTime: 100, unreadCount: 0 }
+    if (key === 'user:22') return { lastIncomingMessageTime: 50, unreadCount: 3 }
+    return undefined
+  }, key => key === 'user:23')
+  assert.deepEqual(Array.from(sorted, u => u.id), [23, 21, 22])
 })

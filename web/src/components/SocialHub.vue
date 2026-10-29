@@ -6,7 +6,7 @@
         <button v-for="item in ['people', 'encounter', 'daily', 'me'] as const" :key="item" :aria-pressed="ready && tab === item" :aria-busy="pending === item" :class="{ active: tab === item }" @click="changeTab(item)">{{ t(`social.${item}`) }}</button>
       </nav>
       <!-- 标题块放在标签栏下方：它只随“找人”页出现，若置于上方会把整排标签按钮顶下去 -->
-      <div class="social-welcome" v-if="tab === 'people'"><h2>{{ t('product.discoverTitle') }}</h2><p>{{ t('product.discoverLead') }}</p></div>
+      <div class="social-welcome" v-if="tab === 'people'"><h2>{{ t('product.discoverTitle') }}</h2></div>
       <div class="social-loading-track"><div v-if="busy || pending" class="social-loading-line" role="progressbar" :aria-label="t('social.loading')"></div></div>
       <div class="social-entry-status" role="status" aria-live="polite"><span v-if="pending">{{ t('social.preparing', { page: t(`social.${pending}`) }) }}</span></div>
       <div v-if="entryError" class="social-entry-error social-error" role="alert">{{ entryError }} <button class="cancel-btn" @click="retryEntry">{{ t('polish.retry') }}</button></div>
@@ -22,10 +22,10 @@
                 <label>{{ t('social.tags') }}<input v-model="tag" maxlength="24" class="profile-input" /></label>
               </div></details>
             </form>
-            <p class="social-muted">{{ t('social.discoveryHint') }}</p>
+            <p v-if="!people.length && !error && !busy" class="social-muted">{{ t('social.discoveryHint') }}</p>
             <div v-if="!people.length && !error" class="social-empty" :aria-busy="busy">
               <div v-if="busy" class="social-empty-loading" role="status"><span class="social-spinner" aria-hidden="true"></span>{{ t('social.loading') }}</div>
-              <template v-else><h3>{{ t('polish.noPeople') }}</h3><p class="social-muted">{{ t('social.empty') }}</p><p class="social-muted">{{ t('social.emptyOptIn') }}</p><button class="cancel-btn" @click="changeTab('me')">{{ t('social.publishCard') }}</button></template>
+              <template v-else><p class="social-muted">{{ t('social.empty') }}</p><button class="cancel-btn" @click="changeTab('me')">{{ t('social.publishCard') }}</button></template>
             </div>
             <article v-for="person in people" :key="person.id" class="social-person">
               <div class="social-person-head"><img v-if="person.avatarUrl" :src="person.avatarUrl" class="social-avatar" alt="" /><div v-else class="social-avatar social-initial">{{ person.username.slice(0, 1) }}</div><div><h3>{{ person.username }}</h3><p class="social-muted">{{ person.signature || person.city }}</p></div></div>
@@ -242,7 +242,11 @@ async function changeTab(value: Tab) {
   })
 }
 function onBlocked(id: string) { invalidatePages(); people.value = people.value.filter(person => person.id !== id); selected.value = '' }
-function onSaved(profile: SocialProfile) { invalidatePages(); store.mergeUsers([{ id: profile.id, username: profile.username, name: profile.username, signature: profile.signature }]) }
+function onSaved(profile: SocialProfile) {
+  invalidatePages()
+  // 名片主人不是联系人：合并进 users 会让消息页多出一条“自己和自己”的会话
+  if (String(profile.id) !== accountId.value) store.mergeUsers([{ id: profile.id, username: profile.username, name: profile.username, signature: profile.signature }])
+}
 function startChat(profile: SocialProfile) { emit('chat', profile) }
 watch(accountId, () => { clearTimeout(draftTimer);draftDirty=false;cacheSession=sessionEpoch.capture();socialViewCache.activate(accountId.value,cacheSession.version);cancelEntry(); invalidatePages(); ready.value = false; preparedProfile.value = null; preparedBlocked.value = []; revision++; controller.abort(); people.value = []; daily.value = null; selected.value = ''; query.value = ''; tag.value = ''; channel.value = 'all'; if (!accountId.value) emit('close'); else changeTab('people') })
 onMounted(() => { window.addEventListener('resize', resize);window.addEventListener('pagehide',flushAnswerDraft);document.addEventListener('visibilitychange',onHidden);changeTab(props.initialTab) })

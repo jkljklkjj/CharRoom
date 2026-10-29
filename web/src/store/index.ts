@@ -5,6 +5,7 @@ import { setToken, setRefreshToken, setAccountId, setPendingRegister,
 import { setUsers, setGroups, mergeUsers,
          addUser, removeUser, updateUserOnlineStatus,
          rebuildConversationStates, updateConversationState, clearConversationUnread } from './users'
+import { toggleConversationPin, hideConversation } from './conversationPrefs'
 import { beginHistorySync, restoreAppliedCursors, restoreHistoryPage, addMessage, addGroupMessage, upsertAgentStreamMessage,
          updateMessageStatus, confirmMessageId, setSelectedChat,
          loadLatestMessages, setHistoryFollowingLatest, loadOlderMessages, trimMessages, trimGroupMessages,
@@ -36,6 +37,8 @@ export function useStore() {
     rebuildConversationStates,
     updateConversationState,
     clearConversationUnread,
+    toggleConversationPin,
+    hideConversation,
     setLoginValid,
     getConversationSeqId,
     setConversationSeqId,

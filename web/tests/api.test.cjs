@@ -19,6 +19,19 @@ test('search rate limits preserve the session and read server cooldown even with
   await assert.rejects(api.searchUsers('friend'), error => error instanceof api.UserSearchRateLimitError && error.retryAfterSeconds === 17)
   assert.equal(store.state.token, 'expired')
 })
+test('contact search requests six results per page and clamps to four pages', async () => {
+  const urls = []
+  const { exports: api } = await loadTs(path.resolve(__dirname, '../src/api/index.ts'), {
+    fetch: async url => { urls.push(String(url)); return response(200, { data: [] }) }, Headers,
+    sessionStorage: storage(), localStorage: storage(), window: { location: {} }
+  }, { '../store': { default: fixtureStore() } })
+  await api.searchUsers('nick', 2)
+  await api.searchUsers('nick', 99)
+  await api.searchUsers('nick', 0)
+  assert.ok(urls[0].includes('limit=6&offset=6'))
+  assert.ok(urls[1].includes('limit=6&offset=18'), 'page 4 is the hard cap')
+  assert.ok(urls[2].includes('limit=6&offset=0'), 'page 0 falls back to the first page')
+})
 test('concurrent 401 requests refresh once and retry with the new bearer token', async () => {
   const store = fixtureStore(), sessionStorage = storage()
   let refreshCalls = 0

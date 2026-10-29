@@ -70,7 +70,7 @@
 
     <span v-if="store.state.directoryPhase === 'refreshing'" class="directory-feedback" role="status">{{ $t('sync.refreshing') }}</span>
     <button v-else-if="store.state.directoryPhase === 'stale'" class="directory-feedback" @click="refreshContacts(true)">{{ $t('sync.stale') }}</button>
-    <div ref="directoryPanel" id="sidebar-panel" class="directory-panel" role="tabpanel" :aria-labelledby="`sidebar-tab-${tab}`" :aria-busy="friendsLoading" @scroll="directoryScrolled">
+    <div ref="directoryPanel" id="sidebar-panel" class="directory-panel" role="tabpanel" :aria-labelledby="`sidebar-tab-${tab}`" :aria-busy="friendsLoading" @scroll="onDirectoryScroll">
       <!-- 加载态用骨架行占位：与真实联系人行同尺寸，不出文字，避免加载前后布局跳变 -->
       <ul v-if="friendsLoading && !visibleCount" class="users-list skeleton-list" role="status" :aria-label="$t('social.loading')">
         <li v-for="n in 7" :key="n" class="user-row skeleton-row" aria-hidden="true">
@@ -83,8 +83,8 @@
       </ul>
       <div v-else-if="friendsError && !visibleCount" class="contacts-empty" role="alert"><p>{{ $t('social.failed') }}</p><button class="cancel-btn" @click="loadFriends">{{ $t('polish.retry') }}</button></div>
       <div v-else-if="!visibleCount" class="contacts-empty" role="status">
-        <p>{{ $t(query.trim() ? 'sidebar.noMatches' : 'polish.emptyContacts') }}</p>
-        <button class="cancel-btn" @click="query.trim() ? emit('update:query', '') : emit('open-discovery')">{{ $t(query.trim() ? 'sidebar.clearSearch' : 'social.discover') }}</button>
+        <p>{{ $t(query.trim() ? 'sidebar.noMatches' : tab === 'messages' && allUsers.length ? 'sidebar.emptyConversations' : 'polish.emptyContacts') }}</p>
+        <button class="cancel-btn" @click="query.trim() ? emit('update:query', '') : tab === 'messages' && allUsers.length ? emit('update:tab', 'contacts') : emit('open-discovery')">{{ $t(query.trim() ? 'sidebar.clearSearch' : tab === 'messages' && allUsers.length ? 'sidebar.openContacts' : 'social.discover') }}</button>
       </div>
       <ul v-else class="users-list virtual-contacts" :aria-label="$t(`sidebar.${tab}`)">
         <li role="presentation" aria-hidden="true" :style="{height:`${directoryLayout.offsets[directoryRange.start]}px`}"></li>
@@ -92,13 +92,17 @@
           <li v-if="row.kind==='heading'" class="section-heading"><h3>{{ row.label }} <span>{{ row.count }}</span></h3></li>
           <template v-else>
           <li v-for="u in [row.user]" :key="u.id" class="user-row" role="button" tabindex="0" :aria-posinset="directoryRange.start+rowOffset+1" :aria-setsize="rows.length"
+            :aria-haspopup="tab === 'messages' ? 'menu' : undefined"
             :data-contact-id="ConversationId.forContact(u).key" :aria-current="store.state.selectedChatId === ConversationId.forContact(u).key ? 'true' : undefined"
-            @click="select(u)" @keydown="contactKeydown($event,row.key)" @keydown.enter.prevent="select(u)" @keydown.space.prevent="select(u)" :class="{active: store.state.selectedChatId === ConversationId.forContact(u).key}">
+            @click="select(u)" @keydown="contactKeydown($event,row.key,u)" @keydown.enter.prevent="select(u)" @keydown.space.prevent="select(u)" :class="{active: store.state.selectedChatId === ConversationId.forContact(u).key, pinned: isPinned(u)}"
+            @pointerdown="pressStart($event,u)" @pointermove="pressMove" @pointerup="pressEnd" @pointercancel="pressEnd" @pointerleave="pressEnd"
+            @contextmenu.prevent="openConversationMenu($event,u)">
             <div v-if="u.avatarUrl" class="avatar"><img :src="avatarSrc(u)" alt="" loading="lazy" decoding="async" width="44" height="44" /></div>
             <div v-else class="avatar" :class="{ 'group-avatar': u.conversationKind==='group' }">{{ initials(contactName(u)) }}</div>
             <div class="meta">
               <div class="name-row">
                 <div class="name">{{ contactName(u) }}</div>
+                <span v-if="isPinned(u)" class="pin-mark" role="img" :aria-label="$t('sidebar.pinned')"><AppIcon name="pin" /></span>
                 <span v-if="tab === 'messages' && unreadCount(u) > 0" class="unread-badge">{{ unreadCount(u) > 99 ? '99+' : unreadCount(u) }}</span>
               </div>
               <div class="sub">{{ subtitle(u) }}</div>
@@ -108,8 +112,14 @@
         </template>
         <li role="presentation" aria-hidden="true" :style="{height:`${directoryLayout.total-directoryLayout.offsets[directoryRange.end]}px`}"></li>
       </ul>
+      <button v-if="remoteHasMore" type="button" class="remote-more" :disabled="remoteSearching || searchCooldown > 0" @click="loadMoreRemote">{{ $t('sidebar.userSearchMore') }}</button>
     </div>
     <button class="discovery-entry" :aria-label="$t('social.discover')" @click="emit('open-discovery')"><AppIcon name="discover" /><span>{{ $t('social.discover') }}<small>{{ $t('polish.discoverySubtitle') }}</small></span><span aria-hidden="true">›</span></button>
+    <div v-if="conversationMenu" ref="conversationMenuEl" class="conversation-menu" role="menu" :aria-label="$t('sidebar.conversationActions')"
+      :style="{ left: `${conversationMenu.x}px`, top: `${conversationMenu.y}px` }" @contextmenu.prevent @pointerdown.stop>
+      <button type="button" role="menuitem" @click="togglePinnedFromMenu">{{ $t(isPinned(conversationMenu.user) ? 'sidebar.unpin' : 'sidebar.pin') }}</button>
+      <button type="button" role="menuitem" class="danger" :title="$t('sidebar.deleteConversationHint')" @click="deleteFromMenu">{{ $t('sidebar.deleteConversation') }}</button>
+    </div>
   </div>
 </template>
 
@@ -123,7 +133,7 @@ import {contactRows,contactRowHeight} from '../utils/virtualContacts'
 import {virtualLayout} from '../utils/virtualLayout'
 import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
-import api, { UserSearchRateLimitError } from '../api'
+import api, { UserSearchRateLimitError, USER_SEARCH_PAGE_SIZE, USER_SEARCH_MAX_PAGE } from '../api'
 import AppIcon from './AppIcon.vue'
 import SocialProfileCard from './SocialProfileCard.vue'
 import BrandMark from './BrandMark.vue'
@@ -152,16 +162,25 @@ const friendsError = computed(() => store.state.directoryPhase === 'error')
 const requestsDialog = ref<HTMLElement | null>(null)
 useDialog(requestsDialog, () => { showFriendRequests.value = false })
 
-const allUsers = computed(() => sidebarUsers(store.state.users, store.state.groups))
+const allUsers = computed(() => sidebarUsers(store.state.users, store.state.groups, store.state.accountId))
 
-// Vue computed tracks profile changes as well as conversation activity.
-const sortedUsers = computed(() => sortConversationUsers(allUsers.value, key => store.state.conversationStates[key]))
+// 消息页不展示被“删除”的会话；联系人页仍能看到好友，重新打开后历史还在
+const conversationUsers = computed(() => {
+  if (props.tab !== 'messages') return allUsers.value
+  const hidden = new Set(store.state.hiddenConversations)
+  return allUsers.value.filter(user => !hidden.has(ConversationId.forContact(user).key))
+})
+const isPinnedKey = (key: string) => store.state.pinnedConversations.includes(key)
+const isPinned = (user: User) => isPinnedKey(ConversationId.forContact(user).key)
+const sortedUsers = computed(() => sortConversationUsers(conversationUsers.value, key => store.state.conversationStates[key], isPinnedKey))
 
 const sortedDirectory = computed(() => contactDirectory(allUsers.value, store.state.accountId, locale.value))
 const directory = computed(() => filterContactDirectory(sortedDirectory.value, props.query))
 
-// 服务端按昵称/ID 搜人：结果并入联系人列表，点击直接发好友申请
+// 服务端按昵称分页搜人：结果并入联系人列表，滚动到底部继续翻页，点击直接发好友申请
 const remoteHits = ref<UserSearchHit[]>([])
+const remotePage = ref(0)
+const remoteHasMore = ref(false)
 const remoteSearching = ref(false)
 const remoteError = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -195,20 +214,114 @@ const sections = computed(() => {
   return rows
 })
 
+// ── 会话右键/长按菜单 ───────────────────────────
+interface ConversationMenuState { user: User; x: number; y: number }
+const conversationMenu = ref<ConversationMenuState | null>(null)
+const conversationMenuEl = ref<HTMLElement | null>(null)
+let pressTimer: ReturnType<typeof setTimeout> | undefined
+let pressOrigin: { x: number; y: number } | null = null
+let suppressClickUntil = 0
+let menuTrigger: HTMLElement | null = null
+const canUseConversationMenu = () => props.tab === 'messages'
+
+function menuPosition(x: number, y: number) {
+  const width = 176, height = 112, pad = 8
+  return { x: Math.max(pad, Math.min(x, window.innerWidth - width - pad)),
+    y: Math.max(pad, Math.min(y, window.innerHeight - height - pad)) }
+}
+function openConversationMenuAt(x: number, y: number, user: User, trigger: HTMLElement | null = null) {
+  if (!canUseConversationMenu()) return
+  pressEnd()
+  menuTrigger = trigger
+  conversationMenu.value = { user, ...menuPosition(x, y) }
+  void nextTick(() => conversationMenuEl.value?.querySelector<HTMLButtonElement>('button')?.focus())
+}
+function openConversationMenu(event: MouseEvent, user: User) {
+  if (!canUseConversationMenu()) return
+  // 触屏长按可能先触发原生 contextmenu；同样抑制随后可能到达的 click
+  suppressClickUntil = Date.now() + 800
+  openConversationMenuAt(event.clientX, event.clientY, user, event.currentTarget as HTMLElement)
+}
+function closeConversationMenu(restoreFocus = false) {
+  if (!conversationMenu.value) return
+  conversationMenu.value = null
+  if (restoreFocus && menuTrigger?.isConnected) menuTrigger.focus({ preventScroll: true })
+  menuTrigger = null
+}
+/** 触屏/手写笔长按 500ms 打开；鼠标走右键，避免按住拖动时误触。 */
+function pressStart(event: PointerEvent, user: User) {
+  if (!canUseConversationMenu() || event.pointerType === 'mouse' || event.button !== 0) return
+  pressEnd()
+  pressOrigin = { x: event.clientX, y: event.clientY }
+  pressTimer = setTimeout(() => {
+    pressTimer = undefined
+    if (!pressOrigin) return
+    suppressClickUntil = Date.now() + 800
+    openConversationMenuAt(pressOrigin.x, pressOrigin.y, user)
+    pressOrigin = null
+  }, 500)
+}
+function pressMove(event: PointerEvent) {
+  if (!pressOrigin) return
+  if (Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y) > 12) pressEnd()
+}
+function pressEnd() {
+  if (pressTimer) clearTimeout(pressTimer)
+  pressTimer = undefined
+  pressOrigin = null
+}
+function togglePinnedFromMenu() {
+  const menu = conversationMenu.value
+  if (!menu) return
+  store.toggleConversationPin(ConversationId.forContact(menu.user).key)
+  closeConversationMenu(true)
+}
+function deleteFromMenu() {
+  const menu = conversationMenu.value
+  if (!menu) return
+  const key = ConversationId.forContact(menu.user).key
+  // 只隐藏列表项，不删除 IndexedDB 历史；下一条消息到达会自动恢复
+  store.hideConversation(key)
+  if (store.state.selectedChatId === key) store.setSelectedChat(null)
+  closeConversationMenu(true)
+}
+function onWindowPointerDown(event: PointerEvent) {
+  if (!conversationMenu.value) return
+  if (conversationMenuEl.value?.contains(event.target as Node)) return
+  closeConversationMenu()
+}
+function onWindowKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeConversationMenu(true)
+}
+onMounted(() => {
+  window.addEventListener('pointerdown', onWindowPointerDown, true)
+  window.addEventListener('keydown', onWindowKeydown)
+})
+onUnmounted(() => {
+  window.removeEventListener('pointerdown', onWindowPointerDown, true)
+  window.removeEventListener('keydown', onWindowKeydown)
+  pressEnd()
+})
+
 function resetRemoteSearch() {
   clearTimeout(remoteTimer)
   remoteController?.abort()
   remoteController = undefined
   remoteKeyword = ''
   remoteHits.value = []
+  remotePage.value = 0
+  remoteHasMore.value = false
   remoteSearching.value = false
   remoteError.value = ''
 }
-async function runRemoteSearch(force = false) {
+async function runRemoteSearch(force = false, append = false) {
   clearTimeout(remoteTimer)
   const keyword = props.query.trim()
   if (searchComposing.value || props.tab !== 'contacts' || !keyword) return
-  if (!force && remoteSearching.value && remoteKeyword === keyword) return
+  if (append) {
+    if (!remoteHasMore.value || remotePage.value >= USER_SEARCH_MAX_PAGE) return
+    if (remoteSearching.value || remoteKeyword !== keyword) return
+  } else if (!force && remoteSearching.value && remoteKeyword === keyword) return
   remoteController?.abort()
   const owner = String(store.state.accountId)
   const cooldown = contactSearchBudget.reserve(owner)
@@ -218,11 +331,18 @@ async function runRemoteSearch(force = false) {
   remoteKeyword = keyword
   remoteSearching.value = true
   remoteError.value = ''
+  const page = append ? remotePage.value + 1 : 1
   const active = () => remoteController === controller && !controller.signal.aborted
     && session.isCurrent() && props.tab === 'contacts' && props.query.trim() === keyword
   try {
-    const hits = await api.searchUsers(keyword, controller.signal)
-    if (active()) remoteHits.value = hits
+    const hits = await api.searchUsers(keyword, page, controller.signal)
+    if (active()) {
+      const merged = append ? [...remoteHits.value, ...hits] : hits
+      remoteHits.value = [...new Map(merged.map(hit => [String(hit.id), hit])).values()]
+      remotePage.value = page
+      // 服务端每页 6 条：整页返回才认为后面还有；第 4 页后强制停止
+      remoteHasMore.value = page < USER_SEARCH_MAX_PAGE && hits.length === USER_SEARCH_PAGE_SIZE
+    }
   } catch (error) {
     if (active() && error instanceof UserSearchRateLimitError) {
       contactSearchBudget.defer(owner, error.retryAfterSeconds * 1000)
@@ -234,6 +354,10 @@ async function runRemoteSearch(force = false) {
       remoteController = undefined
     }
   }
+}
+function loadMoreRemote() {
+  if (remoteSearching.value || searchCooldown.value > 0) return
+  void runRemoteSearch(false, true)
 }
 function finishSearchComposition() {
   searchComposing.value = false
@@ -295,12 +419,30 @@ const rows=computed(()=>contactRows(sections.value))
 const directoryLayout=computed(()=>virtualLayout(rows.value.map(row=>row.key),new Map(rows.value.map(row=>[row.key,contactRowHeight(row)]))))
 const directoryRange=computed(()=>directoryLayout.value.range(directoryTop.value,directoryHeight.value,300))
 const visibleRows=computed(()=>rows.value.slice(directoryRange.value.start,directoryRange.value.end))
-function directoryScrolled(){const el=directoryPanel.value;if(el){directoryTop.value=el.scrollTop;directoryHeight.value=el.clientHeight}}
+function onDirectoryScroll() {
+  closeConversationMenu()
+  directoryScrolled(true)
+}
+function directoryScrolled(allowMore = false) {
+  const el = directoryPanel.value
+  if (!el) return
+  directoryTop.value = el.scrollTop
+  directoryHeight.value = el.clientHeight
+  // 只有真实滚动才触发翻页；列表不足一屏时用底部“加载更多”按钮补齐
+  if (allowMore && el.scrollHeight - el.scrollTop - el.clientHeight < 200) loadMoreRemote()
+}
 let directoryObserver:ResizeObserver|undefined
-onMounted(()=>{directoryObserver=new ResizeObserver(directoryScrolled);if(directoryPanel.value)directoryObserver.observe(directoryPanel.value);directoryScrolled()})
+onMounted(()=>{directoryObserver=new ResizeObserver(() => directoryScrolled());if(directoryPanel.value)directoryObserver.observe(directoryPanel.value);directoryScrolled()})
 onUnmounted(()=>directoryObserver?.disconnect())
-watch(()=>[props.tab,props.query],()=>{if(directoryPanel.value)directoryPanel.value.scrollTop=0;directoryTop.value=0})
-async function contactKeydown(event:KeyboardEvent,key:string){
+watch(()=>[props.tab,props.query],()=>{closeConversationMenu();if(directoryPanel.value)directoryPanel.value.scrollTop=0;directoryTop.value=0})
+async function contactKeydown(event:KeyboardEvent,key:string,user:User){
+  if(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10')){
+    if(!canUseConversationMenu())return
+    event.preventDefault()
+    const rect=(event.currentTarget as HTMLElement).getBoundingClientRect()
+    openConversationMenuAt(rect.left+20,rect.top+16,user,event.currentTarget as HTMLElement)
+    return
+  }
   if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return
   event.preventDefault()
   const entries=rows.value,current=entries.findIndex(row=>row.key===key),direction=event.key==='ArrowUp'?-1:1
@@ -336,6 +478,7 @@ import { AGENT_USER_ID } from '../constants'
 import { toast } from '../utils/toast'
 
 function select(u: User) {
+  if (Date.now() < suppressClickUntil) return
   // 搜索结果里"还不是好友的人"：先打开名片，加好友在名片里操作
   if (remoteState.value.has(String(u.id))) { openPreview(u); return }
   store.setSelectedChat(ConversationId.forContact(u).key)
@@ -477,6 +620,8 @@ function loadFriends() { return refreshContacts() }
 .profile-preview-close{position:absolute;top:8px;right:8px;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:inherit;font-size:20px;cursor:pointer;z-index:1}
 .profile-preview-close:hover{background:var(--hover)}
 .user-search-feedback.error{color:#b53b27}
+.remote-more{display:block;margin:4px auto 16px;padding:8px 18px;border:1px solid var(--surface-border);border-radius:10px;background:var(--panel);color:var(--text-secondary);font:inherit;font-size:13px;cursor:pointer}
+.remote-more:disabled{opacity:.5;cursor:not-allowed}
 .search-bar{display:flex;align-items:center;margin:0 12px 10px;border:1px solid var(--surface-border);background:var(--panel);border-radius:12px;min-height:44px}
 .search-bar:focus-within{border-color:var(--accent-2)}
 .search-bar input{width:100%;min-width:0;background:transparent;color:var(--text-primary);border:0;outline:0;padding:12px;font:inherit;font-size:13px}
@@ -506,9 +651,14 @@ function loadFriends() { return refreshContacts() }
 .settings-btn{background:transparent;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px}
 .settings-btn:hover{background:var(--hover)}
 .users-list{list-style:none;padding:0;margin:0;overflow:auto;flex:1;overscroll-behavior:contain}
-.users-list .user-row{display:flex;align-items:center;padding:12px;margin:2px 8px;border-radius:10px;cursor:pointer;min-height:44px}
+.users-list .user-row{display:flex;align-items:center;padding:12px;margin:2px 8px;border-radius:10px;cursor:pointer;user-select:none;-webkit-touch-callout:none;min-height:44px}
 .users-list .user-row:hover{background:var(--hover)}
 .users-list .user-row.active{background:var(--apricot)}
+.pin-mark{display:inline-flex;flex:none;width:13px;height:13px;color:var(--accent-2)}
+.conversation-menu{position:fixed;z-index:1200;min-width:160px;padding:6px;display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--surface-border);border-radius:12px;box-shadow:0 18px 40px rgba(52,43,37,.2)}
+.conversation-menu button{display:flex;align-items:center;width:100%;min-height:40px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--text-primary);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.conversation-menu button:hover,.conversation-menu button:focus-visible{background:var(--hover);outline:none}
+.conversation-menu button.danger{color:#b53b27}
 .virtual-contacts{flex:none;overflow:visible}
 .virtual-contacts .user-row{height:72px;min-height:0;box-sizing:border-box;margin:0 8px}
 .virtual-contacts .section-heading{height:40px;box-sizing:border-box;display:flex;align-items:center}
@@ -517,6 +667,7 @@ function loadFriends() { return refreshContacts() }
 .avatar img{width:100%;height:100%;object-fit:cover}
 .meta{flex:1;min-width:0}
 .name-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.name-row .name{flex:1;min-width:0}
 .meta .name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta .sub{font-size:12px;color:var(--muted);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .unread-badge{background:#ff4757;color:white;font-size:10px;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center;line-height:16px;flex:none}
