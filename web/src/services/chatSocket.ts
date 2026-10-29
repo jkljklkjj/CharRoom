@@ -16,7 +16,7 @@ import { encodeMessage, decodeMessage } from '../proto'
 import DOMPurify from 'dompurify'
 import i18n from '../i18n'
 import { createTransport, buildWebTransportUrl, isWebTransportSupported } from './transport/TransportFactory'
-import { saveToQueue, getPending, getDuePending, removeMessage, markAttempt, markFailed, retryMessage, MAX_RETRIES } from './offlineQueue'
+import { saveToQueue, getPending, getDuePending, removeMessage, markAttempt, markFailed, retryMessage as retryQueuedMessage, MAX_RETRIES } from './offlineQueue'
 import type { QueueEntry } from './offlineQueue'
 import { getDeviceId, getDeviceType } from '../utils/device'
 import { MSG_TYPE, DEVICE_TYPE_NUM, PROTO_DEVICE_TYPE } from '../proto/constants'
@@ -245,7 +245,28 @@ export async function sendWrapper(wrapperObj: MessageWrapper) {
   if (generation !== connectionGeneration) return false
   const entry = await getPending(accountId, String(wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId))
   if (!entry) return false
-  if (entry.state === 'failed') { await retryMessage(accountId, entry.messageId); entry.state = 'pending'; entry.retryCount = 0 }
+  if (entry.state === 'failed') { await retryQueuedMessage(accountId, entry.messageId); entry.state = 'pending'; entry.retryCount = 0 }
+  return sendQueued(entry)
+}
+
+/** Manual retry: reset a failed/exhausted outbox row and force a fresh attempt. */
+export async function retryWrapper(wrapperObj: MessageWrapper, owner: string): Promise<boolean> {
+  const generation = connectionGeneration
+  if (!owner || owner !== String(storeRef?.state.accountId || currentUserId || '')) throw new Error('Stale sending account')
+  const messageId = String(wrapperObj.chat?.messageId || wrapperObj.groupChat?.messageId || '')
+  if (!messageId) throw new Error('Stable message ID required')
+  const buffer = await encodeMessage(wrapperObj)
+  if (owner !== String(storeRef?.state.accountId || currentUserId || '') || generation !== connectionGeneration) throw new Error('Sending session changed')
+  if (buffer.byteLength > 65536) throw new Error('Message exceeds transport frame limit')
+  const opts = { streamType: getStreamType(wrapperObj), conversationId: resolveConversationId(wrapperObj) }
+  await saveToQueue(owner, wrapperObj, buffer, opts)
+  // Reset retry exhaustion/state and detach any stuck in-flight promise.
+  await retryQueuedMessage(owner, messageId)
+  pendingAcks.delete(messageId)
+  outgoing.delete(`${generation}:${owner}:${messageId}`)
+  const entry = await getPending(owner, messageId)
+  if (!entry) return false
+  entry.state = 'pending'; entry.retryCount = 0; entry.nextAttemptAt = 0
   return sendQueued(entry)
 }
 
@@ -681,6 +702,7 @@ export default {
   connect,
   close,
   sendWrapper,
+  retryWrapper,
   enqueueWrapper,
   sendAck,
   readyState,

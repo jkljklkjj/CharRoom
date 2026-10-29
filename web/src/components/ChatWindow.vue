@@ -574,9 +574,8 @@ async function retryMessage(m: ChatMessage) {
   store.updateMessageStatus(m.messageId, 'sending', Date.now())
 
   try {
-    // sendWrapper 会复用原 ID 并把失败/超限的 outbox 记录重新置为 pending；
-    // 返回 false 通常表示当前未连接，记录仍会在重连后自动补发。
-    await chatSocket.sendWrapper(wrapper)
+    // 重置失败/超限的 outbox 记录并强制发起一次新尝试；离线时记录保留到重连。
+    await chatSocket.retryWrapper(wrapper, String(store.state.accountId || ''))
     toast.info(t('product.retryQueued'))
   } catch (e) {
     console.warn("重试失败:", e instanceof Error ? e.message : String(e))
