@@ -43,6 +43,10 @@ const root = path.resolve(__dirname, '../dist');
     browser = await puppeteer.launch({ executablePath:process.env.CHROME_BIN || process.argv[2], headless:'new', args:['--no-sandbox'] });
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(false);
+    for (const uri of ['/embed-demo.html', '/docs/api/index.html']) {
+      assert.equal((await page.goto(origin + uri)).status(), 200);
+      assert.equal(await page.$eval('meta[name="robots"]', element => element.content), 'noindex,follow');
+    }
     for (const route of config.routes) {
       const response = await page.goto(origin + route.path);
       assert.equal(response.status(), 200);
@@ -53,6 +57,10 @@ const root = path.resolve(__dirname, '../dist');
         assert.ok(head.h1?.trim(), `No static content at ${route.path}`);
         assert.equal(await page.$$eval('#app h1', elements => elements.length), 1);
         for (const href of ['https://github.com/jkljklkjj/CharRoom', 'https://gitee.com/zhenye55/chat-room']) assert.ok(await page.$(`a[href="${href}"]`));
+      }
+      if (route.path === '/faq') {
+        assert.equal(await page.$$eval('details', elements => elements.length), 10);
+        assert.match(await page.$eval('main', element => element.textContent), /重发倒计时/);
       }
       if (route.index && route.path !== '/') {
         const breadcrumb = await page.$eval('#breadcrumb-schema', element => JSON.parse(element.textContent));

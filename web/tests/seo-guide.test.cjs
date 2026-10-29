@@ -47,3 +47,20 @@ test('robots uses supported directives while ARD remains discoverable through HT
   const html = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8')
   assert.ok(html.includes('rel="ard" href="/.well-known/ard.json"'))
 })
+
+test('standalone utility HTML excludes itself from indexing before JavaScript runs', () => {
+  for (const file of ['embed-demo.html', 'docs/api/index.html']) {
+    const html = fs.readFileSync(path.resolve(__dirname, '../public', file), 'utf8')
+    const head = html.split('</head>')[0]
+    assert.match(head, /<meta name="robots" content="noindex,follow"/)
+    assert.match(head, /<meta name="description" content="[^"]+"/)
+  }
+  const docs = fs.readFileSync(path.resolve(__dirname, '../public/docs/api/index.html'), 'utf8')
+  assert.ok(docs.includes('https://www.chatlite.xin/api'))
+  assert.ok(!docs.includes('站点验证页'))
+})
+
+test('gateway serves build-time metadata without stale HTML substitutions', () => {
+  const nginx = fs.readFileSync(path.resolve(__dirname, '../../../chat-room/docker/nginx/nginx.conf.template'), 'utf8')
+  assert.ok(!/\bsub_filter(?:_|\s)|\$seo_/.test(nginx))
+})

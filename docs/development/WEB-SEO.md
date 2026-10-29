@@ -1,10 +1,13 @@
 # Web SEO 与部署验证
 
+全部 176 份参考资料的适用性、证据及后续任务见 [SEO Guide 全量对照](SEO-GUIDE-FULL-AUDIT-2026-10-29.md)；它同时覆盖普通搜索、内容、移动体验、多语言与运营，不能只用 ARD 校验代表 SEO。
+
 SEO 配置由 `web/site.routes.json` 管理；`src/services/pageSeo.ts` 更新客户端路由和语言切换后的元信息，`scripts/build-route-heads.cjs` 为每个已知路由生成独立初始 HTML。标题与描述在三份 locale 文件的 `seo.*` 中维护。
 
 ## 页面范围
 
 - `/`、`/features`、`/faq` 可以索引，站点地图仅包含这三个规范 URL。
+- `/embed-demo.html` 和 `/docs/api/index.html` 是开发演示/简略入口说明，初始 HTML 保持 `noindex,follow`；它们不进入 sitemap，也不被 robots 阻止读取 noindex。
 - `/app`、`/verify`、`/reset`、`/admin`、`/copilot` 初始 HTML 和运行时均为 `noindex,follow`，不进入 sitemap。robots.txt 允许抓取，以便搜索引擎看到 noindex；访问控制仍由认证与后端权限负责。
 - `/compare` 暂时 noindex。现有对竞品和加密能力的描述需要单独核实，不将未核实内容作为搜索入口。
 - Nginx 对未知地址返回真实 404，前端也有本地导航的不存在页。私有入口不包含首页结构化数据；删除了未实现的 SearchAction 和 iOS 支持声明。

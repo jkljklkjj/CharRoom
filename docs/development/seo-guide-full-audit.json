@@ -1,0 +1,2396 @@
+{
+  "referenceCommit": "ab8af275605f249b8a3eb620ba0cd1b74eb01436",
+  "documentCount": 176,
+  "documents": [
+    {
+      "id": "D001",
+      "path": "README.md",
+      "sha256": "185100c8103728363451e7ca713a74410862cca241c04b17c89330bf0a71dadd",
+      "bytes": 11702,
+      "lines": 192,
+      "status": "参考",
+      "title": "seo-guide-skill",
+      "evidence": [
+        "I"
+      ],
+      "assessment": "仓库入口已清点176文件；目录索引和重复正文分别保留，不按176个独立SEO规则计算。"
+    },
+    {
+      "id": "D002",
+      "path": "references/content-strategy.md",
+      "sha256": "641650ea0b5101d0757f089df1905ec08797b4f22350530c665ccac6d23e4c98",
+      "bytes": 4525,
+      "lines": 127,
+      "status": "部分满足",
+      "title": "内容策略与 SEO 写作",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "首页/功能/FAQ按用户意图分工；本轮补注册和连接排障。下一轮内容以真实搜索查询和反馈选题，不批量造文章。"
+    },
+    {
+      "id": "D003",
+      "path": "references/keyword-research.md",
+      "sha256": "7584499965a35705cb137bd1c4553a19aeeb9ef3275d42f0a2957a81eb04cdd6",
+      "bytes": 4031,
+      "lines": 96,
+      "status": "待数据",
+      "title": "关键词研究与分析",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "有页面意图映射；搜索量、竞争度、已有排名没有数据，不能声称做完关键词研究。"
+    },
+    {
+      "id": "D004",
+      "path": "references/link-building.md",
+      "sha256": "04f65dad43fc51a33ac44bcda9b042fb86e403e219d109c9bf5a600b7d114738",
+      "bytes": 3510,
+      "lines": 93,
+      "status": "待运营",
+      "title": "外链建设（Link Building）",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "源码可查且有自然出处链接；未获得外链报告，未群发邮件、购买或交换链接。"
+    },
+    {
+      "id": "D005",
+      "path": "references/local-seo.md",
+      "sha256": "e2c06d0ac1063af65af26fe2189f19ecdd04e3e43322ddf0530d44949adb26e0",
+      "bytes": 4626,
+      "lines": 132,
+      "status": "不适用",
+      "title": "本地 SEO（Local SEO）",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "在线聊天产品没有已确认的实体门店，不创建GBP、地址、营业时间或本地引用。"
+    },
+    {
+      "id": "D006",
+      "path": "references/on-page-seo.md",
+      "sha256": "be58ed99a9b6c480286ddb1a224050e21e2b9d8d2fbe01b26bac173ccfbd0f90",
+      "bytes": 3526,
+      "lines": 94,
+      "status": "部分满足",
+      "title": "页面优化（On-Page SEO）",
+      "evidence": [
+        "A",
+        "B",
+        "C"
+      ],
+      "assessment": "标题、H1、正文、真实链接已核对；不采用固定关键词密度、LSI或每页强制图片规则。"
+    },
+    {
+      "id": "D007",
+      "path": "references/seo-audit.md",
+      "sha256": "e518a17fbbe5bba71fb58b51c72dc1992ef18275f3d71dac46dff019929540be",
+      "bytes": 6001,
+      "lines": 172,
+      "status": "部分满足",
+      "title": "SEO 诊断与审计",
+      "evidence": [
+        "A",
+        "D",
+        "E",
+        "F",
+        "G"
+      ],
+      "assessment": "源码/构建与本地浏览器审查可做；收录、CTR、自然流量和线上CWV须站长数据。"
+    },
+    {
+      "id": "D008",
+      "path": "references/seo-principles.md",
+      "sha256": "f5a72f05da5129d05e3a92a9d23409b4e644df6b1782282d52f72279d48e3546",
+      "bytes": 1253,
+      "lines": 23,
+      "status": "已核对",
+      "title": "SEO 核心原则与常见误区",
+      "evidence": [
+        "A",
+        "B"
+      ],
+      "assessment": "以用户任务、真实能力、可抓取正文为准；不把满分或AI清单等同于排名。"
+    },
+    {
+      "id": "D009",
+      "path": "references/seo-tools.md",
+      "sha256": "4d327fa806e177e8cff12a5c03ec8720e7d5491f1bfa9a1a6a968613382ae697",
+      "bytes": 520,
+      "lines": 12,
+      "status": "待数据",
+      "title": "SEO 常用工具",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "本地构建和浏览器可验证；GSC/Bing/百度站长/Ahrefs未连接，不自动安装GA或付费工具。"
+    },
+    {
+      "id": "D010",
+      "path": "references/technical-seo.md",
+      "sha256": "4f641d7572c81602b09c52a77e702748df77166f79c478bc9ae51b53552873af",
+      "bytes": 3778,
+      "lines": 125,
+      "status": "部分满足",
+      "title": "技术SEO诊断与修复",
+      "evidence": [
+        "A",
+        "D",
+        "E",
+        "F"
+      ],
+      "assessment": "SSR、状态码、canonical、robots、缓存入口已核对；线上网关和字段数据仍需部署验证。"
+    },
+    {
+      "id": "D011",
+      "path": "references/tkd-standard.md",
+      "sha256": "0bd632e1afe17adbef322f7b6886bf50efbc34169ff30f77baa7b029695e0461",
+      "bytes": 22130,
+      "lines": 386,
+      "status": "部分满足",
+      "title": "TKD 写作规范（Title / Keywords / Description）",
+      "evidence": [
+        "A",
+        "B"
+      ],
+      "assessment": "三语标题与描述有内容依据；Google不把meta keywords和固定字符数作为通行合格线。"
+    },
+    {
+      "id": "D012",
+      "path": "references-ahrefs/AHREFS-CONTENT-MARKETING-SUMMARY.md",
+      "sha256": "84026657abea2041649c07e5de15dfde105998813eebce68c415cb0f7108896c",
+      "bytes": 3502,
+      "lines": 116,
+      "status": "部分满足",
+      "title": "Ahrefs Content Marketing Course 学习总结",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "采用产品相关问题而非泛化营销；内容发布效果和分发渠道待真实数据。"
+    },
+    {
+      "id": "D013",
+      "path": "references-ahrefs/AHREFS-DIGITAL-MARKETING-SUMMARY.md",
+      "sha256": "1b73890d8af1d26d003c757b18ac7eb130aef1a866a0a2777925b59a3c49a094",
+      "bytes": 3452,
+      "lines": 129,
+      "status": "待运营",
+      "title": "Ahrefs Digital Marketing Course 学习总结",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "营销渠道选择与转化目标需运营决策，职业技能章节不对应产品代码。"
+    },
+    {
+      "id": "D014",
+      "path": "references-ahrefs/AHREFS-KEYWORD-RESEARCH-SUMMARY.md",
+      "sha256": "4e71a4cba26f8faff1b9841d4fb900b4f5d7f25437fa0df1e0af925aae581494",
+      "bytes": 14772,
+      "lines": 539,
+      "status": "待数据",
+      "title": "Ahrefs Keyword Research Course 学习总结",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "需求、商业相关性、流量潜力与可竞争性分开；没有工具数据时不填虚构搜索量。"
+    },
+    {
+      "id": "D015",
+      "path": "references-ahrefs/AHREFS-LINK-BUILDING-SUMMARY.md",
+      "sha256": "03e111932497418ad3ef3c21aeaee8090a751e424e1215d6695b011b543e6c81",
+      "bytes": 10490,
+      "lines": 318,
+      "status": "待运营",
+      "title": "Ahrefs Advanced Link Building Course 学习总结",
+      "evidence": [
+        "C",
+        "G"
+      ],
+      "assessment": "提供可引用的真实项目资料；潜在链接对象筛选、联系与效果不在源码中假装完成。"
+    },
+    {
+      "id": "D016",
+      "path": "references-ahrefs/AHREFS-LOCAL-SEO-SUMMARY.md",
+      "sha256": "d0f8b51d26a81538f3f688856899356b57f5b10124fd8573f939ec8a5717e055",
+      "bytes": 10295,
+      "lines": 307,
+      "status": "不适用",
+      "title": "Ahrefs Local SEO Course 学习总结",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "本地商家课程不匹配无实体门店产品；移动和技术通用建议另见技术条目。"
+    },
+    {
+      "id": "D017",
+      "path": "references-ahrefs/AHREFS-TECHNICAL-SEO-SUMMARY.md",
+      "sha256": "e3f2ca4ce8e4abeb556474b4753da99c0ce9efca2fe80160639e77d799fcb7e0",
+      "bytes": 9936,
+      "lines": 362,
+      "status": "部分满足",
+      "title": "Ahrefs Technical SEO Course 学习总结",
+      "evidence": [
+        "A",
+        "D",
+        "E",
+        "F"
+      ],
+      "assessment": "技术课程对应可抓取、HTTPS、结构、性能；WordPress插件与本项目无关。"
+    },
+    {
+      "id": "D018",
+      "path": "references-ahrefs/AHREFS-VIDEO-MARKETING-SUMMARY.md",
+      "sha256": "62926afb9a43d1b4d5f9745df5aa67f9e1a4f8c2385e2f8d6d142d5444e6e409",
+      "bytes": 3675,
+      "lines": 133,
+      "status": "不适用",
+      "title": "Ahrefs Video Marketing Course 学习总结",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "没有公开视频内容、YouTube频道或视频广告活动，不创建VideoObject。"
+    },
+    {
+      "id": "D019",
+      "path": "references-ahrefs/content_marketing/0R_3iarc8IA.txt",
+      "sha256": "6919bafcc9f3f798e414fe4559cd2dae135c4e227b3e1d8a3cac62211dd61593",
+      "bytes": 16415,
+      "lines": 406,
+      "status": "部分满足",
+      "title": "references-ahrefs/content_marketing/0R_3iarc8IA.txt",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "内容创建与分发围绕轻聊任务；本轮补真实操作说明，分发效果待运营。"
+    },
+    {
+      "id": "D020",
+      "path": "references-ahrefs/content_marketing/8BdZ0dUu7VQ.txt",
+      "sha256": "e7c961e35ab7e66a82946a870927d98f4d9193b318a351ce0a60bed92937b938",
+      "bytes": 13178,
+      "lines": 335,
+      "status": "部分满足",
+      "title": "references-ahrefs/content_marketing/8BdZ0dUu7VQ.txt",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "FAQ按问题清晰作答；SERP三要素需实际搜索结果数据复核。"
+    },
+    {
+      "id": "D021",
+      "path": "references-ahrefs/content_marketing/9fglNtHmc8I.txt",
+      "sha256": "fb41afffed921183f6055dacc0e2fd909f5095b13c2aa48fdcbc02fc84753ab9",
+      "bytes": 16097,
+      "lines": 371,
+      "status": "待数据",
+      "title": "references-ahrefs/content_marketing/9fglNtHmc8I.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "业务目标应看访问到使用/下载，而非只看Lighthouse数字；没有转化基线。"
+    },
+    {
+      "id": "D022",
+      "path": "references-ahrefs/content_marketing/9HWna4hK47c.txt",
+      "sha256": "bd2812aa4749c5eb718bc222bb3cf971c34f1b186e2f08b97873886893c819c6",
+      "bytes": 14433,
+      "lines": 348,
+      "status": "待数据",
+      "title": "references-ahrefs/content_marketing/9HWna4hK47c.txt",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "更新过时能力文案；持续刷新节奏按查询与使用问题判断，不伪造更新时间。"
+    },
+    {
+      "id": "D023",
+      "path": "references-ahrefs/content_marketing/n5KKbPS6N-g.txt",
+      "sha256": "697702e8f6fbf6ae9fd9d09597076bddec3576b56f835988e6e2fc96bddc8052",
+      "bytes": 17240,
+      "lines": 427,
+      "status": "部分满足",
+      "title": "references-ahrefs/content_marketing/n5KKbPS6N-g.txt",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "正文准确性与可操作性已核对；注册、邮件未达和连接限制已补说明。"
+    },
+    {
+      "id": "D024",
+      "path": "references-ahrefs/content_marketing/nIbJI1kCxrU.txt",
+      "sha256": "f951f0272d7ade812509f2e1307602880e950e4a3b6c69173b10e7589b0dfdde",
+      "bytes": 8237,
+      "lines": 199,
+      "status": "部分满足",
+      "title": "references-ahrefs/content_marketing/nIbJI1kCxrU.txt",
+      "evidence": [
+        "C",
+        "G"
+      ],
+      "assessment": "三页形成互链；目前无需为了内容集群强造大量子页面，按需求再扩展。"
+    },
+    {
+      "id": "D025",
+      "path": "references-ahrefs/content_marketing/PoVYweKH4ck.txt",
+      "sha256": "231d95e14c5cfdb9a216b4ced8e95c556db0cb84c7d9c7d2f8625ce0e592067e",
+      "bytes": 8831,
+      "lines": 225,
+      "status": "待运营",
+      "title": "references-ahrefs/content_marketing/PoVYweKH4ck.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "内容推广清单需要渠道与受众；本轮没有自动外发消息或垃圾链接。"
+    },
+    {
+      "id": "D026",
+      "path": "references-ahrefs/content_marketing/tWNvAGwiVqo.txt",
+      "sha256": "f4d5a7dff3ab4e8889ff6475f0792ceb66b05fa49d5f50062413e2b1924ac533",
+      "bytes": 15866,
+      "lines": 401,
+      "status": "待数据",
+      "title": "references-ahrefs/content_marketing/tWNvAGwiVqo.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "删除、合并与刷新旧页需要流量和外链依据；不凭内容篇幅盲删页面。"
+    },
+    {
+      "id": "D027",
+      "path": "references-ahrefs/content_marketing/xOB-Pa2aERs.txt",
+      "sha256": "bc093bcb91bc7925b5c1480f8238fc4a625270b1d817e45d328d52501f526384",
+      "bytes": 9387,
+      "lines": 226,
+      "status": "部分满足",
+      "title": "references-ahrefs/content_marketing/xOB-Pa2aERs.txt",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "用注册、下载、历史恢复、浏览器兼容解决产品问题，不写无关热点文章。"
+    },
+    {
+      "id": "D028",
+      "path": "references-ahrefs/digital_marketing/7sRyflzOc1Y.txt",
+      "sha256": "0cd4d51f121985043028dcc6789c799bbe7c34ea5096ed4d0bf6386ef7a4e86d",
+      "bytes": 11350,
+      "lines": 285,
+      "status": "不适用",
+      "title": "references-ahrefs/digital_marketing/7sRyflzOc1Y.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "数字营销硬技能/软技能职业课程，不对应站点实现任务。"
+    },
+    {
+      "id": "D029",
+      "path": "references-ahrefs/digital_marketing/bG-AL2Hd6Cc.txt",
+      "sha256": "e59496a207eb592dcfe8e296e01af91daa9380591d28aa7d0c33560c728de427",
+      "bytes": 12281,
+      "lines": 306,
+      "status": "不适用",
+      "title": "references-ahrefs/digital_marketing/bG-AL2Hd6Cc.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "营销职业入门路径不对应产品页面或SEO技术缺陷。"
+    },
+    {
+      "id": "D030",
+      "path": "references-ahrefs/digital_marketing/eedeyfy_B-Q.txt",
+      "sha256": "8016d08b6cf2c8cb128cc39797cdaa2a28eb7854abe927008802c6723703779f",
+      "bytes": 12706,
+      "lines": 292,
+      "status": "待数据",
+      "title": "references-ahrefs/digital_marketing/eedeyfy_B-Q.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "优先以真实业务转化验证渠道；没有数据时不因访问量或分数做收益结论。"
+    },
+    {
+      "id": "D031",
+      "path": "references-ahrefs/digital_marketing/N8MvgpFf_-k.txt",
+      "sha256": "6fd0975fbaeae48bdca61af1329f641f33b525895abf3e5a223aa392895eb081",
+      "bytes": 7768,
+      "lines": 196,
+      "status": "待运营",
+      "title": "references-ahrefs/digital_marketing/N8MvgpFf_-k.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "跨渠道内容应适配平台意图；当前未制定/执行多渠道运营。"
+    },
+    {
+      "id": "D032",
+      "path": "references-ahrefs/digital_marketing/wZZnxXyES80.txt",
+      "sha256": "360ee202321fe31487fd06777d1895088126635f5181b3edc364fca00e67137d",
+      "bytes": 17362,
+      "lines": 422,
+      "status": "待运营",
+      "title": "references-ahrefs/digital_marketing/wZZnxXyES80.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "七类营销渠道需要目标和成本判断；不自动开PPC、邮件或社媒活动。"
+    },
+    {
+      "id": "D033",
+      "path": "references-ahrefs/INDEX.md",
+      "sha256": "5a50838ca1d9ac70f3b14bc84bab9432017edf013f0c9196c7829ca5857a107c",
+      "bytes": 1425,
+      "lines": 24,
+      "status": "参考",
+      "title": "Ahrefs Academy 补充资料索引",
+      "evidence": [
+        "I"
+      ],
+      "assessment": "Ahrefs目录实际64文件：7总结、1索引、56字幕；与README所称58课时区分。"
+    },
+    {
+      "id": "D034",
+      "path": "references-ahrefs/keyword_research/01-what-are-keywords.txt",
+      "sha256": "91633ac204121d7e837f93ff081a44ff2e1ab644fd466a67c942fe1336380a7b",
+      "bytes": 8311,
+      "lines": 252,
+      "status": "待数据",
+      "title": "references-ahrefs/keyword_research/01-what-are-keywords.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "关键词必须兼顾需求、流量潜力、业务价值和排名可行性；当前无量化数据。"
+    },
+    {
+      "id": "D035",
+      "path": "references-ahrefs/keyword_research/02-analyze-searcher-intent.txt",
+      "sha256": "2fa0c64a357b278dd2a5e2d93f40a5a360b8b053cca9712f549ae53010849413",
+      "bytes": 4526,
+      "lines": 141,
+      "status": "待数据",
+      "title": "references-ahrefs/keyword_research/02-analyze-searcher-intent.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "搜索意图按内容类型/格式/角度核对；尚无目标查询的SERP采样。"
+    },
+    {
+      "id": "D036",
+      "path": "references-ahrefs/keyword_research/03-find-keywords-for-website.txt",
+      "sha256": "1cbecf5abde21ea54bbb2284a4064050a95f1227be152490d3142a3ca1334862",
+      "bytes": 11470,
+      "lines": 352,
+      "status": "待数据",
+      "title": "references-ahrefs/keyword_research/03-find-keywords-for-website.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "种子词可来自产品能力；扩词和筛选指标未获得工具数据。"
+    },
+    {
+      "id": "D037",
+      "path": "references-ahrefs/keyword_research/04-understanding-ranking-difficulty.txt",
+      "sha256": "6bf2dbe529c37a6e2b539c12ea49846300d435d4156aa2bb58c7eb209604d283",
+      "bytes": 9451,
+      "lines": 297,
+      "status": "待数据",
+      "title": "references-ahrefs/keyword_research/04-understanding-ranking-difficulty.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "竞争度需评估实际结果与主题权威，不能凭竞品名称推断。"
+    },
+    {
+      "id": "D038",
+      "path": "references-ahrefs/keyword_research/05-keyword-research-tutorial.txt",
+      "sha256": "38184f4b8777b36ec52d7c959cbc75094c387022d14c5373452bef86a91331e7",
+      "bytes": 11738,
+      "lines": 300,
+      "status": "部分满足",
+      "title": "references-ahrefs/keyword_research/05-keyword-research-tutorial.txt",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "同一任务相关词映射同页；收入/转化潜力需要实际业务数据。"
+    },
+    {
+      "id": "D039",
+      "path": "references-ahrefs/keyword_research/06-keyword-research-new-website.txt",
+      "sha256": "abede9602b583d30c6ff502c204fbee16230f644b4687d30c8179380c9b88511",
+      "bytes": 19524,
+      "lines": 502,
+      "status": "部分满足",
+      "title": "references-ahrefs/keyword_research/06-keyword-research-new-website.txt",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "先覆盖品牌加具体用途，不承诺泛化聊天大词排名；目标难度待研究。"
+    },
+    {
+      "id": "D040",
+      "path": "references-ahrefs/keyword_research/07-low-competition-keywords.txt",
+      "sha256": "84c997c85b4557081da8096703042b902f971a2f60203f0105ea6f96d044c288",
+      "bytes": 11160,
+      "lines": 348,
+      "status": "待数据",
+      "title": "references-ahrefs/keyword_research/07-low-competition-keywords.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "关键词难度不能仅看反向链接数；需要人工核对SERP与内容匹配。"
+    },
+    {
+      "id": "D041",
+      "path": "references-ahrefs/keyword_research/08-long-tail-keywords.txt",
+      "sha256": "5fab3daaabef68ef6dec427f71f112d9c2f045e477e06bf1e776861a51540346",
+      "bytes": 13715,
+      "lines": 353,
+      "status": "部分满足",
+      "title": "references-ahrefs/keyword_research/08-long-tail-keywords.txt",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "长尾同意图合并在FAQ；未为每个词序变体新增薄页。"
+    },
+    {
+      "id": "D042",
+      "path": "references-ahrefs/keyword_research/09-keyword-difficulty-scores.txt",
+      "sha256": "7308b283804f19a7e6a65459ac8613ab2036ebec55ff945eabae4cd73ab8c9a1",
+      "bytes": 13882,
+      "lines": 363,
+      "status": "待数据",
+      "title": "references-ahrefs/keyword_research/09-keyword-difficulty-scores.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "单独KD分数不能代表可排名性；没有工具数据，不生成难度结论。"
+    },
+    {
+      "id": "D043",
+      "path": "references-ahrefs/keyword_research/10-advanced-keyword-tips.txt",
+      "sha256": "8c53729d8a19539ccc024b59fb4d481a1ed2728e7ea9581b30c7c02ff6fd9cbd",
+      "bytes": 10343,
+      "lines": 320,
+      "status": "待数据",
+      "title": "references-ahrefs/keyword_research/10-advanced-keyword-tips.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "竞品内容缺口需已排名页面和查询数据，不把未证实竞品表作为研究。"
+    },
+    {
+      "id": "D044",
+      "path": "references-ahrefs/keyword_research/11-fractured-search-intent.txt",
+      "sha256": "283236d61446adde1ab9857a37933a6db6240705d6a216012f4f759b4eb2f847",
+      "bytes": 12168,
+      "lines": 330,
+      "status": "部分满足",
+      "title": "references-ahrefs/keyword_research/11-fractured-search-intent.txt",
+      "evidence": [
+        "A",
+        "B"
+      ],
+      "assessment": "“轻聊”品牌可能有歧义，页面标题/引导说明网页聊天、私聊、群聊的具体上下文。"
+    },
+    {
+      "id": "D045",
+      "path": "references-ahrefs/link_building/linkbuild-01-advanced-link-building-fundamentals.txt",
+      "sha256": "9494ba1ef92ab3e643affd4ab084d03d14067b7468723b2ebfeea50f8bd2b4ed",
+      "bytes": 319816,
+      "lines": 5778,
+      "status": "待运营",
+      "title": "references-ahrefs/link_building/linkbuild-01-advanced-link-building-fundamentals.txt",
+      "evidence": [
+        "C",
+        "G"
+      ],
+      "assessment": "大型字幕含基础与高级链接策略；已提供真实源码出处，未执行外链获取。"
+    },
+    {
+      "id": "D046",
+      "path": "references-ahrefs/link_building/linkbuild-02-outreach.txt",
+      "sha256": "52e3c4b37d5ade601348a28499e16f215acbf870aa73726c4721d91287200abb",
+      "bytes": 62153,
+      "lines": 1052,
+      "status": "待运营",
+      "title": "references-ahrefs/link_building/linkbuild-02-outreach.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "外联要相关、可信且有价值；没有网站权威/联系方式数据，不批量发送。"
+    },
+    {
+      "id": "D047",
+      "path": "references-ahrefs/link_building/linkbuild-03-team-building-systems.txt",
+      "sha256": "7642121b83f9301f9e56b70d355e490350b56af2173a2bf51a34c331ce60b8a9",
+      "bytes": 31613,
+      "lines": 535,
+      "status": "待运营",
+      "title": "references-ahrefs/link_building/linkbuild-03-team-building-systems.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "文件名虽写team-building，正文是新链接策略介绍；按正文判断，不当作人员配置任务。"
+    },
+    {
+      "id": "D048",
+      "path": "references-ahrefs/link_building/m2l1_seed_prospects.txt",
+      "sha256": "e70c475bd9fc80633ccbf5db8d87f89af3ec74418cb2e408db64ede1496908ea",
+      "bytes": 6846,
+      "lines": 170,
+      "status": "待运营",
+      "title": "Module 2.1: How to Find Your Seed Prospects",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "种子链接候选需有真实推荐理由；本轮未创建联系名单。"
+    },
+    {
+      "id": "D049",
+      "path": "references-ahrefs/link_building/m2l2_lookalike_prospects.txt",
+      "sha256": "a259a0e0e01c29576f3461fa18ca155831ecf1b050d386bf5d0f793c2126c578",
+      "bytes": 9946,
+      "lines": 239,
+      "status": "待运营",
+      "title": "Module 2.2: How to Grow Your List with Lookalike Prospects",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "相似候选扩展需要工具和人工筛选；未采集联系人。"
+    },
+    {
+      "id": "D050",
+      "path": "references-ahrefs/link_building/m2l3_segment_prospects.txt",
+      "sha256": "3fcdfef705243f45746697e20fdf7ddac3c55f96e326c9c41573d8e568568ac3",
+      "bytes": 6231,
+      "lines": 152,
+      "status": "待运营",
+      "title": "Module 2.3: How to Segment Link Prospects for Scale",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "外联细分与目标相关性属运营执行；没有把模板嵌入网站。"
+    },
+    {
+      "id": "D051",
+      "path": "references-ahrefs/link_building/m3l1_vetting_prospects.txt",
+      "sha256": "979fc72d79ce306a435bc00de448e5deef866b49aefea09e064b09386348cba6",
+      "bytes": 7111,
+      "lines": 172,
+      "status": "待运营",
+      "title": "Module 3.1: How to Vet and Validate Link Prospects",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "检查页面语境与相关性，不能只看DR；缺外链候选数据。"
+    },
+    {
+      "id": "D052",
+      "path": "references-ahrefs/link_building/m3l2_who_to_pitch.txt",
+      "sha256": "6d6ed0ac0c3481546d98b95b481bb36dc8c1576acf464cbc69a2d6061caf31bc",
+      "bytes": 3282,
+      "lines": 80,
+      "status": "待运营",
+      "title": "Module 3.2: Who's the Best Person to Pitch for a Backlink",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "联系作者/编辑需明确授权；本轮没有对外发送消息。"
+    },
+    {
+      "id": "D053",
+      "path": "references-ahrefs/link_building/m3l3_blitz_list.txt",
+      "sha256": "bb4260ed0ba50574d5137978d156f3a954abb73587eeb1e761e99cdbe5beac98",
+      "bytes": 6961,
+      "lines": 167,
+      "status": "待运营",
+      "title": "Module 3.3: The Blitz List: How to Start Link Building Campaigns Fast",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "批量联系人工作流涉及数据、API和预算；未擅自收集邮箱或开通服务。"
+    },
+    {
+      "id": "D054",
+      "path": "references-ahrefs/link_building/m4l2_hybrid_outreach.txt",
+      "sha256": "88260ee39f7895b6e549914d7591dd70d93b0948c9181bfb24cbc82c80041959",
+      "bytes": 5754,
+      "lines": 142,
+      "status": "待运营",
+      "title": "Module 4.2: Hybrid Outreach - Scaling Value in Email Outreach",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "混合外联需真实价值理由；没有实际外联活动。"
+    },
+    {
+      "id": "D055",
+      "path": "references-ahrefs/link_building/m4l3_email_templates.txt",
+      "sha256": "cf32a0028f94cf070a8fa4a57618c9dff4fe05c7f10367b4eb85b28c608e51bb",
+      "bytes": 14116,
+      "lines": 349,
+      "status": "待运营",
+      "title": "Module 4.3: How to Write Email Outreach Templates That Don't Sound Templated",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "可读且针对对象的邮件模板并非站内SEO修复；未发信。"
+    },
+    {
+      "id": "D056",
+      "path": "references-ahrefs/link_building/m5l2_link_building_system.txt",
+      "sha256": "223fab2a5a4e11e5e7a0daebec4a7eedaa75fbc184577eada8cf470afa1c1adc",
+      "bytes": 8242,
+      "lines": 218,
+      "status": "不适用",
+      "title": "Module 5.2: How to Create a Link Building System",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "链接团队分工与招聘属于人员运营，不为此改产品代码或安排人员。"
+    },
+    {
+      "id": "D057",
+      "path": "references-ahrefs/link_building/m5l3_team_workflow.txt",
+      "sha256": "b2261d4debc02b8e63b5e1defef0e2072610f7c534ecf3d2cfac8a04d80a49c3",
+      "bytes": 12201,
+      "lines": 296,
+      "status": "待运营",
+      "title": "Module 5.3: A Link Building Team's Workflow in Action",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "候选筛选、去重、外联工作流需运营负责人；本轮未建立自动发送链路。"
+    },
+    {
+      "id": "D058",
+      "path": "references-ahrefs/local_seo/01_how_to_do_local_seo.txt",
+      "sha256": "51292def456f04a7f08396305b24dbe5c6bea38d102109d5d710e430bcf407e1",
+      "bytes": 22416,
+      "lines": 567,
+      "status": "不适用",
+      "title": "How to Do Local SEO: Complete A-Z Tutorial",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "本地商家NAP/GoogleBusinessProfile没有实体门店依据。"
+    },
+    {
+      "id": "D059",
+      "path": "references-ahrefs/local_seo/02_local_keyword_research.txt",
+      "sha256": "2db614d39ee9cab31340b4b08517ea85ab9ffa361597cc7b0fafcf24a4a04905",
+      "bytes": 10086,
+      "lines": 253,
+      "status": "不适用",
+      "title": "How to Do Local Keyword Research for Your Small Business",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "城市服务词不匹配当前数字产品，不造城市落地页。"
+    },
+    {
+      "id": "D060",
+      "path": "references-ahrefs/local_seo/03_link_building_for_local_seo.txt",
+      "sha256": "8dd473177d8e6cf4200ae2252151335bd93f6248451c3c2fa499307f5fb4b9b2",
+      "bytes": 12592,
+      "lines": 310,
+      "status": "不适用",
+      "title": "Link Building for Local SEO: 6 Easy Ways to Get Backlinks",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "地方商会/本地链接课程没有适用商家场景。"
+    },
+    {
+      "id": "D061",
+      "path": "references-ahrefs/local_seo/04_find_citations_for_local_seo.txt",
+      "sha256": "9a8cdeb9ca64ca06a2a1733a8d7d331a5d363c201dad8151c1b0246262d1f3dd",
+      "bytes": 2115,
+      "lines": 52,
+      "status": "不适用",
+      "title": "How to Find Citations for Local SEO",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "本地目录引用和地址一致性没有已确认门店资料。"
+    },
+    {
+      "id": "D062",
+      "path": "references-ahrefs/technical_seo/techseo-01-what-is-technical-seo.txt",
+      "sha256": "262709492207f86753d2ebea72b15ea22abdb18245bf1e5464d5ff3261b8d357",
+      "bytes": 22928,
+      "lines": 456,
+      "status": "部分满足",
+      "title": "references-ahrefs/technical_seo/techseo-01-what-is-technical-seo.txt",
+      "evidence": [
+        "A",
+        "D"
+      ],
+      "assessment": "公开SSR不需登录，私有页noindex；演示与简略文档页本轮补初始noindex。"
+    },
+    {
+      "id": "D063",
+      "path": "references-ahrefs/technical_seo/techseo-02-technical-seo-best-practices.txt",
+      "sha256": "275195cea3b268cc790572819c01527e2a48b9f185177f883c2c656a17c6482c",
+      "bytes": 18792,
+      "lines": 370,
+      "status": "部分满足",
+      "title": "references-ahrefs/technical_seo/techseo-02-technical-seo-best-practices.txt",
+      "evidence": [
+        "C",
+        "E",
+        "F"
+      ],
+      "assessment": "层级、缓存和加载体验已有实现；维护效果需线上抓取和字段数据。"
+    },
+    {
+      "id": "D064",
+      "path": "references-ahrefs/technical_seo/techseo-03-http-vs-https.txt",
+      "sha256": "767bc99e885077629bd798a1499c62bab8a787a43d8132c98e21a01436e41d95",
+      "bytes": 22245,
+      "lines": 378,
+      "status": "部分满足",
+      "title": "references-ahrefs/technical_seo/techseo-03-http-vs-https.txt",
+      "evidence": [
+        "E",
+        "G"
+      ],
+      "assessment": "模板包含TLS和HTTP到HTTPS重定向；证书有效性/线上实际配置须部署端确认。"
+    },
+    {
+      "id": "D065",
+      "path": "references-ahrefs/technical_seo/techseo-04-technical-seo-audit.txt",
+      "sha256": "e59d6e7e95f218a6ad497ff54a475c02b86ba35f0dfcc4c35edc517edef04bdd",
+      "bytes": 27190,
+      "lines": 452,
+      "status": "部分满足",
+      "title": "references-ahrefs/technical_seo/techseo-04-technical-seo-audit.txt",
+      "evidence": [
+        "A",
+        "E"
+      ],
+      "assessment": "canonical统一www；没有强制跨主机迁移/app，避免丢失原域本地会话，迁移需单独方案。"
+    },
+    {
+      "id": "D066",
+      "path": "references-ahrefs/technical_seo/techseo-05-speed-up-wordpress.txt",
+      "sha256": "47052f512af8118c4140a28713cb585998ffcaa79659e0e6586dec983ea9d5aa",
+      "bytes": 41147,
+      "lines": 702,
+      "status": "不适用",
+      "title": "references-ahrefs/technical_seo/techseo-05-speed-up-wordpress.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "项目不是WordPress，不装插件；通用缓存、压缩和资源建议另见技术证据。"
+    },
+    {
+      "id": "D067",
+      "path": "references-ahrefs/technical_seo/techseo-06-internal-links.txt",
+      "sha256": "82852a7758626b991a8745d0143d01511d3919deaa6fbbf62d4e07d1eca8306d",
+      "bytes": 18194,
+      "lines": 364,
+      "status": "已核对",
+      "title": "references-ahrefs/technical_seo/techseo-06-internal-links.txt",
+      "evidence": [
+        "C"
+      ],
+      "assessment": "公开页面通过真实href互链，锚文本描述目标，未机械填满固定链接数。"
+    },
+    {
+      "id": "D068",
+      "path": "references-ahrefs/technical_seo/techseo-07-seo-audit-fix-issues.txt",
+      "sha256": "a7fdad8dfedd18cb1a7e4a51d0123457e56d8b28f13df0f7ad6c98239c9287c4",
+      "bytes": 38898,
+      "lines": 642,
+      "status": "本轮修复",
+      "title": "references-ahrefs/technical_seo/techseo-07-seo-audit-fix-issues.txt",
+      "evidence": [
+        "D"
+      ],
+      "assessment": "扩大到Vue路由以外的静态HTML，发现演示页和简略API页未声明noindex并修复。"
+    },
+    {
+      "id": "D069",
+      "path": "references-ahrefs/technical_seo/techseo-08-core-web-vitals.txt",
+      "sha256": "a2f07f17517f6889f878f2db4ad8d8ee11acdab20a6bf7835f7e0e7ddeed6106",
+      "bytes": 50284,
+      "lines": 1028,
+      "status": "待数据",
+      "title": "references-ahrefs/technical_seo/techseo-08-core-web-vitals.txt",
+      "evidence": [
+        "F",
+        "G"
+      ],
+      "assessment": "旧课程FID已过时；关注LCP/INP/CLS的p75字段数据，本地实验不能代替。"
+    },
+    {
+      "id": "D070",
+      "path": "references-ahrefs/video_marketing/BObU_VCwnvY.txt",
+      "sha256": "8e227c0e4b814eeeb8ade71b10b7209301c64aed647543d46c550765219dfedf",
+      "bytes": 12683,
+      "lines": 307,
+      "status": "不适用",
+      "title": "references-ahrefs/video_marketing/BObU_VCwnvY.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "未提供可索引的视频观看页，不添加视频富结果标记。"
+    },
+    {
+      "id": "D071",
+      "path": "references-ahrefs/video_marketing/kAuM2nQb_P8.txt",
+      "sha256": "6d9344d8a617a17fc34430930db12a6ce74ba8e368cd247b2c2039ba891376ee",
+      "bytes": 12262,
+      "lines": 315,
+      "status": "不适用",
+      "title": "references-ahrefs/video_marketing/kAuM2nQb_P8.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "没有视频选题/视频搜索需求研究场景。"
+    },
+    {
+      "id": "D072",
+      "path": "references-ahrefs/video_marketing/Nh0mDbfEdVA.txt",
+      "sha256": "3e334e43f2f2fe28735849af6ff8d4ee93be60bf70ea695b0876a30be24906c2",
+      "bytes": 19299,
+      "lines": 491,
+      "status": "不适用",
+      "title": "references-ahrefs/video_marketing/Nh0mDbfEdVA.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "没有YouTube频道，不做频道标题或视频排名改造。"
+    },
+    {
+      "id": "D073",
+      "path": "references-ahrefs/video_marketing/NR_V2nGSp98.txt",
+      "sha256": "4b42325c745f5a1d98ba8844b6347de20f58532bd1c87b189abb2313931ee4c8",
+      "bytes": 16649,
+      "lines": 419,
+      "status": "不适用",
+      "title": "references-ahrefs/video_marketing/NR_V2nGSp98.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "没有视频订阅增长运营目标，不加订阅组件。"
+    },
+    {
+      "id": "D074",
+      "path": "references-ahrefs/video_marketing/QCgDIhvFkCM.txt",
+      "sha256": "f00d61a80e9970072cb54d12a65605acd4af9fc3b84151845f7aeaae1d38d4d8",
+      "bytes": 17821,
+      "lines": 436,
+      "status": "不适用",
+      "title": "references-ahrefs/video_marketing/QCgDIhvFkCM.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "品牌/教育/娱乐视频框架需真实视频计划；本轮不制作占位视频。"
+    },
+    {
+      "id": "D075",
+      "path": "references-ahrefs/video_marketing/YShyWxW2iB4.txt",
+      "sha256": "1d701824b72ea9040e6dda65bb96e81914eb482db4ebe05805e29d6d51536173",
+      "bytes": 14743,
+      "lines": 387,
+      "status": "不适用",
+      "title": "references-ahrefs/video_marketing/YShyWxW2iB4.txt",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "YouTube广告需要预算与活动，不属于当前站内SEO修复。"
+    },
+    {
+      "id": "D076",
+      "path": "references-google/301-redirects.md",
+      "sha256": "945e1b33a7d1a5f733001872edb8f7b7ce2df50f47ca8d31c449a8ade1e9cd3a",
+      "bytes": 12179,
+      "lines": 185,
+      "status": "已核对",
+      "title": "重定向与 Google 搜索",
+      "evidence": [
+        "E"
+      ],
+      "assessment": "显式index.html和已知末尾斜线使用301；查询保留，内部目录解析不被错误重定向。"
+    },
+    {
+      "id": "D077",
+      "path": "references-google/ai-features.md",
+      "sha256": "b5e2f0380c7b3fd8d8e8a05299222ffda0cfc496dde084620f5fe00e87e00468",
+      "bytes": 8737,
+      "lines": 75,
+      "status": "已核对",
+      "title": "AI 功能与网站",
+      "evidence": [
+        "A",
+        "B"
+      ],
+      "assessment": "Google AI搜索沿用常规SEO；ARD是额外发现协议，不作为Google收录/排名的必要条件。"
+    },
+    {
+      "id": "D078",
+      "path": "references-google/appearance-ad-network-and-translation.md",
+      "sha256": "a6d7e2e1e931050bcc1b9757f4ca4a9d09e8802937662868cc623b8b16a045d9",
+      "bytes": 5938,
+      "lines": 100,
+      "status": "不适用",
+      "title": "Enabling your ad network to work with translation-related Google Search features",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无广告网络翻译集成；不会为此安装广告脚本。"
+    },
+    {
+      "id": "D079",
+      "path": "references-google/avoid-interstitials.md",
+      "sha256": "fe921babe7dc19e81182f67199ce47c6b54a7b351ed9fee9cfa29cd3ef3dd015",
+      "bytes": 4748,
+      "lines": 50,
+      "status": "已核对",
+      "title": "避免侵入式插页广告",
+      "evidence": [
+        "B",
+        "F"
+      ],
+      "assessment": "公开页无强制登录或遮挡正文的自动弹窗；用户主动打开打赏不等于侵入广告。"
+    },
+    {
+      "id": "D080",
+      "path": "references-google/block-indexing.md",
+      "sha256": "93e7d4a18a8ca40bec6eb4cd856eba2884c184d1149871ae6ed2e143e6869434",
+      "bytes": 5173,
+      "lines": 66,
+      "status": "本轮修复",
+      "title": "阻止索引（noindex）",
+      "evidence": [
+        "D"
+      ],
+      "assessment": "noindex放入静态head；没有通过robots阻止这两页被抓取，否则爬虫读不到noindex。"
+    },
+    {
+      "id": "D081",
+      "path": "references-google/build-sitemap.md",
+      "sha256": "58422dc285601c5717ab6d097d485d1b27964003f7b5910877eebc9706ea34d1",
+      "bytes": 14761,
+      "lines": 190,
+      "status": "已核对",
+      "title": "如何构建和提交 Sitemap",
+      "evidence": [
+        "A"
+      ],
+      "assessment": "sitemap仅3个公开canonical，不含账号/管理页，不伪造lastmod。"
+    },
+    {
+      "id": "D082",
+      "path": "references-google/canonicalization.md",
+      "sha256": "096c069ca37c9990cb0c504b04384d2d03cd42131ac8ae76f4dba0bcbb57b502",
+      "bytes": 4205,
+      "lines": 36,
+      "status": "部分满足",
+      "title": "URL 规范化（Canonicalization）",
+      "evidence": [
+        "A",
+        "G"
+      ],
+      "assessment": "canonical信号已给出；Google实际选择的canonical只能由URL检查报告确认。"
+    },
+    {
+      "id": "D083",
+      "path": "references-google/cloaking.md",
+      "sha256": "803a02515c644b6d23782b82a0598473dd58d9bdb18863754a2792698f490770",
+      "bytes": 24719,
+      "lines": 245,
+      "status": "已核对",
+      "title": "伪装（Cloaking）",
+      "evidence": [
+        "B",
+        "E"
+      ],
+      "assessment": "该文件实际为完整SpamPolicies正文；SSR对普通用户与爬虫相同，不做UA特殊展示。"
+    },
+    {
+      "id": "D084",
+      "path": "references-google/consolidate-duplicate-urls.md",
+      "sha256": "c96b4670fbc000917335d5163a99756773ef319031c1bb5d7b5037dbb678771e",
+      "bytes": 15593,
+      "lines": 206,
+      "status": "已核对",
+      "title": "如何指定规范 URL",
+      "evidence": [
+        "A",
+        "C",
+        "E"
+      ],
+      "assessment": "初始HTML、运行时、sitemap和内链canonical一致；不把noindex当重复页归并方法。"
+    },
+    {
+      "id": "D085",
+      "path": "references-google/core-updates.md",
+      "sha256": "e304e01be81b60624ccf1158b93c50539152fd5f980d795776fd5f0a14653b6a",
+      "bytes": 7020,
+      "lines": 54,
+      "status": "待数据",
+      "title": "核心更新与应对策略",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "核心更新判断需流量、查询和日期对照；Lighthouse降分不等于算法惩罚。"
+    },
+    {
+      "id": "D086",
+      "path": "references-google/core-web-vitals.md",
+      "sha256": "a902970c0ebe60da90e8a81658446f5874dc704eb165aab3f1c556a6ead6db20",
+      "bytes": 2699,
+      "lines": 32,
+      "status": "待数据",
+      "title": "Core Web Vitals",
+      "evidence": [
+        "F",
+        "G"
+      ],
+      "assessment": "本地浏览器是实验数据；真实CWV需CrUX/GSC或合规真实用户数据。"
+    },
+    {
+      "id": "D087",
+      "path": "references-google/creating-helpful-content.md",
+      "sha256": "e593cc77c4ba74fc69105db3ccdd21acd146d4f3b4c9dcb60bfc9ca394843525",
+      "bytes": 12787,
+      "lines": 128,
+      "status": "部分满足",
+      "title": "创建以人为先的有帮助内容",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "清楚说明产品能力与边界，补操作型FAQ；需要继续依据真实问题维护内容。"
+    },
+    {
+      "id": "D088",
+      "path": "references-google/debugging-traffic-drops.md",
+      "sha256": "fdf5ae520339d4ea35651be53ebf5232c714a54fc6dc0956240396fe147fab01",
+      "bytes": 13478,
+      "lines": 26,
+      "status": "待数据",
+      "title": "排查搜索流量下降",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "流量下降需检查收录/安全/手动处置/需求季节性；当前没有该数据，不能归因。"
+    },
+    {
+      "id": "D089",
+      "path": "references-google/do-i-need-seo.md",
+      "sha256": "5eaace7bc50f68c1040e4ef713cf5514e085785da015742c178b566925813462",
+      "bytes": 12501,
+      "lines": 129,
+      "status": "不适用",
+      "title": "是否需要 SEO",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "聘请SEO指南不要求立刻采购代理服务；目前直接修复已知站内问题。"
+    },
+    {
+      "id": "D090",
+      "path": "references-google/ecommerce-appear.md",
+      "sha256": "04ea2b614d80cee30c791e4c4a67b5e87a89ad91d1c767fa92ec1db47ddd832a",
+      "bytes": 4532,
+      "lines": 24,
+      "status": "不适用",
+      "title": "电商内容在 Google 的展示位置",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "没有商品交易/购物Feed，不配置MerchantCenter或Shopping展示。"
+    },
+    {
+      "id": "D091",
+      "path": "references-google/ecommerce-getting-started.md",
+      "sha256": "97816ddd0626bdd35d24cb18edda1f3bd2f72eda0af6d6f1025d56a9ddaea3c4",
+      "bytes": 3006,
+      "lines": 16,
+      "status": "不适用",
+      "title": "电商 SEO 入门",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "非电商网站；导航等通用部分已在C核对，不套商品目录。"
+    },
+    {
+      "id": "D092",
+      "path": "references-google/ecommerce-launch.md",
+      "sha256": "8cb413baa191d0d6c86a9875185303f71404d6f2f93805f0d2b3216cfb9bb9df",
+      "bytes": 6170,
+      "lines": 31,
+      "status": "不适用",
+      "title": "电商网站上线指南",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无电商开店上线任务；SearchConsole发现步骤另列G。"
+    },
+    {
+      "id": "D093",
+      "path": "references-google/ecommerce-pagination.md",
+      "sha256": "8f9146b7465be6a22dc6a717aa1c2d1a7bcd2a156962fdab693e133c3985981b",
+      "bytes": 8645,
+      "lines": 82,
+      "status": "不适用",
+      "title": "电商分页与增量加载",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "公开页无商品分页；私有聊天历史不能为SEO暴露，也不取消聊天虚拟列表。"
+    },
+    {
+      "id": "D094",
+      "path": "references-google/ecommerce-product-data.md",
+      "sha256": "1eb13c03d00596a0b39306062585057e8b07b5595f9bf99f646bee8a849e3f16",
+      "bytes": 7810,
+      "lines": 34,
+      "status": "不适用",
+      "title": "向 Google 提供产品数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无商品价格/库存数据，不生成产品Feed。"
+    },
+    {
+      "id": "D095",
+      "path": "references-google/ecommerce-reviews.md",
+      "sha256": "567be815e92b3dd0d601b22870fde4c167683b2eea8fa3a31c4c5e6874475d08",
+      "bytes": 4602,
+      "lines": 35,
+      "status": "部分满足",
+      "title": "高质量电商评论写法",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "compare保留noindex；没有原创验证材料前，不把竞品断言当可信评测索引。"
+    },
+    {
+      "id": "D096",
+      "path": "references-google/ecommerce-site-structure.md",
+      "sha256": "8eb7b5268a982057943cc5fd4cd7ab6f0ef8fc22a7820339b8e7cbb8b584579c",
+      "bytes": 5017,
+      "lines": 12,
+      "status": "已核对",
+      "title": "帮助 Google 理解电商网站结构",
+      "evidence": [
+        "C"
+      ],
+      "assessment": "首页→功能/FAQ互链，源代码入口可见，公开页无孤立页。"
+    },
+    {
+      "id": "D097",
+      "path": "references-google/ecommerce-structured-data.md",
+      "sha256": "9630aa2ffb71758a1d6850d6f6e32e5160e7e8a31ded95b0cac6705c386b298c",
+      "bytes": 4209,
+      "lines": 25,
+      "status": "不适用",
+      "title": "电商结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无购物商品与商家政策，不补与实际无关的commerce schema。"
+    },
+    {
+      "id": "D098",
+      "path": "references-google/ecommerce-url-structure.md",
+      "sha256": "21ea0018cc4d06ba5df167c5d510b0a41a0fa86b265e0df91c5099eae2328d13",
+      "bytes": 7566,
+      "lines": 45,
+      "status": "不适用",
+      "title": "电商网站 URL 结构设计",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无电商筛选/变体URL；通用简洁URL见D157。"
+    },
+    {
+      "id": "D099",
+      "path": "references-google/essentials-spam-policies.md",
+      "sha256": "c8acb1f9e7e713c4d6e51b1841e78e4b8ce2b2566e1a7fa3f103f0be8e7a4db2",
+      "bytes": 24803,
+      "lines": 245,
+      "status": "已核对",
+      "title": "垃圾政策（Spam Policies）",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "实际完整SpamPolicies；不做关键词堆砌、门页、隐藏内容、链接买卖或批量薄页。"
+    },
+    {
+      "id": "D100",
+      "path": "references-google/essentials-technical.md",
+      "sha256": "698b237d4916816a471586cdd8cc6abcd9c7a30f157231a5151523e0431af443",
+      "bytes": 3382,
+      "lines": 43,
+      "status": "部分满足",
+      "title": "技术要求",
+      "evidence": [
+        "A",
+        "D",
+        "E",
+        "G"
+      ],
+      "assessment": "公开文本可直接取得、正常页200、未知页404；Google访问线上仍需URLInspection证据。"
+    },
+    {
+      "id": "D101",
+      "path": "references-google/essentials.md",
+      "sha256": "af74832364b5bc608d30001b5c7ba590e764ab026737e7e49c561a1082be5a16",
+      "bytes": 4038,
+      "lines": 40,
+      "status": "部分满足",
+      "title": "Search Essentials — 技术要求总览",
+      "evidence": [
+        "A",
+        "B",
+        "C",
+        "G"
+      ],
+      "assessment": "技术资格、真实内容和链接已审查；搜索引擎不保证索引或排名。"
+    },
+    {
+      "id": "D102",
+      "path": "references-google/faceted-navigation.md",
+      "sha256": "750273c6ea53f3674ca0b9514b9d3a30056c02fca481a6656415a8d9a5b80f1c",
+      "bytes": 6589,
+      "lines": 59,
+      "status": "不适用",
+      "title": "分面导航（Faceted Navigation）管理",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无公开多维筛选导航；账号数据与聊天筛选不成为抓取入口。"
+    },
+    {
+      "id": "D103",
+      "path": "references-google/featured-snippets.md",
+      "sha256": "0baf8c0724729b9405db5f0ff43b567a65f3ca4288d03569036d9e3df882156d",
+      "bytes": 3751,
+      "lines": 52,
+      "status": "已核对",
+      "title": "精选摘要（Featured Snippets）",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "FAQ可清楚作答，但精选摘要由搜索引擎选择，不添加不存在的精选摘要schema。"
+    },
+    {
+      "id": "D104",
+      "path": "references-google/fix-search-javascript.md",
+      "sha256": "21bf087fdf9ccbfa1e4da410b72ebf60ae29fb9049cc12b46c858bc3ff946791",
+      "bytes": 11117,
+      "lines": 105,
+      "status": "已核对",
+      "title": "修复 JavaScript SEO 问题",
+      "evidence": [
+        "A",
+        "D",
+        "E"
+      ],
+      "assessment": "直接HTML含公开正文，使用History路由与指纹资源；未知URL不回退首页软404。"
+    },
+    {
+      "id": "D105",
+      "path": "references-google/google-discover.md",
+      "sha256": "bee87521a4b912380622a08738f32c04ff48abbfabe6a919ee9a4dfcdf467347",
+      "bytes": 7750,
+      "lines": 54,
+      "status": "不适用",
+      "title": "Google Discover 指南",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "目前产品入口不是新闻/兴趣内容站；现有品牌分享图不冒充Discover编辑图片，后续内容页另评估。"
+    },
+    {
+      "id": "D106",
+      "path": "references-google/google-images.md",
+      "sha256": "f83ff5bffeed213e308e6b708c07fc0356070c8fe7d7187f59c7e3380fe0b60e",
+      "bytes": 15007,
+      "lines": 191,
+      "status": "部分满足",
+      "title": "图片 SEO 最佳实践",
+      "evidence": [
+        "F"
+      ],
+      "assessment": "图像有真实用途；分享图是品牌图，未宣称符合所有Discover图像建议，未来文章需真实配图。"
+    },
+    {
+      "id": "D107",
+      "path": "references-google/googlebot.md",
+      "sha256": "5616eee5b9361619c60a6db11e81645d726b7c16740989313244fefd49743cf4",
+      "bytes": 5014,
+      "lines": 48,
+      "status": "待数据",
+      "title": "Googlebot 指南",
+      "evidence": [
+        "E",
+        "G"
+      ],
+      "assessment": "不依UA放宽认证/握手；Googlebot异常访问需真实日志与DNS/IP验证，不能凭UA认定。"
+    },
+    {
+      "id": "D108",
+      "path": "references-google/hacked-site.md",
+      "sha256": "422732a2931842eb70e41d393531c370948aa0121842d335af916912487113c2",
+      "bytes": 24731,
+      "lines": 245,
+      "status": "待数据",
+      "title": "网站被黑（Hacked Content）",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "正文为SpamPolicies；本轮未执行服务器入侵取证，安全报告/部署文件完整性需运营数据。"
+    },
+    {
+      "id": "D109",
+      "path": "references-google/how-search-works.md",
+      "sha256": "3e57ae7525853d77f86d64f0f102e4dd229c9c5fff496df9557f86f763e85ec2",
+      "bytes": 9418,
+      "lines": 36,
+      "status": "已核对",
+      "title": "Google 搜索如何工作",
+      "evidence": [
+        "A",
+        "G"
+      ],
+      "assessment": "区分发现、抓取、索引与排序；构建成功或SEO100不能证明已收录。"
+    },
+    {
+      "id": "D110",
+      "path": "references-google/http-status-codes.md",
+      "sha256": "8d454b3b6ffb071bff6aa0b10ea0827fd6f1ae533ce4564e2e046815ff69677c",
+      "bytes": 6935,
+      "lines": 66,
+      "status": "部分满足",
+      "title": "HTTP 状态码对爬虫的影响",
+      "evidence": [
+        "D",
+        "E",
+        "G"
+      ],
+      "assessment": "已知页面200/规范重定向301/未知404；实际线上限流、5xx情况需日志验证。"
+    },
+    {
+      "id": "D111",
+      "path": "references-google/image-sitemap.md",
+      "sha256": "3ee2fdeceae8283d2d53c4bb66e78424db71529c01057a61bd4b3c2ea588a746",
+      "bytes": 3870,
+      "lines": 71,
+      "status": "不适用",
+      "title": "图片 Sitemap",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "没有独立图像内容集或难发现图片，当前少量品牌资源无需额外image sitemap。"
+    },
+    {
+      "id": "D112",
+      "path": "references-google/INDEX.md",
+      "sha256": "52b869d1962c46b04f626e045439cfed4765f12d3cb5fa73c4543b807e1e538e",
+      "bytes": 5157,
+      "lines": 114,
+      "status": "参考",
+      "title": "Google 官方文档索引（86篇）",
+      "evidence": [
+        "I"
+      ],
+      "assessment": "Google索引87文件含86篇正文；目录逐项纳入清单，没有把索引当第87条技术要求。"
+    },
+    {
+      "id": "D113",
+      "path": "references-google/international-seo.md",
+      "sha256": "e8aed025114fb71db11c67f44960818dc48c9bbe2a53a3f3bbc440c80ff116f4",
+      "bytes": 1255,
+      "lines": 11,
+      "status": "后续项",
+      "title": "国际化多语言 SEO",
+      "evidence": [
+        "H"
+      ],
+      "assessment": "三语切换已有；英日文没有独立URL，不能宣称多语言SEO已完成。"
+    },
+    {
+      "id": "D114",
+      "path": "references-google/javascript-seo-basics.md",
+      "sha256": "f50cc5e53ee623ae964a62ffe37dd2c5d370ec164464f0441f386432945bb2ad",
+      "bytes": 17182,
+      "lines": 261,
+      "status": "已核对",
+      "title": "JavaScript SEO 基础",
+      "evidence": [
+        "A",
+        "D",
+        "E"
+      ],
+      "assessment": "初始与运行时metadata保持一致；公开内容SSR，私有入口初始noindex。"
+    },
+    {
+      "id": "D115",
+      "path": "references-google/lazy-loading.md",
+      "sha256": "0150da09a7da5a023884eb32e16cc927a990e2d88576c50ad155a5df1b0918ab",
+      "bytes": 4247,
+      "lines": 42,
+      "status": "已核对",
+      "title": "懒加载内容修复",
+      "evidence": [
+        "A",
+        "F"
+      ],
+      "assessment": "首屏和FAQ正文不依赖滚动/点击请求；聊天历史懒加载是私有功能，不暴露给爬虫。"
+    },
+    {
+      "id": "D116",
+      "path": "references-google/links-crawlable.md",
+      "sha256": "1e5f4f9180a614ef65f93baad90c621a70d091c52a41e9b3d4687318f1c4a8f1",
+      "bytes": 9274,
+      "lines": 155,
+      "status": "已核对",
+      "title": "链接最佳实践",
+      "evidence": [
+        "C"
+      ],
+      "assessment": "使用a href和可读锚文本，首页可抵达功能/FAQ，来源可查。"
+    },
+    {
+      "id": "D117",
+      "path": "references-google/locale-adaptive.md",
+      "sha256": "9ea60a59de658fe4ee357842af1bf0497a3bcfe5b557555b48e9141ef136041a",
+      "bytes": 2001,
+      "lines": 11,
+      "status": "后续项",
+      "title": "语言自适应页面",
+      "evidence": [
+        "H"
+      ],
+      "assessment": "自适应语言不能保证各语种被发现；后续需独立语言URL与互返链接，而非同URL乱加hreflang。"
+    },
+    {
+      "id": "D118",
+      "path": "references-google/localized-versions.md",
+      "sha256": "2f4bd242bffbf8e783c7d307c8feebc3d4c845088b624e0059a20f46b5ec28b6",
+      "bytes": 18256,
+      "lines": 194,
+      "status": "后续项",
+      "title": "本地化版本页面指南",
+      "evidence": [
+        "H"
+      ],
+      "assessment": "未实现独立语言版本URL；未来需自引用、互返、完整URL及x-default，当前不伪造通过。"
+    },
+    {
+      "id": "D119",
+      "path": "references-google/mobile-first-indexing.md",
+      "sha256": "aa03dee87b5b6d4ff7f35e92aed7c7ed449d5595f904129ad4d921d7dc1dd221",
+      "bytes": 23051,
+      "lines": 235,
+      "status": "部分满足",
+      "title": "移动优先索引",
+      "evidence": [
+        "A",
+        "F",
+        "G"
+      ],
+      "assessment": "响应式共用HTML，移动不删正文/metadata；已做本地首屏，线上移动收录仍需站长验证。"
+    },
+    {
+      "id": "D120",
+      "path": "references-google/mobile-guide.md",
+      "sha256": "1308580157e79aa43f186a9d599fc86ec94cdb997cd93ef37123c90325eac47d",
+      "bytes": 22951,
+      "lines": 235,
+      "status": "部分满足",
+      "title": "移动端 SEO 完整指南",
+      "evidence": [
+        "A",
+        "F",
+        "G"
+      ],
+      "assessment": "与D119正文重复；同一响应式实现满足内容一致，真实设备与字段体验仍需持续检查。"
+    },
+    {
+      "id": "D121",
+      "path": "references-google/multi-regional-sites.md",
+      "sha256": "9ac5d9e57e1eb3b65841524b503f289dd9b9ef2c3cf4ed4f7f35a31b7c2510f4",
+      "bytes": 10251,
+      "lines": 114,
+      "status": "后续项",
+      "title": "多地区网站管理",
+      "evidence": [
+        "H"
+      ],
+      "assessment": "尚无地域特供内容，不按IP强跳语言；独立语言路径作为后续明确任务。"
+    },
+    {
+      "id": "D122",
+      "path": "references-google/overview-google-crawlers.md",
+      "sha256": "3246202487d647a97c91b488772d70da7b6d10922ba747ae98c364295b1f3066",
+      "bytes": 8895,
+      "lines": 78,
+      "status": "待数据",
+      "title": "Google 爬虫总览",
+      "evidence": [
+        "E",
+        "G"
+      ],
+      "assessment": "资源指纹、缓存策略已查；爬虫负载、ETag实际响应和WAF行为须线上头部/日志。"
+    },
+    {
+      "id": "D123",
+      "path": "references-google/page-experience.md",
+      "sha256": "412e30ac534a55d418263d49a89b5dcab1660ae679b8843d3b67a770e6dbfe0f",
+      "bytes": 4739,
+      "lines": 61,
+      "status": "部分满足",
+      "title": "页面体验信号",
+      "evidence": [
+        "F",
+        "G"
+      ],
+      "assessment": "不只追单个分数，保留公开可读和/app聊天体验；真实体验需字段数据。"
+    },
+    {
+      "id": "D124",
+      "path": "references-google/paid-links.md",
+      "sha256": "aa4729eaa5d54c80c246f9fa6db70863802969769f5be784e1b374f5e8dbaace",
+      "bytes": 24717,
+      "lines": 245,
+      "status": "已核对",
+      "title": "付费链接政策",
+      "evidence": [
+        "B",
+        "C"
+      ],
+      "assessment": "付费链接文件是完整SpamPolicies；目前未买链，公开源码链接不是付费推荐。"
+    },
+    {
+      "id": "D125",
+      "path": "references-google/qualify-outbound-links.md",
+      "sha256": "a0368d1b31d08391fe21494adf12bc703f0716d1ca981c839dc6aa3b6dc2348b",
+      "bytes": 3954,
+      "lines": 65,
+      "status": "已核对",
+      "title": "外链限定（rel=sponsored/ugc/nofollow）",
+      "evidence": [
+        "C"
+      ],
+      "assessment": "普通出处链接不用一律nofollow；无公开UGC/赞助链接，不伪造sponsored，聊天内容不索引。"
+    },
+    {
+      "id": "D126",
+      "path": "references-google/reviews-system.md",
+      "sha256": "3bf773d4c2c69e118a67dbb8cefc3a41b1a8c0f6b2370590bfb32b805875896f",
+      "bytes": 3067,
+      "lines": 34,
+      "status": "部分满足",
+      "title": "Google 评价系统",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "没有有证据的独立评测，compare不索引；不编造研究、测评结果或用户评分。"
+    },
+    {
+      "id": "D127",
+      "path": "references-google/robots-create.md",
+      "sha256": "b826e1b1a2bad32d753d1d5a8c6ef755c87d8b1f4ef81cececc1846f851d7cb5",
+      "bytes": 10599,
+      "lines": 125,
+      "status": "已核对",
+      "title": "如何编写 robots.txt",
+      "evidence": [
+        "A"
+      ],
+      "assessment": "根robots为UTF8标准User-agent/Allow/Disallow/Sitemap，未添加Lighthouse不识别的Agentmap。"
+    },
+    {
+      "id": "D128",
+      "path": "references-google/robots-intro.md",
+      "sha256": "6e793794e6cfde3300f48683775d29fa38c237053e75ef354aaeabf914d88632",
+      "bytes": 6709,
+      "lines": 56,
+      "status": "已核对",
+      "title": "robots.txt 入门",
+      "evidence": [
+        "A",
+        "D"
+      ],
+      "assessment": "robots不承担隐私或去索引职责；私有内容靠认证，静态工具页靠noindex。"
+    },
+    {
+      "id": "D129",
+      "path": "references-google/robots-meta-tag.md",
+      "sha256": "18afda9da99166a0f6ae620a974f3583c878f3a2f8d484891a927e8236926eb5",
+      "bytes": 20310,
+      "lines": 330,
+      "status": "本轮修复",
+      "title": "Robots Meta Tag 和 X-Robots-Tag",
+      "evidence": [
+        "D"
+      ],
+      "assessment": "独立HTML初始robots noindex,follow；允许爬取以读取声明，没有误用nofollow隐藏正文。"
+    },
+    {
+      "id": "D130",
+      "path": "references-google/robots-submit.md",
+      "sha256": "2095a242244da23c873955b827df036afbbdd8bdbb1683043cedcadbd50b3c09",
+      "bytes": 3460,
+      "lines": 45,
+      "status": "待数据",
+      "title": "更新 robots.txt",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "仓库robots已更新；Google缓存何时刷新需线上抓取或SearchConsole请求，未冒充提交成功。"
+    },
+    {
+      "id": "D131",
+      "path": "references-google/robots-txt.md",
+      "sha256": "abece7e25d81fa2336b1df833904feb28c21367745ae97c275b35a1687d6d2b4",
+      "bytes": 20794,
+      "lines": 440,
+      "status": "已核对",
+      "title": "robots.txt 完整指南",
+      "evidence": [
+        "A"
+      ],
+      "assessment": "规则位于站点根、标准语法，私有页面未robots屏蔽到读不到noindex。"
+    },
+    {
+      "id": "D132",
+      "path": "references-google/safesearch.md",
+      "sha256": "209642824fd17266773b244d45ead656be5b8e41f90362c4e16f6043dc70e1bb",
+      "bytes": 11240,
+      "lines": 110,
+      "status": "不适用",
+      "title": "SafeSearch 与成人内容指南",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "公开产品页无成人内容，不添加成人评级；私有UGC不面向索引，平台治理另属业务安全范围。"
+    },
+    {
+      "id": "D133",
+      "path": "references-google/search-console-start.md",
+      "sha256": "138b1a0a8907f48d8b4d0059d44c6c2b3241e97ca7ec80f4204fc95c91887cfe",
+      "bytes": 7678,
+      "lines": 33,
+      "status": "待数据",
+      "title": "Search Console 入门",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "未连接站长账号；所有权、sitemap提交、索引覆盖、安全/手动操作需站长确认。"
+    },
+    {
+      "id": "D134",
+      "path": "references-google/search-ranking-systems.md",
+      "sha256": "3cb972470b3ec13292256b48d589ae2aeb544f1fd08adcee6dc35b068290b919",
+      "bytes": 14656,
+      "lines": 116,
+      "status": "已核对",
+      "title": "Google 排名系统完全指南",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "理解去重、语义和可靠性系统；不声称可通过固定关键词公式操控排名。"
+    },
+    {
+      "id": "D135",
+      "path": "references-google/seo-starter-guide.md",
+      "sha256": "d4256593a35c53ca9a1cd64f083068ccfb4ae19de94086fdff534968c9b3d748",
+      "bytes": 28457,
+      "lines": 252,
+      "status": "部分满足",
+      "title": "Google SEO 入门指南（官方原文）",
+      "evidence": [
+        "A",
+        "B",
+        "C",
+        "G"
+      ],
+      "assessment": "公开内容、标题、摘要、链接已落实；实际搜索效果须等待抓取并从站长数据评估。"
+    },
+    {
+      "id": "D136",
+      "path": "references-google/site-move.md",
+      "sha256": "dc28d6fe3741c072b4ae45389ff2c0df9ba2addd16de7d3f0091863ba37f3795",
+      "bytes": 23784,
+      "lines": 222,
+      "status": "后续项",
+      "title": "网站迁移指南",
+      "evidence": [
+        "E",
+        "H"
+      ],
+      "assessment": "当前没有迁站；未来统一apex/www或语言路径迁移要URL映射、会话存储迁移及监控。"
+    },
+    {
+      "id": "D137",
+      "path": "references-google/site-pause.md",
+      "sha256": "0e7f77b22ab18bf8064895a50bea84f825d88aa7fef87569aee76c2da48df95a",
+      "bytes": 10516,
+      "lines": 98,
+      "status": "不适用",
+      "title": "临时关闭或暂停网站",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "未安排停站；发生短期维护再按503/Retry-After评估，不能因聊天故障把全站改noindex。"
+    },
+    {
+      "id": "D138",
+      "path": "references-google/sitemap.md",
+      "sha256": "20ca3c46507bd6d3025fa04c794c58c5bd35f3f672f43e1d67d405c575f47500",
+      "bytes": 4117,
+      "lines": 44,
+      "status": "已核对",
+      "title": "Sitemap 入门",
+      "evidence": [
+        "A",
+        "C"
+      ],
+      "assessment": "小站仍提供sitemap但不依赖它代替内链；只列真正希望索引的页面。"
+    },
+    {
+      "id": "D139",
+      "path": "references-google/sneaky-redirects.md",
+      "sha256": "b806d6fc64ea0f5d524317598b03c3e8976dffda8098877ea26c035b6f799d8f",
+      "bytes": 24720,
+      "lines": 245,
+      "status": "已核对",
+      "title": "隐藏重定向政策",
+      "evidence": [
+        "E"
+      ],
+      "assessment": "正文为完整SpamPolicies；无UA/设备诱导跳转，index规范化保持原有路径与参数。"
+    },
+    {
+      "id": "D140",
+      "path": "references-google/snippet.md",
+      "sha256": "3c518837a6cf35d7d8616f0eeffdfab87b7075079727ebfc3ee76be557852830",
+      "bytes": 9179,
+      "lines": 104,
+      "status": "已核对",
+      "title": "元描述和摘要（Snippet）优化",
+      "evidence": [
+        "A",
+        "B"
+      ],
+      "assessment": "每页摘要准确且独立；Google可重写摘要，没有固定字数或强制展示承诺。"
+    },
+    {
+      "id": "D141",
+      "path": "references-google/spam-policies-full.md",
+      "sha256": "bb26afffbc50f612328ccad52dfd28850bc37ffbf3cd8c7e4bf3d1228c75579b",
+      "bytes": 24796,
+      "lines": 245,
+      "status": "已核对",
+      "title": "完整垃圾政策详解",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "完整垃圾政策与其他文件重复；未以批量内容、无关词或虚假功能操纵排名。"
+    },
+    {
+      "id": "D142",
+      "path": "references-google/spam-report.md",
+      "sha256": "8c6bc410e78da49d229c57935e98041125d06910ff183feb65863a57a1dcf61a",
+      "bytes": 2191,
+      "lines": 32,
+      "status": "不适用",
+      "title": "举报垃圾内容",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "未发现需举报的外部垃圾站点，不擅自提交举报或以此替代自身修复。"
+    },
+    {
+      "id": "D143",
+      "path": "references-google/spampolicy-full.md",
+      "sha256": "4553619b9a519ad28f351126915550f05b73fbd315ac6cb87a4e5beedd544b78",
+      "bytes": 24730,
+      "lines": 245,
+      "status": "已核对",
+      "title": "Google 垃圾政策完整详解",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "与D141近重复全文；不额外创造一套检查规则，沿用同一垃圾政策证据。"
+    },
+    {
+      "id": "D144",
+      "path": "references-google/structured-data-article.md",
+      "sha256": "7151ffe5bf8ee01e796ddd315c41fc4a7e43eb904428c808533898afab2f3c88",
+      "bytes": 18493,
+      "lines": 287,
+      "status": "不适用",
+      "title": "Article 结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "当前公开页为产品说明/FAQ，不伪装新闻Article，不编造作者履历、发布日期。"
+    },
+    {
+      "id": "D145",
+      "path": "references-google/structured-data-event.md",
+      "sha256": "689b2d5e60ed7abb427b2d5ce17547fd4739a2e9733233eadd5c0e83ba7b645a",
+      "bytes": 42557,
+      "lines": 665,
+      "status": "不适用",
+      "title": "Event 结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无真实可报名活动及时间地点，不加Event。"
+    },
+    {
+      "id": "D146",
+      "path": "references-google/structured-data-faqpage.md",
+      "sha256": "4f0302768c474430268b7e3400537d16594dbd8091866cc88a216dfbe8773b74",
+      "bytes": 16725,
+      "lines": 223,
+      "status": "已核对",
+      "title": "FAQPage 结构化数据",
+      "evidence": [
+        "B"
+      ],
+      "assessment": "旧FAQ富结果资料已过时；普通产品FAQ提供可见回答，不承诺GoogleFAQ富结果。"
+    },
+    {
+      "id": "D147",
+      "path": "references-google/structured-data-intro.md",
+      "sha256": "ba4e27e3a97e3a00e69d8e8861abe0ea3104cf1c9af608831f9c2711361aca44",
+      "bytes": 12456,
+      "lines": 82,
+      "status": "部分满足",
+      "title": "结构化数据入门",
+      "evidence": [
+        "A",
+        "G"
+      ],
+      "assessment": "使用JSON-LD WebSite/BreadcrumbList且与可见页面对应；线上RichResults/索引需工具数据。"
+    },
+    {
+      "id": "D148",
+      "path": "references-google/structured-data-job-posting.md",
+      "sha256": "ca29c70f9fc4442a58b3a77d7b4b4d2a1c33ac7a842a948258fa60799740fc96",
+      "bytes": 54397,
+      "lines": 821,
+      "status": "不适用",
+      "title": "JobPosting 结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无招聘岗位及申请入口，不加JobPosting或调用招聘IndexingAPI。"
+    },
+    {
+      "id": "D149",
+      "path": "references-google/structured-data-local-business.md",
+      "sha256": "80ebdb91a71b13439c616ffffc003ed6871abf15cc361d8897213a6f63d901d9",
+      "bytes": 30010,
+      "lines": 488,
+      "status": "不适用",
+      "title": "LocalBusiness 结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无实体营业地点，不加LocalBusiness、营业时间或虚构坐标。"
+    },
+    {
+      "id": "D150",
+      "path": "references-google/structured-data-policies.md",
+      "sha256": "eae9b51a792cdcd382c95b535c9beffa5cd0aae446ca8322ffedcdb45d5ab56a",
+      "bytes": 12253,
+      "lines": 169,
+      "status": "已核对",
+      "title": "结构化数据通用指南",
+      "evidence": [
+        "A",
+        "B"
+      ],
+      "assessment": "JSON-LD只描述真实可见内容；不伪造评分/价格/身份来填结构化字段。"
+    },
+    {
+      "id": "D151",
+      "path": "references-google/structured-data-product.md",
+      "sha256": "501bd1dd78a027f46997ecde7e42522ce5e412e0dec608285e594ed9b583789a",
+      "bytes": 6637,
+      "lines": 70,
+      "status": "不适用",
+      "title": "Product 产品结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无电商产品详情/购买交易，不加Product/库存/配送/退货政策。"
+    },
+    {
+      "id": "D152",
+      "path": "references-google/structured-data-recipe.md",
+      "sha256": "35a87b2246464725a3b0c3be224aec6659874aca6671830f7ceeedef94ca2557",
+      "bytes": 32649,
+      "lines": 487,
+      "status": "不适用",
+      "title": "Recipe 结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无食谱内容，不加Recipe/烹饪步骤/营养数据。"
+    },
+    {
+      "id": "D153",
+      "path": "references-google/structured-data-software-app.md",
+      "sha256": "7c56b3e6ae4f62967bbc1757c6c4a96812fd3f0ef0dbddbf89a6a4f94c3c0cf6",
+      "bytes": 3910,
+      "lines": 59,
+      "status": "后续项",
+      "title": "Software app (`SoftwareApplication`) structured data",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "软件富结果需真实价格/评价等资格资料；现有资料不足，不复制示例伪造AggregateRating。"
+    },
+    {
+      "id": "D154",
+      "path": "references-google/structured-data-video.md",
+      "sha256": "00f73efc5cccd3d0a7e18c5aad841cb65f61cf2efbdcef08af17ae7006764668",
+      "bytes": 47218,
+      "lines": 582,
+      "status": "不适用",
+      "title": "Video 结构化数据",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无视频观看页、时码/直播，不加VideoObject/Clip/BroadcastEvent。"
+    },
+    {
+      "id": "D155",
+      "path": "references-google/title-link.md",
+      "sha256": "762fea4b42d16d09b4038a6b20e41919f2fffba95123b7b61fbeca0a05604bca",
+      "bytes": 12192,
+      "lines": 137,
+      "status": "已核对",
+      "title": "标题链接（Title Link）优化",
+      "evidence": [
+        "A",
+        "B"
+      ],
+      "assessment": "各页title精简、准确、语言匹配且有唯一主标题；搜索结果标题可能由Google改写。"
+    },
+    {
+      "id": "D156",
+      "path": "references-google/trends-start.md",
+      "sha256": "7be5f88b9d3cc8578ebe69ed3cf553f66c4bc7b0d5c8611870e548096afbe419",
+      "bytes": 13637,
+      "lines": 35,
+      "status": "待数据",
+      "title": "Google Trends 入门",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "选题需产品相关并结合趋势/查询数据；未获取Trends数据，不追无关热点。"
+    },
+    {
+      "id": "D157",
+      "path": "references-google/url-structure.md",
+      "sha256": "bf815f9598cecd62148469d40a5d0e3e4769eee04272d429dcb5f0a80785070f",
+      "bytes": 11911,
+      "lines": 234,
+      "status": "已核对",
+      "title": "URL 结构最佳实践",
+      "evidence": [
+        "A",
+        "C",
+        "E"
+      ],
+      "assessment": "History路径、少参数、公开canonical明确；#downloads仅同页锚点，不用fragment切换独立内容。"
+    },
+    {
+      "id": "D158",
+      "path": "references-google/verifying-googlebot.md",
+      "sha256": "283c5fe1af273a35cde0bd8287869b2b05a2b1e1dd301628f17be5d0174653cb",
+      "bytes": 5433,
+      "lines": 74,
+      "status": "待数据",
+      "title": "验证 Googlebot 身份",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "Googlebot真伪应反查DNS再正查或用官方IP范围；无线上日志，未验证具体请求。"
+    },
+    {
+      "id": "D159",
+      "path": "references-google/video-seo.md",
+      "sha256": "bbba8ec8adc7afd9273989d5d616af7f3ee492a2105e31641b8602d05e1ccef6",
+      "bytes": 23644,
+      "lines": 306,
+      "status": "不适用",
+      "title": "视频 SEO 最佳实践",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "没有视频观看内容与媒体文件，不为SEO新增视频播放器请求。"
+    },
+    {
+      "id": "D160",
+      "path": "references-google/video-sitemap.md",
+      "sha256": "0d5630c8be8c10a56d9011d013482be2e0bdd0f359830726ca99c9fbec32ced9",
+      "bytes": 22637,
+      "lines": 322,
+      "status": "不适用",
+      "title": "视频 Sitemap",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无视频库存，不创建video sitemap或mRSS。"
+    },
+    {
+      "id": "D161",
+      "path": "references-google/web-stories-policy.md",
+      "sha256": "36597808b28412a6bd9b95371100bdfe93dd54f246ec98ca42d1567d13976f5a",
+      "bytes": 3637,
+      "lines": 40,
+      "status": "不适用",
+      "title": "Web Stories 内容政策",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "未制作AMP WebStories，常规聊天UI不是Story。"
+    },
+    {
+      "id": "D162",
+      "path": "references-google/web-stories-seo.md",
+      "sha256": "df011afdbc89c8a814824532f28e86d8179f324e1f4c81e4c233e32f7248a79e",
+      "bytes": 10276,
+      "lines": 96,
+      "status": "不适用",
+      "title": "Web Stories SEO 最佳实践",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "无WebStories叙事/海报/视频，不为此改首页为故事轮播。"
+    },
+    {
+      "id": "D163",
+      "path": "references-moz/growing-popularity-and-links.txt",
+      "sha256": "55fd2c5712479fb84164b7a0272c60b073e38db1070c0321759915d15978e6db",
+      "bytes": 35869,
+      "lines": 487,
+      "status": "待运营",
+      "title": "Table of Contents:",
+      "evidence": [
+        "C",
+        "G"
+      ],
+      "assessment": "可信链接应自然且相关；项目出处已给，外链质量与新增推荐仍需运营与数据。"
+    },
+    {
+      "id": "D164",
+      "path": "references-moz/how-search-engines-operate.txt",
+      "sha256": "32f78b63d4bafb586d1c1507938d89312cedeb4e12192d0000f9767020f04d33",
+      "bytes": 51327,
+      "lines": 529,
+      "status": "部分满足",
+      "title": "Table of Contents:",
+      "evidence": [
+        "A",
+        "D",
+        "E",
+        "G"
+      ],
+      "assessment": "公共内容可抓取、登录内容隔离；GSC旧URL参数工具等历史建议不照搬。"
+    },
+    {
+      "id": "D165",
+      "path": "references-moz/INDEX.md",
+      "sha256": "5da62e992921ebc0e81548e1f9e10114f85e4c7d88f6dc09a2cb1d2d387241d6",
+      "bytes": 1340,
+      "lines": 23,
+      "status": "参考",
+      "title": "Moz Beginner's Guide to SEO — 索引",
+      "evidence": [
+        "I"
+      ],
+      "assessment": "Moz索引含10章原文和总结，12份均列出，Google当前文档优先。"
+    },
+    {
+      "id": "D166",
+      "path": "references-moz/introduction.txt",
+      "sha256": "fee9931ffbf1c8730a200f49fb3259f5cca2deabb1b0ba0d3267ecf1ab4d4662",
+      "bytes": 8844,
+      "lines": 149,
+      "status": "参考",
+      "title": "Table of Contents:",
+      "evidence": [
+        "I"
+      ],
+      "assessment": "SEO学习框架可用于优先级，不需为课程推广/认证购买服务。"
+    },
+    {
+      "id": "D167",
+      "path": "references-moz/keyword-research.txt",
+      "sha256": "ed9b60719d6b6be0bf157cdfe4abdb564cd99ad1ee0d6e8ce60f049a19ded4f6",
+      "bytes": 21592,
+      "lines": 255,
+      "status": "待数据",
+      "title": "Table of Contents:",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "页面级意图已映射；用户需求、地域、长尾流量与排名尚无量化证据。"
+    },
+    {
+      "id": "D168",
+      "path": "references-moz/measuring-and-tracking-success.txt",
+      "sha256": "88567da99ff791c86e0eb61b4903a187b5d8933a6296458fa2c45a48f843e1c0",
+      "bytes": 24440,
+      "lines": 295,
+      "status": "待数据",
+      "title": "Table of Contents:",
+      "evidence": [
+        "G"
+      ],
+      "assessment": "指标应包括自然访问和有意义的使用/下载；无数据时不把停留时长/DA当排名证明。"
+    },
+    {
+      "id": "D169",
+      "path": "references-moz/MOZ-LEARNING-SUMMARY.md",
+      "sha256": "062a1737181de1690de6cb7df617a02746d4958a687543e836e1809421885f08",
+      "bytes": 12709,
+      "lines": 430,
+      "status": "部分满足",
+      "title": "Moz SEO Beginners Guide 学习总结",
+      "evidence": [
+        "A",
+        "B",
+        "G"
+      ],
+      "assessment": "综合清单已映射；旧UA/GA工具、固定字符数及统计断言不机械照搬。"
+    },
+    {
+      "id": "D170",
+      "path": "references-moz/on-page-seo.txt",
+      "sha256": "279258b85720003001026236e2672bea5e891fffe0659cecb3fad422faeafdd2",
+      "bytes": 44511,
+      "lines": 500,
+      "status": "部分满足",
+      "title": "Table of Contents:",
+      "evidence": [
+        "A",
+        "B",
+        "C"
+      ],
+      "assessment": "同意图合页、清晰标题与内链，避开薄页/堆词；新增FAQ解决实际任务。"
+    },
+    {
+      "id": "D171",
+      "path": "references-moz/quick-start-guide.txt",
+      "sha256": "46b74e34f2b389c1dc8be5c8e8cb9c1f8c97375ff4e9777e66c0406b69b41cc7",
+      "bytes": 34940,
+      "lines": 493,
+      "status": "部分满足",
+      "title": "Table of Contents:",
+      "evidence": [
+        "A",
+        "D",
+        "F",
+        "G"
+      ],
+      "assessment": "技术和内容检查可完成；搜索后台、关键词和外链基线仍待数据。"
+    },
+    {
+      "id": "D172",
+      "path": "references-moz/seo-glossary.txt",
+      "sha256": "e7cb12582db4c89543830c8d2d70ddbcd9e7c8473a297d49080702b37cdacec5",
+      "bytes": 30543,
+      "lines": 399,
+      "status": "参考",
+      "title": "Table of Contents:",
+      "evidence": [
+        "I"
+      ],
+      "assessment": "术语表用于统一表达；rel next/prev、noarchive等历史用法不当当前Google优化要求。"
+    },
+    {
+      "id": "D173",
+      "path": "references-moz/technical-seo.txt",
+      "sha256": "2e7502b25a78a32ad4068f741b2783339858dddd0577fca0df1cee13c8b4da6d",
+      "bytes": 34796,
+      "lines": 327,
+      "status": "部分满足",
+      "title": "Table of Contents:",
+      "evidence": [
+        "A",
+        "E",
+        "F",
+        "G"
+      ],
+      "assessment": "SSR、指纹资源与响应式已实现；不为SEO安装AMP框架或改私有聊天加载逻辑。"
+    },
+    {
+      "id": "D174",
+      "path": "references-moz/why-search-engine-marketing-is-necessary.txt",
+      "sha256": "c5eb1d7c9b1c6c5f0ad69bcf86cb894fe375ae522982b3ec79258151d7e5331e",
+      "bytes": 20765,
+      "lines": 273,
+      "status": "部分满足",
+      "title": "Table of Contents:",
+      "evidence": [
+        "B",
+        "G"
+      ],
+      "assessment": "目标是相关用户找到并使用产品；白帽原则已核对，业务成效需后续实际数据。"
+    },
+    {
+      "id": "D175",
+      "path": "scripts/README.md",
+      "sha256": "6af675cd5c112cd662aea12b1902fde988ab61456caefc50860912c4297f497b",
+      "bytes": 1587,
+      "lines": 49,
+      "status": "不适用",
+      "title": "SEO 诊断 PDF 报告生成",
+      "evidence": [
+        "N"
+      ],
+      "assessment": "PDF工具只在用户明确要求PDF时使用；本次交付可维护Markdown和JSON。"
+    },
+    {
+      "id": "D176",
+      "path": "SKILL.md",
+      "sha256": "1a31757a70460d28d2f35fd8f88601979f55d4de729a6628572a231c6788c8cc",
+      "bytes": 2434,
+      "lines": 51,
+      "status": "参考",
+      "title": "SEO Guide Skill",
+      "evidence": [
+        "I"
+      ],
+      "assessment": "按全站体检入口覆盖全部目录；未要求安装skill或执行外联，Google官方资料优先。"
+    }
+  ],
+  "method": "逐文件提取主题、章节和规范性要求，按适用性对照源码与构建；关键适用章节另读全文。不是逐句翻译，也不是176项检查全部通过。",
+  "auditDate": "2026-10-29",
+  "statusCounts": {
+    "参考": 7,
+    "部分满足": 39,
+    "待数据": 27,
+    "待运营": 19,
+    "不适用": 44,
+    "已核对": 31,
+    "本轮修复": 3,
+    "后续项": 6
+  }
+}

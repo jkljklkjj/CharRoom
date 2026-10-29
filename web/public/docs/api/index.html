@@ -4,6 +4,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,follow" />
+    <meta name="description" content="轻聊公开服务入口与 API 目录说明；完整接口定义请参阅服务端源码。" />
     <title>轻聊 API 文档</title>
     <style>
         :root {
@@ -102,14 +104,14 @@
             <ul>
                 <li><a href="/">首页</a></li>
                 <li><a href="/app">Web 体验</a></li>
-                <li><a href="/verify">站点验证页</a></li>
+                <li><a href="/verify">注册邮箱验证码页</a></li>
                 <li><a href="/sitemap.xml">Sitemap</a></li>
             </ul>
             <h2>常见约定</h2>
             <pre>{
   "content-type": "application/json",
   "auth": "Authorization: Bearer &lt;token&gt;",
-  "base-url": "https://www.chatlite.xin"
+  "base-url": "https://www.chatlite.xin/api"
 }</pre>
             <div class="meta">
                 <div><strong>Canonical Host:</strong> <a href="https://www.chatlite.xin/">https://www.chatlite.xin</a>
