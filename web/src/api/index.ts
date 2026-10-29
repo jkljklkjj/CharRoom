@@ -5,8 +5,19 @@ import { getTokenQuota, getTokenPrices, purchaseTokens, getPurchaseStatus } from
 import * as copilotApi from './copilot'
 import { sessionEpoch } from '../services/sessionEpoch'
 import type { Id, User, Group } from '../types/chat'
-import type { Tokens, LoginResult, OfflineMessage, SyncResult, RecentHistoryRequest, RecentHistoryPage, FriendRequest, FriendNotification, UserProfile } from '../types/api'
+import type { Tokens, LoginResult, OfflineMessage, SyncResult, RecentHistoryRequest, RecentHistoryPage, FriendRequest, FriendNotification, UserProfile, ApiBody } from '../types/api'
 export { safeFetch, API_BASE, refreshToken }
+
+/**
+ * 后端业务失败一律是 HTTP 200 + `code != 0`（ApiResponse.failure）。
+ * 只看 response.ok 会把「邮箱已注册」「验证码错误」当成成功，必须同时看 code。
+ */
+function businessError<T>(ok: boolean, body: ApiBody<T> | null | undefined, fallback: string) {
+  if (!ok) return body?.message || fallback
+  const code = body?.code
+  if (code != null && code !== 0) return body?.message || fallback
+  return null
+}
 
 export async function login(account: string, password: string): Promise<LoginResult> {
   if (!account || !password) return { ok: false, error: '请输入账号和密码' }
@@ -14,9 +25,9 @@ export async function login(account: string, password: string): Promise<LoginRes
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ account, password, deviceType: getDeviceType(), deviceId: getDeviceId() })
   })
-  if (!ok) {
-    const errorMsg = body?.message || '登录失败'
-    return { ok: false, error: errorMsg }
+  const loginError = businessError(ok, body as ApiBody<Tokens | string> | null, '登录失败')
+  if (loginError) {
+    return { ok: false, error: loginError }
   }
 
   const data = body?.data
@@ -42,7 +53,7 @@ export async function register(username: string, password: string) {
   const { ok, body } = await safeFetch<number>(`${API_BASE}/auth/register/verify`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userObj)
   })
-  if (!ok) return -1
+  if (businessError(ok, body, '注册失败')) return -1
   return body?.data ?? -1
 }
 
@@ -51,10 +62,8 @@ export async function sendVerifyCode(email: string) {
   const { ok, body } = await safeFetch<unknown>(`${API_BASE}/auth/verify-code`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
   })
-  if (!ok) {
-    const errorMsg = body?.message || '验证码发送失败'
-    return { ok: false, error: errorMsg }
-  }
+  const error = businessError(ok, body, '验证码发送失败')
+  if (error) return { ok: false, error }
   return { ok: true }
 }
 
@@ -63,10 +72,8 @@ export async function verifyRegister(email: string, code: string, password: stri
   const { ok, body } = await safeFetch<User>(`${API_BASE}/auth/register/verify`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code, password })
   })
-  if (!ok) {
-    const errorMsg = body?.message || '注册失败'
-    return { ok: false, error: errorMsg }
-  }
+  const error = businessError(ok, body, '注册失败')
+  if (error) return { ok: false, error }
   return { ok: true, data: body?.data }
 }
 
@@ -118,13 +125,31 @@ export async function getMyGroups() {
   return body?.data || []
 }
 
+export interface UserSearchHit {
+  id: string
+  username: string
+  avatarUrl?: string
+  avatarKey?: string
+  signature?: string
+  relation: 'NONE' | 'PENDING' | 'FRIEND'
+}
+
+/** 按昵称/ID 搜人（加好友用）。发现页只含公开名片，这里覆盖全部用户。 */
+export async function searchUsers(q: string, signal?: AbortSignal): Promise<UserSearchHit[]> {
+  const keyword = q.trim()
+  if (!keyword) return []
+  const { ok, body } = await safeFetch<UserSearchHit[]>(`${API_BASE}/users/search?q=${encodeURIComponent(keyword)}`, { method: 'GET', signal })
+  const error = businessError(ok, body, '搜索失败')
+  if (error) throw new Error(error)
+  return body?.data || []
+}
+
 export async function addFriend(account: string): Promise<{ ok: boolean; message: string }> {
   const { ok, body } = await safeFetch(`${API_BASE}/friends`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account })
   })
-  if (!ok) {
-    return { ok: false, message: body?.message || '请求失败' }
-  }
+  const error = businessError(ok, body, '请求失败')
+  if (error) return { ok: false, message: error }
   return { ok: true, message: '' }
 }
 
@@ -196,10 +221,7 @@ export async function getCurrentUser() {
   return body?.data || null
 }
 
-/**
- * 更新当前用户资料（昵称/签名/密码）。
- * @returns {Promise<boolean>}
- */
+/** 更新当前用户资料（昵称/签名/密码）。 */
 export async function updateUserProfile({ username, phone, signature, password }: UserProfile = {}) {
   const body: UserProfile = {}
   if (username) body.username = username
@@ -266,7 +288,8 @@ export async function sendResetCode(email: string) {
   const { ok, body } = await safeFetch<unknown>(`${API_BASE}/auth/password/reset/code`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
   })
-  if (!ok) return { ok: false, error: body?.message || '验证码发送失败' }
+  const error = businessError(ok, body, '验证码发送失败')
+  if (error) return { ok: false, error }
   return { ok: true }
 }
 
@@ -276,7 +299,8 @@ export async function resetPassword(email: string, code: string, newPassword: st
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, code, newPassword })
   })
-  if (!ok) return { ok: false, error: body?.message || '重置失败' }
+  const error = businessError(ok, body, '重置失败')
+  if (error) return { ok: false, error }
   return { ok: true }
 }
 
@@ -344,6 +368,7 @@ export default {
   confirmOfflineMessages,
   getRecentMessages,
   addFriend,
+  searchUsers,
   getFriendRequests,
   acceptFriend,
   rejectFriend,

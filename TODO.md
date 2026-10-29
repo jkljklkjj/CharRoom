@@ -13,6 +13,7 @@
 - [x] DOMPurify 预清洗
 - [x] localStorage O(n) 消息持久化 → IndexedDB
 
+- [ ] **`/app` 首屏静态壳（app shell）** — 试过两条路：注入灰条骨架、以及"真实文案壳 + 乐观启动"，刷新时仍有「壳 → 界面」的观感跳变，已整体撤回（`scripts/inline-app-shell.cjs`、`src/styles/app-boot.css` 已删除）。重新评估的前置条件：`/app` 能 SSR 出真实界面（或持久化上次渲染），否则静态壳只会让首帧更吵。当前保持「转圈 + 正在验证登录状态…」。
 - [ ] WebTransport Datagram（长期）
 - [ ] WASM 编解码（长期）
 

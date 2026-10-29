@@ -19,12 +19,20 @@ export function sidebarUsers(users: readonly User[], groups: readonly Group[]): 
   return [...merged.values()]
 }
 
+/**
+ * 搜索用的文本归一化：NFKC 把全角字符（２、Ａ、全角空格）折成半角，
+ * 再去首尾空白、转小写。不做这一步时，昵称「昵称２」用 "2" 搜不到、大小写/全角
+ * 输入也被当成不同关键字。
+ */
+const normalizeSearchText = (value: string): string => value.normalize('NFKC').toLocaleLowerCase().trim()
+
 function matchesKeyword(user: User, keyword: string): boolean {
-  return !keyword || [user.name, user.username, user.account, String(user.id)].some(value => value?.toLocaleLowerCase().includes(keyword))
+  return !keyword || [user.name, user.username, user.account, String(user.id)]
+    .some(value => value != null && normalizeSearchText(String(value)).includes(keyword))
 }
 
 export function filterContacts(users: User[], query: string): User[] {
-  const keyword = query.trim().toLocaleLowerCase()
+  const keyword = normalizeSearchText(query)
   return keyword ? users.filter(user => matchesKeyword(user, keyword)) : users
 }
 

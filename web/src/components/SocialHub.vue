@@ -25,7 +25,7 @@
             <p class="social-muted">{{ t('social.discoveryHint') }}</p>
             <div v-if="!people.length && !error" class="social-empty" :aria-busy="busy">
               <div v-if="busy" class="social-empty-loading" role="status"><span class="social-spinner" aria-hidden="true"></span>{{ t('social.loading') }}</div>
-              <template v-else><h3>{{ t('polish.noPeople') }}</h3><p class="social-muted">{{ t('social.empty') }}</p><button class="cancel-btn" @click="changeTab('me')">{{ t('social.me') }}</button></template>
+              <template v-else><h3>{{ t('polish.noPeople') }}</h3><p class="social-muted">{{ t('social.empty') }}</p><p class="social-muted">{{ t('social.emptyOptIn') }}</p><button class="cancel-btn" @click="changeTab('me')">{{ t('social.publishCard') }}</button></template>
             </div>
             <article v-for="person in people" :key="person.id" class="social-person">
               <div class="social-person-head"><img v-if="person.avatarUrl" :src="person.avatarUrl" class="social-avatar" alt="" /><div v-else class="social-avatar social-initial">{{ person.username.slice(0, 1) }}</div><div><h3>{{ person.username }}</h3><p class="social-muted">{{ person.signature || person.city }}</p></div></div>

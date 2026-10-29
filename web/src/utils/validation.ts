@@ -1,63 +1,49 @@
 /**
- * 表单验证工具
+ * 表单验证工具。
+ *
+ * <p>密码规则必须与后端 `com.chatlite.util.PasswordValidator` 以及原生客户端保持一致：
+ * 只要求长度 8–64 位，<b>不</b>要求大写字母、小写字母、数字或特殊符号。</p>
+ *
+ * <p>校验失败时返回的是 i18n key（不是成品文案），调用方用 `t()` 翻译，
+ * 保证三种语言下的提示一致。</p>
  */
 
-/**
- * 密码强度校验
- * @param {string} password - 密码
- * @returns {{ valid: boolean, message: string }}
- */
+export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_MAX_LENGTH = 64
+
+/** 密码校验：message 为 i18n key（通过时为空字符串）。 */
 export function validatePassword(password: string) {
-  if (!password) {
-    return { valid: false, message: '请输入密码' }
+  if (!password || !password.trim()) {
+    return { valid: false, message: 'validation.passwordRequired' }
   }
 
-  if (password.length < 8) {
-    return { valid: false, message: '密码长度至少 8 位' }
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return { valid: false, message: 'validation.passwordTooShort' }
   }
 
-  if (password.length > 64) {
-    return { valid: false, message: '密码长度不能超过 64 位' }
-  }
-
-  if (!/[a-z]/.test(password)) {
-    return { valid: false, message: '密码必须包含小写字母' }
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    return { valid: false, message: '密码必须包含大写字母' }
-  }
-
-  if (!/[0-9]/.test(password)) {
-    return { valid: false, message: '密码必须包含数字' }
+  if (password.length > PASSWORD_MAX_LENGTH) {
+    return { valid: false, message: 'validation.passwordTooLong' }
   }
 
   return { valid: true, message: '' }
 }
 
-/**
- * 邮箱格式校验
- * @param {string} email - 邮箱
- * @returns {{ valid: boolean, message: string }}
- */
+/** 邮箱格式校验：message 为 i18n key（通过时为空字符串）。 */
 export function validateEmail(email: string) {
-  if (!email) {
-    return { valid: false, message: '请输入邮箱' }
+  const value = (email || '').trim()
+  if (!value) {
+    return { valid: false, message: 'validation.emailRequired' }
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    return { valid: false, message: '邮箱格式不正确' }
+  if (!emailRegex.test(value)) {
+    return { valid: false, message: 'validation.emailInvalid' }
   }
 
   return { valid: true, message: '' }
 }
 
-/**
- * 用户名校验
- * @param {string} username - 用户名
- * @returns {{ valid: boolean, message: string }}
- */
+/** 用户名校验（当前 UI 未使用，保留给后续资料编辑复用）。 */
 export function validateUsername(username: string) {
   if (!username) {
     return { valid: false, message: '请输入用户名' }

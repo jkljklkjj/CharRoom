@@ -27,6 +27,22 @@ test('search trims input, matches names/accounts and group target stays positive
   assert.equal(api.chatTargetId('user:0'), '0')
 })
 
+test('search is substring-based and normalizes width/case instead of requiring an exact match', async () => {
+  const { exports: api } = await loadTs(file)
+  const users = [
+    { id: 12, username: '张三2号' },
+    { id: 33, username: 'Wang' },
+    { id: 44, username: 'x', name: '昵称２' }
+  ]
+  // 子串即可命中，不需要完整昵称；半角 "2" 也能命中全角「昵称２」
+  assert.deepEqual(Array.from(api.filterContacts(users, '2').map(u => u.id)), [12, 44])
+  assert.deepEqual(Array.from(api.filterContacts(users, '三2').map(u => u.id)), [12])
+  // 全角数字 / 全角空格 / 大小写归一
+  assert.deepEqual(Array.from(api.filterContacts(users, '２').map(u => u.id)), [12, 44])
+  assert.deepEqual(Array.from(api.filterContacts(users, 'ｗａｎｇ').map(u => u.id)), [33])
+  assert.deepEqual(Array.from(api.filterContacts(users, '  WANG ').map(u => u.id)), [33])
+})
+
 test('filtering a cached directory never repeats locale sorting', async () => {
   let comparisons = 0
   const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true })

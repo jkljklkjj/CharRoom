@@ -23,6 +23,9 @@
         :placeholder="$t(tab === 'contacts' ? 'sidebar.searchContacts' : 'sidebar.searchMessages')" @input="emit('update:query', ($event.target as HTMLInputElement).value)" />
       <button v-if="query" class="clear-search" :aria-label="$t('sidebar.clearSearch')" @click="emit('update:query', '')">×</button>
     </div>
+    <!-- 联系人搜索会同时找"还不是好友的人"：找到后点一下即可发申请，不需要额外的加好友入口 -->
+    <span v-if="remoteSearching" class="user-search-feedback" role="status">{{ $t('sidebar.userSearchSearching') }}</span>
+    <span v-else-if="remoteError" class="user-search-feedback error" role="alert">{{ remoteError }}</span>
 
     <!-- 好友申请弹窗 -->
     <div v-if="showFriendRequests" class="friend-requests-modal" @click.self="toggleFriendRequests">
@@ -51,6 +54,14 @@
             </li>
           </ul>
         </div>
+      </div>
+    </div>
+
+    <!-- 搜索结果名片：先看资料，再在名片里决定是否加好友 -->
+    <div v-if="previewUser" class="profile-preview-overlay" @click.self="closePreview">
+      <div ref="previewDialog" class="profile-preview" role="dialog" aria-modal="true" :aria-label="previewUser.username" tabindex="-1">
+        <button class="profile-preview-close" :aria-label="$t('social.close')" @click="closePreview">×</button>
+        <SocialProfileCard :user-id="String(previewUser.id)" @chat="onPreviewChat" @blocked="closePreview" @changed="onPreviewChanged" />
       </div>
     </div>
 
@@ -103,6 +114,7 @@
 import {ConversationId} from '../utils/conversationId'
 import type { Id, User } from '../types/chat'
 import type { FriendRequest } from '../types/api'
+import type { UserSearchHit } from '../api'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import {contactRows,contactRowHeight} from '../utils/virtualContacts'
 import {virtualLayout} from '../utils/virtualLayout'
@@ -110,6 +122,7 @@ import { useI18n } from 'vue-i18n'
 import { useStore } from '../store'
 import api from '../api'
 import AppIcon from './AppIcon.vue'
+import SocialProfileCard from './SocialProfileCard.vue'
 import BrandMark from './BrandMark.vue'
 import { useDialog } from '../composables/useDialog'
 import chatSocket from '../services/chatSocket'
@@ -141,9 +154,87 @@ const sortedUsers = computed(() => sortConversationUsers(allUsers.value, key => 
 
 const sortedDirectory = computed(() => contactDirectory(allUsers.value, store.state.accountId, locale.value))
 const directory = computed(() => filterContactDirectory(sortedDirectory.value, props.query))
-const sections = computed(() => props.tab === 'contacts'
-  ? [{ key: 'friends', label: t('sidebar.friends'), users: directory.value.friends }, { key: 'groups', label: t('sidebar.groups'), users: directory.value.groups }]
-  : [{ key: 'messages', label: '', users: filterContacts(sortedUsers.value, props.query) }])
+
+// 服务端按昵称/ID 搜人：结果并入联系人列表，点击直接发好友申请
+const remoteHits = ref<UserSearchHit[]>([])
+const remoteSearching = ref(false)
+const remoteError = ref('')
+let remoteController: AbortController | undefined
+let remoteTimer: ReturnType<typeof setTimeout> | undefined
+const contactKeys = computed(() => new Set(allUsers.value.map(u => ConversationId.forContact(u).key)))
+const remoteState = computed(() => new Map(remoteHits.value.map(hit => [String(hit.id), hit])))
+const remoteUsers = computed<User[]>(() => remoteHits.value
+  .filter(hit => !contactKeys.value.has(ConversationId.forContact({ id: hit.id } as User).key))
+  .map(hit => ({ id: hit.id, username: hit.username, avatarUrl: hit.avatarUrl, signature: hit.signature })))
+const sections = computed(() => {
+  if (props.tab !== 'contacts') return [{ key: 'messages', label: '', users: filterContacts(sortedUsers.value, props.query) }]
+  const rows = [
+    { key: 'friends', label: t('sidebar.friends'), users: directory.value.friends },
+    { key: 'groups', label: t('sidebar.groups'), users: directory.value.groups }
+  ]
+  if (remoteUsers.value.length) rows.push({ key: 'remote', label: t('sidebar.userSearchRemote'), users: remoteUsers.value })
+  return rows
+})
+
+function resetRemoteSearch() {
+  clearTimeout(remoteTimer)
+  remoteController?.abort()
+  remoteController = undefined
+  remoteHits.value = []
+  remoteSearching.value = false
+  remoteError.value = ''
+}
+watch(() => [props.tab, props.query] as const, ([tab, query]) => {
+  resetRemoteSearch()
+  const keyword = query.trim()
+  if (tab !== 'contacts' || !keyword) return
+  remoteTimer = setTimeout(async () => {
+    const controller = new AbortController()
+    remoteController = controller
+    remoteSearching.value = true
+    try {
+      remoteHits.value = await api.searchUsers(keyword, controller.signal)
+      remoteError.value = ''
+    } catch (error) {
+      if (!controller.signal.aborted) remoteError.value = t('sidebar.userSearchFailed')
+    } finally {
+      if (remoteController === controller) remoteSearching.value = false
+    }
+  }, 300)
+})
+onUnmounted(resetRemoteSearch)
+
+function remoteHint(user: User): string | null {
+  const hit = remoteState.value.get(String(user.id))
+  if (!hit) return null
+  if (hit.relation === 'FRIEND') return t('sidebar.userSearchFriend')
+  if (hit.relation === 'PENDING') return t('sidebar.userSearchSent')
+  return t('sidebar.userSearchViewCard')
+}
+
+// 点搜索结果先看名片：资料确认无误后，在名片里点"加为好友"发申请
+const previewUser = ref<User | null>(null)
+const previewDialog = ref<HTMLElement | null>(null)
+useDialog(previewDialog, () => closePreview())
+function openPreview(user: User) {
+  previewUser.value = user
+}
+function closePreview() {
+  previewUser.value = null
+}
+function onPreviewChat(profile: { id: string; username: string }) {
+  const user: User = { id: profile.id, username: profile.username }
+  store.mergeUsers([user])
+  closePreview()
+  select(user)
+}
+// 名片里加了好友/拉黑后：刷新联系人并重跑当前搜索，状态行跟着更新
+async function onPreviewChanged() {
+  await refreshContacts(true)
+  if (props.query.trim() && props.tab === 'contacts') {
+    try { remoteHits.value = await api.searchUsers(props.query.trim()) } catch { /* 保留旧结果 */ }
+  }
+}
 const visibleCount = computed(() => sections.value.reduce((total, section) => total + section.users.length, 0))
 const directoryPanel=ref<HTMLElement|null>(null),directoryTop=ref(0),directoryHeight=ref(700)
 const rows=computed(()=>contactRows(sections.value))
@@ -171,6 +262,8 @@ async function contactKeydown(event:KeyboardEvent,key:string){
 }
 const unreadCount = (user: User) => store.state.conversationStates[ConversationId.forContact(user).key]?.unreadCount || 0
 function subtitle(user: User) {
+  const hint = remoteHint(user)
+  if (hint) return hint
   if (props.tab === 'contacts') return user.signature || t(user.conversationKind==='group' ? 'sidebar.groupId' : 'sidebar.accountId', { id: user.id })
   return store.state.conversationStates[ConversationId.forContact(user).key]?.lastMessagePreview || user.signature || user.status || t('polish.startConversation')
 }
@@ -189,6 +282,8 @@ import { AGENT_USER_ID } from '../constants'
 import { toast } from '../utils/toast'
 
 function select(u: User) {
+  // 搜索结果里"还不是好友的人"：先打开名片，加好友在名片里操作
+  if (remoteState.value.has(String(u.id))) { openPreview(u); return }
   store.setSelectedChat(ConversationId.forContact(u).key)
   emit('user-selected', u)
 
@@ -322,6 +417,12 @@ function loadFriends() { return refreshContacts() }
 .sidebar-tabs button[aria-selected="true"]{background:var(--apricot);color:var(--on-apricot)}
 
 .sidebar-tabs button:focus-visible,.user-row:focus-visible{outline:2px solid var(--accent-2);outline-offset:-2px}
+.user-search-feedback{display:block;margin:-4px 12px 8px;font-size:12px;color:var(--muted)}
+.profile-preview-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.4)}
+.profile-preview{position:relative;width:min(420px,100%);max-height:calc(100dvh - 48px);overflow:auto;background:var(--panel);border:1px solid var(--surface-border);border-radius:18px;box-shadow:0 24px 60px rgba(52,43,37,.24)}
+.profile-preview-close{position:absolute;top:8px;right:8px;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:inherit;font-size:20px;cursor:pointer;z-index:1}
+.profile-preview-close:hover{background:var(--hover)}
+.user-search-feedback.error{color:#b53b27}
 .search-bar{display:flex;align-items:center;margin:0 12px 10px;border:1px solid var(--surface-border);background:var(--panel);border-radius:12px;min-height:44px}
 .search-bar:focus-within{border-color:var(--accent-2)}
 .search-bar input{width:100%;min-width:0;background:transparent;color:var(--text-primary);border:0;outline:0;padding:12px;font:inherit;font-size:13px}

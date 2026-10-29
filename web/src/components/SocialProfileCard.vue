@@ -45,6 +45,11 @@
           </fieldset>
         </form>
         <template v-else>
+          <div v-if="profile.relation === 'SELF'" class="social-visibility-panel">
+            <p class="social-muted" role="status">{{ visibilityState }}</p>
+            <button v-if="!isDiscoverable || profile.settings?.visibility !== 'PUBLIC'" type="button" class="cancel-btn" :disabled="busy || refreshing || !verified" @click="publishOwn">{{ t('social.publishCard') }}</button>
+            <p v-if="!isDiscoverable || profile.settings?.visibility !== 'PUBLIC'" class="social-muted">{{ t('social.publishHint') }}</p>
+          </div>
           <div class="social-actions social-profile-primary">
             <button v-if="profile.relation === 'SELF'" class="save-btn" :disabled="busy || refreshing || !verified || !profile.settings" @click="edit">{{ t(refreshing ? 'sync.refreshing' : 'social.edit') }}</button>
             <button v-else-if="profile.relation === 'FRIEND'" class="save-btn" :disabled="busy" @click="emit('chat', profile)">{{ t('social.chat') }}</button>
@@ -98,7 +103,7 @@ watch(editing, async () => {
   if (panel) panel.scrollTop = 0
 })
 let controller = new AbortController(), generation = 0
-const form = reactive<SocialEdit>({ username: '', signature: '', bio: '', interests: [], city: '', intent: '', cover: 'sunset', visibility: 'SELF', discoverable: false, mutualDiscovery: false })
+const form = reactive<SocialEdit>({ username: '', signature: '', bio: '', interests: [], city: '', intent: '', cover: 'sunset', visibility: 'FRIENDS', discoverable: false, mutualDiscovery: false })
 const detailsVisible = computed(() => {
   if (!profile.value) return false
   if (profile.value.relation !== 'SELF' || audience.value === 'self') return profile.value.detailsVisible
@@ -142,6 +147,23 @@ async function perform(work: () => Promise<void>) {
   busy.value = true; error.value = ''; notice.value = ''
   try { await work(); if (current === generation) emit('changed') } catch (failure) { if (current === generation) error.value = (failure as Error).message }
   finally { if (current === generation) busy.value = false }
+}
+const isDiscoverable = computed(() => Boolean(profile.value?.settings?.discoverable))
+const visibilityState = computed(() => {
+  if (!profile.value?.settings) return ''
+  if (!isDiscoverable.value) return t('social.stateHidden')
+  // 候选池要求“允许推荐 + 可见范围公开”，只勾推荐不改可见性依然进不去
+  return profile.value.settings.visibility === 'PUBLIC' ? t('social.statePublic') : t('social.stateNeedsPublic')
+})
+/** 一键公开名片：把可见性设为公开并打开推荐，省掉 5 个下拉框的配置成本 */
+function publishOwn() {
+  if (!profile.value?.settings) return
+  const saved = profile.value.settings
+  Object.assign(form, { username: profile.value.username, signature: profile.value.signature || '', bio: saved.bio,
+    interests: saved.interests, city: saved.city, intent: saved.intent, cover: saved.cover,
+    visibility: 'PUBLIC', discoverable: true, mutualDiscovery: saved.mutualDiscovery })
+  interestText.value = form.interests.join('、')
+  void save()
 }
 const save = () => perform(async () => { const current = generation; const next = await saveSocialProfile({ ...form, interests: interestText.value.split(/[、,，]/).map(v => v.trim()).filter(Boolean) }); if (current !== generation) return; profile.value = next; if (next.relation === 'SELF') saveOwnProfileCache(store.state.accountId, next); editing.value = false; notice.value = t('polish.saved'); emit('saved', next) })
 const requestFriend = () => perform(async () => { const id = props.userId; await sendSocialFriendRequest(id, reason.value); if (id !== props.userId || !profile.value) return; profile.value.relation = 'PENDING'; requesting.value = false })

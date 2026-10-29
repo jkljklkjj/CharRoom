@@ -32,12 +32,13 @@
     </div>
 
     <!-- 聊天消息列表：只显示当前会话的消息 -->
-    <VirtualMessageList :key="readingKey" class="messages" ref="virtualList" v-if="currentChatId !== null" :items="currentMessages" @scroll="onMessageScroll" v-slot="{ item: m }">
+    <VirtualMessageList :key="readingKey" class="messages" ref="virtualList" v-if="currentChatId !== null" :items="currentMessages" @scroll="onMessageScroll" v-slot="{ item: m, index }">
       <div>
+        <!-- QQ 式时间分隔：首条消息、跨天或与上一条间隔 5 分钟以上时居中显示时间 -->
+        <div v-if="showTimeDivider(index)" class="time-divider">{{ formatDividerTime(m.time ?? m.timestamp) }}</div>
         <!-- 系统消息（加入群聊/退出群聊等） -->
         <div v-if="isSystemMessage(m)" class="system-message">
           <span class="system-text">{{ m.text }}</span>
-          <span class="system-time">{{ formatRelativeTime(m.time) }}</span>
         </div>
         <!-- 普通消息 -->
         <div v-else :class="['msg', {me: m.user===SELF_USER}]" @contextmenu.prevent="showMessageContextMenu($event, m)">
@@ -47,9 +48,9 @@
               <div v-else class="avatar-placeholder">{{ initials(senderName(m.user)) }}</div>
             </div>
             <div class="bubble-col paper-bubble" :class="{mine:m.user===SELF_USER}">
-              <div class="meta">
+              <!-- 群聊保留发送者昵称以区分成员；私聊不显示用户名和时间（参考 QQ） -->
+              <div v-if="isGroupChat" class="meta">
                 <span class="sender">{{ senderName(m.user) }}</span>
-                <span class="time">{{ formatRelativeTime(m.time) }}</span>
               </div>
             <!-- 图片消息 -->
             <div v-if="m.messageType === 1 && m.fileUrl" class="image-message">
@@ -188,7 +189,7 @@ useDialog(forwardDialog, () => { forwardDialogOpen.value = false })
 // 注入 store 引用给 chatSocket（替代 window.__chatStore hack）
 chatSocket.setStore(store)
 
-// 相对时间实时刷新：每 60s 更新一次 now，触发模板重渲染（formatRelativeTime 读取 now.value）
+// 时间分隔实时刷新：每 60s 更新一次 now，跨天时重算分隔文案（formatDividerTime 读取 now.value）
 const now = ref(Date.now())
 let relTimeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -401,29 +402,37 @@ watch(() => [currentMessages.value.at(-1)?.messageId || currentMessages.value.at
   }
 })
 
-// 相对时间格式化（读取 now.value 使模板随 30s 定时器实时刷新）
-function formatRelativeTime(ts: TimeValue | undefined) {
-  if (!ts) return ''
-  const diff = now.value - new Date(ts).getTime()
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  if (seconds < 10) return t('time.justNow')
-  if (seconds < 60) return t('time.secondsAgo', { n: seconds })
-  if (minutes < 60) return t('time.minutesAgo', { n: minutes })
-  if (hours < 24) return t('time.hoursAgo', { n: hours })
-  if (days === 1) return t('time.yesterday')
-  if (days < 7) return t('time.daysAgo', { n: days })
-
-  // 超过 7 天显示绝对时间
-  const time = new Date(ts)
-  const month = time.getMonth() + 1
-  const day = time.getDate()
-  const hour = time.getHours().toString().padStart(2, '0')
-  const minute = time.getMinutes().toString().padStart(2, '0')
-  return `${month}/${day} ${hour}:${minute}`
+// QQ 式时间分隔：首条消息、跨天或与上一条间隔 5 分钟以上时居中显示时间
+const TIME_DIVIDER_GAP_MS = 5 * 60 * 1000
+function messageTimestamp(m: ChatMessage | undefined) {
+  return m ? normalizeTimeValue(m.time ?? m.timestamp) : 0
+}
+function dayStart(ts: number) {
+  const date = new Date(ts)
+  date.setHours(0, 0, 0, 0)
+  return date.getTime()
+}
+function showTimeDivider(index: number) {
+  const list = currentMessages.value
+  const current = messageTimestamp(list[index])
+  if (!current) return false
+  if (index === 0) return true
+  const previous = messageTimestamp(list[index - 1])
+  if (!previous) return true
+  return current - previous >= TIME_DIVIDER_GAP_MS || dayStart(current) !== dayStart(previous)
+}
+// 今天只显示时间；昨天/本年/跨年补齐日期（读取 now.value 使模板随定时器刷新）
+function formatDividerTime(ts: TimeValue | undefined) {
+  const value = normalizeTimeValue(ts)
+  if (!value) return ''
+  const date = new Date(value)
+  const time = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+  const days = Math.round((dayStart(now.value) - dayStart(value)) / 86400000)
+  if (days <= 0) return time
+  if (days === 1) return t('time.dividerYesterday', { time })
+  const month = date.getMonth() + 1, day = date.getDate()
+  if (date.getFullYear() === new Date(now.value).getFullYear()) return t('time.dividerMonthDay', { month, day, time })
+  return t('time.dividerFull', { year: date.getFullYear(), month, day, time })
 }
 
 // userId → avatarUrl 的 memoized 映射，避免每条消息 O(好友数) find
@@ -806,14 +815,26 @@ function handleKeydown(e: KeyboardEvent) {
   word-wrap: break-word;
   white-space: pre-wrap;
   width: fit-content; /* 宽度随内容自适应 */
+  flex: 0 1 auto;
   padding: 11px 15px;
+}
+
+/* QQ 式时间分隔：仅首条、跨天或间隔 5 分钟以上出现，替代气泡内的用户名/时间 */
+.time-divider {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  user-select: none;
 }
 
 /* 系统消息（加入群聊/退出群聊等） */
 .system-message {
   text-align: center;
-  padding: 8px 16px;
-  margin: 4px 0;
+  padding: 4px 16px;
+  margin: 2px 0;
 }
 .system-text {
   display: inline-block;
@@ -824,22 +845,12 @@ function handleKeydown(e: KeyboardEvent) {
   border-radius: 12px;
   line-height: 1.4;
 }
-.system-time {
-  display: block;
-  font-size: 11px;
-  color: #bbb;
-  margin-top: 2px;
-}
 
 /* 暗色主题 */
 :root.dark .system-text,
 [data-theme='dark'] .system-text {
   background: rgba(255, 255, 255, 0.08);
   color: #888;
-}
-:root.dark .system-time,
-[data-theme='dark'] .system-time {
-  color: #666;
 }
 
 /* 自己发的消息：在右边，橙色气泡，头像在右侧 */
@@ -858,21 +869,17 @@ function handleKeydown(e: KeyboardEvent) {
   justify-content: flex-start;
 }
 
-/* 消息元信息（发送者 + 时间） */
+/* 消息元信息：仅群聊显示发送者昵称 */
 .meta {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 11px;
   color: var(--muted);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .meta .sender {
   font-weight: 500;
-}
-.meta .time {
-  opacity: 0.7;
-  font-size: 10px;
 }
 
 /* 文本内容 */

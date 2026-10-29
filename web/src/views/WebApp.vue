@@ -82,13 +82,15 @@
       </div>
     </div>
 
-    <!-- 退出确认弹窗 -->
+    <!-- 退出确认弹窗：独立样式（ChatWindow 的 confirm-* 是 scoped，不能跨组件复用） -->
     <div v-if="showLogoutConfirm" class="settings-overlay" @click.self="showLogoutConfirm = false">
-      <div ref="logoutDialog" class="settings-dialog confirm-dialog" role="dialog" aria-modal="true" :aria-label="$t('app.settings.logout')" tabindex="-1">
-        <div class="confirm-text">{{ $t('app.settings.logoutConfirm') }}</div>
-        <div class="confirm-actions">
-          <button class="btn cancel" @click="showLogoutConfirm = false">{{ $t('app.cancel') }}</button>
-          <button class="logout-btn" @click="doLogout">{{ $t('app.settings.logout') }}</button>
+      <div ref="logoutDialog" class="logout-dialog" role="dialog" aria-modal="true" aria-labelledby="logout-dialog-title" tabindex="-1">
+        <div class="logout-dialog-icon" aria-hidden="true">🚪</div>
+        <h3 id="logout-dialog-title" class="logout-dialog-title">{{ $t('app.settings.logout') }}</h3>
+        <p class="logout-dialog-text">{{ $t('app.settings.logoutConfirm') }}</p>
+        <div class="logout-dialog-actions">
+          <button type="button" class="logout-dialog-cancel" @click="showLogoutConfirm = false">{{ $t('app.cancel') }}</button>
+          <button type="button" class="logout-dialog-confirm" @click="doLogout">{{ $t('app.settings.logout') }}</button>
         </div>
       </div>
     </div>
@@ -803,15 +805,84 @@ onUnmounted(() => {
   padding: 20px;
 }
 
-.logout-btn {
-  width: 100%;
-  padding: 12px 16px;
-  border: none;
-  border-radius: 10px;
-  background: #ff5f5f;
-  color: white;
+/* 退出登录确认框：纸感卡片 + 图标 + 左右双按钮，避免复用聊天窗的 scoped 样式 */
+.logout-dialog {
+  width: min(360px, calc(100% - 40px));
+  box-sizing: border-box;
+  background: var(--panel);
+  border: 1px solid var(--surface-border);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(52, 43, 37, 0.22);
+  padding: 26px 24px 20px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.logout-dialog-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border-radius: 16px;
+  background: var(--sage-soft);
+  color: var(--sage-ink);
+}
+
+.logout-dialog-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.logout-dialog-text {
+  margin: 0 0 22px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.logout-dialog-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.logout-dialog-actions button {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.logout-dialog-cancel {
+  border: 1px solid var(--input-border);
+  background: var(--panel);
+  color: var(--text-primary);
+}
+
+.logout-dialog-cancel:hover {
+  background: var(--hover);
+}
+
+.logout-dialog-confirm {
+  border: 1px solid transparent;
+  background: var(--action);
+  color: var(--on-action);
+}
+
+.logout-dialog-confirm:hover {
+  opacity: 0.9;
+}
+
+.logout-dialog-actions button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 3px;
 }
 
 .settings-divider {
@@ -879,10 +950,6 @@ onUnmounted(() => {
 .profile-error {
   color: #ff4757;
   font-size: 13px;
-}
-
-.logout-btn:hover {
-  background: #e04747;
 }
 
 /* 主题设置样式 */
