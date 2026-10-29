@@ -11,6 +11,8 @@ const queries = {
 
 function resourceCatalog() {
   return {
+    // ARD v0.91 permits this extra root field; older AI Catalog/Lighthouse requires it.
+    specVersion: '1.0',
     entries: routes.filter(route => route.index).map(route => ({
       '@context': 'https://agenticresourcediscovery.org/context/v1',
       identifier: `urn:air:${new URL(baseUrl).hostname}:docs:${route.key}`,

@@ -5,6 +5,12 @@ const path = require('node:path')
 const config = require('../site.routes.json')
 const { resourceCatalog, catalogPaths } = require('../scripts/resource-catalog.cjs')
 
+test('catalog retains the AI Catalog 1.0 root required by older Lighthouse validators', () => {
+  const catalog = resourceCatalog()
+  assert.equal(catalog.specVersion, '1.0')
+  assert.deepEqual(Object.keys(catalog).sort(), ['entries', 'specVersion'])
+})
+
 test('ARD catalog describes only real public resources with valid discovery fields', () => {
   const catalog = resourceCatalog()
   assert.deepEqual(catalog.entries.map(entry => new URL(entry.url).pathname), config.routes.filter(route => route.index).map(route => route.path))

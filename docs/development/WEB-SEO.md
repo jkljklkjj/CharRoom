@@ -42,6 +42,8 @@ Google Search Console / 百度站长平台的站点验证、sitemap 提交、实
 
 HTML head 提供 `rel="ard"` 和旧版 `rel="ai-catalog"` 链接，robots.txt 提供 Agentmap。目录只列出首页、功能和 FAQ 的公开文档，类型为真实的 `text/html`，不将登录入口或内部聊天 Agent 冒充公开 MCP/A2A 服务，也不声明未经验证的信任签名。
 
+兼容旧版 Lighthouse：根部保留 `specVersion: "1.0"`。现行 ARD 的 ArdManifest 只要求 entries 并允许额外字段，但旧版 AI Catalog schema 还要求 specVersion 为字符串 1.0；只通过现行官方校验不能证明旧版 Lighthouse 通过。三个地址使用同一份兼容格式，并已用两份官方 JSON Schema 逐一验证。新增回归锁定根部版本字段；本轮 139 项测试串行通过、生产构建和 SEO HTTP 回归通过。text/html 的低级别类型提示仍保留真实语义，旧版检测器可能因此轻微扣分，不能承诺部署后 SEO 一定是 100。参见 [旧版 AI Catalog Schema](https://github.com/ards-project/ard-spec/blob/main/spec/schemas/ai-catalog.schema.json) 与 [Lighthouse 的 ARD 兼容问题](https://github.com/GoogleChrome/lighthouse/issues/17251)。
+
 两份 Nginx 配置都为清单提供独立 JSON 路由，绕过首页和 Markdown 回退；文件缺失返回 JSON 404。部署必须包含 dist 的隐藏目录 `.well-known`，不能只复制 `dist/*`。当前 Docker COPY 和共享卷 `cp -a .../.` 会保留该目录。发布时同时更新前端镜像和生产网关配置；仅推送代码不会改变在线响应。如 CDN 缓存了旧的 HTML 回退，需要刷新这三个精确 URL，再检查状态码、Content-Type 与 JSON 正文。
 
 2026-10-29 实测修复前线上三个清单 URL 均为 `200 text/html`，返回首页 doctype；本地修复后生产构建和 HTTP 浏览器测试确认三个地址均为 `application/json`，包括请求 Accept 为 text/markdown 的场景。官方 ARD conformance CLI 使用其 JSON Schema 校验 ArdManifest 与三个 ArdEntry 均通过，无错误；三条提示是 text/html 不在该工具内置的 Agent 类型列表中，不是 schema 失败。现行规范允许按真实 IANA 媒体类型描述资源，见 [ARD §3.3、§4、§5.1](https://agenticresourcediscovery.org/spec/)。
