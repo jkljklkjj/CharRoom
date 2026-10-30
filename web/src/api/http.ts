@@ -4,7 +4,7 @@ import { sessionEpoch } from '../services/sessionEpoch'
 import { requestScope, abortable } from '../utils/requestScope'
 import { persistAccessSession, readAccessSession } from '../services/accessSession'
 
-export const API_BASE = import.meta.env.VITE_API_BASE || 'https://chatlite.xin/api'
+export const API_BASE = import.meta.env.VITE_API_BASE || 'https://www.chatlite.xin/api'
 type RefreshReply = { state: 'ready'; tokens: Tokens } | { state: 'invalid' | 'unavailable' }
 export type SessionRecovery = 'ready' | 'invalid' | 'unavailable' | 'stale'
 let refreshing: { version: number; promise: Promise<SessionRecovery> } | null = null

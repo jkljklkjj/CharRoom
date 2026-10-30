@@ -1,7 +1,7 @@
 import { getDeviceId, getDeviceType } from '../utils/device'
 import { requestScope } from '../utils/requestScope'
 
-const BASE = import.meta.env.VITE_API_BASE || 'https://chatlite.xin/api'
+const BASE = import.meta.env.VITE_API_BASE || 'https://www.chatlite.xin/api'
 const ACCESS = 'charroom_admin_access', REFRESH = 'charroom_admin_refresh'
 export const releasePlatforms = ['android', 'desktop'] as const
 export type ReleasePlatform = typeof releasePlatforms[number]
