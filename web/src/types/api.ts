@@ -13,6 +13,8 @@ export interface OfflineMessage {
   replyToSender?: string
   id?: string
   messageId?: string
+  /** 客户端生成的消息 ID；服务端落库后随同步/历史回传，用于按身份归并本地乐观行。 */
+  clientMessageId?: string | null
   senderId: Id
   receiverId: Id
   message: string

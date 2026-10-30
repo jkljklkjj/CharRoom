@@ -18,6 +18,7 @@
 - 本地存储：`src/utils/messageDB.ts`；待发消息：`src/services/offlineQueue.ts`。新设备七天历史入口与 IndexedDB 合并规则见 [历史恢复](../docs/development/RECENT-HISTORY.md)。
 - 联系人和群组由 `store/contactDirectory.ts` 统一同步，先读账号快照再校验版本；组件不直接拉取完整列表。`services/conversationViews.ts` 保存有上限的会话页面与阅读位置。消息库 v8 将增量消息、游标和 ACK 别名同事务提交，详见 [本地优先加载](../docs/development/LOCAL-FIRST-DIRECTORY-AND-HISTORY.md)。
 - 会话列表支持右键/长按置顶和删除；删除只隐藏会话行、不删历史，新消息由 `updateConversationState` 自动恢复。偏好按账号存 localStorage，见 [会话列表动作](../docs/development/CONVERSATION-LIST-ACTIONS.md)。
+- 历史行同时携带服务端主键与 `clientMessageId`：`utils/historyMessages.ts` 透传，`utils/messageDB.ts` 在合并事务里写别名并删除被取代的占位行，`store/messages.ts` 的 `mergeRows` 先按这个映射归一，文本+时间窗只作为老数据的兜底。
 - 联系人远程搜索延迟3秒，Enter/表单立即提交；只按昵称模糊匹配，账号/ID 不参与；每页6条最多4页，滚动接近底部加载下一页。每账号滚动60秒8次，前端预算与后端429冷却配合，不按IP或token分桶。名片与跨端验证见 [搜索与名片](../docs/development/CONTACT-SEARCH-AND-PROFILE.md)。
 - 发现页短时缓存由 `services/socialViewCache.ts` 按登录代次管理；资料、关系与回答修改后失效，不将他人资料落盘。本人名片与今日一问草稿分别在 `utils/socialProfileCache.ts` / `dailyAnswerDraft.ts`，账号切换、退出和异步完成必须核对所有者。
 - `services/gatewayOwner.ts` 在每次实时连接前解析 `/cluster/owner`；outbox v3 按账号和重试时间索引分批读取，发送成功只能由匹配的服务端 ACK 确认。

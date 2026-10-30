@@ -11,6 +11,8 @@ export interface ChatMessage {
   time?: TimeValue
   timestamp?: TimeValue
   messageId?: string
+  /** 服务端回传的客户端 ID（若有）。写入持久别名后，归并不再依赖文本与时间窗。 */
+  clientMessageId?: string
   messageType?: 0 | 1 | 2
   fileUrl?: string
   fileName?: string

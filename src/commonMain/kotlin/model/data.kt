@@ -73,7 +73,9 @@ data class Message(
     val fileSize: Long? = null,            // 文件大小
     val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
     val conversationId: String = "",        // 会话ID
-    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED
+    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
+    /** 客户端消息 ID：服务端随同步/历史回传，用于把本地乐观行按身份归并（可空：旧行没有它）。 */
+    val clientMessageId: String? = null
 ) : ChatMessage {
     override val chatMessageId get() = messageId
     override val chatText get() = message
@@ -109,7 +111,8 @@ data class Message(
         fileName = fileName,
         fileSize = fileSize,
         seqId = seqId,
-        conversationId = conversationId
+        conversationId = conversationId,
+        clientMessageId = clientMessageId
     )
 }
 
@@ -131,7 +134,9 @@ data class GroupMessage(
     val fileSize: Long? = null,            // 文件大小
     val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
     val conversationId: String = "",        // 会话ID
-    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED
+    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
+    /** 客户端消息 ID：服务端随同步/历史回传，用于把本地乐观行按身份归并（可空：旧行没有它）。 */
+    val clientMessageId: String? = null
 ) : ChatMessage {
     override val chatMessageId get() = messageId
     override val chatText get() = text

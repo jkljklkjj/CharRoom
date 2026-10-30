@@ -103,8 +103,18 @@ function ensureMemoryScope() {
 }
 function conversationKey(id:Id) {return ConversationId.parse(id).historyKey}
 function mergeRows(older:readonly ChatMessage[],current:readonly ChatMessage[]) {
+  // Rows that arrived with their client ID carry the authoritative mapping, so a placeholder
+  // still stored under that ID collapses into the server row without any content matching.
+  const canonical = new Map<string, ChatMessage>()
+  for (const message of [...older,...current]) {
+    if (message.clientMessageId && message.messageId && message.clientMessageId !== message.messageId) canonical.set(message.clientMessageId, message)
+  }
   const rows=new Map<string,ChatMessage>()
-  for(const message of [...older,...current])rows.set(message.messageId || `${message.time}:${message.user}:${message.text}`,message)
+  for(const message of [...older,...current]) {
+    const server = message.messageId ? canonical.get(message.messageId) : undefined
+    const row = server ? {...message, messageId: server.messageId, seqId: message.seqId ?? server.seqId, isSent: 'sent' as const} : message
+    rows.set(row.messageId || `${row.time}:${row.user}:${row.text}`,row)
+  }
   const sorted=[...rows.values()].sort((a,b)=>{
     const time=normalizeTimeValue(a.time ?? a.timestamp)-normalizeTimeValue(b.time ?? b.timestamp)
     if(time)return time

@@ -36,7 +36,7 @@ function aliasRecord(accountId: Id, conversationId: Id, clientId: string, server
     conversationId: String(conversationId), clientId, serverId: String(serverId), seqId: String(seqId) }
 }
 /** Aliases only ever start at a client ID, so server rows never need a lookup. */
-function aliasCandidate(message: ChatMessage) { return !!message.messageId?.startsWith('local_') }
+function aliasCandidate(message: { messageId?: string | null }) { return !!message.messageId?.startsWith('local_') }
 let databasePromise: Promise<IDBDatabase> | null = null
 function openDB(): Promise<IDBDatabase> {
   databasePromise ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -332,6 +332,13 @@ export async function mergeHistoryMessages(accountId: Id, conversationId: Id, me
       }
     }
     for (const [id, message] of batch) {
+      // A history row that still names its client ID proves the mapping for good, even when the
+      // ACK never arrived: record the alias and let the placeholder be removed below.
+      const clientId = message.clientMessageId
+      if (clientId && clientId !== id && aliasCandidate({ messageId: clientId }) && message.seqId != null) {
+        aliases.put(aliasRecord(accountId, conversationId, clientId, id, String(message.seqId)))
+        if (!superseded.includes(clientId)) superseded.push(clientId)
+      }
       if (aliasCandidate(message)) {
         const lookup = aliases.get(`${scope[0]}:${scope[1]}:${id}`)
         lookup.onsuccess = () => {
@@ -346,7 +353,7 @@ export async function mergeHistoryMessages(accountId: Id, conversationId: Id, me
       const reverse = aliases.index(ALIAS_SERVER_INDEX).getAll([scope[0], scope[1], id])
       reverse.onsuccess = () => {
         for (const alias of (reverse.result || []) as AliasRecord[]) if (alias.clientId !== id) superseded.push(alias.clientId)
-        resolved.push([id, message])
+        resolved.push([id, clientId ? { ...message, isSent: 'sent' as const } : message])
         settle()
       }
     }

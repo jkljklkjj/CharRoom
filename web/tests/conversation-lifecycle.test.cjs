@@ -213,3 +213,12 @@ test('reloading a stored window hides a placeholder already stored under its ser
   await messages.loadLatestMessages()
   assert.deepEqual(Array.from(state.messages, row => row.messageId), ['9301'])
 })
+
+test('a history row carrying the client ID collapses its placeholder without any text matching', async () => {
+  const { messages, state } = await fixture(async () => ({ messages: [], beforeIndex: null, hasMore: false }))
+  await messages.loadConversation('user:42')
+  // Same text, different time: content matching alone would keep both rows.
+  await messages.addMessage({ messageId: 'local_never', targetId: '42', user: 'you', text: 'same', time: 1000, isSent: 'sent' })
+  await messages.restoreHistoryPage('A', [{ messageId: '9009', targetId: '42', user: 'you', text: 'same', time: 900000, seqId: '31', clientMessageId: 'local_never' }])
+  assert.deepEqual(Array.from(state.messages, row => [row.messageId, row.isSent]), [['9009', 'sent']])
+})

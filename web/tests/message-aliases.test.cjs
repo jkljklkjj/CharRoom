@@ -70,3 +70,14 @@ test('aliases never cross accounts or conversations', async () => {
   assert.deepEqual(Array.from(await db.getMessages('1', '2'), row => row.messageId), [])
   assert.deepEqual(Array.from(await db.getMessages('9', '2'), row => row.messageId), ['local_a'])
 })
+
+test('a history row carrying the client ID replaces the placeholder without the ACK', async () => {
+  const db = await fixture()
+  // Sent, never acknowledged: the row keeps its client ID and the outbox entry is gone.
+  await db.appendMessage('1', '2', { ...own('local_never', 'hi', 1000), isSent: 'sent' })
+  await db.mergeHistoryMessages('1', '2', [{ ...own('9009', 'hi', 1000), seqId: '31', clientMessageId: 'local_never' }])
+  assert.deepEqual(Array.from(await db.getMessages('1', '2'), row => [row.messageId, row.seqId, row.isSent]), [['9009', '31', 'sent']])
+  // The alias survives and later copies of the same client ID merge into the same row.
+  await db.appendMessage('1', '2', { ...own('local_never', 'hi', 1000), isSent: 'sent' })
+  assert.deepEqual(Array.from(await db.getMessages('1', '2'), row => row.messageId), ['9009'])
+})

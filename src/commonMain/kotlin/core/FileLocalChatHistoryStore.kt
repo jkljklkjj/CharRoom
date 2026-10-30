@@ -45,7 +45,8 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
                         fileSize = groupMsg.fileSize,
                         seqId = groupMsg.seqId,
                         conversationId = groupMsg.conversationId,
-                        deliveryState = groupMsg.deliveryState
+                        deliveryState = groupMsg.deliveryState,
+                        clientMessageId = groupMsg.clientMessageId
                     )
                 })
             }
@@ -207,13 +208,25 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
     }
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
+        val directory = getAccountDir(accountId)
+        val superseded = mutableListOf<core.IndexedHistoryJournal.Row>()
         val rows = messages.map { message ->
-            val alias = core.MessageIdAliases.resolve(getAccountDir(accountId), targetId, isGroup, message.messageId)
+            // A server row that still names its client ID proves the mapping even without an ACK.
+            // Record it, then tombstone the placeholder it supersedes so one send keeps one row.
+            val clientId = message.clientMessageId
+            if (!clientId.isNullOrBlank() && clientId != message.messageId && message.seqId > 0) {
+                val conversation = message.conversationId.ifBlank {
+                    if (isGroup) "group:$targetId" else ""
+                }
+                core.MessageIdAliases.record(directory, targetId, isGroup, clientId, message.messageId, message.seqId, conversation)
+                superseded += core.IndexedHistoryJournal.Row(clientId, 0, null)
+            }
+            val alias = core.MessageIdAliases.resolve(directory, targetId, isGroup, message.messageId)
             val canonical = if (alias == null) message else message.copy(messageId = alias.serverId,
                 seqId = alias.seq, conversationId = alias.conversation, isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
             core.IndexedHistoryJournal.Row(canonical.messageId, canonical.timestamp, objectMapper.writeValueAsString(messageToJson(canonical)))
         }
-        journal(accountId, targetId, isGroup).write(rows)
+        journal(accountId, targetId, isGroup).write(rows + superseded)
     }
 
     private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean,
@@ -251,6 +264,7 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
             put("fileSize", message.fileSize)
             put("seqId", message.seqId)
             put("conversationId", message.conversationId)
+            message.clientMessageId?.let { put("clientMessageId", it) }
         }
     }
 
@@ -267,6 +281,7 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
                 isSent = json.path("isSent").asBoolean(true),
                 deliveryState = model.MessageDeliveryState.valueOf(json.required("deliveryState").asText()),
                 messageId = json.path("messageId").asText(""),
+                clientMessageId = json.path("clientMessageId").takeIf { it.isTextual }?.asText(),
                 replyToMessageId = json.path("replyToMessageId").asText(null),
                 replyToContent = json.path("replyToContent").asText(null),
                 replyToSender = json.path("replyToSender").asText(null),
@@ -287,6 +302,7 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
                 isSent = json.path("isSent").asBoolean(true),
                 deliveryState = model.MessageDeliveryState.valueOf(json.required("deliveryState").asText()),
                 messageId = json.path("messageId").asText(""),
+                clientMessageId = json.path("clientMessageId").takeIf { it.isTextual }?.asText(),
                 replyToMessageId = json.path("replyToMessageId").asText(null),
                 replyToContent = json.path("replyToContent").asText(null),
                 replyToSender = json.path("replyToSender").asText(null),

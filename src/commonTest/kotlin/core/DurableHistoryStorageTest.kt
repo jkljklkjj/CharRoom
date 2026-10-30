@@ -78,6 +78,29 @@ class DurableHistoryStorageTest {
         } finally { System.setProperty("user.home", previous); folder.deleteRecursively() }
     }
 
+    @Test fun aHistoryRowCarryingTheClientIdReplacesThePlaceholderWithoutAnAck() {
+        val previous = System.getProperty("user.home")
+        val folder = Files.createTempDirectory("history-id-from-history").toFile()
+        try {
+            System.setProperty("user.home", folder.absolutePath)
+            val pending = Message(42, "fixture", sender = true, receiverId = 1,
+                timestamp = 1, isSent = false, messageId = "local_lost")
+            DesktopLocalChatHistoryStore.save("42", listOf(pending), emptyList())
+            assertEquals("local_lost", DesktopLocalChatHistoryStore.restore("42").privateMessages.single().messageId)
+            // The ACK was lost, but the server row arrives by sync and still names the client ID.
+            val persisted = Message(42, "fixture", sender = true, receiverId = 1, timestamp = 1, isSent = true,
+                messageId = "9007199254740995", seqId = 31, conversationId = "1:42", clientMessageId = "local_lost")
+            DesktopLocalChatHistoryStore.save("42", listOf(persisted), emptyList())
+            val restored = DesktopLocalChatHistoryStore.restore("42").privateMessages
+            assertEquals(1, restored.size)
+            assertEquals("9007199254740995", restored.single().messageId)
+            // The alias keeps resolving even if an old snapshot with the client ID shows up later.
+            DesktopLocalChatHistoryStore.save("42", listOf(pending), emptyList())
+            assertEquals(listOf("9007199254740995"),
+                DesktopLocalChatHistoryStore.restore("42").privateMessages.map { it.messageId })
+        } finally { System.setProperty("user.home", previous); folder.deleteRecursively() }
+    }
+
     @Test fun cursorFilesAreAccountScopedAndDiskWriteFailureIsObservable() {
         val previous = System.getProperty("user.home")
         val folder = Files.createTempDirectory("history-durability").toFile()
