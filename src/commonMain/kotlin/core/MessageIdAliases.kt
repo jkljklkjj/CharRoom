@@ -20,6 +20,19 @@ object MessageIdAliases {
     fun resolve(directory: File, target: String, group: Boolean, clientId: String): Entry? =
         journal(directory, target, group).read(clientId)?.body?.let { json.decodeFromString<Entry>(it) }
 
+    fun resolveAll(directory: File, target: String, group: Boolean, clientIds: Collection<String>): Map<String, Entry> =
+        journal(directory, target, group).readMany(clientIds).associate { it.id to json.decodeFromString<Entry>(it.body!!) }
+
+    /** Validate the entire batch, then durably commit aliases before changing any history rows. */
+    fun recordAll(directory: File, target: String, group: Boolean, entries: Map<String, Entry>) {
+        val rows = entries.map { (clientId, entry) ->
+            require(clientId.isNotBlank() && clientId.length <= 256 && entry.serverId.isNotBlank() && entry.seq > 0) { "Invalid message ID alias" }
+            require(clientId != entry.serverId) { "Alias must point at a different row" }
+            IndexedHistoryJournal.Row(clientId, entry.seq, json.encodeToString(entry))
+        }
+        journal(directory, target, group).write(rows)
+    }
+
     fun confirm(directory: File, account: String, ack: MessageProtos.AckMessage) {
         require(ack.messageId.isNotBlank() && ack.serverMessageId.isNotBlank() && ack.seqId > 0)
         record(directory, account, ack.conversationId, ack.messageId, ack.serverMessageId, ack.seqId)
@@ -39,10 +52,7 @@ object MessageIdAliases {
     /** Same mapping when the caller already resolved the conversation target. */
     fun record(directory: File, target: String, group: Boolean, clientId: String, serverId: String,
                seq: Long, conversation: String) {
-        require(clientId.isNotBlank() && serverId.isNotBlank() && seq > 0) { "Invalid message ID alias" }
-        require(clientId != serverId) { "Alias must point at a different row" }
-        val entry = Entry(serverId, seq, conversation)
-        journal(directory, target, group).write(listOf(IndexedHistoryJournal.Row(clientId, seq, json.encodeToString(entry))))
+        recordAll(directory, target, group, mapOf(clientId to Entry(serverId, seq, conversation)))
     }
 
     fun target(account: String, conversation: String): Pair<String, Boolean> {

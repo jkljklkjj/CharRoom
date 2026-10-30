@@ -61,7 +61,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                         fileSize = groupMsg.fileSize,
                         seqId = groupMsg.seqId,
                         conversationId = groupMsg.conversationId,
-                        deliveryState = groupMsg.deliveryState
+                        deliveryState = groupMsg.deliveryState,
+                        clientMessageId = groupMsg.clientMessageId
                     )
                 })
             }
@@ -79,10 +80,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
         }
     }
 
-    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
-        java.io.File(getAccountDir(accountId), "indexed").listFiles { file ->
-            file.name.startsWith(if (isGroup) "group_" else "private_") && file.extension == "history"
-        }?.forEach { file -> core.IndexedHistoryJournal.open(file).write(listOf(core.IndexedHistoryJournal.Row(messageId, 0, null))) }
+    override fun deleteMessage(accountId: String, targetId: String, messageId: String, isGroup: Boolean) {
+        journal(accountId, targetId, isGroup).write(listOf(core.IndexedHistoryJournal.Row(messageId, 0, null)))
     }
 
     override fun restore(accountId: String): RestoredChatHistory {
@@ -91,10 +90,10 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
 
     override fun restorePage(accountId: String, page: Int, pageSize: Int): RestoredChatHistory {
         if (accountId.isBlank() || !this::context.isInitialized) return RestoredChatHistory()
-        val privateRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
-            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), false) as Message }
-        val groupRows = core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
-            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), true) as GroupMessage }
+        val privateRows = decodeMessages(accountId, false, core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
+            .asReversed()).map { it as Message }.distinctBy { it.messageId }
+        val groupRows = decodeMessages(accountId, true, core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
+            .asReversed()).map { it as GroupMessage }.distinctBy { it.messageId }
         return RestoredChatHistory(privateRows, groupRows)
     }
 
@@ -105,6 +104,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
 
         return loadMessages(accountId, userId.toString(), false, startTime, endTime)
             .filterIsInstance<Message>()
+            .distinctBy { it.messageId }
             .filter { it.timestamp in startTime..endTime }
             .sortedBy { it.timestamp }
     }
@@ -116,6 +116,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
 
         return loadMessages(accountId, groupId.toString(), true, startTime, endTime)
             .filterIsInstance<GroupMessage>()
+            .distinctBy { it.messageId }
             .filter { it.timestamp in startTime..endTime }
             .sortedBy { it.timestamp }
     }
@@ -123,15 +124,27 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     override fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int, pageSize: Int): List<Message> {
         if (accountId.isBlank() || !this::context.isInitialized) return emptyList()
         require(page >= 0 && pageSize in 1..10000)
-        return journal(accountId, userId.toString(), false).page(Math.multiplyExact(page, pageSize), pageSize)
-            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), false) as Message }
+        return decodeMessages(accountId, false, journal(accountId, userId.toString(), false)
+            .page(Math.multiplyExact(page, pageSize), pageSize).asReversed()).map { it as Message }.distinctBy { it.messageId }
     }
 
     override fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int, pageSize: Int): List<GroupMessage> {
         if (accountId.isBlank() || !this::context.isInitialized) return emptyList()
         require(page >= 0 && pageSize in 1..10000)
-        return journal(accountId, groupId.toString(), true).page(Math.multiplyExact(page, pageSize), pageSize)
-            .asReversed().map { row -> jsonToMessage(JSONObject(row.body!!), true) as GroupMessage }
+        return decodeMessages(accountId, true, journal(accountId, groupId.toString(), true)
+            .page(Math.multiplyExact(page, pageSize), pageSize).asReversed()).map { it as GroupMessage }.distinctBy { it.messageId }
+    }
+
+    override fun getPrivateMessagesBefore(accountId: String, userId: Int, before: core.HistoryCursor?, limit: Int): core.LocalHistoryPage<Message> {
+        if (accountId.isBlank() || !this::context.isInitialized) return core.LocalHistoryPage(emptyList(), null, false)
+        val page = journal(accountId, userId.toString(), false).pageBefore(before, limit)
+        return core.LocalHistoryPage(decodeMessages(accountId, false, page.rows.asReversed()).map { it as Message }.distinctBy { it.messageId }, page.before, page.hasMore)
+    }
+
+    override fun getGroupMessagesBefore(accountId: String, groupId: Int, before: core.HistoryCursor?, limit: Int): core.LocalHistoryPage<GroupMessage> {
+        if (accountId.isBlank() || !this::context.isInitialized) return core.LocalHistoryPage(emptyList(), null, false)
+        val page = journal(accountId, groupId.toString(), true).pageBefore(before, limit)
+        return core.LocalHistoryPage(decodeMessages(accountId, true, page.rows.asReversed()).map { it as GroupMessage }.distinctBy { it.messageId }, page.before, page.hasMore)
     }
 
     override fun clear(accountId: String): Boolean {
@@ -194,18 +207,57 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
     }
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
+        val directory = getAccountDir(accountId)
+        val entries = linkedMapOf<String, core.MessageIdAliases.Entry>()
+        messages.forEach { message ->
+            val clientId = message.clientMessageId
+            if (!clientId.isNullOrBlank() && clientId != message.messageId && message.seqId > 0) {
+                val conversation = message.conversationId.ifBlank { if (isGroup) "group:$targetId" else "" }
+                entries[clientId] = core.MessageIdAliases.Entry(message.messageId, message.seqId, conversation)
+            }
+        }
+        core.MessageIdAliases.recordAll(directory, targetId, isGroup, entries)
+        val aliases = core.MessageIdAliases.resolveAll(directory, targetId, isGroup, messages.map { it.messageId })
         val rows = messages.map { message ->
-            val alias = core.MessageIdAliases.resolve(getAccountDir(accountId), targetId, isGroup, message.messageId)
+            val alias = aliases[message.messageId]
             val canonical = if (alias == null) message else message.copy(messageId = alias.serverId,
                 seqId = alias.seq, conversationId = alias.conversation, isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
             core.IndexedHistoryJournal.Row(canonical.messageId, canonical.timestamp, messageToJson(canonical).toString())
         }
-        journal(accountId, targetId, isGroup).write(rows)
+        val superseded = entries.keys.map { core.IndexedHistoryJournal.Row(it, 0, null) }
+        journal(accountId, targetId, isGroup).write(rows + superseded)
+    }
+
+    private fun decodeMessages(accountId: String, isGroup: Boolean, rows: List<core.IndexedHistoryJournal.Row>): List<Any> {
+        val decoded = rows.map { jsonToMessage(JSONObject(it.body!!), isGroup) }
+        fun target(message: Any): String = when (message) {
+            is Message -> (if (message.senderId.toString() == accountId) message.receiverId else message.senderId).toString()
+            is GroupMessage -> message.groupId.toString()
+            else -> error("Unknown history message")
+        }
+        val directory = getAccountDir(accountId)
+        val aliases = decoded.groupBy(::target).mapValues { (id, messages) ->
+            core.MessageIdAliases.resolveAll(directory, id, isGroup, messages.map { (it as model.ChatMessage).chatMessageId })
+        }
+        return decoded.map { message ->
+            val id = target(message)
+            val alias = aliases.getValue(id)[(message as model.ChatMessage).chatMessageId]
+            if (alias == null) message else {
+                val conversation = alias.conversation.ifBlank { if (isGroup) "group:$id" else "" }
+                when (message) {
+                    is Message -> message.copy(messageId = alias.serverId, seqId = alias.seq, conversationId = conversation,
+                        isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+                    is GroupMessage -> message.copy(messageId = alias.serverId, seqId = alias.seq, conversationId = conversation,
+                        isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
+                    else -> message
+                }
+            }
+        }
     }
 
     private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean,
                              from: Long = Long.MIN_VALUE, through: Long = Long.MAX_VALUE): List<Any> =
-        journal(accountId, targetId, isGroup).range(from, through).map { row -> jsonToMessage(JSONObject(row.body!!), isGroup) }
+        decodeMessages(accountId, isGroup, journal(accountId, targetId, isGroup).range(from, through))
 
     private fun journal(accountId: String, targetId: String, isGroup: Boolean): core.IndexedHistoryJournal =
         core.IndexedHistoryJournal.open(core.IndexedHistoryJournal.conversation(getAccountDir(accountId), targetId, isGroup))
@@ -238,6 +290,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("fileSize", message.fileSize)
             put("seqId", message.seqId)
             put("conversationId", message.conversationId)
+            put("clientMessageId", message.clientMessageId)
         }
     }
 
@@ -260,6 +313,7 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
             put("fileSize", message.fileSize)
             put("seqId", message.seqId)
             put("conversationId", message.conversationId)
+            put("clientMessageId", message.clientMessageId)
         }
     }
 
@@ -284,7 +338,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
                 fileSize = if (!json.isNull("fileSize")) json.optLong("fileSize") else null,
                 seqId = json.optLong("seqId", 0),
-                conversationId = json.optString("conversationId", "")
+                conversationId = json.optString("conversationId", ""),
+                clientMessageId = json.optString("clientMessageId").takeIf { it.isNotEmpty() && it != "null" }
             )
         } else {
             Message(
@@ -304,7 +359,8 @@ object AndroidLocalChatHistoryStore : LocalChatHistoryStoreProvider {
                 fileName = json.optString("fileName").takeIf { it.isNotEmpty() },
                 fileSize = if (!json.isNull("fileSize")) json.optLong("fileSize") else null,
                 seqId = json.optLong("seqId", 0),
-                conversationId = json.optString("conversationId", "")
+                conversationId = json.optString("conversationId", ""),
+                clientMessageId = json.optString("clientMessageId").takeIf { it.isNotEmpty() && it != "null" }
             )
         }
     }

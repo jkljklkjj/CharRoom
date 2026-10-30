@@ -33,7 +33,7 @@ dependencies {
 // Explicit allowlist shares protocol/storage/HTTP source without importing the graphical application.
 val sharedCore = listOf("ApiClient", "ApiClientAuth", "ApiClientContacts", "ApiClientMessages", "ApiClientAgent",
     "ApiEndpoints", "AppConfig", "AppLogger", "AtomicHistoryFile", "ChatTransport", "FileLocalChatHistoryStore",
-    "GatewayOwner", "IndexedHistoryJournal", "LocalChatHistoryStore", "MessageIdAliases", "MessageProtocol",
+    "GatewayOwner", "IndexedHistoryJournal", "DurableCommitQueue", "LocalChatHistoryStore", "MessageIdAliases", "MessageProtocol",
     "OfflineHistory", "PendingMessageAcks", "ProtobufBuilders", "ProtobufMessageDispatcher", "ReceivedMessagePersistence",
     "RecentHistory", "ServerConfig", "SocialLocalCache", "StreamSession")
 sourceSets {

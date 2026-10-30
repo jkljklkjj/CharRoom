@@ -4,6 +4,20 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
 class RecentHistoryTest {
+    @Test fun restHistoryRetainsTheClientIdentityForPrivateAndGroupRows() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val row = json.decodeFromString<RecentHistoryMessage>("""{
+            "id":"9007199254740993","senderId":"1","receiverId":"2","message":"fixture",
+            "timestamp":1000,"conversationId":"user:1:2","seqId":"7","clientMessageId":"local_lost"
+        }""")
+        assertEquals("local_lost", row.privateMessage(1).clientMessageId)
+        assertEquals("local_lost", row.copy(conversationId = "group:2").groupMessage().clientMessageId)
+        val legacy = json.decodeFromString<RecentHistoryMessage>("""{
+            "id":"101","senderId":"1","receiverId":"2","message":"fixture","timestamp":1000
+        }""")
+        assertNull(legacy.privateMessage(1).clientMessageId)
+    }
+
     private fun message(id: String, sender: String = "2", receiver: String = "1", conversation: String = "user:1:2") =
         RecentHistoryMessage(id, sender, receiver, "fixture", 1000, conversation, "9007199254740993")
 

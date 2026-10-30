@@ -64,10 +64,8 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
         }
     }
 
-    override fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean) {
-        java.io.File(getAccountDir(accountId), "indexed").listFiles { file ->
-            file.name.startsWith(if (isGroup) "group_" else "private_") && file.extension == "history"
-        }?.forEach { file -> core.IndexedHistoryJournal.open(file).write(listOf(core.IndexedHistoryJournal.Row(messageId, 0, null))) }
+    override fun deleteMessage(accountId: String, targetId: String, messageId: String, isGroup: Boolean) {
+        journal(accountId, targetId, isGroup).write(listOf(IndexedHistoryJournal.Row(messageId, 0, null)))
     }
 
     override fun restore(accountId: String): RestoredChatHistory {
@@ -76,10 +74,10 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
 
     override fun restorePage(accountId: String, page: Int, pageSize: Int): RestoredChatHistory {
         if (accountId.isBlank()) return RestoredChatHistory()
-        val privateRows = distinctById(core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
-            .asReversed().map { row -> decodeMessage(accountId, false, row.body!!) as Message })
-        val groupRows = distinctById(core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
-            .asReversed().map { row -> decodeMessage(accountId, true, row.body!!) as GroupMessage })
+        val privateRows = distinctById(decodeMessages(accountId, false, core.IndexedHistoryJournal.page(getAccountDir(accountId), false, page, pageSize)
+            .asReversed()).map { it as Message })
+        val groupRows = distinctById(decodeMessages(accountId, true, core.IndexedHistoryJournal.page(getAccountDir(accountId), true, page, pageSize)
+            .asReversed()).map { it as GroupMessage })
         return RestoredChatHistory(privateRows, groupRows)
     }
 
@@ -110,15 +108,27 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
     override fun getPrivateMessagesPage(accountId: String, userId: Int, page: Int, pageSize: Int): List<Message> {
         if (accountId.isBlank()) return emptyList()
         require(page >= 0 && pageSize in 1..10000)
-        return distinctById(journal(accountId, userId.toString(), false).page(Math.multiplyExact(page, pageSize), pageSize)
-            .asReversed().map { row -> decodeMessage(accountId, false, row.body!!) as Message })
+        return distinctById(decodeMessages(accountId, false, journal(accountId, userId.toString(), false)
+            .page(Math.multiplyExact(page, pageSize), pageSize).asReversed()).map { it as Message })
     }
 
     override fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int, pageSize: Int): List<GroupMessage> {
         if (accountId.isBlank()) return emptyList()
         require(page >= 0 && pageSize in 1..10000)
-        return distinctById(journal(accountId, groupId.toString(), true).page(Math.multiplyExact(page, pageSize), pageSize)
-            .asReversed().map { row -> decodeMessage(accountId, true, row.body!!) as GroupMessage })
+        return distinctById(decodeMessages(accountId, true, journal(accountId, groupId.toString(), true)
+            .page(Math.multiplyExact(page, pageSize), pageSize).asReversed()).map { it as GroupMessage })
+    }
+
+    override fun getPrivateMessagesBefore(accountId: String, userId: Int, before: HistoryCursor?, limit: Int): LocalHistoryPage<Message> {
+        if (accountId.isBlank()) return LocalHistoryPage(emptyList(), null, false)
+        val page = journal(accountId, userId.toString(), false).pageBefore(before, limit)
+        return LocalHistoryPage(distinctById(decodeMessages(accountId, false, page.rows.asReversed()).map { it as Message }), page.before, page.hasMore)
+    }
+
+    override fun getGroupMessagesBefore(accountId: String, groupId: Int, before: HistoryCursor?, limit: Int): LocalHistoryPage<GroupMessage> {
+        if (accountId.isBlank()) return LocalHistoryPage(emptyList(), null, false)
+        val page = journal(accountId, groupId.toString(), true).pageBefore(before, limit)
+        return LocalHistoryPage(distinctById(decodeMessages(accountId, true, page.rows.asReversed()).map { it as GroupMessage }), page.before, page.hasMore)
     }
 
     override fun clear(accountId: String): Boolean {
@@ -179,18 +189,25 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
         }.getOrDefault(emptyMap())
     }
 
-    private fun decodeMessage(accountId: String, isGroup: Boolean, body: String): Any {
-        val decoded = jsonToMessage(objectMapper.readTree(body) as ObjectNode, isGroup)
+    private fun decodeMessages(accountId: String, isGroup: Boolean, rows: List<IndexedHistoryJournal.Row>): List<Any> {
+        val decoded = rows.map { jsonToMessage(objectMapper.readTree(it.body!!) as ObjectNode, isGroup) }
+        fun target(message: Any): String = when (message) {
+            is Message -> (if (message.senderId.toString() == accountId) message.receiverId else message.senderId).toString()
+            is GroupMessage -> message.groupId.toString()
+            else -> error("Unknown history message")
+        }
+        val directory = getAccountDir(accountId)
+        val aliases = decoded.groupBy(::target).mapValues { (id, messages) ->
+            MessageIdAliases.resolveAll(directory, id, isGroup, messages.map { (it as ChatMessage).chatMessageId })
+        }
+        return decoded.map { message -> resolveMessage(message, target(message), isGroup, aliases.getValue(target(message))) }
+    }
+
+    private fun resolveMessage(decoded: Any, targetId: String, group: Boolean, aliases: Map<String, MessageIdAliases.Entry>): Any {
         // The ACK records the alias before it renames the row, so a crash in between leaves a
         // row stored under its client ID. Resolve it on read: identity, not content, decides.
-        val (targetId, group) = when (decoded) {
-            is Message -> (if (decoded.senderId.toString() == accountId) decoded.receiverId
-                else decoded.senderId).toString() to false
-            is GroupMessage -> decoded.groupId.toString() to true
-            else -> return decoded
-        }
         val clientId = (decoded as ChatMessage).chatMessageId
-        val alias = core.MessageIdAliases.resolve(getAccountDir(accountId), targetId, group, clientId) ?: return decoded
+        val alias = aliases[clientId] ?: return decoded
         val conversation = if (alias.conversation.isBlank()) (if (group) "group:$targetId" else "") else alias.conversation
         return when (decoded) {
             is Message -> decoded.copy(messageId = alias.serverId, seqId = alias.seq, conversationId = conversation,
@@ -209,8 +226,8 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
 
     private fun saveMessages(accountId: String, targetId: String, isGroup: Boolean, messages: List<Message>) {
         val directory = getAccountDir(accountId)
-        val superseded = mutableListOf<core.IndexedHistoryJournal.Row>()
-        val rows = messages.map { message ->
+        val entries = linkedMapOf<String, MessageIdAliases.Entry>()
+        messages.forEach { message ->
             // A server row that still names its client ID proves the mapping even without an ACK.
             // Record it, then tombstone the placeholder it supersedes so one send keeps one row.
             val clientId = message.clientMessageId
@@ -218,20 +235,24 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
                 val conversation = message.conversationId.ifBlank {
                     if (isGroup) "group:$targetId" else ""
                 }
-                core.MessageIdAliases.record(directory, targetId, isGroup, clientId, message.messageId, message.seqId, conversation)
-                superseded += core.IndexedHistoryJournal.Row(clientId, 0, null)
+                entries[clientId] = MessageIdAliases.Entry(message.messageId, message.seqId, conversation)
             }
-            val alias = core.MessageIdAliases.resolve(directory, targetId, isGroup, message.messageId)
+        }
+        MessageIdAliases.recordAll(directory, targetId, isGroup, entries)
+        val aliases = MessageIdAliases.resolveAll(directory, targetId, isGroup, messages.map { it.messageId })
+        val rows = messages.map { message ->
+            val alias = aliases[message.messageId]
             val canonical = if (alias == null) message else message.copy(messageId = alias.serverId,
                 seqId = alias.seq, conversationId = alias.conversation, isSent = true, deliveryState = model.MessageDeliveryState.ACCEPTED)
             core.IndexedHistoryJournal.Row(canonical.messageId, canonical.timestamp, objectMapper.writeValueAsString(messageToJson(canonical)))
         }
+        val superseded = entries.keys.map { IndexedHistoryJournal.Row(it, 0, null) }
         journal(accountId, targetId, isGroup).write(rows + superseded)
     }
 
     private fun loadMessages(accountId: String, targetId: String, isGroup: Boolean,
                              from: Long = Long.MIN_VALUE, through: Long = Long.MAX_VALUE): List<Any> =
-        journal(accountId, targetId, isGroup).range(from, through).map { row -> decodeMessage(accountId, isGroup, row.body!!) }
+        decodeMessages(accountId, isGroup, journal(accountId, targetId, isGroup).range(from, through))
 
     private fun journal(accountId: String, targetId: String, isGroup: Boolean): core.IndexedHistoryJournal =
         core.IndexedHistoryJournal.open(core.IndexedHistoryJournal.conversation(getAccountDir(accountId), targetId, isGroup))

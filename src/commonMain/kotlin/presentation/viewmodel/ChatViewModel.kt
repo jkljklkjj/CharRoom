@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import model.Group
@@ -91,15 +92,53 @@ open class ChatViewModel(
                 val owner=GlobalAppState.currentUserId?.toString() ?: return@launch
                 if(value!=null) {
                     if(value.isGroup && chatState.groupMessagesFor(value.id).value.isEmpty()) {
-                        val rows=withContext(Dispatchers.IO) { LocalChatHistoryStore.getGroupMessagesPage(owner,value.id,0,50) }
-                        chatState.prependGroupMessages(rows)
+                        val rows=withContext(Dispatchers.IO) { LocalChatHistoryStore.getGroupMessagesBefore(owner,value.id).messages }
+                        chatState.prependGroupMessages(rows, isCurrentAccount = { GlobalAppState.currentUserId?.toString() == owner })
                     } else if(!value.isGroup && chatState.messagesFor(value.id).value.isEmpty()) {
-                        val rows=withContext(Dispatchers.IO) { LocalChatHistoryStore.getPrivateMessagesPage(owner,value.id,0,50) }
-                        chatState.prependMessages(rows)
+                        val rows=withContext(Dispatchers.IO) { LocalChatHistoryStore.getPrivateMessagesBefore(owner,value.id).messages }
+                        chatState.prependMessages(rows, isCurrentAccount = { GlobalAppState.currentUserId?.toString() == owner })
                     }
                 }
             }
         }
+
+    suspend fun loadOlderMessages(userId: Int, before: core.HistoryCursor?): core.LocalHistoryPage<Message>? {
+        val owner = GlobalAppState.currentUserId?.toString() ?: return null
+        val visible = chatState.messagesFor(userId).value
+        val page = olderPage(visible, before, { it.timestamp }, { it.messageId }) {
+            LocalChatHistoryStore.getPrivateMessagesBefore(owner, userId, it)
+        }
+        if (GlobalAppState.currentUserId?.toString() != owner) return null
+        chatState.prependMessages(page.messages, isCurrentAccount = { GlobalAppState.currentUserId?.toString() == owner })
+        return page
+    }
+
+    suspend fun loadOlderGroupMessages(groupId: Int, before: core.HistoryCursor?): core.LocalHistoryPage<GroupMessage>? {
+        val owner = GlobalAppState.currentUserId?.toString() ?: return null
+        val visible = chatState.groupMessagesFor(groupId).value
+        val page = olderPage(visible, before, { it.timestamp }, { it.messageId }) {
+            LocalChatHistoryStore.getGroupMessagesBefore(owner, groupId, it)
+        }
+        if (GlobalAppState.currentUserId?.toString() != owner) return null
+        chatState.prependGroupMessages(page.messages, isCurrentAccount = { GlobalAppState.currentUserId?.toString() == owner })
+        return page
+    }
+
+    private suspend fun <T> olderPage(visible: List<T>, before: core.HistoryCursor?, timestamp: (T) -> Long,
+        id: (T) -> String, read: (core.HistoryCursor?) -> core.LocalHistoryPage<T>): core.LocalHistoryPage<T> = withContext(Dispatchers.IO) {
+        val known = visible.mapTo(HashSet(), id)
+        // The first boundary includes the whole timestamp tie: aliases may have changed visible
+        // IDs. Subsequent pages use raw journal cursors, including across boundary deletion.
+        var cursor = before ?: visible.minOfOrNull(timestamp)?.let { core.HistoryCursor(it, "\uffff") }
+        var page: core.LocalHistoryPage<T>
+        do {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            page = read(cursor)
+            check(!page.hasMore || (page.before != null && page.before != cursor)) { "History cursor did not advance" }
+            cursor = page.before
+        } while (page.hasMore && page.messages.all { id(it) in known })
+        page
+    }
 
     var isLoadingMore: Boolean
         get() = chatState.isLoadingMore.value
@@ -515,12 +554,13 @@ open class ChatViewModel(
     /**
      * 删除私聊消息
      */
-    fun deleteMessage(messageId: String) {
+    fun deleteMessage(message: Message) {
+        val owner = GlobalAppState.currentUserId ?: return
+        val target = if (message.senderId == owner) message.receiverId else message.senderId
         sessionScope.launch {
-            val owner = GlobalAppState.currentUserId ?: return@launch
             flushLocalHistory()
-            chatState.deleteMessage(messageId)
-            withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), messageId, false) }
+            chatState.deleteMessage(message.messageId)
+            withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), target.toString(), message.messageId, false) }
             // 异步保存到本地存储
             saveChatHistoryToLocal()
         }
@@ -529,12 +569,12 @@ open class ChatViewModel(
     /**
      * 删除群聊消息
      */
-    fun deleteGroupMessage(messageId: String) {
+    fun deleteGroupMessage(message: GroupMessage) {
+        val owner = GlobalAppState.currentUserId ?: return
         sessionScope.launch {
-            val owner = GlobalAppState.currentUserId ?: return@launch
             flushLocalHistory()
-            chatState.deleteGroupMessage(messageId)
-            withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), messageId, true) }
+            chatState.deleteGroupMessage(message.messageId)
+            withContext(Dispatchers.IO) { LocalChatHistoryStore.deleteMessage(owner.toString(), message.groupId.toString(), message.messageId, true) }
             // 异步保存到本地存储
             saveChatHistoryToLocal()
         }

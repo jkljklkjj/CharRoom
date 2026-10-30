@@ -1,0 +1,112 @@
+name: Client checks
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: CharRoom/web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: CharRoom
+          persist-credentials: false
+      # Protocol fixtures and nginx contract tests read the adjacent backend.
+      - name: Checkout public backend contracts
+        working-directory: .
+        run: |
+          git clone --depth 1 --branch main https://gitee.com/zhenye55/chat-room.git chat-room
+          git -C chat-room rev-parse HEAD
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: CharRoom/web/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check all protocol copies before generation
+        run: |
+          python3 -m unittest discover -s ../scripts/tests -p test_ci_checks.py
+          python3 ../scripts/check-protocol-copies.py
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Offline tests including backend protocol fixtures
+        run: npm test
+      - name: Production build with SSR
+        run: npm run build
+      - name: Check generated protocol outputs remain current
+        run: |
+          python3 ../scripts/check-protocol-copies.py
+          git diff --exit-code -- src/proto public/proto
+
+  jvm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.5'
+      - name: Compile desktop and run shared, desktop and CLI tests
+        run: xvfb-run -a gradle compileKotlin :test :cli:test :cli:verifyHeadlessRuntime --no-daemon
+      - name: Require executed JVM and CLI tests
+        run: python3 scripts/check-test-results.py build/test-results/test cli/build/test-results/test
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: jvm-test-reports
+          path: |
+            build/test-results/test/
+            cli/build/test-results/test/
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.5'
+      - name: Install compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      # Kotlin/JVM validation does not load JNI. Actual native builds and packaging
+      # stay in build-installers.yml; this job makes no APK or interop claim.
+      - name: Compile Android and run unit tests
+        run: gradle :androidApp:compileDebugKotlin :androidApp:testDebugUnitTest -x :androidApp:buildQuicNative --no-daemon
+      - name: Require executed Android unit tests
+        run: python3 scripts/check-test-results.py androidApp/build/test-results/testDebugUnitTest
+      - name: Upload Android test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: android-unit-test-reports
+          path: androidApp/build/test-results/testDebugUnitTest/

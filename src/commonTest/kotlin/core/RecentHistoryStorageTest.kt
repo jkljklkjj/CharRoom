@@ -15,7 +15,7 @@ class RecentHistoryStorageTest {
             DesktopLocalChatHistoryStore.save("1", rows.takeLast(10), emptyList())
             DesktopLocalChatHistoryStore.save("3", rows.take(1), emptyList())
             assertEquals(650, DesktopLocalChatHistoryStore.getPrivateMessagesPage("1", 2, 0, 1000).size)
-            DesktopLocalChatHistoryStore.deleteMessage("1", "650", false)
+            DesktopLocalChatHistoryStore.deleteMessage("1", "2", "650", false)
             val restored = DesktopLocalChatHistoryStore.getPrivateMessagesPage("1", 2, 0, 1000)
             assertEquals(649, restored.size)
             assertEquals(649L, restored.last().seqId)

@@ -51,6 +51,8 @@ npm run preview
 
 `npm run test:messages` 先检查常量生成文件是否过期，再用后端主协议生成夹具，验证枚举、Web 编解码、消息分发与成功/失败 ACK；使用 Node 内置测试工具，需启用脚本中的 VM Modules 参数。它不连接服务器，不能代替真实双账号收发验证。
 
+`npm test` / `test:messages` 显式输出 TAP；PR 工作流先检出相邻后端、检查双 proto 四处副本，再测试和构建，最后检查协议生成产物未漂移。流程见 `../.github/workflows/ci.yml`。
+
 REST 支持 `VITE_API_BASE`，默认指向线上；QUIC 目标还要单独检查 `chatSocket.ts` / 调用方，设置 REST 地址不会自动改变实时目标。
 
 ## 修改约定

@@ -3,6 +3,10 @@ package core
 import model.GroupMessage
 import model.Message
 
+/** Ordered by timestamp then journal row ID; the boundary is exclusive. */
+data class HistoryCursor(val timestamp: Long, val id: String)
+data class LocalHistoryPage<T>(val messages: List<T>, val before: HistoryCursor?, val hasMore: Boolean)
+
 /**
  * 本地聊天历史存储接口
  */
@@ -18,7 +22,7 @@ interface LocalChatHistoryStoreProvider {
 
     fun confirmMessageId(accountId: String, ack: com.chatlite.proto.MessageProtos.AckMessage)
 
-    fun deleteMessage(accountId: String, messageId: String, isGroup: Boolean)
+    fun deleteMessage(accountId: String, targetId: String, messageId: String, isGroup: Boolean)
 
     /**
      * 恢复聊天历史（默认加载最近100条）
@@ -75,6 +79,9 @@ interface LocalChatHistoryStoreProvider {
      * @return 消息列表
      */
     fun getGroupMessagesPage(accountId: String, groupId: Int, page: Int = 0, pageSize: Int = 50): List<GroupMessage>
+
+    fun getPrivateMessagesBefore(accountId: String, userId: Int, before: HistoryCursor? = null, limit: Int = 50): LocalHistoryPage<Message>
+    fun getGroupMessagesBefore(accountId: String, groupId: Int, before: HistoryCursor? = null, limit: Int = 50): LocalHistoryPage<GroupMessage>
 
     /**
      * 清除指定用户的所有聊天历史

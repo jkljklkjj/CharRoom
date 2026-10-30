@@ -65,6 +65,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -199,13 +200,8 @@ private fun ChatScreenContent(
             }
         }
     }
-    // 只保留最新 100 条消息（类似 QQ 展示策略）
-    val displayMessages by remember {
-        derivedStateOf {
-            val msgs = filteredMessages
-            if (msgs.size > 100) msgs.subList(msgs.size - 100, msgs.size) else msgs
-        }
-    }
+    // History is loaded in bounded pages; every loaded older row remains scrollable.
+    val displayMessages = filteredMessages
     var isSending by remember { mutableStateOf(false) }
     val listState = remember { LazyListState() }
     // 切换用户时直接滚到底部，无动画（QQ/微信风格：瞬间切换，不闪烁）
@@ -235,9 +231,9 @@ private fun ChatScreenContent(
     val pageCreateTime = remember { System.currentTimeMillis() }
 
     // 分页加载相关状态
-    var currentPage by remember { mutableStateOf(1) } // 第0页已经在启动时加载
-    var isLoadingMore by remember { mutableStateOf(false) }
-    var hasMoreHistory by remember { mutableStateOf(true) }
+    var historyCursor by remember(GlobalAppState.currentUserId, user.id) { mutableStateOf<core.HistoryCursor?>(null) }
+    var isLoadingMore by remember(GlobalAppState.currentUserId, user.id) { mutableStateOf(false) }
+    var hasMoreHistory by remember(GlobalAppState.currentUserId, user.id) { mutableStateOf(true) }
 
     // 长按菜单相关状态
     var longPressMessage by remember { mutableStateOf<Message?>(null) }
@@ -409,7 +405,7 @@ private fun ChatScreenContent(
      */
     fun deleteMessage(message: Message) {
         // 通过ViewModel删除消息
-        chatViewModel.deleteMessage(message.messageId)
+        chatViewModel.deleteMessage(message)
     }
 
     /**
@@ -557,22 +553,24 @@ private fun ChatScreenContent(
                 elevation = 0.dp
             ) {
                 // 监听滚动位置，滚动到顶部时加载更多历史
-                LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll) {
-                    if (hasInitializedScroll && !isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                        isLoadingMore = true
-                        val olderMessages = LocalChatHistoryStore.getPrivateMessagesPage(
-                            accountId = GlobalAppState.currentUserId.toString(),
-                            userId = user.id,
-                            page = currentPage,
-                            pageSize = 50
-                        )
-                        if (olderMessages.isNotEmpty()) {
-                            chatViewModel.prependMessages(olderMessages)
-                            currentPage++
-                        } else {
-                            hasMoreHistory = false
+                LaunchedEffect(GlobalAppState.currentUserId, user.id, listState) {
+                    androidx.compose.runtime.snapshotFlow {
+                        Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll)
+                    }.collect { (index, offset, initialized) ->
+                        if (initialized && !isLoadingMore && hasMoreHistory && index == 0 && offset == 0) {
+                            isLoadingMore = true
+                            try {
+                                val page = chatViewModel.loadOlderMessages(user.id, historyCursor)
+                                if (page != null) {
+                                    historyCursor = page.before
+                                    hasMoreHistory = page.hasMore
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                core.AppLogger.e("Failed to load older local history", failure)
+                            } finally { isLoadingMore = false }
                         }
-                        isLoadingMore = false
                     }
                 }
 

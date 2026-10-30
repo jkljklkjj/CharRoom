@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "test:messages": "node scripts/generate-protocol-constants.cjs --check && node --experimental-vm-modules --test tests/message-contract.test.cjs",
+    "test:messages": "node scripts/generate-protocol-constants.cjs --check && node --experimental-vm-modules --test --test-reporter=tap tests/message-contract.test.cjs",
     "generate:protocol": "node scripts/generate-protocol-constants.cjs",
     "generate:site": "node scripts/generate-static-site-files.cjs",
     "generate:icons": "node scripts/generate-favicons.cjs",
@@ -13,7 +13,7 @@
     "prerender": "node scripts/prerender.cjs",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "test": "node scripts/generate-protocol-constants.cjs --check && node --experimental-vm-modules --test tests/*.test.cjs",
+    "test": "node scripts/generate-protocol-constants.cjs --check && node --experimental-vm-modules --test --test-reporter=tap tests/*.test.cjs",
     "test:browser": "node tests/browser-smoke.cjs"
   },
   "dependencies": {

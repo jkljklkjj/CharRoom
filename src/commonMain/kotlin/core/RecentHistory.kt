@@ -19,19 +19,20 @@ data class RecentHistoryMessage(val id: String, val senderId: String, val receiv
     val message: String, val timestamp: Long, val conversationId: String = "", val seqId: String = "0",
     val messageType: Int? = null, val fileUrl: String? = null, val fileName: String? = null,
     val fileSize: Long? = null, val replyToMessageId: String? = null,
-    val replyToContent: String? = null, val replyToSender: String? = null) {
+    val replyToContent: String? = null, val replyToSender: String? = null,
+    val clientMessageId: String? = null) {
     val isGroup: Boolean get() = conversationId.startsWith("group:")
     private fun type() = when (messageType) { 1 -> MessageType.IMAGE; 2 -> MessageType.FILE; else -> MessageType.TEXT }
     fun privateMessage(accountId: Int) = Message(senderId = senderId.toInt(), receiverId = receiverId.toInt(),
         sender = senderId == accountId.toString(), message = message, timestamp = timestamp, messageId = id,
         seqId = seqId.toLong(), conversationId = conversationId, messageType = type(), fileUrl = fileUrl,
         fileName = fileName, fileSize = fileSize, replyToMessageId = replyToMessageId,
-        replyToContent = replyToContent, replyToSender = replyToSender)
+        replyToContent = replyToContent, replyToSender = replyToSender, clientMessageId = clientMessageId)
     fun groupMessage() = GroupMessage(groupId = conversationId.removePrefix("group:").toInt(),
         senderName = senderId, senderId = senderId.toInt(), text = message, timestamp = timestamp, messageId = id,
         seqId = seqId.toLong(), conversationId = conversationId, messageType = type(), fileUrl = fileUrl,
         fileName = fileName, fileSize = fileSize, replyToMessageId = replyToMessageId,
-        replyToContent = replyToContent, replyToSender = replyToSender)
+        replyToContent = replyToContent, replyToSender = replyToSender, clientMessageId = clientMessageId)
 }
 
 /** History recovery is independent of delivery and incremental cursors. Failed pages propagate. */

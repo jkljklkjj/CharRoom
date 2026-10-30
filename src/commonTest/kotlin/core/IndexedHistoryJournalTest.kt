@@ -5,6 +5,149 @@ import java.io.RandomAccessFile
 import kotlin.test.*
 
 class IndexedHistoryJournalTest {
+    @Test fun retryAfterFailedSyncMustSyncEvenWhenTheAppendedBodyIsUnchanged() {
+        val dir = Files.createTempDirectory("history-sync-retry").toFile()
+        try {
+            val file = java.io.File(dir, "fixture.history")
+            var fail = true
+            var syncs = 0
+            val journal = IndexedHistoryJournal(file) { descriptor ->
+                syncs++
+                if (fail) throw java.io.IOException("fixture sync failure")
+                descriptor.sync()
+            }
+            val row = IndexedHistoryJournal.Row("id", 1, "body")
+            assertFailsWith<java.io.IOException> { journal.write(listOf(row)) }
+            fail = false
+            journal.write(listOf(row))
+            assertEquals(2, syncs)
+            assertEquals(row, IndexedHistoryJournal(file).read("id"))
+            journal.write(listOf(row))
+            assertEquals(2, syncs)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun manyConversationsKeepTheBoundedSelectionPathAndDeepPageOrder() {
+        val dir = Files.createTempDirectory("history-many-sources").toFile()
+        try {
+            val all = (1..80).flatMap { target ->
+                val rows = (1..8).map { n -> IndexedHistoryJournal.Row("$target-$n", n.toLong(), "body") }
+                IndexedHistoryJournal.open(IndexedHistoryJournal.conversation(dir, "$target", false)).write(rows)
+                rows
+            }.sortedWith(compareByDescending<IndexedHistoryJournal.Row> { it.timestamp }.thenByDescending { it.id })
+            for (page in listOf(0, 1, 10, 25)) {
+                assertEquals(all.drop(page * 25).take(25), IndexedHistoryJournal.page(dir, false, page, 25))
+            }
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun globalDeepPagesMatchFullSortWithEmptyConversationsAndDuplicateKeys() {
+        val dir = Files.createTempDirectory("history-merge-frontier").toFile()
+        try {
+            val files = (1..18).map { target ->
+                val file = IndexedHistoryJournal.conversation(dir, "$target", false)
+                val rows = if (target == 18) emptyList() else (1..180).map { n ->
+                    IndexedHistoryJournal.Row("id-$n", n / 3L, "$target-$n")
+                }
+                // Empty file is a valid cold journal too.
+                file.parentFile.mkdirs(); if (rows.isEmpty()) file.createNewFile()
+                else IndexedHistoryJournal.open(file).write(rows)
+                file
+            }
+            // Expected stable ties use the filesystem source order, as the existing API does.
+            val sourceOrder = java.io.File(dir, "indexed").listFiles()!!.toList()
+            val expected = sourceOrder.flatMap { file -> IndexedHistoryJournal.open(file).page(0, 1000) }
+                .sortedWith(compareByDescending<IndexedHistoryJournal.Row> { it.timestamp }.thenByDescending { it.id })
+            for (page in listOf(0, 1, 25, 60, 100)) {
+                assertEquals(expected.drop(page * 43).take(43), IndexedHistoryJournal.page(dir, false, page, 43))
+            }
+            assertTrue(IndexedHistoryJournal.page(dir, true, 0, 43).isEmpty())
+            assertEquals(18, files.size)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun unchangedBatchesPerformNoAdditionalDiskSyncAndChangedBatchesSyncOnce() {
+        val dir = Files.createTempDirectory("history-sync-budget").toFile()
+        try {
+            var syncs = 0
+            val journal = IndexedHistoryJournal(java.io.File(dir, "fixture.history")) { descriptor ->
+                syncs++; descriptor.sync()
+            }
+            val rows = (1..100).map { IndexedHistoryJournal.Row("$it", it.toLong(), "body-$it") }
+            journal.write(rows)
+            assertEquals(1, syncs)
+            repeat(10) { journal.write(rows) }
+            assertEquals(1, syncs)
+            journal.write(listOf(rows.first().copy(body = "changed"), rows.last().copy(body = "changed")))
+            assertEquals(2, syncs)
+            assertEquals("changed", journal.read("1")?.body)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun noopWriteRepairsAnIncompleteTailAndRepeatedIdsKeepTheFinalValue() {
+        val dir = Files.createTempDirectory("history-noop-tail").toFile()
+        try {
+            val file = java.io.File(dir, "fixture.history")
+            val journal = IndexedHistoryJournal(file)
+            val row = IndexedHistoryJournal.Row("id", 1, "body")
+            journal.write(listOf(row))
+            val committedLength = file.length()
+            RandomAccessFile(file, "rw").use { it.seek(it.length()); it.writeUTF("partial") }
+            journal.write(listOf(row))
+            assertEquals(committedLength, file.length())
+            journal.write(listOf(row.copy(body = "intermediate"), row.copy(body = "final")))
+            assertEquals("final", IndexedHistoryJournal(file).read("id")?.body)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun invalidLaterRowDoesNotLeaveEarlierRowsOnDisk() {
+        val dir = Files.createTempDirectory("history-invalid-batch").toFile()
+        try {
+            val file = java.io.File(dir, "fixture.history")
+            val journal = IndexedHistoryJournal(file)
+            journal.write(listOf(IndexedHistoryJournal.Row("original", 1, "body")))
+            val before = file.readBytes()
+            assertFailsWith<IllegalArgumentException> {
+                journal.write(listOf(IndexedHistoryJournal.Row("new", 2, "must not survive"),
+                    IndexedHistoryJournal.Row("", 3, "invalid")))
+            }
+            assertContentEquals(before, file.readBytes())
+            assertEquals(listOf("original"), IndexedHistoryJournal(file).page(0, 10).map { it.id })
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun deletingAMissingRowDoesNotCreateAFileAndNoopBatchesKeepBytesUnchanged() {
+        val dir = Files.createTempDirectory("history-noop").toFile()
+        try {
+            val file = java.io.File(dir, "fixture.history")
+            val journal = IndexedHistoryJournal(file)
+            journal.write(listOf(IndexedHistoryJournal.Row("missing", 0, null)))
+            assertFalse(file.exists())
+            val row = IndexedHistoryJournal.Row("id", 1, "body")
+            journal.write(listOf(row))
+            val before = file.readBytes()
+            journal.write(listOf(row, IndexedHistoryJournal.Row("missing", 0, null)))
+            assertContentEquals(before, file.readBytes())
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun batchLookupReadsOnlyRequestedIdsAndKeepsTheirOrderAfterReopening() {
+        val dir = Files.createTempDirectory("history-batch-read").toFile()
+        try {
+            val file = java.io.File(dir, "fixture.history")
+            IndexedHistoryJournal.open(file).write(listOf(
+                IndexedHistoryJournal.Row("unrelated", 1, "body"),
+                IndexedHistoryJournal.Row("a", 2, "first"),
+                IndexedHistoryJournal.Row("b", 3, "second")))
+            RandomAccessFile(file, "rw").use { raw ->
+                raw.readInt(); raw.readUTF(); raw.readLong(); raw.readInt(); raw.writeByte('X'.code)
+            }
+            val reopened = IndexedHistoryJournal(file)
+            assertEquals(listOf("b", "a"), reopened.readMany(listOf("b", "missing", "a", "b")).map { it.id })
+            assertTrue(reopened.readMany(listOf("missing")).isEmpty())
+        } finally { dir.deleteRecursively() }
+    }
+
     @Test fun deletingMostRowsCompactsTheRemainingPayloadAndReopenedIndexCanAppend() {
         val dir = Files.createTempDirectory("history-delete-compaction").toFile()
         try {

@@ -51,6 +51,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -131,9 +132,9 @@ fun GroupChatScreen(
     val pageCreateTime = remember { System.currentTimeMillis() }
 
     // 分页加载相关状态
-    var currentPage by remember { mutableStateOf(1) } // 第0页已经在启动时加载
-    var isLoadingMore by remember { mutableStateOf(false) }
-    var hasMoreHistory by remember { mutableStateOf(true) }
+    var historyCursor by remember(GlobalAppState.currentUserId, group.id) { mutableStateOf<core.HistoryCursor?>(null) }
+    var isLoadingMore by remember(GlobalAppState.currentUserId, group.id) { mutableStateOf(false) }
+    var hasMoreHistory by remember(GlobalAppState.currentUserId, group.id) { mutableStateOf(true) }
 
     // 长按菜单相关状态
     var longPressMessage by remember { mutableStateOf<GroupMessage?>(null) }
@@ -279,7 +280,7 @@ fun GroupChatScreen(
      * 删除消息
      */
     fun deleteMessage(message: GroupMessage) {
-        chatViewModel.deleteGroupMessage(message.messageId)
+        chatViewModel.deleteGroupMessage(message)
     }
 
     /**
@@ -354,22 +355,24 @@ fun GroupChatScreen(
             elevation = 0.dp
         ) {
             // 监听滚动位置，滚动到顶部时加载更多历史
-            LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll) {
-                if (hasInitializedScroll && !isLoadingMore && hasMoreHistory && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                    isLoadingMore = true
-                    val olderMessages = LocalChatHistoryStore.getGroupMessagesPage(
-                        accountId = GlobalAppState.currentUserId.toString(),
-                        groupId = group.id,
-                        page = currentPage,
-                        pageSize = 50
-                    )
-                    if (olderMessages.isNotEmpty()) {
-                        chatViewModel.prependGroupMessages(olderMessages)
-                        currentPage++
-                    } else {
-                        hasMoreHistory = false
+            LaunchedEffect(GlobalAppState.currentUserId, group.id, listState) {
+                androidx.compose.runtime.snapshotFlow {
+                    Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll)
+                }.collect { (index, offset, initialized) ->
+                    if (initialized && !isLoadingMore && hasMoreHistory && index == 0 && offset == 0) {
+                        isLoadingMore = true
+                        try {
+                            val page = chatViewModel.loadOlderGroupMessages(group.id, historyCursor)
+                            if (page != null) {
+                                historyCursor = page.before
+                                hasMoreHistory = page.hasMore
+                            }
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            core.AppLogger.e("Failed to load older local history", failure)
+                        } finally { isLoadingMore = false }
                     }
-                    isLoadingMore = false
                 }
             }
 

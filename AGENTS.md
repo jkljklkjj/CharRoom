@@ -48,9 +48,13 @@ AI 辅助文件存放在 `.agent/`，技能源目录是 `.agent/skills/`。聚�
 | JVM 编译 / 启动 | `./gradlew.bat compileKotlin`、`./gradlew.bat run` |
 | JVM 检查 | `./gradlew.bat test detekt`（先确认测试源存在；NO-SOURCE 不代表回归通过） |
 | CLI 检查 / 包 | `./gradlew.bat :cli:test :cli:verifyHeadlessRuntime cliJar` |
+| 跨仓库协议副本检查 | `python scripts/check-protocol-copies.py`；默认读取相邻 `../chat-room`，只读且漂移返回非零 |
+| 确认测试实际执行 | `python scripts/check-test-results.py build/test-results/test cli/build/test-results/test`；先运行测试，缺少报告或全跳过均失败 |
 | Android 编译 | `./gradlew.bat :androidApp:assembleDebug`（需要 SDK/JDK、Rust/NDK/CMake/libclang 或 `-PquicJniLibsDir=<预构建目录>`；见 `native/README.md`） |
 
 安装包、签名与发布另见 [packaging/README.md](packaging/README.md) 和工作流，不以发版任务替代 PR 检查。Wrapper 缺失时报告阻断并确认已有删除意图，不自动还原用户删除或下载不明版本。
+
+PR 检查见 `.github/workflows/ci.yml`：Web 类型/离线测试/SSR 构建、JVM/CLI、Android Kotlin/单测分开运行。Android PR 检查跳过 JNI 构建，不代表安装包或真机验证；边界与本轮结果见 [历史批处理与门禁](docs/development/HISTORY-BATCH-AND-CI.md)。
 
 桌面发布使用 `stageDesktopReleaseArtifacts`，收集当前系统的 `main-release` 安装器及 `packageDesktopArchive` 生成的免安装包（Windows/macOS ZIP、Linux tar.gz）；Android 不增加压缩包。Windows 经 `packageCompactReleaseMsi` 生成高压缩 MSI，各桌面包仍内置 Java。打包前执行 `verifyDesktopRuntime`，体积用 `desktopSizeReport` 测量。QUIC/Skiko 原生依赖只允许目标平台各一份，不给桌面重新引入 CLI 或已排除通话模块的依赖。
 
@@ -71,6 +75,9 @@ Windows 遇到 `Unable to establish loopback connection` / `UnixDomainSockets.co
 
 - 原生 Agent 回调是累计全文；历史保存只提交脏消息，禁止恢复全会话正文去重映射。摘要、缓存预算、前后台轮询及跨端验证见 [第二轮性能改进](docs/development/CLIENT-PERFORMANCE-SECOND-PASS.md)。
 - 本地历史批量读取复用文件句柄，时间范围按索引定位，跨会话候选有界；Web 删除使用主键游标并保持消息/摘要原子清理，见 [历史存储优化](docs/development/HISTORY-STORAGE-PERFORMANCE.md)。
+- journal 写入先校验全批；无变化时不创建文件或执行同步，但必须修复不完整尾部。行为和验证见 [历史空操作](docs/development/HISTORY-NOOP-WRITES.md)。
+- 会话上翻使用排他 `HistoryCursor`，journal 缓存同时限制数量和估算索引字节；并发写入经单写者合并，调用方等到实际刷盘完成才能确认接收。边界与回归见 [游标、预算与提交](docs/development/HISTORY-CURSOR-BUDGET-COMMIT.md)。
+- 跨会话深页在最多 64 个会话时使用有界多路归并，浅页及更多来源保留 top-k；别为减少候选堆而无限保留活跃索引。边界见 [历史归并](docs/development/HISTORY-MERGE-FRONTIER.md)。
 - 列表与图片性能边界见 [跨端性能改进](docs/development/CLIENT-PERFORMANCE-2026-10-28.md)：群消息入口接收正群ID；头像尺寸与对象键共同决定缓存键，平台实现不能重复保留一份解码内存缓存。
 - UI 展示与交互留在组件；业务协调放 ViewModel，数据访问放 Repository。对现有大文件逐步提取，避免一次迁移整个架构。
 - 平台实现留在对应目录；共享源码不得新增仅桌面可用的依赖。新增抽象前检查现有平台的实际编译方式。
