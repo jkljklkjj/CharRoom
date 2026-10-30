@@ -24,12 +24,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.chatlite.i18n.LocalStrings
-import model.ChatMessage
-import model.MessageType
 import component.bubbleShape
 import component.qingliaoPalette
 import component.sidebarHeaderBrush
 import core.loadImageBitmapWithCache
+import model.ChatMessage
+import model.MessageType
 
 /**
  * 统一消息气泡组件，供私聊和群聊复用。
@@ -59,75 +59,74 @@ fun MessageBubble(
     showSenderName: Boolean = false,
     senderName: String? = null,
     showTimestamp: Boolean = true,
-    senderAvatar: @Composable (() -> Unit)? = null,
-    myAvatar: @Composable (() -> Unit)? = null,
-    onSenderAvatarClick: (() -> Unit)? = null,
-    onMyAvatarClick: (() -> Unit)? = null,
+    avatars: MessageAvatars = MessageAvatars(),
     onResend: (() -> Unit)? = null,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
 ) {
     val s = LocalStrings.current
     val palette = qingliaoPalette(isDarkMode)
-    val bubbleBorderColor = if (isMine) {
-        Color.Transparent
-    } else {
-        palette.line.copy(alpha = 0.65f)
-    }
-    val bubbleTextColor = if (isMine) {
-        palette.onMessage
-    } else {
-        palette.ink
-    }
+    val bubbleBorderColor =
+        if (isMine) {
+            Color.Transparent
+        } else {
+            palette.line.copy(alpha = 0.65f)
+        }
+    val bubbleTextColor =
+        if (isMine) {
+            palette.onMessage
+        } else {
+            palette.ink
+        }
     val bubbleShape = bubbleShape(isMine)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             // 重发按钮
-            if (isMine && message.chatDeliveryState == model.MessageDeliveryState.FAILED && onResend != null) {
+            val retryable = isMine && message.chatDeliveryState == model.MessageDeliveryState.FAILED
+            if (retryable && onResend != null) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = s["chat.resend"],
                     tint = MaterialTheme.colors.secondary,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable { onResend() }
+                    modifier = Modifier.size(20.dp).clickable { onResend() },
                 )
                 Spacer(modifier = Modifier.width(6.dp))
             }
 
             // 对方头像
-            if (!isMine && senderAvatar != null) {
-                senderAvatar()
+            if (!isMine && avatars.senderAvatar != null) {
+                avatars.senderAvatar()
                 Spacer(modifier = Modifier.width(8.dp))
             }
 
             // 气泡主体
             Box(
-                modifier = Modifier
-                    .widthIn(max = maxBubbleWidth)
-                    .clip(bubbleShape)
-                    .background(bubbleBrush)
-                    .border(1.dp, bubbleBorderColor, bubbleShape)
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = onLongClick
-                    )
-                    .let {
-                        if (isMine && !message.chatIsSent) it.alpha(0.7f) else it
-                    }
-                    .padding(horizontal = 15.dp, vertical = 12.dp)
+                modifier =
+                    Modifier.widthIn(max = maxBubbleWidth)
+                        .clip(bubbleShape)
+                        .background(bubbleBrush)
+                        .border(1.dp, bubbleBorderColor, bubbleShape)
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = onLongClick,
+                        )
+                        .let {
+                            if (isMine && !message.chatIsSent) it.alpha(0.7f) else it
+                        }
+                        .padding(horizontal = 15.dp, vertical = 12.dp)
             ) {
                 Column {
                     // 发送者名称（群聊）
-                    if (showSenderName && !isMine && !senderName.isNullOrBlank()) {
+                    val showPeerName = showSenderName && !isMine
+                    if (showPeerName && !senderName.isNullOrBlank()) {
                         Text(
                             text = senderName,
                             style = MaterialTheme.typography.caption,
                             color = MaterialTheme.colors.primary,
-                            modifier = Modifier.padding(bottom = 4.dp)
+                            modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
 
@@ -136,23 +135,24 @@ fun MessageBubble(
                         Surface(
                             color = MaterialTheme.colors.surface.copy(alpha = 0.3f),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 6.dp)
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text(
-                                    text = s["chat.reply.to"].format(message.chatReplyToSender.orEmpty()),
+                                    text =
+                                        s["chat.reply.to"].format(
+                                            message.chatReplyToSender.orEmpty()
+                                        ),
                                     style = MaterialTheme.typography.caption,
                                     color = MaterialTheme.colors.primary,
-                                    maxLines = 1
+                                    maxLines = 1,
                                 )
                                 Text(
                                     text = replyContent,
                                     style = MaterialTheme.typography.body2,
                                     color = bubbleTextColor.copy(alpha = 0.8f),
                                     maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
@@ -161,16 +161,23 @@ fun MessageBubble(
                     // 消息内容
                     MessageContent(
                         message = message,
-                        bubbleTextColor = bubbleTextColor
+                        bubbleTextColor = bubbleTextColor,
                     )
 
-                    if (isMine && message.chatDeliveryState != model.MessageDeliveryState.ACCEPTED) {
-                        val key = when (message.chatDeliveryState) {
-                            model.MessageDeliveryState.QUEUED -> "chat.queued"
-                            model.MessageDeliveryState.SENDING -> "chat.sending"
-                            else -> "chat.send.failed"
-                        }
-                        Text(s[key], style = MaterialTheme.typography.caption, color = bubbleTextColor.copy(alpha = 0.7f))
+                    if (
+                        isMine && message.chatDeliveryState != model.MessageDeliveryState.ACCEPTED
+                    ) {
+                        val key =
+                            when (message.chatDeliveryState) {
+                                model.MessageDeliveryState.QUEUED -> "chat.queued"
+                                model.MessageDeliveryState.SENDING -> "chat.sending"
+                                else -> "chat.send.failed"
+                            }
+                        Text(
+                            s[key],
+                            style = MaterialTheme.typography.caption,
+                            color = bubbleTextColor.copy(alpha = 0.7f),
+                        )
                     }
 
                     // 时间戳
@@ -180,30 +187,27 @@ fun MessageBubble(
                             text = formatTime(message.chatTimestamp),
                             style = MaterialTheme.typography.caption,
                             color = bubbleTextColor.copy(alpha = 0.76f),
-                            modifier = Modifier.align(
-                                if (isMine) Alignment.End else Alignment.Start
-                            )
+                            modifier =
+                                Modifier.align(if (isMine) Alignment.End else Alignment.Start),
                         )
                     }
                 }
             }
 
             // 我的头像
-            if (isMine && myAvatar != null) {
+            if (isMine && avatars.myAvatar != null) {
                 Spacer(modifier = Modifier.width(8.dp))
-                myAvatar()
+                avatars.myAvatar()
             }
         }
     }
 }
 
-/**
- * 消息内容渲染（文本/图片/文件）
- */
+/** 消息内容渲染（文本/图片/文件） */
 @Composable
 private fun MessageContent(
     message: ChatMessage,
-    bubbleTextColor: androidx.compose.ui.graphics.Color
+    bubbleTextColor: androidx.compose.ui.graphics.Color,
 ) {
     val s = LocalStrings.current
     when (message.chatMessageType) {
@@ -211,7 +215,7 @@ private fun MessageContent(
             Text(
                 text = message.chatText,
                 style = MaterialTheme.typography.body1,
-                color = bubbleTextColor
+                color = bubbleTextColor,
             )
         }
         MessageType.IMAGE -> {
@@ -224,34 +228,33 @@ private fun MessageContent(
                     Image(
                         bitmap = bitmap,
                         contentDescription = s["chat.image"],
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 200.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                } ?: Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = bubbleTextColor
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .heightIn(max = 200.dp)
+                                .clip(RoundedCornerShape(8.dp)),
                     )
                 }
+                    ?: Box(
+                        modifier = Modifier.fillMaxWidth().height(150.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = bubbleTextColor,
+                        )
+                    }
             }
         }
         MessageType.FILE -> {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.AttachFile,
                     contentDescription = s["chat.file"],
                     tint = bubbleTextColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -260,12 +263,12 @@ private fun MessageContent(
                         style = MaterialTheme.typography.body1,
                         color = bubbleTextColor,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = formatFileSize(message.chatFileSize ?: 0),
                         style = MaterialTheme.typography.caption,
-                        color = bubbleTextColor.copy(alpha = 0.7f)
+                        color = bubbleTextColor.copy(alpha = 0.7f),
                     )
                 }
             }
@@ -273,9 +276,7 @@ private fun MessageContent(
     }
 }
 
-/**
- * 对方头像（通用，加载网络图片）
- */
+/** 对方头像（通用，加载网络图片） */
 @Composable
 fun AvatarImage(
     avatarUrl: String?,
@@ -283,42 +284,43 @@ fun AvatarImage(
     size: Dp = 32.dp,
     isViewportReady: Boolean = true,
     username: String? = null,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
 ) {
     val s = LocalStrings.current
     var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(avatarUrl, avatarKey, isViewportReady) {
-        bitmap = if (isViewportReady && !avatarUrl.isNullOrBlank()) {
-            loadImageBitmapWithCache(avatarUrl, avatarKey)
-        } else null
+        bitmap =
+            if (isViewportReady && !avatarUrl.isNullOrBlank()) {
+                loadImageBitmapWithCache(avatarUrl, avatarKey)
+            } else null
     }
     val bmp = bitmap
     if (bmp != null) {
         Image(
             bitmap = bmp,
             contentDescription = s["user.avatar"],
-            modifier = Modifier
-                .size(size)
-                .clip(CircleShape)
-                .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            modifier =
+                Modifier.size(size)
+                    .clip(CircleShape)
+                    .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         )
     } else {
         // 占位符：显示用户名首字符（无用户名时用 ?）
         Box(
-            modifier = Modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(
-                    brush = sidebarHeaderBrush(true),
-                    shape = CircleShape
-                )
-                .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier.size(size)
+                    .clip(CircleShape)
+                    .background(
+                        brush = sidebarHeaderBrush(true),
+                        shape = CircleShape,
+                    )
+                    .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = username?.firstOrNull()?.toString() ?: "?",
                 color = Color.White,
-                style = MaterialTheme.typography.caption
+                style = MaterialTheme.typography.caption,
             )
         }
     }

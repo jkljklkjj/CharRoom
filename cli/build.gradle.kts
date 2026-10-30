@@ -33,7 +33,9 @@ dependencies {
 // Explicit allowlist shares protocol/storage/HTTP source without importing the graphical application.
 val sharedCore = listOf("ApiClient", "ApiClientAuth", "ApiClientContacts", "ApiClientMessages", "ApiClientAgent",
     "ApiEndpoints", "AppConfig", "AppLogger", "AtomicHistoryFile", "ChatTransport", "FileLocalChatHistoryStore",
-    "GatewayOwner", "IndexedHistoryJournal", "DurableCommitQueue", "LocalChatHistoryStore", "MessageIdAliases", "MessageProtocol",
+    "TransportListenerRegistry", "HistoryJournalFormat", "MessageAttachment", "HistoryMessageCodec", "OperationRecovery",
+    "GatewayOwner", "IndexedHistoryJournal", "DurableCommitQueue", "LocalChatHistoryStore", "MessageIdAliases",
+    "MessageProtocol",
     "OfflineHistory", "PendingMessageAcks", "ProtobufBuilders", "ProtobufMessageDispatcher", "ReceivedMessagePersistence",
     "RecentHistory", "ServerConfig", "SocialLocalCache", "StreamSession")
 sourceSets {
@@ -42,7 +44,8 @@ sourceSets {
         kotlin.srcDir(rootProject.tasks.named("generateReleaseVersion"))
         kotlin.include("CliMain.kt", "cli/**", "core/BuildReleaseVersion.kt", "core/state/AppState.kt",
             "model/data.kt", "model/ConversationKey.kt", "model/MessageIdGenerator.kt", "model/SocialModels.kt",
-            "data/datasource/local/**", "core/QuicClientImpl.kt", "core/QuicNettyClient.kt", "core/QuicPeerTrust.kt", "core/QuicChannelInitializer.kt", "core/QuicStreamProtocol.kt")
+            "data/datasource/local/**", "core/QuicClientImpl.kt", "core/QuicNettyClient.kt", "core/QuicPeerTrust.kt",
+            "core/QuicStreamInitializer.kt", "core/QuicStreamProtocol.kt")
         sharedCore.forEach { kotlin.include("core/$it.kt") }
         kotlin.exclude("**/*.android.kt", "**/DesktopFileProvider.kt")
     }

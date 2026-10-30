@@ -1,13 +1,11 @@
 package component
 
+import androidx.compose.runtime.Composable
 import com.chatlite.i18n.currentStrings
 import component.io.FilePickerProvider
-
-import androidx.compose.runtime.Composable
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.FileInputStream
 import javax.imageio.IIOImage
 import javax.imageio.ImageIO
@@ -15,25 +13,35 @@ import javax.imageio.ImageWriteParam
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
 
-/**
- * 桌面端文件选择器实现
- */
+/** 桌面端文件选择器实现 */
 private const val MAX_AVATAR_BYTES = 500 * 1024 // 500KB
 
 object DesktopFilePicker : FilePickerProvider {
     override fun pickImage(onResult: (ByteArray, String) -> Unit) {
         val fileChooser = JFileChooser()
-        fileChooser.fileFilter = FileNameExtensionFilter(
-            currentStrings["file.picker.image"], "jpg", "jpeg", "png", "gif", "bmp"
-        )
+        fileChooser.fileFilter =
+            FileNameExtensionFilter(
+                currentStrings["file.picker.image"],
+                "jpg",
+                "jpeg",
+                "png",
+                "gif",
+                "bmp",
+            )
         val result = fileChooser.showOpenDialog(null)
         if (result == JFileChooser.APPROVE_OPTION) {
             val file = fileChooser.selectedFile
             val bytes = FileInputStream(file).readBytes()
             val compressed = compressImageIfNeeded(bytes)
-            val fileName = if (compressed !== bytes && !file.name.endsWith(".jpg", true) && !file.name.endsWith(".jpeg", true)) {
-                "${file.nameWithoutExtension}.jpg"
-            } else file.name
+            val fileName =
+                if (
+                    compressed !== bytes &&
+                        !file.extension.lowercase(java.util.Locale.ROOT).let {
+                            it in setOf("jpg", "jpeg")
+                        }
+                ) {
+                    "${file.nameWithoutExtension}.jpg"
+                } else file.name
             onResult(compressed, fileName)
         }
     }
@@ -50,11 +58,15 @@ object DesktopFilePicker : FilePickerProvider {
 
     private fun compressImageIfNeeded(bytes: ByteArray): ByteArray {
         if (bytes.size <= MAX_AVATAR_BYTES) return bytes
-        val original = ImageIO.read(ByteArrayInputStream(bytes)) ?: return bytes
+        val original = ImageIO.read(ByteArrayInputStream(bytes))
+        return if (original == null) bytes else compressImage(original, bytes)
+    }
+
+    private fun compressImage(original: java.awt.image.BufferedImage, bytes: ByteArray): ByteArray {
         val output = ByteArrayOutputStream()
         var quality = 0.9f
         var compressedBytes = bytes
-        while (quality > 0.1f) {
+        while (quality > 0.1f && compressedBytes.size > MAX_AVATAR_BYTES) {
             output.reset()
             val writer = ImageIO.getImageWritersByFormatName("jpeg").next()
             val ios = ImageIO.createImageOutputStream(output)
@@ -68,7 +80,6 @@ object DesktopFilePicker : FilePickerProvider {
             ios.close()
             writer.dispose()
             val nextBytes = output.toByteArray()
-            if (nextBytes.size <= MAX_AVATAR_BYTES) return nextBytes
             compressedBytes = nextBytes
             quality -= 0.1f
         }

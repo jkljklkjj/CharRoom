@@ -5,20 +5,29 @@ import com.chatlite.proto.MessageProtos
 /** Correlates send callbacks with server ACKs; the transport owns and cancels the timeout jobs. */
 class PendingMessageAcks(
     private val schedule: (Long, () -> Unit) -> (() -> Unit),
-    private val onCallbackFailure: (Exception) -> Unit = {}
+    private val onCallbackFailure: (Exception) -> Unit = {},
 ) {
-    private class Pending(val id: String, val callbacks: MutableList<(Boolean, List<ByteArray>) -> Unit>) {
+    private class Pending(
+        val id: String,
+        val callbacks: MutableList<(Boolean, List<ByteArray>) -> Unit>,
+    ) {
         var cancel: (() -> Unit)? = null
     }
+
     private val pending = mutableMapOf<String, Pending>()
 
     fun await(messageId: String, callback: (Boolean, List<ByteArray>) -> Unit) {
         require(messageId.isNotBlank()) { "A messageId is required for delivery acknowledgement" }
-        val entry = synchronized(pending) {
-            pending[messageId]?.let { it.callbacks.add(callback); return }
-            Pending(messageId, mutableListOf(callback)).also { pending[messageId] = it }
-        }
-        val cancel = schedule(MessageProtocol.ACK_TIMEOUT_MILLIS) { complete(entry, false, emptyList()) }
+        val entry =
+            synchronized(pending) {
+                pending[messageId]?.let {
+                    it.callbacks.add(callback)
+                    return
+                }
+                Pending(messageId, mutableListOf(callback)).also { pending[messageId] = it }
+            }
+        val cancel =
+            schedule(MessageProtocol.ACK_TIMEOUT_MILLIS) { complete(entry, false, emptyList()) }
         synchronized(pending) {
             if (pending[messageId] === entry) entry.cancel = cancel else cancel()
         }
@@ -40,16 +49,20 @@ class PendingMessageAcks(
     }
 
     private fun complete(entry: Pending, success: Boolean, responses: List<ByteArray>) {
-        val callbacks = synchronized(pending) {
-            if (pending[entry.id] !== entry) return
-            pending.remove(entry.id)
-            entry.cancel?.invoke()
-            entry.callbacks.toList()
-        }
+        val callbacks =
+            synchronized(pending) {
+                if (pending[entry.id] !== entry) return
+                pending.remove(entry.id)
+                entry.cancel?.invoke()
+                entry.callbacks.toList()
+            }
         callbacks.forEach { callback ->
-            try { callback(success, responses) } catch (error: Exception) {
-                if (error is java.util.concurrent.CancellationException) throw error
-                onCallbackFailure(error)
+            core.recoverOperation(
+                onFailure = { error ->
+                    onCallbackFailure(error)
+                }
+            ) {
+                callback(success, responses)
             }
         }
     }

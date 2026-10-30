@@ -2,13 +2,10 @@ package data.datasource.local
 
 import java.io.File
 
-/**
- * Desktop (JVM) 平台文件操作实现
- */
+/** Desktop (JVM) 平台文件操作实现 */
 class DesktopFileProvider : FileProvider {
-    override fun getAppDataDir(): String {
-        return File(System.getProperty("user.home"), ".qingliao").absolutePath
-    }
+    override fun getAppDataDir(): String =
+        File(System.getProperty("user.home"), ".qingliao").absolutePath
 
     override fun readFile(path: String): ByteArray? {
         val file = File(path)
@@ -22,13 +19,9 @@ class DesktopFileProvider : FileProvider {
         file.writeBytes(data)
     }
 
-    override fun fileExists(path: String): Boolean {
-        return File(path).exists()
-    }
+    override fun fileExists(path: String): Boolean = File(path).exists()
 
-    override fun deleteFile(path: String): Boolean {
-        return File(path).delete()
-    }
+    override fun deleteFile(path: String): Boolean = File(path).delete()
 
     override fun mkdirs(path: String) {
         File(path).mkdirs()

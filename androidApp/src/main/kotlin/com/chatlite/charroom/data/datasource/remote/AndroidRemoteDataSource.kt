@@ -1,62 +1,58 @@
 package com.chatlite.charroom.data.datasource.remote
 
 import com.chatlite.charroom.data.repository.NetworkRepository
-import com.chatlite.charroom.data.repository.NetworkRepository.TokenBundle
 import core.ApiService
 import core.ApiService.LoginTokens
 import model.Group
 import model.Message
 import model.User
-import model.toUiUser
 
-/**
- * Android端远程数据源实现
- * 基于Android现有的NetworkRepository实现，复用现有稳定的网络逻辑
- */
+/** Android端远程数据源实现 基于Android现有的NetworkRepository实现，复用现有稳定的网络逻辑 */
 class AndroidRemoteDataSource(
     private val networkRepository: NetworkRepository = NetworkRepository.getInstance()
 ) {
 
-    suspend fun login(account: String, password: String): ApiService.LoginTokens? {
-        return networkRepository.login(account, password)?.let {
+    suspend fun login(account: String, password: String): ApiService.LoginTokens? =
+        networkRepository.login(account, password)?.let {
             ApiService.LoginTokens(
                 accessToken = it.accessToken,
-                refreshToken = it.refreshToken
+                refreshToken = it.refreshToken,
             )
         }
-    }
 
-    suspend fun register(username: String, password: String): Int {
-        return networkRepository.register(username, password)
-    }
+    suspend fun register(username: String, password: String): Int =
+        networkRepository.register(username, password)
 
-    suspend fun verifyRegister(username: String, password: String, email: String, verifyCode: String): Int {
+    suspend fun verifyRegister(
+        username: String,
+        password: String,
+        email: String,
+        verifyCode: String,
+    ): Int {
         // 使用core的ApiService实现，与网页端逻辑一致
-        return core.ApiService.verifyRegister(username, password, email, verifyCode)
+        return core.verifyRegister(username, password, email, verifyCode) ?: -1
     }
 
     suspend fun sendRegisterVerifyCode(email: String): Boolean {
         // 使用core的ApiService实现，与网页端逻辑一致
-        return core.ApiService.sendRegisterVerifyCode(email)
+        return core.sendRegisterVerifyCode(email)
     }
 
-    suspend fun validateToken(token: String): ApiService.LoginTokens? {
-        return networkRepository.validateToken(token)?.let {
+    suspend fun validateToken(token: String): ApiService.LoginTokens? =
+        networkRepository.validateToken(token)?.let {
             ApiService.LoginTokens(
                 accessToken = it.accessToken,
-                refreshToken = it.refreshToken
+                refreshToken = it.refreshToken,
             )
         }
-    }
 
-    suspend fun refreshToken(refreshToken: String): ApiService.LoginTokens? {
-        return networkRepository.refreshAccessToken(refreshToken)?.let {
+    suspend fun refreshToken(refreshToken: String): ApiService.LoginTokens? =
+        networkRepository.refreshAccessToken(refreshToken)?.let {
             ApiService.LoginTokens(
                 accessToken = it.accessToken,
-                refreshToken = it.refreshToken
+                refreshToken = it.refreshToken,
             )
         }
-    }
 
     suspend fun getUserInfo(token: String): User? {
         // 获取当前用户信息需要自己的ID，这里暂时返回null，后续可以完善
@@ -64,8 +60,9 @@ class AndroidRemoteDataSource(
         return null
     }
 
-    suspend fun getFriendList(token: String): List<User> {
-        return networkRepository.fetchFriendAndGroupList(token)
+    suspend fun getFriendList(token: String): List<User> =
+        networkRepository
+            .fetchFriendAndGroupList(token)
             .filter { !it.isGroup && it.id > 0 }
             .map { localUser ->
                 User(
@@ -75,32 +72,29 @@ class AndroidRemoteDataSource(
                     phone = localUser.phone,
                     signature = localUser.signature,
                     avatarUrl = localUser.avatarUrl,
-                    online = localUser.online
+                    online = localUser.online,
                 )
             }
-    }
 
-    suspend fun getGroupList(token: String): List<Group> {
-        return networkRepository.fetchFriendAndGroupList(token)
+    suspend fun getGroupList(token: String): List<Group> =
+        networkRepository
+            .fetchFriendAndGroupList(token)
             .filter { it.isGroup }
             .map { localUser ->
                 Group(
                     id = localUser.id,
-                    name = localUser.username
+                    name = localUser.username,
                 )
             }
-    }
 
-    suspend fun addFriend(token: String, account: String): Boolean {
-        return networkRepository.addFriend(account, token)
-    }
+    suspend fun addFriend(token: String, account: String): Boolean =
+        networkRepository.addFriend(account, token)
 
-    suspend fun addGroup(token: String, groupId: String): Boolean {
-        return networkRepository.addGroup(groupId, token)
-    }
+    suspend fun addGroup(token: String, groupId: String): Boolean =
+        networkRepository.addGroup(groupId, token)
 
-    suspend fun getUserDetail(token: String, userId: String): User? {
-        return networkRepository.getUserDetail(userId, token)?.let { localUser ->
+    suspend fun getUserDetail(token: String, userId: String): User? =
+        networkRepository.getUserDetail(userId, token)?.let { localUser ->
             User(
                 id = localUser.id,
                 username = localUser.username,
@@ -108,28 +102,29 @@ class AndroidRemoteDataSource(
                 phone = localUser.phone,
                 signature = localUser.signature,
                 avatarUrl = localUser.avatarUrl,
-                online = localUser.online
+                online = localUser.online,
             )
         }
-    }
 
-    suspend fun getGroupDetail(token: String, groupId: String): Group? {
-        return networkRepository.getGroupDetail(groupId, token)?.let { localUser ->
+    suspend fun getGroupDetail(token: String, groupId: String): Group? =
+        networkRepository.getGroupDetail(groupId, token)?.let { localUser ->
             Group(
                 id = localUser.id,
-                name = localUser.username
+                name = localUser.username,
             )
         }
-    }
 
     suspend fun getOfflineMessages(token: String): List<Message> {
         // 现有实现返回空列表，后续可以完善
         return emptyList()
     }
 
-    suspend fun syncMessages(token: String, conversationId: String, lastSeqId: Long, limit: Int): core.SyncMessagesResult {
-        return core.SyncMessagesResult()
-    }
+    suspend fun syncMessages(
+        token: String,
+        conversationId: String,
+        lastSeqId: Long,
+        limit: Int,
+    ): core.SyncMessagesResult = core.SyncMessagesResult()
 
     suspend fun sendEmailUpdateVerifyCode(token: String, email: String): Boolean {
         // 这个接口Android端还没有实现，暂时返回false
@@ -141,7 +136,7 @@ class AndroidRemoteDataSource(
         username: String,
         phone: String,
         signature: String,
-        password: String?
+        password: String?,
     ): Boolean {
         val userId = "" // 需要获取当前用户ID
         return networkRepository.updateUserProfile(userId, token, username, phone, signature)
@@ -187,11 +182,7 @@ class AndroidRemoteDataSource(
         return false
     }
 
-    /**
-     * 上传头像 - Android特有方法
-     */
-    suspend fun uploadAvatar(token: String, imageBytes: ByteArray, fileName: String): String? {
-        return networkRepository.uploadAvatar(token, imageBytes, fileName)
-    }
-
+    /** 上传头像 - Android特有方法 */
+    suspend fun uploadAvatar(token: String, imageBytes: ByteArray, fileName: String): String? =
+        networkRepository.uploadAvatar(token, imageBytes, fileName)
 }

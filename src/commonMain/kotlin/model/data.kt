@@ -1,24 +1,26 @@
 package model
 
 import kotlinx.serialization.Serializable
+
 // 数据层只定义纯数据模型，不依赖任何其他层
 
-/**
- * 消息类型
- */
+/** 消息类型 */
 enum class MessageType {
-    TEXT,  // 文本消息
+    TEXT, // 文本消息
     IMAGE, // 图片消息
-    FILE   // 文件消息
+    FILE, // 文件消息
 }
 
-/**
- * 聊天消息公共接口，统一私聊 Message 和群聊 GroupMessage 的字段访问。
- */
+/** 聊天消息公共接口，统一私聊 Message 和群聊 GroupMessage 的字段访问。 */
 @Serializable
 enum class MessageDeliveryState {
-    QUEUED, SENDING, ACCEPTED, FAILED;
-    fun afterRestart(): MessageDeliveryState = if (this == QUEUED || this == SENDING) FAILED else this
+    QUEUED,
+    SENDING,
+    ACCEPTED,
+    FAILED;
+
+    fun afterRestart(): MessageDeliveryState =
+        if (this == QUEUED || this == SENDING) FAILED else this
 }
 
 interface ChatMessage {
@@ -26,7 +28,9 @@ interface ChatMessage {
     val chatText: String
     val chatSenderId: Int
     val chatTimestamp: Long
-    val chatDeliveryState: MessageDeliveryState get() = if (chatIsSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED
+    val chatDeliveryState: MessageDeliveryState
+        get() = if (chatIsSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED
+
     val chatIsSent: Boolean
     val chatMessageType: MessageType
     val chatFileUrl: String?
@@ -49,147 +53,172 @@ data class User(
     val online: Boolean? = null,
     val createdAt: Long? = null, // 注册时间，时间戳
     val friendRequestReason: String? = null,
-    val conversationKind: ConversationKind = ConversationKind.PRIVATE
+    val conversationKind: ConversationKind = ConversationKind.PRIVATE,
 ) {
-    val isGroup: Boolean get() = conversationKind == ConversationKind.GROUP
-    val conversationKey: ConversationKey get() = ConversationKey(conversationKind, id)
+    val isGroup: Boolean
+        get() = conversationKind == ConversationKind.GROUP
+
+    val conversationKey: ConversationKey
+        get() = ConversationKey(conversationKind, id)
 }
 
 @Serializable
 data class Message(
-    val senderId: Int,                // 消息的发送用户
-    val message: String,           // 消息内容
-    val sender: Boolean = false,        // 是否是发送者
-    val receiverId: Int = -1,      // 目标用户ID
-    val timestamp: Long,        // 消息的时间戳
-    val isSent: Boolean = true,  // 消息是否发送成功
-    val messageId: String,      // 消息ID（必填）
+    val senderId: Int, // 消息的发送用户
+    val message: String, // 消息内容
+    val sender: Boolean = false, // 是否是发送者
+    val receiverId: Int = -1, // 目标用户ID
+    val timestamp: Long, // 消息的时间戳
+    val isSent: Boolean = true, // 消息是否发送成功
+    val messageId: String, // 消息ID（必填）
     val replyToMessageId: String? = null, // 引用的消息ID
-    val replyToContent: String? = null,   // 引用的消息内容预览
-    val replyToSender: String? = null,    // 引用消息的发送者名称
+    val replyToContent: String? = null, // 引用的消息内容预览
+    val replyToSender: String? = null, // 引用消息的发送者名称
     val messageType: MessageType = MessageType.TEXT, // 消息类型
-    val fileUrl: String? = null,          // 文件/图片URL
-    val fileName: String? = null,         // 文件名称
-    val fileSize: Long? = null,            // 文件大小
-    val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
-    val conversationId: String = "",        // 会话ID
-    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
+    val fileUrl: String? = null, // 文件/图片URL
+    val fileName: String? = null, // 文件名称
+    val fileSize: Long? = null, // 文件大小
+    val seqId: Long = 0L, // 会话级单调递增序列号（增量同步用）
+    val conversationId: String = "", // 会话ID
+    val deliveryState: MessageDeliveryState =
+        if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
     /** 客户端消息 ID：服务端随同步/历史回传，用于把本地乐观行按身份归并（可空：旧行没有它）。 */
-    val clientMessageId: String? = null
+    val clientMessageId: String? = null,
 ) : ChatMessage {
-    override val chatMessageId get() = messageId
-    override val chatText get() = message
-    override val chatSenderId get() = senderId
-    override val chatTimestamp get() = timestamp
-    override val chatDeliveryState get() = deliveryState
-    override val chatIsSent get() = isSent
-    override val chatMessageType get() = messageType
-    override val chatFileUrl get() = fileUrl
-    override val chatFileName get() = fileName
-    override val chatFileSize get() = fileSize
-    override val chatReplyToMessageId get() = replyToMessageId
-    override val chatReplyToContent get() = replyToContent
-    override val chatReplyToSender get() = replyToSender
+    override val chatMessageId
+        get() = messageId
 
-    /**
-     * 复制消息并更新发送状态
-     */
-    fun copy(isSent: Boolean): Message = copy(
-        senderId = senderId,
-        message = message,
-        sender = sender,
-        receiverId = receiverId,
-        timestamp = timestamp,
-        isSent = isSent,
-        deliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
-        messageId = messageId,
-        replyToMessageId = replyToMessageId,
-        replyToContent = replyToContent,
-        replyToSender = replyToSender,
-        messageType = messageType,
-        fileUrl = fileUrl,
-        fileName = fileName,
-        fileSize = fileSize,
-        seqId = seqId,
-        conversationId = conversationId,
-        clientMessageId = clientMessageId
-    )
+    override val chatText
+        get() = message
+
+    override val chatSenderId
+        get() = senderId
+
+    override val chatTimestamp
+        get() = timestamp
+
+    override val chatDeliveryState
+        get() = deliveryState
+
+    override val chatIsSent
+        get() = isSent
+
+    override val chatMessageType
+        get() = messageType
+
+    override val chatFileUrl
+        get() = fileUrl
+
+    override val chatFileName
+        get() = fileName
+
+    override val chatFileSize
+        get() = fileSize
+
+    override val chatReplyToMessageId
+        get() = replyToMessageId
+
+    override val chatReplyToContent
+        get() = replyToContent
+
+    override val chatReplyToSender
+        get() = replyToSender
+
+    /** Return a new message with a consistent delivery state and all metadata retained. */
+    fun toSentState(isSent: Boolean): Message =
+        copy(
+            isSent = isSent,
+            deliveryState =
+                if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
+        )
 }
 
 @Serializable
 data class GroupMessage(
-    val groupId: Int,           // 群组ID
-    val senderName: String,     // 发送者名称
-    val text: String,           // 消息内容
-    val senderId: Int,            // 发送者ID
-    val timestamp: Long,        // 消息的时间戳
-    val isSent: Boolean = true,  // 消息是否发送成功
-    val messageId: String,      // 消息ID（必填）
+    val groupId: Int, // 群组ID
+    val senderName: String, // 发送者名称
+    val text: String, // 消息内容
+    val senderId: Int, // 发送者ID
+    val timestamp: Long, // 消息的时间戳
+    val isSent: Boolean = true, // 消息是否发送成功
+    val messageId: String, // 消息ID（必填）
     val replyToMessageId: String? = null, // 引用的消息ID
-    val replyToContent: String? = null,   // 引用的消息内容预览
-    val replyToSender: String? = null,    // 引用消息的发送者名称
+    val replyToContent: String? = null, // 引用的消息内容预览
+    val replyToSender: String? = null, // 引用消息的发送者名称
     val messageType: MessageType = MessageType.TEXT, // 消息类型
-    val fileUrl: String? = null,          // 文件/图片URL
-    val fileName: String? = null,         // 文件名称
-    val fileSize: Long? = null,            // 文件大小
-    val seqId: Long = 0L,                 // 会话级单调递增序列号（增量同步用）
-    val conversationId: String = "",        // 会话ID
-    val deliveryState: MessageDeliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
+    val fileUrl: String? = null, // 文件/图片URL
+    val fileName: String? = null, // 文件名称
+    val fileSize: Long? = null, // 文件大小
+    val seqId: Long = 0L, // 会话级单调递增序列号（增量同步用）
+    val conversationId: String = "", // 会话ID
+    val deliveryState: MessageDeliveryState =
+        if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
     /** 客户端消息 ID：服务端随同步/历史回传，用于把本地乐观行按身份归并（可空：旧行没有它）。 */
-    val clientMessageId: String? = null
+    val clientMessageId: String? = null,
 ) : ChatMessage {
-    override val chatMessageId get() = messageId
-    override val chatText get() = text
-    override val chatSenderId get() = senderId
-    override val chatTimestamp get() = timestamp
-    override val chatDeliveryState get() = deliveryState
-    override val chatIsSent get() = isSent
-    override val chatMessageType get() = messageType
-    override val chatFileUrl get() = fileUrl
-    override val chatFileName get() = fileName
-    override val chatFileSize get() = fileSize
-    override val chatReplyToMessageId get() = replyToMessageId
-    override val chatReplyToContent get() = replyToContent
-    override val chatReplyToSender get() = replyToSender
+    override val chatMessageId
+        get() = messageId
 
-    /**
-     * 复制消息并更新发送状态
-     */
-    fun copy(isSent: Boolean): GroupMessage = copy(
-        groupId = groupId,
-        senderName = senderName,
-        text = text,
-        senderId = senderId,
-        timestamp = timestamp,
-        isSent = isSent,
-        deliveryState = if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
-        messageId = messageId,
-        replyToMessageId = replyToMessageId,
-        replyToContent = replyToContent,
-        replyToSender = replyToSender,
-        messageType = messageType,
-        fileUrl = fileUrl,
-        fileName = fileName,
-        fileSize = fileSize,
-        seqId = seqId,
-        conversationId = conversationId
-    )
+    override val chatText
+        get() = text
+
+    override val chatSenderId
+        get() = senderId
+
+    override val chatTimestamp
+        get() = timestamp
+
+    override val chatDeliveryState
+        get() = deliveryState
+
+    override val chatIsSent
+        get() = isSent
+
+    override val chatMessageType
+        get() = messageType
+
+    override val chatFileUrl
+        get() = fileUrl
+
+    override val chatFileName
+        get() = fileName
+
+    override val chatFileSize
+        get() = fileSize
+
+    override val chatReplyToMessageId
+        get() = replyToMessageId
+
+    override val chatReplyToContent
+        get() = replyToContent
+
+    override val chatReplyToSender
+        get() = replyToSender
+
+    /** Return a new message with a consistent delivery state and all metadata retained. */
+    fun toSentState(isSent: Boolean): GroupMessage =
+        copy(
+            isSent = isSent,
+            deliveryState =
+                if (isSent) MessageDeliveryState.ACCEPTED else MessageDeliveryState.FAILED,
+        )
 }
 
-@Serializable
-data class Group(val id: Int, val name: String)
+@Serializable data class Group(val id: Int, val name: String)
 
-/**
- * 群组转换为用户类型（用于UI显示）
- */
-fun Group.toUiUser(): User = User(id = this.id, username = this.name, conversationKind = ConversationKind.GROUP)
+/** 群组转换为用户类型（用于UI显示） */
+fun Group.toUiUser(): User =
+    User(id = this.id, username = this.name, conversationKind = ConversationKind.GROUP)
 
-/**
- * 添加AI助手到用户列表
- */
+/** 添加AI助手到用户列表 */
 fun List<User>.withAgentAssistant(): List<User> {
     if (this.any { !it.isGroup && it.id == core.ServerConfig.AGENT_ASSISTANT_ID }) {
         return this
     }
-    return listOf(User(id = core.ServerConfig.AGENT_ASSISTANT_ID, username = core.ServerConfig.AGENT_ASSISTANT_NAME)) + this
+    return listOf(
+        User(
+            id = core.ServerConfig.AGENT_ASSISTANT_ID,
+            username = core.ServerConfig.AGENT_ASSISTANT_NAME,
+        )
+    ) + this
 }

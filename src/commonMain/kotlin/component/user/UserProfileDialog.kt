@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -20,21 +19,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.chatlite.i18n.LocalStrings
 import core.GlobalApiService
 import core.loadImageBitmapWithCache
 import kotlinx.coroutines.launch
 import model.User
 import presentation.viewmodel.ChatViewModel
-import com.chatlite.i18n.LocalStrings
+import presentation.viewmodel.getCurrentUserProfile
+import presentation.viewmodel.loadContacts
+import presentation.viewmodel.updateUserProfile
 
-/**
- * 个人资料对话框
- */
+/** 个人资料对话框 */
 @Composable
 fun UserProfileDialog(
     chatViewModel: ChatViewModel,
     onDismiss: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
 ) {
     var currentUser by remember { mutableStateOf<User?>(null) }
     var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -58,9 +58,11 @@ fun UserProfileDialog(
                 signature = user.signature.orEmpty()
 
                 // 加载头像
-                user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                    avatarBitmap = loadImageBitmapWithCache(url, user.avatarKey)
-                }
+                user.avatarUrl
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { url ->
+                        avatarBitmap = loadImageBitmapWithCache(url, user.avatarKey)
+                    }
             }
         }
     }
@@ -75,12 +77,13 @@ fun UserProfileDialog(
 
         scope.launch {
             isLoading = true
-            val success = GlobalApiService.updateUserProfile(
-                username = username,
-                phone = phone,
-                signature = signature,
-                password = password.takeIf { it.isNotBlank() }
-            )
+            val success =
+                GlobalApiService.updateUserProfile(
+                    username = username,
+                    phone = phone,
+                    signature = signature,
+                    password = password.takeIf { it.isNotBlank() },
+                )
             if (success) {
                 // 刷新用户列表
                 chatViewModel.loadContacts()
@@ -98,12 +101,12 @@ fun UserProfileDialog(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(if (isEditing) s["user.profile.edit.title"] else s["user.profile.view.title"])
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 ) {
                     Icon(Icons.Default.Close, contentDescription = s["user.profile.close"])
                 }
@@ -112,45 +115,44 @@ fun UserProfileDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // 头像
                 Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colors.primary.copy(alpha = 0.1f))
-                        .clickable(enabled = isEditing) {
-                            // 后续实现头像上传功能
-                        },
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier.size(100.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colors.primary.copy(alpha = 0.1f))
+                            .clickable(enabled = isEditing) {
+                                // 后续实现头像上传功能
+                            },
+                    contentAlignment = Alignment.Center,
                 ) {
                     if (avatarBitmap != null) {
                         Image(
                             bitmap = avatarBitmap!!,
                             contentDescription = s["user.avatar"],
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
                         )
                     } else {
                         Text(
                             text = currentUser?.username?.firstOrNull()?.toString() ?: s["chat.me"],
                             style = MaterialTheme.typography.h4,
-                            color = MaterialTheme.colors.primary
+                            color = MaterialTheme.colors.primary,
                         )
                     }
 
                     if (isEditing) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.3f)),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = s["user.profile.change.avatar"],
                                 tint = Color.White,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(32.dp),
                             )
                         }
                     }
@@ -166,7 +168,7 @@ fun UserProfileDialog(
                             onValueChange = { username = it },
                             label = { Text(s["user.profile.username"]) },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoading
+                            enabled = !isLoading,
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -176,7 +178,7 @@ fun UserProfileDialog(
                             onValueChange = { phone = it },
                             label = { Text(s["user.profile.phone"]) },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoading
+                            enabled = !isLoading,
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -187,7 +189,7 @@ fun UserProfileDialog(
                             label = { Text(s["user.profile.signature"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading,
-                            maxLines = 3
+                            maxLines = 3,
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -198,7 +200,8 @@ fun UserProfileDialog(
                             label = { Text(s["user.profile.password.hint"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading,
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                            visualTransformation =
+                                androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -209,8 +212,9 @@ fun UserProfileDialog(
                             label = { Text(s["user.profile.confirm.password"]) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading && password.isNotBlank(),
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                            isError = password.isNotBlank() && password != confirmPassword
+                            visualTransformation =
+                                androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            isError = password.isNotBlank() && password != confirmPassword,
                         )
 
                         if (password.isNotBlank() && password != confirmPassword) {
@@ -218,18 +222,21 @@ fun UserProfileDialog(
                                 text = s["user.profile.password.mismatch"],
                                 color = MaterialTheme.colors.error,
                                 style = MaterialTheme.typography.caption,
-                                modifier = Modifier.padding(top = 4.dp)
+                                modifier = Modifier.padding(top = 4.dp),
                             )
                         }
                     }
                 } else {
                     // 查看模式
-                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         // 用户名
                         Text(
                             text = currentUser?.username ?: s["user.profile.loading"],
                             style = MaterialTheme.typography.h6,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -240,57 +247,65 @@ fun UserProfileDialog(
                                 text = s["user.profile.account.id"].format(id),
                                 style = MaterialTheme.typography.caption,
                                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.padding(top = 4.dp)
+                                modifier = Modifier.padding(top = 4.dp),
                             )
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
 
                         // 个性签名
-                        currentUser?.signature?.takeIf { it.isNotBlank() }?.let { sig ->
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = s["user.profile.signature"],
-                                    style = MaterialTheme.typography.subtitle2,
-                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = sig,
-                                    style = MaterialTheme.typography.body1,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                        currentUser
+                            ?.signature
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { sig ->
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = s["user.profile.signature"],
+                                        style = MaterialTheme.typography.subtitle2,
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = sig,
+                                        style = MaterialTheme.typography.body1,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
 
                         // 手机号
-                        currentUser?.phone?.takeIf { it.isNotBlank() }?.let { phone ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = s["user.profile.phone"],
-                                    style = MaterialTheme.typography.caption,
-                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                                )
-                                Text(
-                                    text = phone,
-                                    style = MaterialTheme.typography.body2
-                                )
+                        currentUser
+                            ?.phone
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { phone ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = s["user.profile.phone"],
+                                        style = MaterialTheme.typography.caption,
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                                    )
+                                    Text(
+                                        text = phone,
+                                        style = MaterialTheme.typography.body2,
+                                    )
+                                }
                             }
-                        }
                     }
                 }
             }
         },
         buttons = {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
                 if (isEditing) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         OutlinedButton(
                             onClick = {
@@ -305,7 +320,7 @@ fun UserProfileDialog(
                                 confirmPassword = ""
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = !isLoading
+                            enabled = !isLoading,
                         ) {
                             Text(s["user.profile.cancel"])
                         }
@@ -313,13 +328,16 @@ fun UserProfileDialog(
                         Button(
                             onClick = ::saveProfile,
                             modifier = Modifier.weight(1f),
-                            enabled = !isLoading && username.isNotBlank() && (password.isBlank() || password == confirmPassword)
+                            enabled =
+                                !isLoading &&
+                                    username.isNotBlank() &&
+                                    (password.isBlank() || password == confirmPassword),
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
                                     strokeWidth = 2.dp,
-                                    color = MaterialTheme.colors.onPrimary
+                                    color = MaterialTheme.colors.onPrimary,
                                 )
                             } else {
                                 Text(s["user.profile.save"])
@@ -330,7 +348,7 @@ fun UserProfileDialog(
                     Button(
                         onClick = { isEditing = true },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading && currentUser != null
+                        enabled = !isLoading && currentUser != null,
                     ) {
                         Text(s["user.profile.edit"])
                     }
@@ -343,16 +361,21 @@ fun UserProfileDialog(
                             onLogout()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colors.error
-                        )
+                        colors =
+                            ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colors.error
+                            ),
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(s["user.profile.logout"])
                     }
                 }
             }
-        }
+        },
     )
 }

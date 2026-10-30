@@ -1,156 +1,125 @@
 package data.repository
 
+import com.chatlite.i18n.currentStrings
+import core.register
+import core.sendRegisterVerifyCode
 import core.state.AuthState
 import core.state.GlobalAppState
+import core.verifyRegister
 import data.datasource.local.LocalDataSource
 import data.datasource.local.LocalDataSourceImpl
-import core.validateToken
-import core.getUserInfo
-import core.refreshTokenBundle
-import core.loginTokens
-import core.register
-import core.verifyRegister
-import core.sendRegisterVerifyCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.chatlite.i18n.currentStrings
 
 /**
- * Authentication Repository
- * Handles authentication business logic, coordinates remote and local data sources
- * 直接调用 ApiClient 函数，移除 RemoteDataSource 中间层
+ * Authentication Repository Handles authentication business logic, coordinates remote and local
+ * data sources 直接调用 ApiClient 函数，移除 RemoteDataSource 中间层
  */
 class AuthRepository(
-    private val localDataSource: LocalDataSource
+    private val localDataSource: LocalDataSource,
+    private val requests: AuthRequests = AuthRequests(),
 ) {
     private val _authState = MutableStateFlow<AuthState>(AuthState.Unauthenticated)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    /**
-     * Initialize: attempt auto login
-     */
+    /** Restore credentials once, then publish one authenticated state. */
     suspend fun init() {
         val savedToken = localDataSource.getSavedAccessToken()
         val savedAccount = localDataSource.getSavedAccount()
-        val savedRefreshToken = localDataSource.getSavedRefreshToken()
-
+        val savedRefresh = localDataSource.getSavedRefreshToken()
         if (savedToken.isNullOrBlank() || savedAccount.isNullOrBlank()) {
             _authState.value = AuthState.Unauthenticated
             return
         }
-
         _authState.value = AuthState.Loading
-
-        try {
-            // Try to validate token
-            val validated = validateToken(savedToken)
-            if (validated != null && validated.accessToken.isNotBlank()) {
-                // Token is valid, update local storage
-                localDataSource.saveAuth(savedAccount, validated.accessToken, validated.refreshToken)
-                // Get user profile (失败时兜底用本地缓存的 userId)
-                val userProfile = runCatching {
-                    getUserInfo(validated.accessToken)
-                }.getOrNull()
-                if (userProfile == null) {
-                    // getUserInfo 失败时从本地存储恢复 userId
-                    val savedUserId = localDataSource.getSavedUserId()
-                    if (savedUserId > 0) {
-                        GlobalAppState.setCurrentUserId(savedUserId)
-                    }
-                }
-                val authState = AuthState.Authenticated(
-                    account = savedAccount,
-                    accessToken = validated.accessToken,
-                    refreshToken = validated.refreshToken,
-                    userProfile = userProfile
-                )
-                _authState.value = authState
-                GlobalAppState.updateAuthState(authState)
-                return
+        core.recoverOperation(
+            onFailure = { failure ->
+                localDataSource.clearAuth()
+                val detail = failure.message ?: currentStrings["auth.network.failed"]
+                _authState.value =
+                    AuthState.Error(currentStrings["auth.auto.login.error"].format(detail))
             }
-
-            // Token is invalid, try to refresh
-            if (!savedRefreshToken.isNullOrBlank()) {
-                val refreshed = refreshTokenBundle(savedRefreshToken)
-                if (refreshed != null && refreshed.accessToken.isNotBlank()) {
-                    localDataSource.saveAuth(savedAccount, refreshed.accessToken, refreshed.refreshToken)
-                    val userProfile = runCatching {
-                        getUserInfo(refreshed.accessToken)
-                    }.getOrNull()
-                    if (userProfile == null) {
-                        val savedUserId = localDataSource.getSavedUserId()
-                        if (savedUserId > 0) {
-                            GlobalAppState.setCurrentUserId(savedUserId)
-                        }
-                    }
-                    val authState = AuthState.Authenticated(
-                        account = savedAccount,
-                        accessToken = refreshed.accessToken,
-                        refreshToken = refreshed.refreshToken,
-                        userProfile = userProfile
-                    )
-                    _authState.value = authState
-                    GlobalAppState.updateAuthState(authState)
-                    return
-                }
+        ) {
+            val restored = restoreTokens(savedToken, savedRefresh)
+            if (restored == null) {
+                localDataSource.clearAuth()
+                _authState.value = AuthState.Error(currentStrings["auth.auto.login.failed"])
+            } else {
+                localDataSource.saveAuth(savedAccount, restored.accessToken, restored.refreshToken)
+                val profile = loadProfile(restored.accessToken)
+                if (profile == null) restoreSavedUserId()
+                publish(savedAccount, restored, profile)
             }
-
-            // Refresh failed, clear local storage
-            localDataSource.clearAuth()
-            _authState.value = AuthState.Error(currentStrings["auth.auto.login.failed"])
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            // Catch auto-login exception to avoid crash
-            localDataSource.clearAuth()
-            val errorMessage = e.message ?: currentStrings["auth.network.failed"]
-            _authState.value = AuthState.Error(currentStrings["auth.auto.login.error"].format(errorMessage))
         }
     }
 
-    /**
-     * Login
-     */
+    private suspend fun restoreTokens(access: String, refresh: String?): core.LoginTokenBundle? {
+        val validated = requests.validate(access)?.takeIf { it.accessToken.isNotBlank() }
+        return validated
+            ?: refresh
+                ?.takeIf { it.isNotBlank() }
+                ?.let { requests.refresh(it) }
+                ?.takeIf { it.accessToken.isNotBlank() }
+    }
+
+    private suspend fun loadProfile(access: String): model.User? =
+        core.recoverOperation({ null }) { requests.profile(access) }
+
+    private suspend fun restoreSavedUserId() {
+        val userId = localDataSource.getSavedUserId()
+        if (userId > 0) GlobalAppState.setCurrentUserId(userId)
+    }
+
+    private fun publish(
+        account: String,
+        tokens: core.LoginTokenBundle,
+        profile: model.User?,
+    ): AuthState.Authenticated {
+        val state =
+            AuthState.Authenticated(account, tokens.accessToken, tokens.refreshToken, profile)
+        _authState.value = state
+        GlobalAppState.updateAuthState(state)
+        return state
+    }
+
+    /** Login */
     suspend fun login(account: String, password: String, rememberMe: Boolean = false): AuthState {
         _authState.value = AuthState.Loading
 
-        return try {
-            val result = loginTokens(account, password)
+        return core.recoverOperation(
+            onFailure = { e ->
+                // Catch all login exceptions to avoid crash
+                val errorMessage = e.message ?: currentStrings["auth.network.retry"]
+                val errorState =
+                    AuthState.Error(currentStrings["auth.login.error"].format(errorMessage))
+                _authState.value = errorState
+                errorState
+            }
+        ) {
+            val result = requests.login(account, password)
             if (result != null && result.accessToken.isNotBlank()) {
-                // Login successful, save locally
-                val userProfile = runCatching {
-                    getUserInfo(result.accessToken)
-                }.getOrNull()
-                val userId = userProfile?.id ?: 0
-                localDataSource.saveAuth(account, result.accessToken, result.refreshToken, userId)
-                val authState = AuthState.Authenticated(
-                    account = account,
-                    accessToken = result.accessToken,
-                    refreshToken = result.refreshToken,
-                    userProfile = userProfile
-                )
-                _authState.value = authState
-                // Sync to GlobalAppState
-                GlobalAppState.updateAuthState(authState)
-                authState
+                val profile = loadProfile(result.accessToken)
+                if (rememberMe) {
+                    localDataSource.saveAuth(
+                        account,
+                        result.accessToken,
+                        result.refreshToken,
+                        profile?.id ?: 0,
+                    )
+                } else {
+                    localDataSource.clearAuth()
+                }
+                publish(account, result, profile)
             } else {
                 val errorState = AuthState.Error(currentStrings["auth.login.failed"])
                 _authState.value = errorState
                 errorState
             }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            // Catch all login exceptions to avoid crash
-            val errorMessage = e.message ?: currentStrings["auth.network.retry"]
-            val errorState = AuthState.Error(currentStrings["auth.login.error"].format(errorMessage))
-            _authState.value = errorState
-            errorState
         }
     }
 
-    /**
-     * Register
-     */
+    /** Register */
     suspend fun register(username: String, password: String): Result<Int> {
         val result = core.register(username, password)
         return if (result != null && result != -1) {
@@ -160,10 +129,13 @@ class AuthRepository(
         }
     }
 
-    /**
-     * Verify registration (consistent with web logic)
-     */
-    suspend fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = ""): Result<Int> {
+    /** Verify registration (consistent with web logic) */
+    suspend fun verifyRegister(
+        username: String,
+        password: String,
+        email: String = "",
+        verifyCode: String = "",
+    ): Result<Int> {
         val result = core.verifyRegister(username, password, email, verifyCode)
         return if (result != null && result != -1) {
             Result.success(result)
@@ -172,26 +144,22 @@ class AuthRepository(
         }
     }
 
-    /**
-     * Send registration verification code
-     */
-    suspend fun sendRegisterVerifyCode(email: String): Result<Boolean> {
-        return try {
+    /** Send registration verification code */
+    suspend fun sendRegisterVerifyCode(email: String): Result<Boolean> =
+        core.recoverOperation(
+            onFailure = { e ->
+                Result.failure(e)
+            }
+        ) {
             val success = core.sendRegisterVerifyCode(email)
             if (success) {
                 Result.success(true)
             } else {
                 Result.failure(Exception(currentStrings["auth.code.send.failed"]))
             }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            Result.failure(e)
         }
-    }
 
-    /**
-     * Logout
-     */
+    /** Logout */
     suspend fun logout() {
         localDataSource.clearAuth()
         _authState.value = AuthState.Unauthenticated
@@ -199,29 +167,15 @@ class AuthRepository(
         GlobalAppState.clearAuth()
     }
 
-    /**
-     * Get current auth state
-     */
+    /** Get current auth state */
     fun getCurrentAuthState(): AuthState = _authState.value
 
-    /**
-     * Get current token
-     */
-    fun getCurrentToken(): String? {
-        return (_authState.value as? AuthState.Authenticated)?.accessToken
-    }
+    /** Get current token */
+    fun getCurrentToken(): String? = (_authState.value as? AuthState.Authenticated)?.accessToken
 
-    /**
-     * Get current account
-     */
-    fun getCurrentAccount(): String? {
-        return (_authState.value as? AuthState.Authenticated)?.account
-    }
+    /** Get current account */
+    fun getCurrentAccount(): String? = (_authState.value as? AuthState.Authenticated)?.account
 }
 
-/**
- * Global singleton, compatible with legacy code
- */
-val GlobalAuthRepository = AuthRepository(
-    localDataSource = LocalDataSourceImpl()
-)
+/** Global singleton, compatible with legacy code */
+val GlobalAuthRepository = AuthRepository(localDataSource = LocalDataSourceImpl())

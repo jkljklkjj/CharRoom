@@ -1,24 +1,25 @@
 package core
-import com.chatlite.proto.MessageProtos
 
-import kotlinx.coroutines.*
+import com.chatlite.proto.MessageProtos
 import core.state.GlobalAppState
-import org.slf4j.LoggerFactory
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.*
+import org.slf4j.LoggerFactory
 
 /**
  * QUIC 协议客户端实现。
  *
- * 实现 [ChatTransport] 接口，通过 QUIC 自定义 Stream 协议通信。
- * 内部委托给 [QuicNettyClient] 进行底层 QUIC 传输。
+ * 实现 [ChatTransport] 接口，通过 QUIC 自定义 Stream 协议通信。 内部委托给 [QuicNettyClient] 进行底层 QUIC 传输。
  *
  * 流分配策略：
  * - Stream 0: 控制流（登录/登出/心跳）
  * - Stream N (N>=1): 会话流（私聊/群聊/Agent），每个会话独立一条流
  */
-class QuicClientImpl : ChatTransport {
+class QuicClientImpl private constructor(private val observers: TransportListenerRegistry) :
+    ChatTransport, TransportObservers by observers {
+    constructor() : this(TransportListenerRegistry())
+
     @Volatile private var reconnectNotBefore = 0L
 
     private val log = LoggerFactory.getLogger(QuicClientImpl::class.java)
@@ -32,12 +33,19 @@ class QuicClientImpl : ChatTransport {
     @Volatile private var loginConfirmation: CompletableDeferred<Unit>? = null
     private var dispatchAccount: Int? = null
     private val incomingPersistence = ReceivedMessagePersistence()
-    private data class Incoming(val stream: Long, val bytes: ByteArray, val generation: Long, val account: Int?)
+
+    private data class Incoming(
+        val stream: Long,
+        val bytes: ByteArray,
+        val generation: Long,
+        val account: Int?,
+    )
+
     private val incoming = kotlinx.coroutines.channels.Channel<Incoming>(256)
 
     // Session 管理: conversationId -> StreamSession
     private val sessions = java.util.concurrent.ConcurrentHashMap<String, StreamSession>()
-    private val CONTROL_SESSION_KEY = "__control__"
+    private val controlSessionKey = "__control__"
 
     // 待发送消息缓冲（断线时缓存）
     private val messageQueue = java.util.concurrent.ArrayBlockingQueue<PendingMessage>(256)
@@ -46,54 +54,85 @@ class QuicClientImpl : ChatTransport {
     private val manualStop = AtomicBoolean(false)
 
     // 消息监听器
-    internal val messageListeners = mutableListOf<MessageReceiveListener>()
-    internal val authStateListeners = mutableListOf<AuthStateListener>()
+    internal val messageListeners
+        get() = observers.messageListeners
+
+    internal val authStateListeners
+        get() = observers.authStateListeners
+
     override var agentStreamHandler: AgentStreamHandler? = null
 
-    private val pendingAcks = PendingMessageAcks(schedule = { timeout, action ->
-        val task = scope.launch { delay(timeout); action() }
-        val cancel: () -> Unit = { task.cancel() }
-        cancel
-    }, onCallbackFailure = { log.warn("发送确认回调失败", it) })
-
-    private val dispatcher = ProtobufMessageDispatcher(
-        listeners = { synchronized(messageListeners) { messageListeners.toList() } },
-        agentHandler = { agentStreamHandler },
-        onResponse = { response ->
-            if (!authenticated.get()) {
-                if (response.success && response.clientId.toIntOrNull() == GlobalAppState.currentUserId) {
-                    authenticated.set(true)
-                    loginConfirmation?.complete(Unit)
-                } else if (!response.success) {
-                    handshakeRetryAfterMillis(response.message)?.let { reconnectNotBefore = System.nanoTime() / 1_000_000 + it }
-                    val routing = isTransientGatewayResponse(response.message)
-                    if (!routing) {
-                        manualStop.set(true)
-                        synchronized(authStateListeners) { authStateListeners.toList() }.forEach { it.onAuthInvalidated("QUIC login rejected") }
-                    }
-                    loginConfirmation?.completeExceptionally(java.io.IOException("QUIC login rejected"))
+    private val pendingAcks =
+        PendingMessageAcks(
+            schedule = { timeout, action ->
+                val task = scope.launch {
+                    delay(timeout)
+                    action()
                 }
-            } else if (isTransientGatewayResponse(response.message)) transport.shutdown()
-        },
-        accountId = { dispatchAccount ?: 0 },
-        persistIncoming = { wrapper ->
-            val owner = dispatchAccount ?: error("Missing receiving account")
-            check(owner == GlobalAppState.currentUserId) { "Stale receiving account" }
-            incomingPersistence.persist(owner, wrapper)
-            check(owner == GlobalAppState.currentUserId) { "Receiving account changed during persistence" }
-        },
-        onAcknowledgement = { ack, bytes -> pendingAcks.acknowledge(ack, bytes) },
-        onFailure = { log.warn("消息分发失败", it) }
-    )
+                val cancel: () -> Unit = { task.cancel() }
+                cancel
+            },
+            onCallbackFailure = { log.warn("发送确认回调失败", it) },
+        )
 
-    private val receiveWorker = scope.launch {
-        for (packet in incoming) {
-            if (packet.generation != sessionGeneration.get() || packet.account != GlobalAppState.currentUserId) continue
-            recordRtt()
-            dispatchAccount = packet.account
-            dispatcher.dispatch(packet.bytes) { id, conversation ->
-                if (packet.generation == sessionGeneration.get() && packet.account == GlobalAppState.currentUserId)
-                    sendAckToServer(packet.stream, id, conversation)
+    private val dispatcher =
+        ProtobufMessageDispatcher(
+            listeners = { synchronized(messageListeners) { messageListeners.toList() } },
+            agentHandler = { agentStreamHandler },
+            onResponse = { response ->
+                if (!authenticated.get()) {
+                    if (
+                        response.success &&
+                            response.clientId.toIntOrNull() == GlobalAppState.currentUserId
+                    ) {
+                        authenticated.set(true)
+                        loginConfirmation?.complete(Unit)
+                    } else if (!response.success) {
+                        handshakeRetryAfterMillis(response.message)?.let {
+                            reconnectNotBefore = System.nanoTime() / 1_000_000 + it
+                        }
+                        val routing = isTransientGatewayResponse(response.message)
+                        if (!routing) {
+                            manualStop.set(true)
+                            synchronized(authStateListeners) { authStateListeners.toList() }
+                                .forEach { it.onAuthInvalidated("QUIC login rejected") }
+                        }
+                        loginConfirmation?.completeExceptionally(
+                            java.io.IOException("QUIC login rejected")
+                        )
+                    }
+                } else if (isTransientGatewayResponse(response.message)) transport.shutdown()
+            },
+            accountId = { dispatchAccount ?: 0 },
+            persistIncoming = { wrapper ->
+                val owner = dispatchAccount ?: error("Missing receiving account")
+                check(owner == GlobalAppState.currentUserId) { "Stale receiving account" }
+                incomingPersistence.persist(owner, wrapper)
+                check(owner == GlobalAppState.currentUserId) {
+                    "Receiving account changed during persistence"
+                }
+            },
+            onAcknowledgement = { ack, bytes -> pendingAcks.acknowledge(ack, bytes) },
+            onFailure = { log.warn("消息分发失败", it) },
+        )
+
+    init {
+        scope.launch {
+            for (packet in incoming) {
+                if (
+                    packet.generation != sessionGeneration.get() ||
+                        packet.account != GlobalAppState.currentUserId
+                )
+                    continue
+                recordRtt()
+                dispatchAccount = packet.account
+                dispatcher.dispatch(packet.bytes) { id, conversation ->
+                    if (
+                        packet.generation == sessionGeneration.get() &&
+                            packet.account == GlobalAppState.currentUserId
+                    )
+                        sendAckToServer(packet.stream, id, conversation)
+                }
             }
         }
     }
@@ -106,12 +145,10 @@ class QuicClientImpl : ChatTransport {
         val payload: ByteArray,
         val type: MsgType,
         val targetClientId: String,
-        val account: Int? = GlobalAppState.currentUserId
+        val account: Int? = GlobalAppState.currentUserId,
     )
 
-    /**
-     * 建立 QUIC 连接并启动登录流程。
-     */
+    /** 建立 QUIC 连接并启动登录流程。 */
     override fun start(host: String?, port: Int?) {
         this.host = host ?: ServerConfig.QUIC_HOST
         this.port = port ?: ServerConfig.QUIC_PORT
@@ -121,97 +158,85 @@ class QuicClientImpl : ChatTransport {
         loginConfirmation = CompletableDeferred()
         manualStop.set(false) // 首次连接/手动 reconnect 时允许自动重连
 
-        transport.listener = object : QuicNettyClient.Listener {
-            override fun onConnected() {
-                if (generation != sessionGeneration.get()) return
-                connected.set(true)
-                scope.launch {
-                    try {
-                        if (generation != sessionGeneration.get()) return@launch
-                        doLogin()
-                        withTimeout(10000) { loginConfirmation!!.await() }
-                        if (generation != sessionGeneration.get()) return@launch
-                        flushPendingMessages()
-                        startHeartbeat()
-                    } catch (e: Exception) {
-                        if (e is kotlinx.coroutines.CancellationException) throw e
-                        log.error("登录流程异常", e)
-                        if (generation == sessionGeneration.get()) transport.shutdown()
+        transport.listener =
+            object : QuicNettyClient.Listener {
+                override fun onConnected() {
+                    if (generation != sessionGeneration.get()) return
+                    connected.set(true)
+                    scope.launch {
+                        core.recoverOperation(
+                            onFailure = { e ->
+                                log.error("登录流程异常", e)
+                                if (generation == sessionGeneration.get()) transport.shutdown()
+                            }
+                        ) {
+                            if (generation != sessionGeneration.get()) return@launch
+                            doLogin()
+                            withTimeout(10000) { loginConfirmation!!.await() }
+                            if (generation != sessionGeneration.get()) return@launch
+                            flushPendingMessages()
+                            startHeartbeat()
+                        }
                     }
                 }
-            }
 
-            override fun onDisconnected(cause: Throwable?) {
-                if (generation != sessionGeneration.get()) return
-                authenticated.set(false)
-                loginConfirmation?.completeExceptionally(java.io.IOException("Disconnected during login"))
-                connected.set(false)
-                pendingAcks.failAll()
-                log.warn("QUIC 连接断开: ${cause?.message}")
-                sessions.clear()
-                // 主动停止（logout/stop）时不再自动重连，避免后台偷偷重连
-                if (manualStop.get()) return
-                // 自动重连：指数退避，最多等 30 秒
-                scope.launch {
-                    var delayMs = 1000L
-                    while (!connected.get() && !manualStop.get()) {
-                        log.info("{}ms 后尝试重连...", delayMs)
-                        delay(maxOf(delayMs, reconnectNotBefore - System.nanoTime() / 1_000_000))
-                        if (manualStop.get()) break
-                        try {
-                            start(this@QuicClientImpl.host, this@QuicClientImpl.port)
-                        } catch (e: Exception) {
-                            if (e is kotlinx.coroutines.CancellationException) throw e
-                            log.warn("重连失败: {}", e.message)
-                        }
-                        // start() 内部会吞掉 connect 异常，不能据此判定成功；
-                        // 必须检查 connected 标志（onConnected 同步 set true）才能 break，
-                        // 否则 connect 失败时也会误判"重连成功"提前退出循环。
-                        if (connected.get()) {
-                            log.info("重连成功")
-                            break
-                        }
-                        delayMs = (delayMs * 2).coerceAtMost(30_000L)
-                    }
+                override fun onDisconnected(cause: Throwable?) {
+                    if (generation != sessionGeneration.get()) return
+                    authenticated.set(false)
+                    loginConfirmation?.completeExceptionally(
+                        java.io.IOException("Disconnected during login")
+                    )
+                    connected.set(false)
+                    pendingAcks.failAll()
+                    log.warn("QUIC 连接断开: ${cause?.message}")
+                    sessions.clear()
+                    // 主动停止（logout/stop）时不再自动重连，避免后台偷偷重连
+                    if (manualStop.get()) return
+                    // 自动重连：指数退避，最多等 30 秒
+                    scope.launch { reconnectUntilConnected() }
+                }
+
+                override fun onStreamFrame(streamId: Long, data: ByteArray) {
+                    if (generation == sessionGeneration.get()) handleStreamData(streamId, data)
+                }
+
+                override fun onError(cause: Throwable) {
+                    log.error("QUIC 传输错误", cause)
                 }
             }
-
-            override fun onStreamFrame(streamId: Long, data: ByteArray) {
-                if (generation == sessionGeneration.get()) handleStreamData(streamId, data)
-            }
-
-            override fun onError(cause: Throwable) {
-                log.error("QUIC 传输错误", cause)
-            }
-        }
 
         // 阻塞等待 QUIC 连接建立完成（CLI 期望 start() 是同步的）
         kotlinx.coroutines.runBlocking {
-            try {
-                val endpoint = discoverGatewayOwner(GlobalAppState.currentToken.orEmpty(), this@QuicClientImpl.host, this@QuicClientImpl.port)
+            core.recoverOperation(
+                onFailure = { e ->
+                    log.error("QUIC 连接失败", e)
+                    if (generation == sessionGeneration.get()) transport.shutdown()
+                }
+            ) {
+                val endpoint =
+                    discoverGatewayOwner(
+                        GlobalAppState.currentToken.orEmpty(),
+                        this@QuicClientImpl.host,
+                        this@QuicClientImpl.port,
+                    )
                 if (generation == sessionGeneration.get()) {
                     transport.connect(endpoint.first, endpoint.second)
                     withTimeout(10000) { loginConfirmation!!.await() }
                 }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                log.error("QUIC 连接失败", e)
-                if (generation == sessionGeneration.get()) transport.shutdown()
             }
         }
     }
 
-    /**
-     * 通过 Stream 0 发送登录消息。
-     */
+    /** 通过 Stream 0 发送登录消息。 */
     private fun doLogin() {
         val stream0Id = transport.openStream()
-        sessions[CONTROL_SESSION_KEY] = StreamSession(
-            streamId = stream0Id,
-            conversationId = CONTROL_SESSION_KEY,
-            conversationType = StreamSession.ConversationType.CONTROL,
-            targetId = ""
-        )
+        sessions[controlSessionKey] =
+            StreamSession(
+                streamId = stream0Id,
+                conversationId = controlSessionKey,
+                conversationType = StreamSession.ConversationType.CONTROL,
+                targetId = "",
+            )
 
         val loginPayload = buildLoginPayload(GlobalAppState.currentToken ?: "")
         val frame = QuicStreamProtocol.encodeFrame(loginPayload)
@@ -242,16 +267,18 @@ class QuicClientImpl : ChatTransport {
         hbSendInProgress = false
     }
 
-    /**
-     * 心跳：自适应间隔（基于 RTT 滑动窗口），服务端 idle timeout=30s。
-     * 每次发送前通过 [getOrCreateControlStream] 确保控制流活跃。
-     */
+    /** 心跳：自适应间隔（基于 RTT 滑动窗口），服务端 idle timeout=30s。 每次发送前通过 [getOrCreateControlStream] 确保控制流活跃。 */
     private suspend fun startHeartbeat() {
         while (connected.get()) {
             val interval = adaptiveHbInterval()
             delay(interval.milliseconds)
             if (!connected.get()) break
-            try {
+            core.recoverOperation(
+                onFailure = { e ->
+                    log.warn("心跳发送失败，尝试重建控制流: ${e.message}")
+                    sessions.remove(controlSessionKey)
+                }
+            ) {
                 val controlStreamId = getOrCreateControlStream()
                 val hbPayload = buildHeartbeatPayload()
                 val frame = QuicStreamProtocol.encodeFrame(hbPayload)
@@ -259,75 +286,77 @@ class QuicClientImpl : ChatTransport {
                 hbSendInProgress = true
                 transport.send(controlStreamId, frame)
                 log.debug("心跳已发送 (interval={}ms)", interval)
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                log.warn("心跳发送失败，尝试重建控制流: ${e.message}")
-                sessions.remove(CONTROL_SESSION_KEY)
             }
         }
     }
 
-    /**
-     * 处理收到的 Stream 数据帧，向上层回调分发。
-     */
+    /** 处理收到的 Stream 数据帧，向上层回调分发。 */
     private fun handleStreamData(streamId: Long, data: ByteArray) {
-        if (incoming.trySend(Incoming(streamId, data.copyOf(), sessionGeneration.get(), GlobalAppState.currentUserId)).isFailure) {
+        if (
+            incoming
+                .trySend(
+                    Incoming(
+                        streamId,
+                        data.copyOf(),
+                        sessionGeneration.get(),
+                        GlobalAppState.currentUserId,
+                    )
+                )
+                .isFailure
+        ) {
             log.warn("Receive queue full; reconnecting for history recovery")
             transport.shutdown()
         }
     }
 
-    /**
-     * 向服务端发送 ACK，确认消息已收到。
-     * 服务端 PendingMessageManager 依赖 ACK 停止重发。
-     */
+    /** 向服务端发送 ACK，确认消息已收到。 服务端 PendingMessageManager 依赖 ACK 停止重发。 */
     private fun sendAckToServer(streamId: Long, messageId: String, conversationId: String) {
-        try {
-            val ackMsg = com.chatlite.proto.MessageProtos.AckMessage.newBuilder()
-                .setMessageId(messageId)
-                .setSuccess(true)
-                .setConversationId(conversationId)
-                .build()
-            val ackWrapper = com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
-                .setType(MessageProtos.MessageWrapperType.ACK)
-                .setAck(ackMsg)
-                .build()
+        core.recoverOperation(
+            onFailure = { e ->
+                log.warn("发送 ACK 失败: messageId={}, error={}", messageId, e.message)
+            }
+        ) {
+            val ackMsg =
+                com.chatlite.proto.MessageProtos.AckMessage.newBuilder()
+                    .setMessageId(messageId)
+                    .setSuccess(true)
+                    .setConversationId(conversationId)
+                    .build()
+            val ackWrapper =
+                com.chatlite.proto.MessageProtos.MessageWrapper.newBuilder()
+                    .setType(MessageProtos.MessageWrapperType.ACK)
+                    .setAck(ackMsg)
+                    .build()
             val frame = QuicStreamProtocol.encodeFrame(ackWrapper.toByteArray())
             transport.send(streamId, frame)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            log.warn("发送 ACK 失败: messageId={}, error={}", messageId, e.message)
         }
     }
 
-    /**
-     * 连接恢复后刷新待发送队列。
-     */
+    /** 连接恢复后刷新待发送队列。 */
     private fun flushPendingMessages() {
         while (messageQueue.isNotEmpty()) {
             val msg = messageQueue.poll() ?: break
-            if (msg.account == GlobalAppState.currentUserId) sendMessage(msg.payload, msg.type, msg.targetClientId)
+            if (msg.account == GlobalAppState.currentUserId)
+                sendMessage(msg.payload, msg.type, msg.targetClientId)
         }
     }
 
-    /**
-     * 获取或重建控制流。
-     * QUIC stream 在服务端回复后可能被关闭，需要检查实际活跃状态。
-     */
+    /** 获取或重建控制流。 QUIC stream 在服务端回复后可能被关闭，需要检查实际活跃状态。 */
     private fun getOrCreateControlStream(): Long {
-        val existing = sessions[CONTROL_SESSION_KEY]
+        val existing = sessions[controlSessionKey]
         if (existing != null && transport.isStreamActive(existing.streamId)) {
             return existing.streamId
         }
         // 控制流已失效，重建
         log.warn("控制流 {} 已失效，重建中", existing?.streamId)
         val newStreamId = transport.openStream()
-        sessions[CONTROL_SESSION_KEY] = StreamSession(
-            streamId = newStreamId,
-            conversationId = CONTROL_SESSION_KEY,
-            conversationType = StreamSession.ConversationType.CONTROL,
-            targetId = ""
-        )
+        sessions[controlSessionKey] =
+            StreamSession(
+                streamId = newStreamId,
+                conversationId = controlSessionKey,
+                conversationType = StreamSession.ConversationType.CONTROL,
+                targetId = "",
+            )
         return newStreamId
     }
 
@@ -339,38 +368,54 @@ class QuicClientImpl : ChatTransport {
      * - 会话类消息（CHAT/GROUP_CHAT/AGENT_CHAT）-> 按 conversationId 复用或新建流
      */
     private fun getOrCreateStream(type: MsgType, targetId: String): Long {
-        val conversationType = when (type) {
-            MsgType.CHAT -> MessageProtos.ConversationType.PRIVATE
-            MsgType.GROUP_CHAT -> MessageProtos.ConversationType.GROUP
-            MsgType.AGENT_CHAT -> MessageProtos.ConversationType.AGENT
-            else -> return getOrCreateControlStream()
-        }
+        val conversationType =
+            when (type) {
+                MsgType.CHAT -> MessageProtos.ConversationType.PRIVATE
+                MsgType.GROUP_CHAT -> MessageProtos.ConversationType.GROUP
+                MsgType.AGENT_CHAT -> MessageProtos.ConversationType.AGENT
+                else -> null
+            }
+        if (conversationType == null) return getOrCreateControlStream()
         val existing = sessions[targetId]
-        if (existing != null && transport.isStreamActive(existing.streamId)) return existing.streamId
+        return if (existing != null && transport.isStreamActive(existing.streamId))
+            existing.streamId
+        else openConversationStream(targetId, conversationType)
+    }
+
+    private fun openConversationStream(
+        targetId: String,
+        conversationType: MessageProtos.ConversationType,
+    ): Long {
         val streamId = transport.openStream()
-        sessions[targetId] = StreamSession(
-            streamId = streamId,
-            conversationId = targetId,
-            conversationType = when (conversationType) {
-                MessageProtos.ConversationType.GROUP -> StreamSession.ConversationType.GROUP
-                MessageProtos.ConversationType.AGENT -> StreamSession.ConversationType.AGENT
-                else -> StreamSession.ConversationType.PRIVATE
-            },
-            targetId = targetId
-        )
-        val check = MessageProtos.CheckMessage.newBuilder().setConversationType(conversationType)
-            .setTargetClientId(targetId.toLong()).build()
-        val init = MessageProtos.MessageWrapper.newBuilder().setType(MsgType.CHECK).setCheck(check).build()
+        sessions[targetId] =
+            StreamSession(
+                streamId = streamId,
+                conversationId = targetId,
+                conversationType =
+                    when (conversationType) {
+                        MessageProtos.ConversationType.GROUP -> StreamSession.ConversationType.GROUP
+                        MessageProtos.ConversationType.AGENT -> StreamSession.ConversationType.AGENT
+                        else -> StreamSession.ConversationType.PRIVATE
+                    },
+                targetId = targetId,
+            )
+        val check =
+            MessageProtos.CheckMessage.newBuilder()
+                .setConversationType(conversationType)
+                .setTargetClientId(targetId.toLong())
+                .build()
+        val init =
+            MessageProtos.MessageWrapper.newBuilder().setType(MsgType.CHECK).setCheck(check).build()
         transport.send(streamId, QuicStreamProtocol.encodeFrame(init.toByteArray()))
         return streamId
     }
 
-    /**
-     * 内部发送，如果未连接则缓存到队列。
-     */
+    /** 内部发送，如果未连接则缓存到队列。 */
     private fun sendMessage(payload: ByteArray, type: MsgType, targetClientId: String) {
         if (!authenticated.get()) {
-            check(messageQueue.offer(PendingMessage(payload.copyOf(), type, targetClientId))) { "Outgoing queue full" }
+            check(messageQueue.offer(PendingMessage(payload.copyOf(), type, targetClientId))) {
+                "Outgoing queue full"
+            }
             return
         }
         val frame = QuicStreamProtocol.encodeFrame(payload)
@@ -383,19 +428,22 @@ class QuicClientImpl : ChatTransport {
         type: MsgType,
         targetClientId: String,
         expectedResponses: Int,
-        callback: (Boolean, List<ByteArray>) -> Unit
+        callback: (Boolean, List<ByteArray>) -> Unit,
     ) {
         var messageId: String? = null
-        try {
+        core.recoverOperation(
+            onFailure = { error ->
+                val pendingId = messageId
+                if (!pendingId.isNullOrBlank()) pendingAcks.fail(pendingId)
+                else callback(false, emptyList())
+            }
+        ) {
             val wrapper = MessageProtos.MessageWrapper.parseFrom(payload)
             require(wrapper.type == type) { "Message type and encoded payload disagree" }
             messageId = wrapper.deliveryMessageId()
             if (messageId != null) pendingAcks.await(messageId, callback)
             sendMessage(payload, type, targetClientId)
             if (messageId == null) callback(true, emptyList())
-        } catch (error: Exception) {
-            if (error is CancellationException) throw error
-            if (!messageId.isNullOrBlank()) pendingAcks.fail(messageId) else callback(false, emptyList())
         }
     }
 
@@ -412,7 +460,7 @@ class QuicClientImpl : ChatTransport {
     }
 
     override fun logoutAndDisconnect() {
-        val controlStreamId = sessions[CONTROL_SESSION_KEY]?.streamId
+        val controlStreamId = sessions[controlSessionKey]?.streamId
         if (controlStreamId != null) {
             val logoutPayload = buildLogoutPayload((GlobalAppState.currentUserId ?: 0).toString())
             val frame = QuicStreamProtocol.encodeFrame(logoutPayload)
@@ -436,34 +484,18 @@ class QuicClientImpl : ChatTransport {
         // 用户主动退出（logoutAndDisconnect）时才应清空。
     }
 
-    override fun addMessageReceiveListener(listener: MessageReceiveListener) {
-        synchronized(messageListeners) {
-            if (!messageListeners.contains(listener)) {
-                messageListeners.add(listener)
-            }
-        }
-    }
-
-    override fun removeMessageReceiveListener(listener: MessageReceiveListener) {
-        synchronized(messageListeners) {
-            messageListeners.remove(listener)
-        }
-    }
-
-    override fun addAuthStateListener(listener: AuthStateListener) {
-        synchronized(authStateListeners) {
-            if (!authStateListeners.contains(listener)) {
-                authStateListeners.add(listener)
-            }
-        }
-    }
-
-    override fun removeAuthStateListener(listener: AuthStateListener) {
-        synchronized(authStateListeners) {
-            authStateListeners.remove(listener)
-        }
-    }
-
     override val isServerConnected: Boolean
         get() = authenticated.get()
+
+    private suspend fun reconnectUntilConnected() {
+        var delayMs = 1000L
+        while (!connected.get() && !manualStop.get()) {
+            log.info("Reconnecting after {}ms", delayMs)
+            delay(maxOf(delayMs, reconnectNotBefore - System.nanoTime() / 1_000_000))
+            if (manualStop.get()) return
+            recoverOperation({ log.warn("Reconnect failed: {}", it.message) }) { start(host, port) }
+            if (connected.get()) log.info("Reconnected")
+            delayMs = (delayMs * 2).coerceAtMost(30_000L)
+        }
+    }
 }

@@ -3,24 +3,23 @@ package core
 /**
  * 聊天传输层接口（QUIC 实现）。
  *
- * 管理连接生命周期、消息收发、监听器注册。
- * 各平台通过 [Chat] 全局变量访问具体实现。
+ * 管理连接生命周期、消息收发、监听器注册。 各平台通过 [Chat] 全局变量访问具体实现。
  */
-interface ChatTransport {
+interface ChatTransport : TransportObservers {
     /**
      * 建立连接并启动登录流程
+     *
      * @param host 服务器地址
      * @param port 服务器端口
      */
     fun start(host: String? = null, port: Int? = null)
 
-    /**
-     * 停止连接
-     */
+    /** 停止连接 */
     fun stop()
 
     /**
      * 发送二进制消息
+     *
      * @param payload 消息内容
      * @param type 消息类型
      * @param targetClientId 目标客户端ID
@@ -32,11 +31,12 @@ interface ChatTransport {
         type: MsgType,
         targetClientId: String,
         expectedResponses: Int,
-        callback: (Boolean, List<ByteArray>) -> Unit
+        callback: (Boolean, List<ByteArray>) -> Unit,
     )
 
     /**
      * 发送文本消息
+     *
      * @param content 文本内容
      * @param callback 发送结果回调
      */
@@ -44,78 +44,80 @@ interface ChatTransport {
 
     /**
      * 检查是否已连接
+     *
      * @return 是否连接成功
      */
     fun isConnected(): Boolean
 
-    /**
-     * 手动重连
-     */
+    /** 手动重连 */
     fun reconnect()
 
-    /**
-     * 登出并断开连接
-     */
+    /** 登出并断开连接 */
     fun logoutAndDisconnect()
 
-    /**
-     * 添加消息接收监听器
-     */
-    fun addMessageReceiveListener(listener: MessageReceiveListener)
-
-    /**
-     * 移除消息接收监听器
-     */
-    fun removeMessageReceiveListener(listener: MessageReceiveListener)
-
-    /**
-     * 添加认证状态监听器
-     */
-    fun addAuthStateListener(listener: AuthStateListener)
-
-    /**
-     * 移除认证状态监听器
-     */
-    fun removeAuthStateListener(listener: AuthStateListener)
-
-    /**
-     * Agent 流式消息回调（绕过 listener 遍历，直接 dispatch）
-     */
+    /** Agent 流式消息回调（绕过 listener 遍历，直接 dispatch） */
     var agentStreamHandler: AgentStreamHandler?
 
-    /**
-     * 服务器连接状态
-     */
+    /** 服务器连接状态 */
     val isServerConnected: Boolean
 }
 
-/**
- * 全局消息接收回调接口
- */
+/** 全局消息接收回调接口 */
 interface MessageReceiveListener {
     /** Preserves server message identity and metadata; legacy listeners remain compatible. */
-    fun onPrivateEnvelope(message: model.Message) = onPrivateMessageReceived(message.senderId,
-        message.message, message.timestamp, message.seqId, message.conversationId)
-    fun onGroupEnvelope(message: model.GroupMessage) = onGroupMessageReceived(message.groupId,
-        message.senderId, message.senderName, message.text, message.timestamp, message.seqId, message.conversationId)
+    fun onPrivateEnvelope(message: model.Message) =
+        onPrivateMessageReceived(
+            message.senderId,
+            message.message,
+            message.timestamp,
+            message.seqId,
+            message.conversationId,
+        )
+
+    fun onGroupEnvelope(message: model.GroupMessage) =
+        onGroupMessageReceived(
+            message.groupId,
+            message.senderId,
+            message.senderName,
+            message.text,
+            message.timestamp,
+            message.seqId,
+            message.conversationId,
+        )
+
     /**
      * 收到私聊消息
+     *
      * @param seqId 会话级序列号（用于增量同步游标，0 表示服务端未携带）
      * @param conversationId 会话 ID（如 "user:1:2"）
      */
-    fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
-                                 seqId: Long = 0, conversationId: String = "")
+    fun onPrivateMessageReceived(
+        senderId: Int,
+        message: String,
+        timestamp: Long,
+        seqId: Long = 0,
+        conversationId: String = "",
+    )
 
     /**
      * 收到群聊消息
+     *
      * @param seqId 会话级序列号（用于增量同步游标，0 表示服务端未携带）
      * @param conversationId 会话 ID（如 "group:42"）
      */
-    fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long,
-                               seqId: Long = 0, conversationId: String = "")
+    fun onGroupMessageReceived(
+        groupId: Int,
+        senderId: Int,
+        senderName: String,
+        message: String,
+        timestamp: Long,
+        seqId: Long = 0,
+        conversationId: String = "",
+    )
 
     /**
      * 收到聊天助手流式输出（默认空实现，按需覆盖）。
+     *
      * @param messageId 请求 ID
      * @param fullContent 文本内容（type=TEXT 时有值）
      * @param done 是否结束
@@ -127,45 +129,69 @@ interface MessageReceiveListener {
      * @param outputTokens 输出 token 数（type=USAGE 时有值）
      */
     fun onAgentStreamChunk(
-        messageId: String, fullContent: String, done: Boolean, error: Boolean,
-        streamType: Int = 0, toolName: String? = null, toolResult: String? = null,
-        inputTokens: Int = 0, outputTokens: Int = 0
+        messageId: String,
+        fullContent: String,
+        done: Boolean,
+        error: Boolean,
+        streamType: Int = 0,
+        toolName: String? = null,
+        toolResult: String? = null,
+        inputTokens: Int = 0,
+        outputTokens: Int = 0,
     ) {}
 
     /**
      * 收到 ACK 确认（默认空实现，按需覆盖）
+     *
      * @param messageId 被确认的消息 ID
      * @param seqId 当前会话的 seqId（用于更新增量同步游标）
      * @param conversationId 会话 ID
      */
-    fun onMessageIdConfirmed(clientId: String, serverId: String, seqId: Long, conversationId: String) {}
+    fun onMessageIdConfirmed(
+        clientId: String,
+        serverId: String,
+        seqId: Long,
+        conversationId: String,
+    ) {}
+
     fun onAckReceived(messageId: String, seqId: Long, conversationId: String) {}
 
     /** 服务端拒绝接收该消息，不可作为发送成功处理。 */
     fun onAckRejected(messageId: String, reason: String) {}
 
     /**
-     * 收到同步提示（默认空实现，按需覆盖）。
-     * 服务端推送 sync_hint 通知客户端有新消息，客户端应调用 /sync/messages 拉取增量。
+     * 收到同步提示（默认空实现，按需覆盖）。 服务端推送 sync_hint 通知客户端有新消息，客户端应调用 /sync/messages 拉取增量。
+     *
      * @param conversationId 会话 ID
      * @param seqId 服务端最新 seqId
      */
     fun onSyncHint(conversationId: String, seqId: Long) {}
 }
 
-/**
- * Agent 流式消息回调函数类型
- */
+/** Agent 流式消息回调函数类型 */
 fun interface AgentStreamHandler {
     fun onAgentStreamChunk(messageId: String, fullContent: String, done: Boolean, error: Boolean)
 }
 
-/**
- * 登录状态监听器
- */
+/** 登录状态监听器 */
 fun interface AuthStateListener {
     fun onAuthInvalidated(reason: String)
 }
 
 // 全局传输层实现，由各平台入口初始化
 lateinit var Chat: ChatTransport
+
+/** Focused TransportObservers contract shared by platform implementations. */
+interface TransportObservers {
+    /** 添加消息接收监听器 */
+    fun addMessageReceiveListener(listener: MessageReceiveListener)
+
+    /** 移除消息接收监听器 */
+    fun removeMessageReceiveListener(listener: MessageReceiveListener)
+
+    /** 添加认证状态监听器 */
+    fun addAuthStateListener(listener: AuthStateListener)
+
+    /** 移除认证状态监听器 */
+    fun removeAuthStateListener(listener: AuthStateListener)
+}

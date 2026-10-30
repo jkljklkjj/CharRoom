@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.runtime.*
@@ -21,23 +20,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.chatlite.i18n.LocalStrings
 import component.AppTopBar
 import component.dialog.AvatarCropDialog
 import component.io.FilePicker
-import com.chatlite.i18n.LocalStrings
+import org.koin.compose.koinInject
 import presentation.viewmodel.ProfileUiState
 import presentation.viewmodel.ProfileViewModel
-import org.koin.compose.koinInject
 
-/**
- * 个人信息页面
- * UI层只负责渲染和事件转发，业务逻辑由ProfileViewModel处理
- */
+/** 个人信息页面 UI层只负责渲染和事件转发，业务逻辑由ProfileViewModel处理 */
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
     onProfileUpdated: () -> Unit = {},
-    viewModel: ProfileViewModel = koinInject()
+    viewModel: ProfileViewModel = koinInject(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -59,7 +55,7 @@ fun ProfileScreen(
                 title = s["profile.title"],
                 subtitle = s["profile.subtitle"],
                 onBack = onBack,
-                modifier = Modifier.statusBarsPadding()
+                modifier = Modifier.statusBarsPadding(),
             )
         }
     ) { padding ->
@@ -74,53 +70,64 @@ fun ProfileScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = (uiState as ProfileUiState.Error).message,
-                        color = MaterialTheme.colors.error
+                        color = MaterialTheme.colors.error,
                     )
                 }
             }
 
             is ProfileUiState.Success -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colors.background)
-                        .padding(padding),
-                    contentAlignment = Alignment.TopCenter
+                    modifier =
+                        Modifier.fillMaxSize()
+                            .background(MaterialTheme.colors.background)
+                            .padding(padding),
+                    contentAlignment = Alignment.TopCenter,
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 760.dp)
-                            .padding(horizontal = 16.dp, vertical = 16.dp)
-                            .verticalScroll(rememberScrollState()),
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .widthIn(max = 760.dp)
+                                .padding(horizontal = 16.dp, vertical = 16.dp)
+                                .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colors.surface.copy(alpha = 0.20f),
                             shape = RoundedCornerShape(24.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-                            elevation = 0.dp
+                            border =
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
+                                ),
+                            elevation = 0.dp,
                         ) {
                             Column(
                                 modifier = Modifier.padding(18.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Column {
                                         Text(
-                                            text = if (viewModel.isEditing.value) s["profile.edit.title"] else s["profile.title"],
-                                            style = MaterialTheme.typography.h6
+                                            text =
+                                                if (viewModel.isEditing.value)
+                                                    s["profile.edit.title"]
+                                                else s["profile.title"],
+                                            style = MaterialTheme.typography.h6,
                                         )
                                         Text(
-                                            text = if (viewModel.isEditing.value) s["profile.edit.reminder"] else s["profile.edit.click.hint"],
+                                            text =
+                                                if (viewModel.isEditing.value)
+                                                    s["profile.edit.reminder"]
+                                                else s["profile.edit.click.hint"],
                                             style = MaterialTheme.typography.caption,
-                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                            color =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                                         )
                                     }
 
@@ -128,7 +135,7 @@ fun ProfileScreen(
                                         Button(
                                             onClick = viewModel::enterEditMode,
                                             modifier = Modifier.height(40.dp),
-                                            shape = RoundedCornerShape(14.dp)
+                                            shape = RoundedCornerShape(14.dp),
                                         ) {
                                             Text(s["profile.edit"])
                                         }
@@ -137,21 +144,25 @@ fun ProfileScreen(
                                             OutlinedButton(
                                                 onClick = viewModel::resetChanges,
                                                 modifier = Modifier.height(40.dp),
-                                                shape = RoundedCornerShape(14.dp)
+                                                shape = RoundedCornerShape(14.dp),
                                             ) {
                                                 Text(s["profile.cancel"])
                                             }
                                             Button(
-                                                onClick = { viewModel.saveProfile(onSuccess = onProfileUpdated) },
+                                                onClick = {
+                                                    viewModel.saveProfile(
+                                                        onSuccess = onProfileUpdated
+                                                    )
+                                                },
                                                 modifier = Modifier.height(40.dp),
                                                 enabled = !viewModel.isSaving.value,
-                                                shape = RoundedCornerShape(14.dp)
+                                                shape = RoundedCornerShape(14.dp),
                                             ) {
                                                 if (viewModel.isSaving.value) {
                                                     CircularProgressIndicator(
                                                         modifier = Modifier.size(18.dp),
                                                         color = MaterialTheme.colors.onPrimary,
-                                                        strokeWidth = 2.dp
+                                                        strokeWidth = 2.dp,
                                                     )
                                                     Spacer(modifier = Modifier.width(8.dp))
                                                     Text(s["profile.saving"])
@@ -165,77 +176,93 @@ fun ProfileScreen(
 
                                 Spacer(modifier = Modifier.height(18.dp))
 
-                                val avatarInteractionSource = remember { MutableInteractionSource() }
-                                val isHoveringAvatar by avatarInteractionSource.collectIsHoveredAsState()
+                                val avatarInteractionSource = remember {
+                                    MutableInteractionSource()
+                                }
+                                val isHoveringAvatar by
+                                    avatarInteractionSource.collectIsHoveredAsState()
                                 Box(
-                                    modifier = Modifier
-                                        .size(136.dp)
-                                        .shadow(
-                                            elevation = if (isHoveringAvatar && viewModel.isEditing.value) 14.dp else 8.dp,
-                                            shape = CircleShape,
-                                            clip = true
-                                        )
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colors.primary.copy(alpha = 0.10f))
-                                        .hoverable(
-                                            interactionSource = avatarInteractionSource,
-                                            enabled = viewModel.isEditing.value
-                                        )
-                                        .clickable(enabled = viewModel.isEditing.value && !viewModel.isUploadingAvatar.value) {
-                                            FilePicker.pickImage { bytes, fileName ->
-                                                val maxSize = 500 * 1024 // 500KB
-                                                if (bytes.size > maxSize) {
-                                                    viewModel.errorMessage.value = s["profile.avatar.size.limit"]
+                                    modifier =
+                                        Modifier.size(136.dp)
+                                            .shadow(
+                                                elevation =
+                                                    if (
+                                                        isHoveringAvatar &&
+                                                            viewModel.isEditing.value
+                                                    )
+                                                        14.dp
+                                                    else 8.dp,
+                                                shape = CircleShape,
+                                                clip = true,
+                                            )
+                                            .clip(CircleShape)
+                                            .background(
+                                                MaterialTheme.colors.primary.copy(alpha = 0.10f)
+                                            )
+                                            .hoverable(
+                                                interactionSource = avatarInteractionSource,
+                                                enabled = viewModel.isEditing.value,
+                                            )
+                                            .clickable(
+                                                enabled =
+                                                    viewModel.isEditing.value &&
+                                                        !viewModel.isUploadingAvatar.value
+                                            ) {
+                                                FilePicker.pickImage { bytes, fileName ->
+                                                    val maxSize = 500 * 1024 // 500KB
+                                                    if (bytes.size > maxSize) {
+                                                        viewModel.errorMessage.value =
+                                                            s["profile.avatar.size.limit"]
+                                                    }
+                                                    selectedImageBytes = bytes
+                                                    selectedImageFileName = fileName
+                                                    showCropDialog = true
                                                 }
-                                                selectedImageBytes = bytes
-                                                selectedImageFileName = fileName
-                                                showCropDialog = true
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
+                                            },
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     if (viewModel.isUploadingAvatar.value) {
                                         CircularProgressIndicator(
                                             color = MaterialTheme.colors.primary,
                                             strokeWidth = 3.dp,
-                                            modifier = Modifier.size(36.dp)
+                                            modifier = Modifier.size(36.dp),
                                         )
                                     } else if (viewModel.avatarBitmap.value != null) {
                                         // 使用 clip 确保图片不会超出圆形边界
                                         Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(CircleShape),
-                                            contentAlignment = Alignment.Center
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                            contentAlignment = Alignment.Center,
                                         ) {
                                             Image(
                                                 bitmap = viewModel.avatarBitmap.value!!,
                                                 contentDescription = s["user.avatar"],
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .clip(CircleShape)
+                                                modifier = Modifier.fillMaxSize().clip(CircleShape),
                                             )
                                         }
 
                                         if (viewModel.isEditing.value && isHoveringAvatar) {
                                             Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(Color.Black.copy(alpha = 0.45f)),
-                                                contentAlignment = Alignment.Center
+                                                modifier =
+                                                    Modifier.fillMaxSize()
+                                                        .background(
+                                                            Color.Black.copy(alpha = 0.45f)
+                                                        ),
+                                                contentAlignment = Alignment.Center,
                                             ) {
                                                 Text(
                                                     text = s["profile.change.avatar"],
                                                     color = Color.White,
-                                                    style = MaterialTheme.typography.subtitle2
+                                                    style = MaterialTheme.typography.subtitle2,
                                                 )
                                             }
                                         }
                                     } else {
                                         Text(
-                                            text = viewModel.username.value.firstOrNull()?.toString() ?: "U",
+                                            text =
+                                                viewModel.username.value.firstOrNull()?.toString()
+                                                    ?: "U",
                                             style = MaterialTheme.typography.h2,
-                                            color = MaterialTheme.colors.primary
+                                            color = MaterialTheme.colors.primary,
                                         )
                                     }
                                 }
@@ -245,19 +272,26 @@ fun ProfileScreen(
                                     Text(
                                         text = s["profile.avatar.hint"],
                                         style = MaterialTheme.typography.caption,
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                                     )
                                 } else {
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Surface(
                                         color = MaterialTheme.colors.secondary.copy(alpha = 0.14f),
-                                        shape = RoundedCornerShape(999.dp)
+                                        shape = RoundedCornerShape(999.dp),
                                     ) {
                                         Text(
-                                            text = if (currentUser?.phone.isNullOrBlank()) s["profile.incomplete"] else s["profile.complete"],
+                                            text =
+                                                if (currentUser?.phone.isNullOrBlank())
+                                                    s["profile.incomplete"]
+                                                else s["profile.complete"],
                                             style = MaterialTheme.typography.caption,
                                             color = MaterialTheme.colors.secondary,
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                            modifier =
+                                                Modifier.padding(
+                                                    horizontal = 12.dp,
+                                                    vertical = 6.dp,
+                                                ),
                                         )
                                     }
                                 }
@@ -268,11 +302,18 @@ fun ProfileScreen(
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colors.surface.copy(alpha = 0.20f),
                             shape = RoundedCornerShape(22.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-                            elevation = 0.dp
+                            border =
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
+                                ),
+                            elevation = 0.dp,
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
-                                Text(text = s["profile.basic.info"], style = MaterialTheme.typography.subtitle1)
+                                Text(
+                                    text = s["profile.basic.info"],
+                                    style = MaterialTheme.typography.subtitle1,
+                                )
                                 Spacer(modifier = Modifier.height(14.dp))
 
                                 OutlinedTextField(
@@ -283,10 +324,12 @@ fun ProfileScreen(
                                     singleLine = true,
                                     enabled = viewModel.isEditing.value,
                                     shape = RoundedCornerShape(14.dp),
-                                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                                        focusedBorderColor = MaterialTheme.colors.primary,
-                                        unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                    )
+                                    colors =
+                                        TextFieldDefaults.outlinedTextFieldColors(
+                                            focusedBorderColor = MaterialTheme.colors.primary,
+                                            unfocusedBorderColor =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
+                                        ),
                                 )
 
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -300,10 +343,12 @@ fun ProfileScreen(
                                     maxLines = 2,
                                     enabled = viewModel.isEditing.value,
                                     shape = RoundedCornerShape(14.dp),
-                                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                                        focusedBorderColor = MaterialTheme.colors.primary,
-                                        unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                    )
+                                    colors =
+                                        TextFieldDefaults.outlinedTextFieldColors(
+                                            focusedBorderColor = MaterialTheme.colors.primary,
+                                            unfocusedBorderColor =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
+                                        ),
                                 )
 
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -314,13 +359,16 @@ fun ProfileScreen(
                                     label = { Text(s["profile.phone"]) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    keyboardOptions =
+                                        KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     enabled = viewModel.isEditing.value,
                                     shape = RoundedCornerShape(14.dp),
-                                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                                        focusedBorderColor = MaterialTheme.colors.primary,
-                                        unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                    )
+                                    colors =
+                                        TextFieldDefaults.outlinedTextFieldColors(
+                                            focusedBorderColor = MaterialTheme.colors.primary,
+                                            unfocusedBorderColor =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
+                                        ),
                                 )
                             }
                         }
@@ -329,11 +377,18 @@ fun ProfileScreen(
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colors.surface.copy(alpha = 0.20f),
                             shape = RoundedCornerShape(22.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-                            elevation = 0.dp
+                            border =
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
+                                ),
+                            elevation = 0.dp,
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
-                                Text(text = s["profile.email.security"], style = MaterialTheme.typography.subtitle1)
+                                Text(
+                                    text = s["profile.email.security"],
+                                    style = MaterialTheme.typography.subtitle1,
+                                )
                                 Spacer(modifier = Modifier.height(14.dp))
 
                                 if (!viewModel.isEditing.value) {
@@ -345,20 +400,24 @@ fun ProfileScreen(
                                         singleLine = true,
                                         enabled = false,
                                         shape = RoundedCornerShape(14.dp),
-                                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                                            disabledBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
-                                            disabledTextColor = MaterialTheme.colors.onSurface
-                                        )
+                                        colors =
+                                            TextFieldDefaults.outlinedTextFieldColors(
+                                                disabledBorderColor =
+                                                    MaterialTheme.colors.onSurface.copy(
+                                                        alpha = 0.12f
+                                                    ),
+                                                disabledTextColor = MaterialTheme.colors.onSurface,
+                                            ),
                                     )
                                 } else {
                                     Text(
                                         text = s["profile.change.email"],
                                         style = MaterialTheme.typography.subtitle2,
-                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                                     )
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         OutlinedTextField(
                                             value = viewModel.newEmail.value,
@@ -366,26 +425,41 @@ fun ProfileScreen(
                                             label = { Text(s["profile.new.email"]) },
                                             modifier = Modifier.weight(1f),
                                             singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                            enabled = viewModel.isEditing.value && viewModel.emailVerifyCountdown.value == 0 && !viewModel.isSendingEmailCode.value,
+                                            keyboardOptions =
+                                                KeyboardOptions(keyboardType = KeyboardType.Email),
+                                            enabled =
+                                                viewModel.isEditing.value &&
+                                                    viewModel.emailVerifyCountdown.value == 0 &&
+                                                    !viewModel.isSendingEmailCode.value,
                                             shape = RoundedCornerShape(14.dp),
-                                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                                focusedBorderColor = MaterialTheme.colors.primary,
-                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                            )
+                                            colors =
+                                                TextFieldDefaults.outlinedTextFieldColors(
+                                                    focusedBorderColor =
+                                                        MaterialTheme.colors.primary,
+                                                    unfocusedBorderColor =
+                                                        MaterialTheme.colors.onSurface.copy(
+                                                            alpha = 0.12f
+                                                        ),
+                                                ),
                                         )
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Button(
                                             onClick = viewModel::sendEmailVerifyCode,
-                                            enabled = viewModel.isEditing.value && viewModel.newEmail.value.isNotBlank() && viewModel.newEmail.value != viewModel.email.value && viewModel.emailVerifyCountdown.value == 0 && !viewModel.isSendingEmailCode.value,
+                                            enabled =
+                                                viewModel.isEditing.value &&
+                                                    viewModel.newEmail.value.isNotBlank() &&
+                                                    viewModel.newEmail.value !=
+                                                        viewModel.email.value &&
+                                                    viewModel.emailVerifyCountdown.value == 0 &&
+                                                    !viewModel.isSendingEmailCode.value,
                                             modifier = Modifier.height(56.dp),
-                                            shape = RoundedCornerShape(14.dp)
+                                            shape = RoundedCornerShape(14.dp),
                                         ) {
                                             if (viewModel.isSendingEmailCode.value) {
                                                 CircularProgressIndicator(
                                                     modifier = Modifier.size(18.dp),
                                                     color = MaterialTheme.colors.onPrimary,
-                                                    strokeWidth = 2.dp
+                                                    strokeWidth = 2.dp,
                                                 )
                                             } else if (viewModel.emailVerifyCountdown.value > 0) {
                                                 Text("${viewModel.emailVerifyCountdown.value}s")
@@ -399,17 +473,25 @@ fun ProfileScreen(
                                         Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = viewModel.emailVerifyCode.value,
-                                            onValueChange = { viewModel.emailVerifyCode.value = it },
+                                            onValueChange = {
+                                                viewModel.emailVerifyCode.value = it
+                                            },
                                             label = { Text(s["profile.email.verify.code"]) },
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            keyboardOptions =
+                                                KeyboardOptions(keyboardType = KeyboardType.Number),
                                             enabled = viewModel.isEditing.value,
                                             shape = RoundedCornerShape(14.dp),
-                                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                                focusedBorderColor = MaterialTheme.colors.primary,
-                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                            )
+                                            colors =
+                                                TextFieldDefaults.outlinedTextFieldColors(
+                                                    focusedBorderColor =
+                                                        MaterialTheme.colors.primary,
+                                                    unfocusedBorderColor =
+                                                        MaterialTheme.colors.onSurface.copy(
+                                                            alpha = 0.12f
+                                                        ),
+                                                ),
                                         )
                                     }
                                 }
@@ -421,15 +503,22 @@ fun ProfileScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = MaterialTheme.colors.surface.copy(alpha = 0.20f),
                                 shape = RoundedCornerShape(22.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-                                elevation = 0.dp
+                                border =
+                                    BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
+                                    ),
+                                elevation = 0.dp,
                             ) {
                                 Column(modifier = Modifier.padding(18.dp)) {
-                                    Text(text = s["profile.change.password"], style = MaterialTheme.typography.subtitle1)
+                                    Text(
+                                        text = s["profile.change.password"],
+                                        style = MaterialTheme.typography.subtitle1,
+                                    )
                                     Text(
                                         text = s["profile.password.leave.blank"],
                                         style = MaterialTheme.typography.caption,
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                                     )
 
                                     Spacer(modifier = Modifier.height(14.dp))
@@ -443,10 +532,14 @@ fun ProfileScreen(
                                         visualTransformation = PasswordVisualTransformation(),
                                         enabled = viewModel.isEditing.value,
                                         shape = RoundedCornerShape(14.dp),
-                                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                                            focusedBorderColor = MaterialTheme.colors.primary,
-                                            unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                        )
+                                        colors =
+                                            TextFieldDefaults.outlinedTextFieldColors(
+                                                focusedBorderColor = MaterialTheme.colors.primary,
+                                                unfocusedBorderColor =
+                                                    MaterialTheme.colors.onSurface.copy(
+                                                        alpha = 0.12f
+                                                    ),
+                                            ),
                                     )
 
                                     Spacer(modifier = Modifier.height(12.dp))
@@ -461,72 +554,92 @@ fun ProfileScreen(
                                             visualTransformation = PasswordVisualTransformation(),
                                             enabled = viewModel.isEditing.value,
                                             shape = RoundedCornerShape(14.dp),
-                                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                                focusedBorderColor = MaterialTheme.colors.primary,
-                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                            )
+                                            colors =
+                                                TextFieldDefaults.outlinedTextFieldColors(
+                                                    focusedBorderColor =
+                                                        MaterialTheme.colors.primary,
+                                                    unfocusedBorderColor =
+                                                        MaterialTheme.colors.onSurface.copy(
+                                                            alpha = 0.12f
+                                                        ),
+                                                ),
                                         )
 
                                         OutlinedTextField(
                                             value = viewModel.confirmPassword.value,
-                                            onValueChange = { viewModel.confirmPassword.value = it },
+                                            onValueChange = {
+                                                viewModel.confirmPassword.value = it
+                                            },
                                             label = { Text(s["profile.confirm.password"]) },
                                             modifier = Modifier.weight(1f).padding(start = 6.dp),
                                             singleLine = true,
                                             visualTransformation = PasswordVisualTransformation(),
                                             enabled = viewModel.isEditing.value,
                                             shape = RoundedCornerShape(14.dp),
-                                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                                focusedBorderColor = MaterialTheme.colors.primary,
-                                                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                                            )
+                                            colors =
+                                                TextFieldDefaults.outlinedTextFieldColors(
+                                                    focusedBorderColor =
+                                                        MaterialTheme.colors.primary,
+                                                    unfocusedBorderColor =
+                                                        MaterialTheme.colors.onSurface.copy(
+                                                            alpha = 0.12f
+                                                        ),
+                                                ),
                                         )
                                     }
                                 }
                             }
                         }
 
-                        if (viewModel.errorMessage.value.isNotBlank() || viewModel.successMessage.value.isNotBlank()) {
+                        if (
+                            viewModel.errorMessage.value.isNotBlank() ||
+                                viewModel.successMessage.value.isNotBlank()
+                        ) {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                color = if (viewModel.errorMessage.value.isNotBlank()) {
-                                    MaterialTheme.colors.error.copy(alpha = 0.10f)
-                                } else {
-                                    MaterialTheme.colors.secondary.copy(alpha = 0.10f)
-                                },
+                                color =
+                                    if (viewModel.errorMessage.value.isNotBlank()) {
+                                        MaterialTheme.colors.error.copy(alpha = 0.10f)
+                                    } else {
+                                        MaterialTheme.colors.secondary.copy(alpha = 0.10f)
+                                    },
                                 shape = RoundedCornerShape(18.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.06f)),
-                                elevation = 0.dp
+                                border =
+                                    BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colors.onSurface.copy(alpha = 0.06f),
+                                    ),
+                                elevation = 0.dp,
                             ) {
                                 Row(
                                     modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     if (viewModel.errorMessage.value.isNotBlank()) {
                                         Icon(
                                             imageVector = Icons.Default.Error,
                                             contentDescription = s["profile.error"],
                                             tint = MaterialTheme.colors.error,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(20.dp),
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = viewModel.errorMessage.value,
                                             color = MaterialTheme.colors.error,
-                                            style = MaterialTheme.typography.body2
+                                            style = MaterialTheme.typography.body2,
                                         )
                                     } else {
                                         Icon(
                                             imageVector = Icons.Default.CheckCircle,
                                             contentDescription = s["profile.success"],
                                             tint = MaterialTheme.colors.secondary,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(20.dp),
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = viewModel.successMessage.value,
                                             color = MaterialTheme.colors.secondary,
-                                            style = MaterialTheme.typography.body2
+                                            style = MaterialTheme.typography.body2,
                                         )
                                     }
                                 }
@@ -548,7 +661,7 @@ fun ProfileScreen(
                                 showCropDialog = false
                                 selectedImageBytes = null
                                 selectedImageFileName = ""
-                            }
+                            },
                         )
                     }
                 }

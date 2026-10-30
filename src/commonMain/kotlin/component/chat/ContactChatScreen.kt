@@ -10,15 +10,17 @@ import presentation.viewmodel.ChatViewModel
 fun ContactChatScreen(
     chatViewModel: ChatViewModel,
     user: User,
-    token: String,
     onAvatarClick: ((User) -> Unit)? = null,
     onMyAvatarClick: (() -> Unit)? = null,
-    onBackClick: (() -> Unit)? = null
+    onBackClick: (() -> Unit)? = null,
 ) {
     val group = user.asContactGroup()
-    if (group != null) GroupChatScreen(
-        chatViewModel, group, token,
-        onBack = onBackClick ?: { chatViewModel.selectedUser = null },
-        onAvatarClick = onAvatarClick, onMyAvatarClick = onMyAvatarClick
-    ) else ChatScreen(chatViewModel, user, onAvatarClick, onMyAvatarClick, onBackClick)
+    if (group != null)
+        GroupChatScreen(
+            chatViewModel,
+            group,
+            onAvatarClick = onAvatarClick,
+            onMyAvatarClick = onMyAvatarClick,
+        )
+    else ChatScreen(chatViewModel, user, onAvatarClick, onMyAvatarClick, onBackClick)
 }

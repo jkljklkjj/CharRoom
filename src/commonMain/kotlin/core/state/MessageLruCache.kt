@@ -17,7 +17,7 @@ class MessageLruCache<T : Any>(
     maxSize: Int,
     private val id: (T) -> String,
     private val timestamp: (T) -> Long,
-    private val changed: (List<T>) -> Unit = {}
+    private val changed: (List<T>) -> Unit = {},
 ) {
     /** 当前缓存容量上限（可在前台/后台切换时动态调整，立即触发淘汰） */
     var maxSize: Int = maxSize
@@ -27,19 +27,28 @@ class MessageLruCache<T : Any>(
                 evictAndEmit()
             }
         }
+
     // 按时间戳排序的消息
     private val _items = mutableListOf<T>()
     private val indices = HashMap<String, Int>()
-    private fun reindex() { indices.clear(); _items.forEachIndexed { index, item -> indices[id(item)] = index } }
+
+    private fun reindex() {
+        indices.clear()
+        _items.forEachIndexed { index, item -> indices[id(item)] = index }
+    }
 
     // 响应式状态：每次变更自动同步
     private val _state = MutableStateFlow<List<T>>(emptyList())
     val state: StateFlow<List<T>> = _state.asStateFlow()
-    val hasSubscribers: Boolean get() = _state.subscriptionCount.value > 0
+    val hasSubscribers: Boolean
+        get() = _state.subscriptionCount.value > 0
 
     /** 当前列表快照（供 `ChatState.updateMessage*` 等只读场景使用，不触发 StateFlow 更新） */
-    val snapshot: List<T> get() = _state.value
-    val size: Int get() = _items.size
+    val snapshot: List<T>
+        get() = _state.value
+
+    val size: Int
+        get() = _items.size
 
     // LRU 访问顺序追踪器
     private val lru = linkedSetOf<String>()
@@ -49,8 +58,7 @@ class MessageLruCache<T : Any>(
     /**
      * 插入或更新消息。
      * - 已存在：替换内容，提升 LRU 位置
-     * - 不存在：按时间戳排序插入
-     * 超限时自动 LRU 淘汰。
+     * - 不存在：按时间戳排序插入 超限时自动 LRU 淘汰。
      */
     fun add(message: T) {
         val msgId = id(message)
@@ -71,24 +79,24 @@ class MessageLruCache<T : Any>(
             reindex()
         }
 
-        lru.remove(msgId); lru.add(msgId)
+        lru.remove(msgId)
+        lru.add(msgId)
         evictAndEmit()
     }
 
     /**
      * 批量前置插入（历史消息）。去重后归并合并（O(n)），避免全量排序。
      *
-     * @return 实际插入且未被 LRU 淘汰的消息（调用方可直接用此列表更新会话状态，
-     *         无需再通过 [snapshot] 回查哪些消息存活了）
+     * @return 实际插入且未被 LRU 淘汰的消息（调用方可直接用此列表更新会话状态， 无需再通过 [snapshot] 回查哪些消息存活了）
      */
     fun prepend(messages: List<T>): List<T> {
-        if (messages.isEmpty()) return emptyList()
         val toAdd = messages.distinctBy(id).filter { id(it) !in indices }
         if (toAdd.isEmpty()) return emptyList()
 
         // 两个列表都已按时间戳有序 → 归并合并 O(n+m)
         val merged = mutableListOf<T>()
-        var i = 0; var j = 0
+        var i = 0
+        var j = 0
         while (i < toAdd.size && j < _items.size) {
             if (timestamp(toAdd[i]) <= timestamp(_items[j])) {
                 merged.add(toAdd[i++])
@@ -99,9 +107,13 @@ class MessageLruCache<T : Any>(
         while (i < toAdd.size) merged.add(toAdd[i++])
         while (j < _items.size) merged.add(_items[j++])
 
-        _items.clear(); _items.addAll(merged)
+        _items.clear()
+        _items.addAll(merged)
         reindex()
-        toAdd.forEach { lru.remove(id(it)); lru.add(id(it)) }
+        toAdd.forEach {
+            lru.remove(id(it))
+            lru.add(id(it))
+        }
         evictAndEmit()
 
         // 返回去重后且未被淘汰的消息（调用方无需回查 snapshot）
@@ -109,9 +121,7 @@ class MessageLruCache<T : Any>(
         return toAdd.filter { id(it) in survivingIds }
     }
 
-    /**
-     * 标记某条消息为最近访问（不影响时间排序）。
-     */
+    /** 标记某条消息为最近访问（不影响时间排序）。 */
     fun touch(messageId: String) {
         if (lru.remove(messageId)) {
             lru.add(messageId)
@@ -119,9 +129,7 @@ class MessageLruCache<T : Any>(
         // 列表内容不变，不发射
     }
 
-    /**
-     * 删除指定消息。
-     */
+    /** 删除指定消息。 */
     fun remove(messageId: String): Boolean {
         val idx = indices[messageId] ?: return false
         _items.removeAt(idx)
@@ -131,9 +139,7 @@ class MessageLruCache<T : Any>(
         return true
     }
 
-    /**
-     * 清空所有数据。
-     */
+    /** 清空所有数据。 */
     fun clear() {
         _items.clear()
         indices.clear()
@@ -157,7 +163,10 @@ class MessageLruCache<T : Any>(
      * - 其余全部移除，O(n) 一次扫描
      */
     private fun evictAndEmit() {
-        if (_items.size <= maxSize) { emit(); return }
+        if (_items.size <= maxSize) {
+            emit()
+            return
+        }
         val keep = lru.toList().takeLast(maxSize).toSet()
         _items.removeAll { id(it) !in keep }
         reindex()

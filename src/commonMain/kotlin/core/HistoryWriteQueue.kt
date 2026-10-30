@@ -4,9 +4,14 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 
 /** Serial, mergeable writes with bounded retries and an awaitable durability barrier. */
-class HistoryWriteQueue<T : Any>(scope: CoroutineScope, private val debounceMillis: Long = 1000,
-    private val merge: (T, T) -> T, private val failed: (Throwable) -> Unit = {},
-    private val retryDelayMillis: Long = 100, private val persist: suspend (T) -> Unit) {
+class HistoryWriteQueue<T : Any>(
+    scope: CoroutineScope,
+    private val debounceMillis: Long = 1000,
+    private val merge: (T, T) -> T,
+    private val failed: (Throwable) -> Unit = {},
+    private val retryDelayMillis: Long = 100,
+    private val persist: suspend (T) -> Unit,
+) {
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private val lock = Any()
     private var pending: T? = null
@@ -15,27 +20,56 @@ class HistoryWriteQueue<T : Any>(scope: CoroutineScope, private val debounceMill
     private var closed = false
     private val barriers = mutableListOf<Pair<Long, CompletableDeferred<Unit>>>()
     private val worker = scope.launch {
-        for (signal in wake) {
+        while (wake.receiveCatching().isSuccess) {
             delay(debounceMillis)
-            while (isActive) {
-                val batch = synchronized(lock) { pending?.let { it to requested }.also { pending = null } } ?: break
-                var failure: Exception? = null
-                for (attempt in 0..2) {
-                    try { withContext(Dispatchers.IO) { persist(batch.first) }; failure = null; break }
-                    catch (cancelled: CancellationException) { throw cancelled }
-                    catch (error: Exception) { failure = error; if (attempt < 2) delay(retryDelayMillis * (1L shl attempt)) }
-                }
-                synchronized(lock) {
-                    if (failure == null) committed = batch.second
-                    else pending = pending?.let { merge(batch.first, it) } ?: batch.first
-                    val finished = barriers.filter { it.first <= batch.second }
-                    barriers.removeAll(finished.toSet())
-                    finished.forEach { if (failure == null) it.second.complete(Unit) else it.second.completeExceptionally(failure!!) }
-                }
-                if (failure != null) { failed(failure!!); break }
+            while (isActive && drainBatch()) {
+                /* Drain merged writes before waiting again. */
             }
         }
     }
+
+    private suspend fun drainBatch(): Boolean {
+        val batch =
+            synchronized(lock) { pending?.let { it to requested }.also { pending = null } }
+                ?: return false
+        val failure = persistWithRetry(batch.first)
+        completeBatch(batch, failure)
+        if (failure != null) {
+            failed(failure)
+        }
+        return failure == null
+    }
+
+    private suspend fun persistWithRetry(value: T): Exception? {
+        var failure: Exception? = null
+        for (attempt in 0..2) {
+            core.recoverOperation(
+                onFailure = { error ->
+                    failure = error
+                    if (attempt < 2) delay(retryDelayMillis * (1L shl attempt))
+                }
+            ) {
+                withContext(Dispatchers.IO) { persist(value) }
+                failure = null
+                break
+            }
+        }
+        return failure
+    }
+
+    private fun completeBatch(batch: Pair<T, Long>, failure: Exception?) {
+        synchronized(lock) {
+            if (failure == null) committed = batch.second
+            else pending = pending?.let { merge(batch.first, it) } ?: batch.first
+            val finished = barriers.filter { it.first <= batch.second }
+            barriers.removeAll(finished.toSet())
+            finished.forEach {
+                if (failure == null) it.second.complete(Unit)
+                else it.second.completeExceptionally(failure)
+            }
+        }
+    }
+
     fun request(value: T) {
         synchronized(lock) {
             check(!closed) { "History writer closed" }
@@ -44,16 +78,26 @@ class HistoryWriteQueue<T : Any>(scope: CoroutineScope, private val debounceMill
         }
         wake.trySend(Unit)
     }
+
     suspend fun flush() {
-        val barrier = synchronized(lock) {
-            if (committed >= requested) return
-            check(!closed) { "History writer closed" }
-            CompletableDeferred<Unit>().also { barriers.add(requested to it) }
-        }
+        val barrier =
+            synchronized(lock) {
+                if (committed >= requested) return
+                check(!closed) { "History writer closed" }
+                CompletableDeferred<Unit>().also { barriers.add(requested to it) }
+            }
         wake.trySend(Unit)
         barrier.await()
     }
-    suspend fun flushAndClose() { try { flush() } finally { close() } }
+
+    suspend fun flushAndClose() {
+        try {
+            flush()
+        } finally {
+            close()
+        }
+    }
+
     fun close() {
         synchronized(lock) {
             closed = true
@@ -61,6 +105,7 @@ class HistoryWriteQueue<T : Any>(scope: CoroutineScope, private val debounceMill
             barriers.clear()
             pending = null
         }
-        wake.close(); worker.cancel()
+        wake.close()
+        worker.cancel()
     }
 }

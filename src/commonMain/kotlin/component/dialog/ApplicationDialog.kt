@@ -1,7 +1,5 @@
 package component.dialog
 
-import component.*
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,31 +14,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
+import com.chatlite.i18n.LocalStrings
+import component.*
 import core.ApiService
 import core.loadImageBitmapFromUrl
 import kotlinx.coroutines.Dispatchers
-import com.chatlite.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import model.User
 import presentation.viewmodel.ChatViewModel
+import presentation.viewmodel.loadContacts
 
-/**
- * 申请类型
- */
-enum class ApplicationType {
-    GROUP, // 群聊申请
-    FRIEND // 好友申请
-}
+/** 申请类型 */
 
-/**
- * 统一申请管理对话框，整合好友申请和群聊申请
- */
+/** 统一申请管理对话框，整合好友申请和群聊申请 */
 @Composable
 fun ApplicationDialog(
     chatViewModel: ChatViewModel,
     onDismiss: () -> Unit,
-    initialType: ApplicationType = ApplicationType.FRIEND
+    initialType: ApplicationType = ApplicationType.FRIEND,
 ) {
     var selectedTab by remember { mutableStateOf(initialType) }
     var friendApplications by remember { mutableStateOf<List<User>>(emptyList()) }
@@ -66,41 +58,51 @@ fun ApplicationDialog(
     }
 
     // 获取当前选中的申请列表
-    val currentApplications = when (selectedTab) {
-        ApplicationType.FRIEND -> friendApplications
-        ApplicationType.GROUP -> groupApplications
-    }
+    val currentApplications =
+        when (selectedTab) {
+            ApplicationType.FRIEND -> friendApplications
+            ApplicationType.GROUP -> groupApplications
+        }
 
-    val emptyText = when (selectedTab) {
-        ApplicationType.GROUP -> s["application.empty.group"]
-        ApplicationType.FRIEND -> s["application.empty.friend"]
-    }
-    val applyDescription = when (selectedTab) {
-        ApplicationType.GROUP -> s["application.desc.group"]
-        ApplicationType.FRIEND -> s["application.desc.friend"]
-    }
+    val emptyText =
+        when (selectedTab) {
+            ApplicationType.GROUP -> s["application.empty.group"]
+            ApplicationType.FRIEND -> s["application.empty.friend"]
+        }
+    val applyDescription =
+        when (selectedTab) {
+            ApplicationType.GROUP -> s["application.desc.group"]
+            ApplicationType.FRIEND -> s["application.desc.friend"]
+        }
 
     fun handleAction(userId: Int, accept: Boolean) {
         scope.launch {
             processingUserId = userId
-            val success = withContext(Dispatchers.IO) {
-                if (accept) {
-                    when (selectedTab) {
-                        ApplicationType.GROUP -> ApiService.acceptGroupApplication("0", userId.toString())
-                        ApplicationType.FRIEND -> ApiService.acceptFriend(userId.toString())
-                    }
-                } else {
-                    when (selectedTab) {
-                        ApplicationType.GROUP -> ApiService.rejectGroupApplication("0", userId.toString())
-                        ApplicationType.FRIEND -> ApiService.rejectFriend(userId.toString())
+            val success =
+                withContext(Dispatchers.IO) {
+                    if (accept) {
+                        when (selectedTab) {
+                            ApplicationType.GROUP ->
+                                ApiService.acceptGroupApplication("0", userId.toString())
+                            ApplicationType.FRIEND -> ApiService.acceptFriend(userId.toString())
+                        }
+                    } else {
+                        when (selectedTab) {
+                            ApplicationType.GROUP ->
+                                ApiService.rejectGroupApplication("0", userId.toString())
+                            ApplicationType.FRIEND -> ApiService.rejectFriend(userId.toString())
+                        }
                     }
                 }
-            }
             if (success) {
                 // 移除已处理的申请
                 when (selectedTab) {
-                    ApplicationType.FRIEND -> friendApplications = friendApplications.filter { it.id != userId }
-                    ApplicationType.GROUP -> groupApplications = groupApplications.filter { it.id != userId }
+                    ApplicationType.FRIEND -> friendApplications = friendApplications.filter {
+                            it.id != userId
+                        }
+                    ApplicationType.GROUP -> groupApplications = groupApplications.filter {
+                            it.id != userId
+                        }
                 }
                 // 刷新用户列表
                 chatViewModel.loadContacts()
@@ -117,7 +119,7 @@ fun ApplicationDialog(
                 // Tab切换栏
                 TabRow(
                     selectedTabIndex = selectedTab.ordinal,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Tab(
                         selected = selectedTab == ApplicationType.FRIEND,
@@ -130,7 +132,7 @@ fun ApplicationDialog(
                                     Badge { Text(friendApplications.size.toString()) }
                                 }
                             }
-                        }
+                        },
                     )
                     Tab(
                         selected = selectedTab == ApplicationType.GROUP,
@@ -143,7 +145,7 @@ fun ApplicationDialog(
                                     Badge { Text(groupApplications.size.toString()) }
                                 }
                             }
-                        }
+                        },
                     )
                 }
 
@@ -151,49 +153,46 @@ fun ApplicationDialog(
 
                 if (isLoading) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator()
                     }
                 } else if (currentApplications.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = emptyText,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                         )
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(currentApplications) { user ->
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = MaterialTheme.shapes.medium,
                                 color = MaterialTheme.colors.surface,
-                                elevation = 1.dp
+                                elevation = 1.dp,
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     // 头像显示
                                     val avatarUrl = user.avatarUrl
-                                    var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+                                    var avatarBitmap by remember {
+                                        mutableStateOf<ImageBitmap?>(null)
+                                    }
                                     LaunchedEffect(avatarUrl, user.avatarKey) {
                                         if (!avatarUrl.isNullOrBlank()) {
-                                            avatarBitmap = loadImageBitmapFromUrl(avatarUrl, user.avatarKey)
+                                            avatarBitmap =
+                                                loadImageBitmapFromUrl(avatarUrl, user.avatarKey)
                                         } else {
                                             avatarBitmap = null
                                         }
@@ -203,23 +202,25 @@ fun ApplicationDialog(
                                         Image(
                                             bitmap = avatarBitmap!!,
                                             contentDescription = "avatar",
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(CircleShape)
+                                            modifier = Modifier.size(40.dp).clip(CircleShape),
                                         )
                                     } else {
                                         Box(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .background(
-                                                    brush = sidebarHeaderBrush(!MaterialTheme.colors.isLight),
-                                                    shape = CircleShape
-                                                ),
-                                            contentAlignment = Alignment.Center
+                                            modifier =
+                                                Modifier.size(40.dp)
+                                                    .background(
+                                                        brush =
+                                                            sidebarHeaderBrush(
+                                                                !MaterialTheme.colors.isLight
+                                                            ),
+                                                        shape = CircleShape,
+                                                    ),
+                                            contentAlignment = Alignment.Center,
                                         ) {
                                             Text(
-                                                text = user.username.firstOrNull()?.toString() ?: "U",
-                                                color = Color.White
+                                                text =
+                                                    user.username.firstOrNull()?.toString() ?: "U",
+                                                color = Color.White,
                                             )
                                         }
                                     }
@@ -229,36 +230,42 @@ fun ApplicationDialog(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = user.username,
-                                            style = MaterialTheme.typography.subtitle1
+                                            style = MaterialTheme.typography.subtitle1,
                                         )
                                         Text(
                                             text = applyDescription,
                                             style = MaterialTheme.typography.caption,
-                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                            color =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                                         )
-                                        user.friendRequestReason?.takeIf { it.isNotBlank() }?.let { Text(it,style=MaterialTheme.typography.body2) }
+                                        user.friendRequestReason
+                                            ?.takeIf { it.isNotBlank() }
+                                            ?.let {
+                                                Text(it, style = MaterialTheme.typography.body2)
+                                            }
                                     }
 
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Button(
                                             onClick = { handleAction(user.id, accept = false) },
                                             enabled = processingUserId == null,
-                                            colors = ButtonDefaults.buttonColors(
-                                                backgroundColor = MaterialTheme.colors.error
-                                            )
+                                            colors =
+                                                ButtonDefaults.buttonColors(
+                                                    backgroundColor = MaterialTheme.colors.error
+                                                ),
                                         ) {
                                             Text(s["application.reject"])
                                         }
 
                                         Button(
                                             onClick = { handleAction(user.id, accept = true) },
-                                            enabled = processingUserId == null
+                                            enabled = processingUserId == null,
                                         ) {
                                             if (processingUserId == user.id) {
                                                 CircularProgressIndicator(
                                                     modifier = Modifier.size(16.dp),
                                                     strokeWidth = 2.dp,
-                                                    color = MaterialTheme.colors.onPrimary
+                                                    color = MaterialTheme.colors.onPrimary,
                                                 )
                                             } else {
                                                 Text(s["application.accept"])
@@ -276,6 +283,6 @@ fun ApplicationDialog(
             TextButton(onClick = onDismiss) {
                 Text(s["application.close"])
             }
-        }
+        },
     )
 }

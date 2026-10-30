@@ -1,10 +1,11 @@
 package presentation.viewmodel
 
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import com.chatlite.i18n.currentStrings
 import core.FileUploader
 import core.loadImageBitmapWithCache
 import data.repository.ChatRepository
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,16 +14,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import model.User
 import model.withAgentAssistant
-import kotlin.time.Duration.Companion.milliseconds
-import com.chatlite.i18n.currentStrings
 
-/**
- * Profile ViewModel - handles profile page business logic
- */
+/** Profile ViewModel - handles profile page business logic */
 class ProfileViewModel(
     private val chatRepository: ChatRepository,
     private val chatViewModel: ChatViewModel,
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate)
+    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate),
 ) {
     // UI状态
     private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
@@ -53,45 +50,37 @@ class ProfileViewModel(
     private var initialSignature = ""
     private var initialEmail = ""
 
-    /**
-     * 加载用户信息
-     */
     fun loadUserProfile() {
         coroutineScope.launch {
             _uiState.value = ProfileUiState.Loading
-            try {
+            core.recoverOperation({ failure ->
+                _uiState.value =
+                    ProfileUiState.Error(
+                        currentStrings["profile.load.error"].format(
+                            failure.message ?: currentStrings["common.unknown.error"]
+                        )
+                    )
+            }) {
                 val user = chatRepository.getCurrentUserProfile()
                 if (user != null) {
                     username.value = user.username
-                    email.value = user.email ?: ""
-                    phone.value = user.phone ?: ""
-                    signature.value = user.signature ?: ""
-                    newEmail.value = user.email ?: ""
-
-                    // 保存初始值
-                    initialUsername = user.username
-                    initialPhone = user.phone ?: ""
-                    initialSignature = user.signature ?: ""
-                    initialEmail = user.email ?: ""
-
-                    // 加载头像
-                    user.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                        avatarBitmap.value = loadImageBitmapWithCache(url, user.avatarKey)
-                    }
-
+                    applyProfileFields(user)
+                    loadProfileAvatar(user)
                     _uiState.value = ProfileUiState.Success(user)
-                } else {
-                    _uiState.value = ProfileUiState.Error(currentStrings["profile.load.failed"])
-                }
-            } catch (e: Exception) {
-                _uiState.value = ProfileUiState.Error(currentStrings["profile.load.error"].format(e.message ?: currentStrings["common.unknown.error"]))
+                } else _uiState.value = ProfileUiState.Error(currentStrings["profile.load.failed"])
             }
         }
     }
 
-    /**
-     * 发送邮箱验证码
-     */
+    private suspend fun loadProfileAvatar(user: model.User) {
+        user.avatarUrl
+            ?.takeIf { it.isNotBlank() }
+            ?.let { url ->
+                avatarBitmap.value = loadImageBitmapWithCache(url, user.avatarKey)
+            }
+    }
+
+    /** 发送邮箱验证码 */
     fun sendEmailVerifyCode() {
         coroutineScope.launch {
             errorMessage.value = ""
@@ -99,38 +88,43 @@ class ProfileViewModel(
             isSendingEmailCode.value = true
 
             try {
-                // 验证邮箱格式（通用正则，跨平台兼容）
-                val emailPattern = "[a-zA-Z0-9._-]+@[a-z]+\\.+[a-z]+"
-                if (!newEmail.value.matches(emailPattern.toRegex())) {
-                    errorMessage.value = currentStrings["profile.email.invalid"]
-                    return@launch
-                }
-
-                val success = chatRepository.sendEmailUpdateVerifyCode(newEmail.value)
-                if (success) {
-                    successMessage.value = currentStrings["profile.email.code.sent"]
-                    emailVerifyCountdown.value = 60 // 60秒倒计时
-                    // 启动倒计时
-                    launch {
-                        while (emailVerifyCountdown.value > 0) {
-                            kotlinx.coroutines.delay(1000.milliseconds)
-                            emailVerifyCountdown.value--
-                        }
+                core.recoverOperation(
+                    onFailure = { e ->
+                        errorMessage.value =
+                            currentStrings["profile.send.failed"].format(
+                                e.message ?: currentStrings["common.unknown.error"]
+                            )
                     }
-                } else {
-                    errorMessage.value = currentStrings["profile.email.code.send.failed"]
+                ) {
+                    // 验证邮箱格式（通用正则，跨平台兼容）
+                    val emailPattern = "[a-zA-Z0-9._-]+@[a-z]+\\.+[a-z]+"
+                    if (!newEmail.value.matches(emailPattern.toRegex())) {
+                        errorMessage.value = currentStrings["profile.email.invalid"]
+                        return@launch
+                    }
+
+                    val success = chatRepository.sendEmailUpdateVerifyCode(newEmail.value)
+                    if (success) {
+                        successMessage.value = currentStrings["profile.email.code.sent"]
+                        emailVerifyCountdown.value = 60 // 60秒倒计时
+                        // 启动倒计时
+                        launch {
+                            while (emailVerifyCountdown.value > 0) {
+                                kotlinx.coroutines.delay(1000.milliseconds)
+                                emailVerifyCountdown.value--
+                            }
+                        }
+                    } else {
+                        errorMessage.value = currentStrings["profile.email.code.send.failed"]
+                    }
                 }
-            } catch (e: Exception) {
-                errorMessage.value = currentStrings["profile.send.failed"].format(e.message ?: currentStrings["common.unknown.error"])
             } finally {
                 isSendingEmailCode.value = false
             }
         }
     }
 
-    /**
-     * 还原修改
-     */
+    /** 还原修改 */
     fun resetChanges() {
         username.value = initialUsername
         phone.value = initialPhone
@@ -145,107 +139,93 @@ class ProfileViewModel(
         isEditing.value = false
     }
 
-    /**
-     * 保存个人信息
-     */
     fun saveProfile(onSuccess: () -> Unit = {}) {
         coroutineScope.launch {
             errorMessage.value = ""
             successMessage.value = ""
             isSaving.value = true
-
             try {
-                // 验证密码
-                if (newPassword.value.isNotBlank() || confirmPassword.value.isNotBlank()) {
-                    if (currentPassword.value.isBlank()) {
-                        errorMessage.value = currentStrings["profile.password.required"]
+                core.recoverOperation({ failure ->
+                    errorMessage.value =
+                        currentStrings["profile.update.error"].format(
+                            failure.message ?: currentStrings["common.unknown.error"]
+                        )
+                }) {
+                    val invalid = validationError()
+                    if (invalid != null) {
+                        errorMessage.value = invalid
                         return@launch
                     }
-                    if (newPassword.value != confirmPassword.value) {
-                        errorMessage.value = currentStrings["profile.password.mismatch"]
-                        return@launch
-                    }
-                    // 与后端 PasswordValidator / Web 保持一致：只要求长度 8–64，不要求字符种类
-                    if (newPassword.value.length < 8) {
-                        errorMessage.value = currentStrings["profile.password.too.short"]
-                        return@launch
-                    }
+                    val updated =
+                        chatRepository.updateUserProfile(
+                            username.value,
+                            phone.value,
+                            signature.value,
+                            newPassword.value.takeIf { it.isNotBlank() },
+                        )
+                    if (!updateEmailIfNeeded()) return@launch
+                    if (updated) completeProfileUpdate(onSuccess)
+                    else errorMessage.value = currentStrings["profile.update.failed"]
                 }
-
-                // Validate username
-                if (username.value.isBlank()) {
-                    errorMessage.value = currentStrings["profile.username.required"]
-                    return@launch
-                }
-
-                // 1. 更新基本信息（用户名、电话、个性签名、密码）
-                val profileSuccess = chatRepository.updateUserProfile(
-                    username = username.value,
-                    phone = phone.value,
-                    signature = signature.value,
-                    password = newPassword.value.takeIf { it.isNotBlank() }
-                )
-
-                // 2. 如果邮箱有修改，更新邮箱
-                var emailSuccess = true
-                if (newEmail.value != email.value) {
-                    if (emailVerifyCode.value.isBlank()) {
-                        errorMessage.value = currentStrings["profile.code.required"]
-                        return@launch
-                    }
-                    emailSuccess = chatRepository.updateEmail(newEmail.value, emailVerifyCode.value)
-                    if (!emailSuccess) {
-                        errorMessage.value = currentStrings["profile.email.update.failed"]
-                        return@launch
-                    }
-                }
-
-                if (profileSuccess) {
-                    successMessage.value = currentStrings["profile.update.success"]
-
-                    // 重新获取用户信息
-                    val updatedUser = chatRepository.getCurrentUserProfile()
-                    if (updatedUser != null) {
-                        // 更新表单
-                        email.value = updatedUser.email ?: ""
-                        newEmail.value = updatedUser.email ?: ""
-                        phone.value = updatedUser.phone ?: ""
-                        signature.value = updatedUser.signature ?: ""
-                        emailVerifyCode.value = ""
-
-                        // 更新初始值
-                        initialUsername = updatedUser.username
-                        initialPhone = updatedUser.phone ?: ""
-                        initialSignature = updatedUser.signature ?: ""
-                        initialEmail = updatedUser.email ?: ""
-
-                        // 更新全局用户列表
-                        val currentUsers = chatViewModel.usersFlow.value.toMutableList()
-                        val index = currentUsers.indexOfFirst { it.id == updatedUser.id }
-                        if (index != -1) {
-                            currentUsers[index] = updatedUser
-                        } else {
-                            currentUsers.add(updatedUser)
-                        }
-                        chatViewModel.updateUsers(currentUsers.withAgentAssistant())
-                    }
-
-                    isEditing.value = false
-                    onSuccess()
-                } else {
-                    errorMessage.value = currentStrings["profile.update.failed"]
-                }
-            } catch (e: Exception) {
-                errorMessage.value = currentStrings["profile.update.error"].format(e.message ?: currentStrings["common.unknown.error"])
             } finally {
                 isSaving.value = false
             }
         }
     }
 
-    /**
-     * 上传头像
-     */
+    private fun validationError(): String? {
+        if (newPassword.value.isNotBlank() || confirmPassword.value.isNotBlank()) {
+            val passwordError =
+                when {
+                    currentPassword.value.isBlank() -> currentStrings["profile.password.required"]
+                    newPassword.value != confirmPassword.value ->
+                        currentStrings["profile.password.mismatch"]
+                    newPassword.value.length < 8 -> currentStrings["profile.password.too.short"]
+                    else -> null
+                }
+            if (passwordError != null) return passwordError
+        }
+        return if (username.value.isBlank()) currentStrings["profile.username.required"] else null
+    }
+
+    private suspend fun updateEmailIfNeeded(): Boolean =
+        if (newEmail.value == email.value) true
+        else if (emailVerifyCode.value.isBlank()) {
+            errorMessage.value = currentStrings["profile.code.required"]
+            false
+        } else {
+            val success = chatRepository.updateEmail(newEmail.value, emailVerifyCode.value)
+            if (!success) errorMessage.value = currentStrings["profile.email.update.failed"]
+            success
+        }
+
+    private suspend fun completeProfileUpdate(onSuccess: () -> Unit) {
+        successMessage.value = currentStrings["profile.update.success"]
+        val user = chatRepository.getCurrentUserProfile()
+        if (user != null) {
+            applyProfileFields(user)
+            emailVerifyCode.value = ""
+            val users = chatViewModel.usersFlow.value.toMutableList()
+            val index = users.indexOfFirst { it.id == user.id }
+            if (index != -1) users[index] = user else users.add(user)
+            chatViewModel.updateUsers(users.withAgentAssistant())
+        }
+        isEditing.value = false
+        onSuccess()
+    }
+
+    private fun applyProfileFields(user: model.User) {
+        email.value = user.email.orEmpty()
+        newEmail.value = user.email.orEmpty()
+        phone.value = user.phone.orEmpty()
+        signature.value = user.signature.orEmpty()
+        initialUsername = user.username
+        initialPhone = user.phone.orEmpty()
+        initialSignature = user.signature.orEmpty()
+        initialEmail = user.email.orEmpty()
+    }
+
+    /** 上传头像 */
     fun uploadAvatar(imageBytes: ByteArray, fileName: String) {
         coroutineScope.launch {
             errorMessage.value = ""
@@ -253,40 +233,45 @@ class ProfileViewModel(
             isUploadingAvatar.value = true
 
             try {
-                // 前端先检查文件大小，超过10MB直接提示（避免413错误）
-                val maxSize = 10 * 1024 * 1024 // 10MB
-                if (imageBytes.size > maxSize) {
-                    errorMessage.value = currentStrings["profile.avatar.upload.size.limit"]
-                    return@launch
-                }
-
-                // 上传裁剪后的头像
-                val avatarUrl = FileUploader.uploadAvatar(imageBytes, fileName)
-                if (avatarUrl != null) {
-                    // Re-load avatar
-                    avatarBitmap.value = loadImageBitmapWithCache(avatarUrl, null)
-                    successMessage.value = currentStrings["profile.avatar.upload.success"]
-
-                    // 更新用户信息
-                    val currentUser = (_uiState.value as? ProfileUiState.Success)?.user
-                    currentUser?.let {
-                        val updatedUser = it.copy(avatarUrl = avatarUrl)
-                        _uiState.value = ProfileUiState.Success(updatedUser)
+                core.recoverOperation(
+                    onFailure = { e ->
+                        errorMessage.value =
+                            currentStrings["profile.avatar.upload.failed.with.error"].format(
+                                e.message ?: currentStrings["common.unknown.error"]
+                            )
                     }
-                } else {
-                    errorMessage.value = currentStrings["profile.avatar.upload.failed"]
+                ) {
+                    // 前端先检查文件大小，超过10MB直接提示（避免413错误）
+                    val maxSize = 10 * 1024 * 1024 // 10MB
+                    if (imageBytes.size > maxSize) {
+                        errorMessage.value = currentStrings["profile.avatar.upload.size.limit"]
+                        return@launch
+                    }
+
+                    // 上传裁剪后的头像
+                    val avatarUrl = FileUploader.uploadAvatar(imageBytes, fileName)
+                    if (avatarUrl != null) {
+                        // Re-load avatar
+                        avatarBitmap.value = loadImageBitmapWithCache(avatarUrl, null)
+                        successMessage.value = currentStrings["profile.avatar.upload.success"]
+
+                        // 更新用户信息
+                        val currentUser = (_uiState.value as? ProfileUiState.Success)?.user
+                        currentUser?.let {
+                            val updatedUser = it.copy(avatarUrl = avatarUrl)
+                            _uiState.value = ProfileUiState.Success(updatedUser)
+                        }
+                    } else {
+                        errorMessage.value = currentStrings["profile.avatar.upload.failed"]
+                    }
                 }
-            } catch (e: Exception) {
-                errorMessage.value = currentStrings["profile.avatar.upload.failed.with.error"].format(e.message ?: currentStrings["common.unknown.error"])
             } finally {
                 isUploadingAvatar.value = false
             }
         }
     }
 
-    /**
-     * 进入编辑模式
-     */
+    /** 进入编辑模式 */
     fun enterEditMode() {
         // 保存当前值作为还原基准
         initialUsername = username.value
@@ -297,11 +282,11 @@ class ProfileViewModel(
     }
 }
 
-/**
- * 个人资料UI状态
- */
+/** 个人资料UI状态 */
 sealed class ProfileUiState {
     object Loading : ProfileUiState()
+
     data class Success(val user: User) : ProfileUiState()
+
     data class Error(val message: String) : ProfileUiState()
 }

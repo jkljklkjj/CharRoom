@@ -6,11 +6,8 @@ import java.nio.ByteOrder
 /**
  * QUIC Stream 帧编解码器。
  *
- * 帧格式：
- * ┌───────────────────────────────────┐
- * │ Frame Length (4 bytes, big-endian)│
- * ├───────────────────────────────────┤
- * │ protobuf MessageWrapper bytes     │
+ * 帧格式： ┌───────────────────────────────────┐ │ Frame Length (4 bytes, big-endian)│
+ * ├───────────────────────────────────┤ │ protobuf MessageWrapper bytes │
  * └───────────────────────────────────┘
  */
 object QuicStreamProtocol {
@@ -22,7 +19,10 @@ object QuicStreamProtocol {
         private val header = ByteBuffer.allocate(FRAME_HEADER_SIZE).order(ByteOrder.BIG_ENDIAN)
         private var payload: ByteBuffer? = null
 
-        fun reset() { header.clear(); payload = null }
+        fun reset() {
+            header.clear()
+            payload = null
+        }
 
         fun decode(bytes: ByteArray): List<ByteArray> {
             val frames = mutableListOf<ByteArray>()
@@ -37,7 +37,9 @@ object QuicStreamProtocol {
                         header.flip()
                         val length = header.int
                         header.clear()
-                        require(length in 1..MAX_FRAME_SIZE) { "Invalid QUIC frame length: $length" }
+                        require(length in 1..MAX_FRAME_SIZE) {
+                            "Invalid QUIC frame length: $length"
+                        }
                         payload = ByteBuffer.allocate(length)
                     } else {
                         frames.add(destination.array())
@@ -59,6 +61,7 @@ object QuicStreamProtocol {
 
     /**
      * 编码消息为 QUIC 帧字节数组。
+     *
      * @param payload protobuf 序列化后的 MessageWrapper 字节
      * @return 含长度前缀的完整帧
      */
@@ -70,26 +73,22 @@ object QuicStreamProtocol {
         return buf.array()
     }
 
-    /**
-     * 从字节数组解码一帧。
-     * @param data 包含帧数据的字节数组
-     * @param offset 起始偏移
-     * @return Pair(解码后的负载, 消耗的字节数)，或 null 如果数据不足
-     */
     fun decodeFrame(data: ByteArray, offset: Int = 0): Pair<ByteArray, Int>? {
         require(offset in 0..data.size)
         if (data.size - offset < FRAME_HEADER_SIZE) return null
-        val buf = ByteBuffer.wrap(data, offset, data.size - offset).order(ByteOrder.BIG_ENDIAN)
-        val frameLen = buf.getInt()
-        if (frameLen <= 0 || frameLen > MAX_FRAME_SIZE) return null
-        if (buf.remaining() < frameLen) return null
-        val payload = ByteArray(frameLen)
-        buf.get(payload)
-        return payload to (FRAME_HEADER_SIZE + frameLen)
+        val buffer = ByteBuffer.wrap(data, offset, data.size - offset).order(ByteOrder.BIG_ENDIAN)
+        val size = buffer.getInt()
+        val validSize = size in 1..MAX_FRAME_SIZE
+        return if (validSize && buffer.remaining() >= size) {
+            val payload = ByteArray(size)
+            buffer.get(payload)
+            payload to (FRAME_HEADER_SIZE + size)
+        } else null
     }
 
     /**
      * 创建 Stream 初始化帧（用于首次打开聊天流时发送元数据）。
+     *
      * @param conversationType 会话类型: "private" / "group" / "agent"
      * @param targetId 目标 ID
      * @return 完整帧字节数组

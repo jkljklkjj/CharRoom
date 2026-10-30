@@ -1,20 +1,14 @@
 package component
-import core.AppLogger
-
-import component.chat.ChatApp
-import presentation.viewmodel.AuthViewModel
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
@@ -24,32 +18,30 @@ import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.unit.Dp
+import com.chatlite.i18n.LocalStrings
+import component.chat.ChatApp
+import core.AppLogger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.chatlite.i18n.LocalStrings
 import org.koin.compose.koinInject
+import presentation.viewmodel.AuthViewModel
 
-/**
- * 登录或注册界面
- * UI层只负责渲染和事件转发，业务逻辑由AuthViewModel处理
- */
+/** 登录或注册界面 UI层只负责渲染和事件转发，业务逻辑由AuthViewModel处理 */
 @Composable
 fun LoginRegisterApp(
     isDarkMode: Boolean,
-    onToggleDarkMode: () -> Unit,
     onBackPressed: ((() -> Boolean) -> Unit)? = null,
     authViewModel: AuthViewModel = koinInject(),
     navigationRequest: model.ChatNavigationRequest? = null,
-    onNavigationHandled: () -> Unit = {}
+    onNavigationHandled: () -> Unit = {},
 ) {
     component.update.UpdateHost()
     var isLogin by remember { mutableStateOf(true) }
@@ -102,25 +94,26 @@ fun LoginRegisterApp(
             val authenticatedState = authState as core.state.AuthState.Authenticated
             // 使用BoxWithConstraints跨平台获取屏幕尺寸
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val windowSize = DpSize(
-                    width = maxWidth,
-                    height = maxHeight
-                )
+                val windowSize =
+                    DpSize(
+                        width = maxWidth,
+                        height = maxHeight,
+                    )
 
                 // 调试日志：输出屏幕尺寸
                 LaunchedEffect(Unit) {
-                    AppLogger.d("Screen size: ${windowSize.width} x ${windowSize.height}, isSmallScreen: ${windowSize.width < 600.dp}")
+                    AppLogger.d(
+                        "Screen size: ${windowSize.width} x ${windowSize.height}, isSmallScreen: ${windowSize.width < 600.dp}"
+                    )
                 }
 
                 ChatApp(
                     windowSize = windowSize,
                     token = authenticatedState.accessToken,
-                    isDarkMode = isDarkMode,
-                    onToggleDarkMode = onToggleDarkMode,
                     onLogout = ::handleLogout,
                     onBackPressed = onBackPressed,
                     navigationRequest = navigationRequest,
-                    onNavigationHandled = onNavigationHandled
+                    onNavigationHandled = onNavigationHandled,
                 )
             }
         }
@@ -128,22 +121,27 @@ fun LoginRegisterApp(
             // 根据认证状态更新提示消息
             LaunchedEffect(authState) {
                 isSuccessMessage = false
-                message = when (authState) {
-                    is core.state.AuthState.Loading -> s["login.logging.in"]
-                    is core.state.AuthState.Error -> (authState as core.state.AuthState.Error).message
-                    else -> message
-                }
+                message =
+                    when (authState) {
+                        is core.state.AuthState.Loading -> s["login.logging.in"]
+                        is core.state.AuthState.Error ->
+                            (authState as core.state.AuthState.Error).message
+                        else -> message
+                    }
             }
 
             val isSubmitting = authState is core.state.AuthState.Loading
 
             Box(
-                modifier = Modifier.fillMaxSize().background(immersiveBackgroundBrush(isDarkMode)).verticalScroll(rememberScrollState()),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier.fillMaxSize()
+                        .background(immersiveBackgroundBrush(isDarkMode))
+                        .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.Center,
             ) {
                 Column(
                     modifier = Modifier.widthIn(max = 380.dp).padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // Brand header - just title
                     Text(
@@ -155,7 +153,7 @@ fun LoginRegisterApp(
                     Text(
                         text = if (isLogin) s["login.title"] else s["register.title"],
                         style = MaterialTheme.typography.subtitle1,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                     )
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -164,45 +162,56 @@ fun LoginRegisterApp(
                         modifier = Modifier.fillMaxWidth(),
                         color = MaterialTheme.colors.surface.copy(alpha = 0.85f),
                         shape = RoundedCornerShape(16.dp),
-                        elevation = 0.dp
+                        elevation = 0.dp,
                     ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp)
-                        ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
                             // 账号/用户名
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
                                 shape = RoundedCornerShape(10.dp),
-                                elevation = 0.dp
+                                elevation = 0.dp,
                             ) {
                                 TextField(
                                     value = if (isLogin) account else username,
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }),
+                                    keyboardActions =
+                                        KeyboardActions(
+                                            onNext = {
+                                                focusManager.moveFocus(
+                                                    androidx.compose.ui.focus.FocusDirection.Next
+                                                )
+                                            }
+                                        ),
                                     onValueChange = {
                                         if (isLogin) account = it else username = it
                                     },
-                                    placeholder = { Text(
-                                        if (isLogin) s["login.account"] else s["login.username"],
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)
-                                    ) },
+                                    placeholder = {
+                                        Text(
+                                            if (isLogin) s["login.account"]
+                                            else s["login.username"],
+                                            color =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                        )
+                                    },
                                     enabled = !isSubmitting,
-                                    colors = TextFieldDefaults.textFieldColors(
-                                        backgroundColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent,
-                                        cursorColor = MaterialTheme.colors.primary
-                                    ),
+                                    colors =
+                                        TextFieldDefaults.textFieldColors(
+                                            backgroundColor = Color.Transparent,
+                                            focusedIndicatorColor = Color.Transparent,
+                                            unfocusedIndicatorColor = Color.Transparent,
+                                            cursorColor = MaterialTheme.colors.primary,
+                                        ),
                                     singleLine = true,
                                     leadingIcon = {
                                         Icon(
                                             Icons.Default.Person,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
-                                            modifier = Modifier.size(20.dp)
+                                            tint =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(20.dp),
                                         )
-                                    }
+                                    },
                                 )
                             }
                             Spacer(modifier = Modifier.height(12.dp))
@@ -212,31 +221,50 @@ fun LoginRegisterApp(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
                                 shape = RoundedCornerShape(10.dp),
-                                elevation = 0.dp
+                                elevation = 0.dp,
                             ) {
                                 TextField(
                                     value = password,
                                     onValueChange = { password = it },
-                                    placeholder = { Text(s["login.password"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                                    placeholder = {
+                                        Text(
+                                            s["login.password"],
+                                            color =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                        )
+                                    },
                                     visualTransformation = PasswordVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }),
+                                    keyboardOptions =
+                                        KeyboardOptions(
+                                            keyboardType = KeyboardType.Password,
+                                            imeAction = ImeAction.Next,
+                                        ),
+                                    keyboardActions =
+                                        KeyboardActions(
+                                            onNext = {
+                                                focusManager.moveFocus(
+                                                    androidx.compose.ui.focus.FocusDirection.Next
+                                                )
+                                            }
+                                        ),
                                     enabled = !isSubmitting,
-                                    colors = TextFieldDefaults.textFieldColors(
-                                        backgroundColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent,
-                                        cursorColor = MaterialTheme.colors.primary
-                                    ),
+                                    colors =
+                                        TextFieldDefaults.textFieldColors(
+                                            backgroundColor = Color.Transparent,
+                                            focusedIndicatorColor = Color.Transparent,
+                                            unfocusedIndicatorColor = Color.Transparent,
+                                            cursorColor = MaterialTheme.colors.primary,
+                                        ),
                                     singleLine = true,
                                     leadingIcon = {
                                         Icon(
                                             Icons.Default.Lock,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
-                                            modifier = Modifier.size(20.dp)
+                                            tint =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(20.dp),
                                         )
-                                    }
+                                    },
                                 )
                             }
 
@@ -247,30 +275,54 @@ fun LoginRegisterApp(
                                     modifier = Modifier.fillMaxWidth(),
                                     color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
                                     shape = RoundedCornerShape(10.dp),
-                                    elevation = 0.dp
+                                    elevation = 0.dp,
                                 ) {
                                     TextField(
                                         value = email,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }),
+                                        keyboardOptions =
+                                            KeyboardOptions(
+                                                keyboardType = KeyboardType.Email,
+                                                imeAction = ImeAction.Next,
+                                            ),
+                                        keyboardActions =
+                                            KeyboardActions(
+                                                onNext = {
+                                                    focusManager.moveFocus(
+                                                        androidx.compose.ui.focus.FocusDirection
+                                                            .Next
+                                                    )
+                                                }
+                                            ),
                                         onValueChange = { email = it },
-                                        placeholder = { Text(s["login.email"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                                        placeholder = {
+                                            Text(
+                                                s["login.email"],
+                                                color =
+                                                    MaterialTheme.colors.onSurface.copy(
+                                                        alpha = 0.4f
+                                                    ),
+                                            )
+                                        },
                                         enabled = !isSubmitting,
-                                        colors = TextFieldDefaults.textFieldColors(
-                                            backgroundColor = Color.Transparent,
-                                            focusedIndicatorColor = Color.Transparent,
-                                            unfocusedIndicatorColor = Color.Transparent,
-                                            cursorColor = MaterialTheme.colors.primary
-                                        ),
+                                        colors =
+                                            TextFieldDefaults.textFieldColors(
+                                                backgroundColor = Color.Transparent,
+                                                focusedIndicatorColor = Color.Transparent,
+                                                unfocusedIndicatorColor = Color.Transparent,
+                                                cursorColor = MaterialTheme.colors.primary,
+                                            ),
                                         singleLine = true,
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.Email,
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
-                                                modifier = Modifier.size(20.dp)
+                                                tint =
+                                                    MaterialTheme.colors.onSurface.copy(
+                                                        alpha = 0.4f
+                                                    ),
+                                                modifier = Modifier.size(20.dp),
                                             )
-                                        }
+                                        },
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -281,30 +333,49 @@ fun LoginRegisterApp(
                                         modifier = Modifier.weight(1f),
                                         color = MaterialTheme.colors.onSurface.copy(alpha = 0.04f),
                                         shape = RoundedCornerShape(10.dp),
-                                        elevation = 0.dp
+                                        elevation = 0.dp,
                                     ) {
                                         TextField(
                                             value = verifyCode,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                            keyboardOptions =
+                                                KeyboardOptions(
+                                                    keyboardType = KeyboardType.Number,
+                                                    imeAction = ImeAction.Done,
+                                                ),
+                                            keyboardActions =
+                                                KeyboardActions(
+                                                    onDone = { focusManager.clearFocus() }
+                                                ),
                                             onValueChange = { verifyCode = it },
-                                            placeholder = { Text(s["login.verify.code"], color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                                            placeholder = {
+                                                Text(
+                                                    s["login.verify.code"],
+                                                    color =
+                                                        MaterialTheme.colors.onSurface.copy(
+                                                            alpha = 0.4f
+                                                        ),
+                                                )
+                                            },
                                             enabled = !isSubmitting,
-                                            colors = TextFieldDefaults.textFieldColors(
-                                                backgroundColor = Color.Transparent,
-                                                focusedIndicatorColor = Color.Transparent,
-                                                unfocusedIndicatorColor = Color.Transparent,
-                                                cursorColor = MaterialTheme.colors.primary
-                                            ),
+                                            colors =
+                                                TextFieldDefaults.textFieldColors(
+                                                    backgroundColor = Color.Transparent,
+                                                    focusedIndicatorColor = Color.Transparent,
+                                                    unfocusedIndicatorColor = Color.Transparent,
+                                                    cursorColor = MaterialTheme.colors.primary,
+                                                ),
                                             singleLine = true,
                                             leadingIcon = {
                                                 Icon(
                                                     Icons.Default.VerifiedUser,
                                                     contentDescription = null,
-                                                    tint = MaterialTheme.colors.onSurface.copy(alpha = 0.4f),
-                                                    modifier = Modifier.size(20.dp)
+                                                    tint =
+                                                        MaterialTheme.colors.onSurface.copy(
+                                                            alpha = 0.4f
+                                                        ),
+                                                    modifier = Modifier.size(20.dp),
                                                 )
-                                            }
+                                            },
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -318,38 +389,49 @@ fun LoginRegisterApp(
                                             }
                                             isSendingCode = true
                                             authViewModel.sendRegisterVerifyCode(email) { result ->
-                                                result.onSuccess {
-                                                    message = s["login.code.sent"]
-                                                    countdownTime = 60
-                                                    scope.launch {
-                                                        while (countdownTime > 0) {
-                                                            delay(1000)
-                                                            countdownTime--
+                                                result
+                                                    .onSuccess {
+                                                        message = s["login.code.sent"]
+                                                        countdownTime = 60
+                                                        scope.launch {
+                                                            while (countdownTime > 0) {
+                                                                delay(1000)
+                                                                countdownTime--
+                                                            }
+                                                            isSendingCode = false
                                                         }
+                                                    }
+                                                    .onFailure {
+                                                        message =
+                                                            s["login.code.send.failed"].format(
+                                                                it.message
+                                                            )
                                                         isSendingCode = false
                                                     }
-                                                }.onFailure {
-                                                    message = s["login.code.send.failed"].format(it.message)
-                                                    isSendingCode = false
-                                                }
                                             }
                                         },
-                                        enabled = !isSubmitting && !isSendingCode && countdownTime == 0,
+                                        enabled =
+                                            !isSubmitting && !isSendingCode && countdownTime == 0,
                                         interactionSource = codeInteraction,
-                                        modifier = Modifier
-                                            .height(48.dp)
-                                            .graphicsLayer { scaleX = codeScale; scaleY = codeScale },
+                                        modifier =
+                                            Modifier.height(48.dp).graphicsLayer {
+                                                scaleX = codeScale
+                                                scaleY = codeScale
+                                            },
                                         shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            backgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.9f),
-                                            contentColor = MaterialTheme.colors.onPrimary
-                                        )
+                                        colors =
+                                            ButtonDefaults.buttonColors(
+                                                backgroundColor =
+                                                    MaterialTheme.colors.primary.copy(alpha = 0.9f),
+                                                contentColor = MaterialTheme.colors.onPrimary,
+                                            ),
                                     ) {
                                         Text(
-                                            if (countdownTime > 0) s["login.send.code.resend"].format(countdownTime)
+                                            if (countdownTime > 0)
+                                                s["login.send.code.resend"].format(countdownTime)
                                             else if (isSendingCode) s["login.send.code.sending"]
                                             else s["login.send.code"],
-                                            maxLines = 1
+                                            maxLines = 1,
                                         )
                                     }
                                 }
@@ -363,15 +445,16 @@ fun LoginRegisterApp(
                                         checked = rememberMe,
                                         onCheckedChange = { rememberMe = it },
                                         enabled = !isSubmitting,
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = MaterialTheme.colors.primary
-                                        )
+                                        colors =
+                                            CheckboxDefaults.colors(
+                                                checkedColor = MaterialTheme.colors.primary
+                                            ),
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = s["login.remember.me"],
                                         style = MaterialTheme.typography.body2,
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
                                     )
                                 }
                             }
@@ -380,7 +463,8 @@ fun LoginRegisterApp(
 
                             // 提交按钮
                             val submitInteraction = remember { MutableInteractionSource() }
-                            val submitScale = rememberElasticScale(submitInteraction, pressedScale = 0.96f)
+                            val submitScale =
+                                rememberElasticScale(submitInteraction, pressedScale = 0.96f)
                             Button(
                                 onClick = {
                                     if (isSubmitting) return@Button
@@ -409,46 +493,57 @@ fun LoginRegisterApp(
                                             message = s["login.code.empty"]
                                             return@Button
                                         }
-                                        authViewModel.verifyRegister(name, pwd, emailText, code) { result ->
-                                            result.onSuccess { accountId ->
-                                                account = accountId.toString()
-                                                message = s["login.register.success"].format(accountId)
-                                                isSuccessMessage = true
-                                                isLogin = true
-                                                password = ""
-                                                email = ""
-                                                verifyCode = ""
-                                            }.onFailure {
-                                                message = s["login.register.failed"].format(it.message ?: s["login.retry.later"])
-                                            }
+                                        authViewModel.verifyRegister(name, pwd, emailText, code) {
+                                            result ->
+                                            result
+                                                .onSuccess { accountId ->
+                                                    account = accountId.toString()
+                                                    message =
+                                                        s["login.register.success"].format(
+                                                            accountId
+                                                        )
+                                                    isSuccessMessage = true
+                                                    isLogin = true
+                                                    password = ""
+                                                    email = ""
+                                                    verifyCode = ""
+                                                }
+                                                .onFailure {
+                                                    message =
+                                                        s["login.register.failed"].format(
+                                                            it.message ?: s["login.retry.later"]
+                                                        )
+                                                }
                                         }
                                     }
                                 },
                                 enabled = !isSubmitting,
                                 interactionSource = submitInteraction,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp)
-                                    .graphicsLayer { scaleX = submitScale; scaleY = submitScale },
+                                modifier =
+                                    Modifier.fillMaxWidth().height(46.dp).graphicsLayer {
+                                        scaleX = submitScale
+                                        scaleY = submitScale
+                                    },
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    backgroundColor = MaterialTheme.colors.primary,
-                                    contentColor = MaterialTheme.colors.onPrimary,
-                                    disabledBackgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.45f)
-                                )
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        backgroundColor = MaterialTheme.colors.primary,
+                                        contentColor = MaterialTheme.colors.onPrimary,
+                                        disabledBackgroundColor =
+                                            MaterialTheme.colors.primary.copy(alpha = 0.45f),
+                                    ),
                             ) {
                                 if (isSubmitting) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(18.dp),
                                         strokeWidth = 2.dp,
-                                        color = MaterialTheme.colors.onPrimary
+                                        color = MaterialTheme.colors.onPrimary,
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
                                 Text(
                                     if (isSubmitting) s["login.processing"]
-                                    else if (isLogin) s["login.title"]
-                                    else s["register.title"]
+                                    else if (isLogin) s["login.title"] else s["register.title"]
                                 )
                             }
                         }
@@ -476,11 +571,17 @@ fun LoginRegisterApp(
                         },
                         enabled = !isSubmitting,
                         interactionSource = toggleInteraction,
-                        modifier = Modifier.graphicsLayer { scaleX = toggleScale; scaleY = toggleScale }
+                        modifier =
+                            Modifier.graphicsLayer {
+                                scaleX = toggleScale
+                                scaleY = toggleScale
+                            },
                     ) {
                         Text(
-                            text = if (isLogin) s["login.switch.to.register"] else s["register.switch.to.login"],
-                            color = MaterialTheme.colors.primary.copy(alpha = 0.8f)
+                            text =
+                                if (isLogin) s["login.switch.to.register"]
+                                else s["register.switch.to.login"],
+                            color = MaterialTheme.colors.primary.copy(alpha = 0.8f),
                         )
                     }
 
@@ -488,16 +589,19 @@ fun LoginRegisterApp(
                     if (message.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Surface(
-                            color = if (isSuccessMessage) Color(0xFF4CAF50).copy(alpha = 0.1f)
-                                    else MaterialTheme.colors.error.copy(alpha = 0.1f),
+                            color =
+                                if (isSuccessMessage) Color(0xFF4CAF50).copy(alpha = 0.1f)
+                                else MaterialTheme.colors.error.copy(alpha = 0.1f),
                             shape = RoundedCornerShape(8.dp),
-                            elevation = 0.dp
+                            elevation = 0.dp,
                         ) {
                             Text(
                                 text = message,
-                                color = if (isSuccessMessage) Color(0xFF2E7D32) else MaterialTheme.colors.error,
+                                color =
+                                    if (isSuccessMessage) Color(0xFF2E7D32)
+                                    else MaterialTheme.colors.error,
                                 style = MaterialTheme.typography.body2,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             )
                         }
                     }

@@ -1,3 +1,4 @@
+// 平台信息
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -7,123 +8,62 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
+import com.chatlite.i18n.currentStrings
+import component.BackHandlerImpl
+import component.DesktopAvatarCropDialog
+import component.DesktopBackHandler
+import component.DesktopFilePicker
+import component.dialog.AvatarCropDialogImpl
+import component.io.FilePicker
 import component.settings.CurrentPlatform
-import component.settings.Platform
-import core.MessageReceiveListener
+import component.settings.Platform as AppPlatform
 import core.Chat
+import core.DesktopImageLoader
+import core.DesktopLocalChatHistoryStore
+import core.GlobalAppUpdateManager
+import core.ImageLoaderImpl
+import core.LocalChatHistoryStore
+import core.MessageReceiveListener
+import core.di.KoinInitializer
+import core.di.desktopModule
+import core.initAppUpdateManager
+import data.datasource.local.DesktopFileProvider
+import data.datasource.local.fileProvider
 import java.awt.SystemTray
-import presentation.viewmodel.ChatViewModel
 import java.awt.Toolkit
 import java.awt.TrayIcon
 import java.util.prefs.Preferences
-import com.chatlite.i18n.currentStrings
-import component.BackHandlerImpl
-import data.datasource.local.DesktopFileProvider
-import data.datasource.local.fileProvider
-import component.DesktopBackHandler
-import component.DesktopFilePicker
-import component.io.FilePicker
-import core.DesktopImageLoader
-import core.GlobalAppUpdateManager
-import core.ImageLoaderImpl
-import core.DesktopLocalChatHistoryStore
-import core.LocalChatHistoryStore
-import core.Chat
-import core.di.desktopModule
-import component.DesktopAvatarCropDialog
-import component.dialog.AvatarCropDialogImpl
-import core.di.KoinInitializer
-import core.initAppUpdateManager
+import presentation.viewmodel.ChatViewModel
 
-// 平台信息
-import component.settings.CurrentPlatform
-import component.settings.Platform as AppPlatform
-
-/**
- * 桌面端应用入口
- * 实现系统托盘、全局快捷键、消息通知、窗口状态记忆等功能
- */
+/** 桌面端应用入口 实现系统托盘、全局快捷键、消息通知、窗口状态记忆等功能 */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() = application {
-    // 初始化依赖注入（含桌面平台模块）并从 DI 获取 QUIC 传输层实例
-    val koin = KoinInitializer.init(platformModules = listOf(desktopModule)).koin
-    Chat = koin.get()
-
-    // 初始化跨平台接口实现
-    BackHandlerImpl = DesktopBackHandler
-    FilePicker = DesktopFilePicker
-    ImageLoaderImpl = DesktopImageLoader
-    LocalChatHistoryStore = DesktopLocalChatHistoryStore
-    AvatarCropDialogImpl = DesktopAvatarCropDialog
-    data.datasource.local.fileProvider = DesktopFileProvider()
-
-    // 初始化平台信息
-    CurrentPlatform = AppPlatform.DESKTOP
+    initializeDesktopPlatform()
 
     // 初始化应用更新管理器
-    val updater = remember { initAppUpdateManager(); GlobalAppUpdateManager }
+    val updater = remember {
+        initAppUpdateManager()
+        GlobalAppUpdateManager
+    }
     androidx.compose.runtime.DisposableEffect(updater) { onDispose { updater.close() } }
 
-    // 窗口状态记忆
     val prefs = Preferences.userNodeForPackage(javaClass)
-    // 读取窗口状态，默认使用浮动窗口（避免默认全屏）
-    val savedPlacement = prefs.getInt("window_placement", WindowPlacement.Floating.ordinal)
-    val windowState = rememberWindowState(
-        width = prefs.get("window_width", "900")?.toInt()?.dp ?: 900.dp,
-        height = prefs.get("window_height", "700")?.toInt()?.dp ?: 700.dp,
-        placement = if (savedPlacement == WindowPlacement.Fullscreen.ordinal) {
-            WindowPlacement.Floating // 禁止默认全屏，首次打开使用浮动窗口
-        } else {
-            WindowPlacement.entries[savedPlacement]
-        }
-    )
+    val windowState = rememberDesktopWindowState(prefs)
 
     // 窗口可见状态
     var isWindowVisible by remember { mutableStateOf(true) }
-    LaunchedEffect(isWindowVisible,windowState.isMinimized) {
-        core.AppActivity.foreground(isWindowVisible&&!windowState.isMinimized)
+    LaunchedEffect(isWindowVisible, windowState.isMinimized) {
+        core.AppActivity.foreground(isWindowVisible && !windowState.isMinimized)
     }
 
-    // 系统托盘初始化
-    val trayState = rememberTrayState()
-    val notificationManager = remember { DesktopNotificationManager() }
-
-    LaunchedEffect(Unit) {
-        // 注册消息接收监听器
-        Chat.addMessageReceiveListener(notificationManager)
-    }
-
-    // 系统托盘
-    @Suppress("DEPRECATION")
-    val trayIcon = painterResource("icons/ic_notification.svg")
-    Tray(
-        state = trayState,
-        icon = trayIcon,
-        // AWT Tray Menu does not support keyboard shortcuts; omit `shortcut` here to avoid
-        // UnsupportedOperationException on some JDKs/platforms.
-        menu = {
-            Item(
-                text = currentStrings["tray.open.window"],
-                onClick = { isWindowVisible = true }
-            )
-            Item(
-                text = currentStrings["tray.notifications"],
-                onClick = { /* open notification settings */ }
-            )
-            Separator()
-            Item(
-                text = currentStrings["tray.quit"],
-                onClick = ::exitApplication
-            )
-        },
-        onAction = {
-            // 点击托盘图标显示/隐藏窗口
-            isWindowVisible = !isWindowVisible
-        }
+    InstallDesktopNotifications()
+    DesktopTray(
+        onOpen = { isWindowVisible = true },
+        onQuit = ::exitApplication,
+        onToggle = { isWindowVisible = !isWindowVisible },
     )
 
-    @Suppress("DEPRECATION")
-    val appIcon = painterResource("icons/ic_launcher.svg")
+    @Suppress("DEPRECATION") val appIcon = painterResource("icons/ic_launcher.svg")
 
     if (isWindowVisible) {
         Window(
@@ -139,7 +79,7 @@ fun main() = application {
             },
             title = currentStrings["app.name"],
             state = windowState,
-            icon = appIcon
+            icon = appIcon,
         ) {
             // 注册文件选择器
             FilePicker.Register()
@@ -150,23 +90,24 @@ fun main() = application {
     }
 }
 
-/**
- * 桌面端通知管理器
- */
+/** 桌面端通知管理器 */
 class DesktopNotificationManager : MessageReceiveListener {
     private val systemTray = if (SystemTray.isSupported()) SystemTray.getSystemTray() else null
     private val trayIcon: TrayIcon?
 
     init {
         // 初始化系统托盘图标
-        trayIcon = try {
-            val image = Toolkit.getDefaultToolkit().getImage(javaClass.getResource("/icons/ic_notification.png"))
-            TrayIcon(image, currentStrings["app.name"]).apply {
-                isImageAutoSize = true
+        trayIcon =
+            try {
+                val image =
+                    Toolkit.getDefaultToolkit()
+                        .getImage(javaClass.getResource("/icons/ic_notification.png"))
+                TrayIcon(image, currentStrings["app.name"]).apply {
+                    isImageAutoSize = true
+                }
+            } catch (_: Exception) {
+                null
             }
-        } catch (_: Exception) {
-            null
-        }
 
         try {
             trayIcon?.let { systemTray?.add(it) }
@@ -176,33 +117,66 @@ class DesktopNotificationManager : MessageReceiveListener {
     }
 
     override fun onPrivateEnvelope(message: model.Message) {
-        if (!message.sender) onPrivateMessageReceived(message.senderId, message.message, message.timestamp, message.seqId, message.conversationId)
+        if (!message.sender)
+            onPrivateMessageReceived(
+                message.senderId,
+                message.message,
+                message.timestamp,
+                message.seqId,
+                message.conversationId,
+            )
     }
 
     override fun onGroupEnvelope(message: model.GroupMessage) {
-        if (message.senderId != core.state.GlobalAppState.currentUserId) onGroupMessageReceived(
-            message.groupId, message.senderId, message.senderName, message.text, message.timestamp, message.seqId, message.conversationId)
+        if (message.senderId != core.state.GlobalAppState.currentUserId)
+            onGroupMessageReceived(
+                message.groupId,
+                message.senderId,
+                message.senderName,
+                message.text,
+                message.timestamp,
+                message.seqId,
+                message.conversationId,
+            )
     }
 
-    override fun onPrivateMessageReceived(senderId: Int, message: String, timestamp: Long,
-                                          seqId: Long, conversationId: String) {
-        val chatViewModel: ChatViewModel = org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
+    override fun onPrivateMessageReceived(
+        senderId: Int,
+        message: String,
+        timestamp: Long,
+        seqId: Long,
+        conversationId: String,
+    ) {
+        val chatViewModel: ChatViewModel =
+            org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
         val sender = chatViewModel.usersFlow.value.find { !it.isGroup && it.id == senderId }
         val senderName = sender?.username ?: currentStrings["tray.stranger"]
         showNotification(currentStrings["tray.new.message"], "$senderName: $message")
     }
 
-    override fun onGroupMessageReceived(groupId: Int, senderId: Int, senderName: String, message: String, timestamp: Long,
-                                        seqId: Long, conversationId: String) {
-        val chatViewModel: ChatViewModel = org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
-        val group = chatViewModel.usersFlow.value.find { it.conversationKey == model.ConversationKey.group(groupId) }
+    override fun onGroupMessageReceived(
+        groupId: Int,
+        senderId: Int,
+        senderName: String,
+        message: String,
+        timestamp: Long,
+        seqId: Long,
+        conversationId: String,
+    ) {
+        val chatViewModel: ChatViewModel =
+            org.koin.java.KoinJavaComponent.get(ChatViewModel::class.java)
+        val group =
+            chatViewModel.usersFlow.value.find {
+                it.conversationKey == model.ConversationKey.group(groupId)
+            }
         val groupName = group?.username ?: currentStrings["tray.group"]
-        showNotification(currentStrings["tray.group.message"].format(groupName), "$senderName: $message")
+        showNotification(
+            currentStrings["tray.group.message"].format(groupName),
+            "$senderName: $message",
+        )
     }
 
-    /**
-     * 显示桌面通知
-     */
+    /** 显示桌面通知 */
     private fun showNotification(title: String, content: String) {
         try {
             trayIcon?.displayMessage(title, content, TrayIcon.MessageType.INFO)
@@ -210,4 +184,85 @@ class DesktopNotificationManager : MessageReceiveListener {
             // 通知不支持，忽略
         }
     }
+}
+
+private fun initializeDesktopPlatform() {
+    // 初始化依赖注入（含桌面平台模块）并从 DI 获取 QUIC 传输层实例
+    val koin = KoinInitializer.init(platformModules = listOf(desktopModule)).koin
+    Chat = koin.get()
+
+    // 初始化跨平台接口实现
+    BackHandlerImpl = DesktopBackHandler
+    FilePicker = DesktopFilePicker
+    ImageLoaderImpl = DesktopImageLoader
+    LocalChatHistoryStore = DesktopLocalChatHistoryStore
+    AvatarCropDialogImpl = DesktopAvatarCropDialog
+    data.datasource.local.fileProvider = DesktopFileProvider()
+
+    // 初始化平台信息
+    CurrentPlatform = AppPlatform.DESKTOP
+}
+
+@androidx.compose.runtime.Composable
+private fun rememberDesktopWindowState(prefs: Preferences): WindowState {
+    // 读取窗口状态，默认使用浮动窗口（避免默认全屏）
+    val savedPlacement = prefs.getInt("window_placement", WindowPlacement.Floating.ordinal)
+    return rememberWindowState(
+        width = prefs.get("window_width", "900")?.toInt()?.dp ?: 900.dp,
+        height = prefs.get("window_height", "700")?.toInt()?.dp ?: 700.dp,
+        placement =
+            if (savedPlacement == WindowPlacement.Fullscreen.ordinal) {
+                WindowPlacement.Floating // 禁止默认全屏，首次打开使用浮动窗口
+            } else {
+                WindowPlacement.entries[savedPlacement]
+            },
+    )
+}
+
+@androidx.compose.runtime.Composable
+private fun InstallDesktopNotifications() {
+    // 系统托盘初始化
+    val notificationManager = remember { DesktopNotificationManager() }
+
+    LaunchedEffect(Unit) {
+        // 注册消息接收监听器
+        Chat.addMessageReceiveListener(notificationManager)
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun ApplicationScope.DesktopTray(
+    onOpen: () -> Unit,
+    onQuit: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    val trayState = rememberTrayState()
+
+    // 系统托盘
+    @Suppress("DEPRECATION") val trayIcon = painterResource("icons/ic_notification.svg")
+    Tray(
+        state = trayState,
+        icon = trayIcon,
+        // AWT Tray Menu does not support keyboard shortcuts; omit `shortcut` here to avoid
+        // UnsupportedOperationException on some JDKs/platforms.
+        menu = {
+            Item(
+                text = currentStrings["tray.open.window"],
+                onClick = { onOpen() },
+            )
+            Item(
+                text = currentStrings["tray.notifications"],
+                onClick = { /* open notification settings */ },
+            )
+            Separator()
+            Item(
+                text = currentStrings["tray.quit"],
+                onClick = onQuit,
+            )
+        },
+        onAction = {
+            // 点击托盘图标显示/隐藏窗口
+            onToggle()
+        },
+    )
 }

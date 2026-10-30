@@ -1,5 +1,6 @@
 package component
 
+// QR code library removed for Android compatibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,20 +17,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import core.state.GlobalAppState
-import core.getTokenQuota
 import core.getTokenPrices
+import core.getTokenQuota
 import core.purchaseTokens
-import model.QuotaInfo
-import model.TokenPrices
-// QR code library removed for Android compatibility
+import core.state.GlobalAppState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import model.QuotaInfo
+import model.TokenPrices
 
-/**
- * Token 配额管理页面
- */
+/** Token 配额管理页面 */
 @Composable
 fun TokenQuotaScreen(onBack: () -> Unit) {
     val s = com.chatlite.i18n.LocalStrings.current
@@ -49,11 +47,9 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
     // 加载配额信息
     LaunchedEffect(Unit) {
         loading = true
-        try {
+        core.recoverOperation(onFailure = { e -> }) {
             quota = withContext(Dispatchers.IO) { getTokenQuota(token) }
             prices = withContext(Dispatchers.IO) { getTokenPrices(token) }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
         }
         loading = false
     }
@@ -82,11 +78,10 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
 
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
+                    .padding(20.dp)
         ) {
             // 余额
             Card(
@@ -136,26 +131,32 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
                     val pct = q.weeklyFreePct.coerceIn(0.0, 100.0)
                     Box(
                         modifier =
-                            Modifier
-                                .fillMaxWidth()
+                            Modifier.fillMaxWidth()
                                 .height(10.dp)
                                 .clip(RoundedCornerShape(5.dp))
-                                .background(Color(0xFFEEEEEE)),
+                                .background(Color(0xFFEEEEEE))
                     ) {
                         Box(
                             modifier =
-                                Modifier
-                                    .fillMaxWidth(pct.toFloat() / 100f)
+                                Modifier.fillMaxWidth(pct.toFloat() / 100f)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(5.dp))
-                                    .background(MaterialTheme.colors.primary),
+                                    .background(MaterialTheme.colors.primary)
                         )
                     }
 
                     Spacer(Modifier.height(4.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("本周已用: ${String.format(displayLocale, "%.2f", q.weeklyCostFen / 100.0)} 元", fontSize = 11.sp, color = Color.Gray)
-                        Text("in ${q.weeklyInputUsed} / out ${q.weeklyOutputUsed}", fontSize = 11.sp, color = Color.Gray)
+                        Text(
+                            "本周已用: ${String.format(displayLocale, "%.2f", q.weeklyCostFen / 100.0)} 元",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                        )
+                        Text(
+                            "in ${q.weeklyInputUsed} / out ${q.weeklyOutputUsed}",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                        )
                     }
                 }
             }
@@ -232,7 +233,10 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
                     shape = RoundedCornerShape(12.dp),
                     elevation = 2.dp,
                 ) {
-                    Column(Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        Modifier.padding(24.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Text("请使用微信扫码支付", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                         Spacer(Modifier.height(20.dp))
                         // 支付链接（二维码跨平台兼容性差，改用 URL 展示）
@@ -247,7 +251,9 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
                         Text("请使用微信扫描二维码支付", fontSize = 13.sp, color = Color.Gray)
                         Spacer(Modifier.height(20.dp))
                         Button(
-                            onClick = { scope.launch { confirmPay(purchaseId, token, scope, onBack) } },
+                            onClick = {
+                                scope.launch { confirmPay(purchaseId, token, scope, onBack) }
+                            },
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             shape = RoundedCornerShape(8.dp),
                         ) {
@@ -300,6 +306,5 @@ private suspend fun confirmPay(
                 onBack()
             }
         }
-    } catch (_: Exception) {
-    }
+    } catch (_: Exception) {}
 }

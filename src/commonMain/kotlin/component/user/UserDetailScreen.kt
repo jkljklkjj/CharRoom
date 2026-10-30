@@ -1,17 +1,14 @@
 package component.user
 
-import component.AppTopBar
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,24 +17,24 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
+import com.chatlite.i18n.LocalStrings
+import component.AppTopBar
 import core.ApiService
 import core.getCachedImage
 import core.loadImageBitmapFromUrl
-import model.User
-import com.chatlite.i18n.LocalStrings
 import kotlinx.coroutines.launch
+import model.User
 import presentation.viewmodel.ChatViewModel
+import presentation.viewmodel.addFriend
+import presentation.viewmodel.updateUsers
 
-/**
- * 用户详情页面（查看他人信息）
- */
+/** 用户详情页面（查看他人信息） */
 @Composable
 fun UserDetailScreen(
     chatViewModel: ChatViewModel,
     userId: Int,
     onBack: () -> Unit,
-    onAddFriend: (() -> Unit)? = null,
-    onStartChat: (() -> Unit)? = null
+    onStartChat: (() -> Unit)? = null,
 ) {
     var user by remember { mutableStateOf<User?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -55,12 +52,13 @@ fun UserDetailScreen(
     LaunchedEffect(userId) {
         scope.launch {
             user = ApiService.getUserDetail(userId.toString())
-            user?.let { it ->
+            user?.let {
                 // 优先从缓存同步读取头像，避免闪动
                 it.avatarUrl?.let { url ->
                     if (url.isNotBlank()) {
                         val cacheKey = it.avatarKey
-                        avatarBitmap = getCachedImage(url, cacheKey) ?: loadImageBitmapFromUrl(url, cacheKey)
+                        avatarBitmap =
+                            getCachedImage(url, cacheKey) ?: loadImageBitmapFromUrl(url, cacheKey)
                     }
                 }
                 // 检查是否已经是好友
@@ -97,15 +95,13 @@ fun UserDetailScreen(
             AppTopBar(
                 title = s["user.detail.title"],
                 subtitle = s["user.detail.subtitle"],
-                onBack = onBack
+                onBack = onBack,
             )
         }
     ) { padding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colors.background)
+            modifier =
+                Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colors.background)
         ) {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -114,11 +110,11 @@ fun UserDetailScreen(
             } else {
                 user?.let { u ->
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier =
+                            Modifier.fillMaxSize()
+                                .padding(horizontal = 16.dp)
+                                .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Spacer(modifier = Modifier.height(16.dp))
 
@@ -126,32 +122,38 @@ fun UserDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colors.surface.copy(alpha = 0.24f),
                             shape = RoundedCornerShape(26.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-                            elevation = 0.dp
+                            border =
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
+                                ),
+                            elevation = 0.dp,
                         ) {
                             Column(
                                 modifier = Modifier.padding(20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Box(
-                                    modifier = Modifier
-                                        .size(128.dp)
-                                        .shadow(10.dp, CircleShape, clip = true)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colors.primary.copy(alpha = 0.10f)),
-                                    contentAlignment = Alignment.Center
+                                    modifier =
+                                        Modifier.size(128.dp)
+                                            .shadow(10.dp, CircleShape, clip = true)
+                                            .clip(CircleShape)
+                                            .background(
+                                                MaterialTheme.colors.primary.copy(alpha = 0.10f)
+                                            ),
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     if (avatarBitmap != null) {
                                         Image(
                                             bitmap = avatarBitmap!!,
                                             contentDescription = s["user.avatar"],
-                                            modifier = Modifier.fillMaxSize()
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     } else {
                                         Text(
                                             text = u.username.firstOrNull()?.toString() ?: "U",
                                             style = MaterialTheme.typography.h2,
-                                            color = MaterialTheme.colors.primary
+                                            color = MaterialTheme.colors.primary,
                                         )
                                     }
                                 }
@@ -161,33 +163,47 @@ fun UserDetailScreen(
                                 Text(
                                     text = u.username,
                                     style = MaterialTheme.typography.h5,
-                                    color = MaterialTheme.colors.onSurface
+                                    color = MaterialTheme.colors.onSurface,
                                 )
 
                                 // 个性签名 - 移到用户名下方更明显的位置
-                                u.signature?.takeIf { it.isNotBlank() }?.let { signature ->
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = signature,
-                                        style = MaterialTheme.typography.body1,
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.70f),
-                                        modifier = Modifier.padding(horizontal = 16.dp),
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                }
+                                u.signature
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { signature ->
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = signature,
+                                            style = MaterialTheme.typography.body1,
+                                            color =
+                                                MaterialTheme.colors.onSurface.copy(alpha = 0.70f),
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            textAlign =
+                                                androidx.compose.ui.text.style.TextAlign.Center,
+                                        )
+                                    }
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     DetailBadge(
-                                        text = if (u.online == true) s["user.detail.online"] else s["user.detail.offline"],
-                                        backgroundColor = if (u.online == true) MaterialTheme.colors.secondary.copy(alpha = 0.14f) else MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
-                                        contentColor = if (u.online == true) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface.copy(alpha = 0.72f)
+                                        text =
+                                            if (u.online == true) s["user.detail.online"]
+                                            else s["user.detail.offline"],
+                                        backgroundColor =
+                                            if (u.online == true)
+                                                MaterialTheme.colors.secondary.copy(alpha = 0.14f)
+                                            else MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
+                                        contentColor =
+                                            if (u.online == true) MaterialTheme.colors.secondary
+                                            else MaterialTheme.colors.onSurface.copy(alpha = 0.72f),
                                     )
                                     DetailBadge(
-                                        text = if (isFriend) s["user.detail.is.friend"] else s["user.detail.not.friend"],
-                                        backgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.12f),
-                                        contentColor = MaterialTheme.colors.primary
+                                        text =
+                                            if (isFriend) s["user.detail.is.friend"]
+                                            else s["user.detail.not.friend"],
+                                        backgroundColor =
+                                            MaterialTheme.colors.primary.copy(alpha = 0.12f),
+                                        contentColor = MaterialTheme.colors.primary,
                                     )
                                 }
 
@@ -201,29 +217,39 @@ fun UserDetailScreen(
                             InfoRow(label = s["user.detail.user.id"], value = u.id.toString())
 
                             if (isFriend) {
-                                u.email?.takeIf { it.isNotBlank() }?.let { email ->
-                                    DetailDivider()
-                                    InfoRow(label = s["user.detail.email"], value = email)
-                                }
-                                u.phone?.takeIf { it.isNotBlank() }?.let { phone ->
-                                    DetailDivider()
-                                    InfoRow(label = s["user.detail.phone"], value = phone)
-                                }
+                                u.email
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { email ->
+                                        DetailDivider()
+                                        InfoRow(label = s["user.detail.email"], value = email)
+                                    }
+                                u.phone
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { phone ->
+                                        DetailDivider()
+                                        InfoRow(label = s["user.detail.phone"], value = phone)
+                                    }
                             }
 
                             DetailDivider()
                             InfoRow(
                                 label = s["user.detail.status"],
-                                value = if (u.online == true) s["user.detail.online"] else s["user.detail.offline"],
-                                valueColor = if (u.online == true) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                value =
+                                    if (u.online == true) s["user.detail.online"]
+                                    else s["user.detail.offline"],
+                                valueColor =
+                                    if (u.online == true) MaterialTheme.colors.secondary
+                                    else MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                             )
 
                             u.createdAt?.let { timestamp ->
                                 DetailDivider()
                                 InfoRow(
                                     label = s["user.detail.registered"],
-                                    value = java.text.SimpleDateFormat(s["chat.date.format"], dateLocale)
-                                        .format(java.util.Date(timestamp))
+                                    value =
+                                        java.text
+                                            .SimpleDateFormat(s["chat.date.format"], dateLocale)
+                                            .format(java.util.Date(timestamp)),
                                 )
                             }
                         }
@@ -236,13 +262,13 @@ fun UserDetailScreen(
                                     onClick = { addFriend() },
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     enabled = !isAddingFriend,
-                                    shape = RoundedCornerShape(14.dp)
+                                    shape = RoundedCornerShape(14.dp),
                                 ) {
                                     if (isAddingFriend) {
                                         CircularProgressIndicator(
                                             modifier = Modifier.size(18.dp),
                                             color = MaterialTheme.colors.onPrimary,
-                                            strokeWidth = 2.dp
+                                            strokeWidth = 2.dp,
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(s["user.detail.add.friend.sending"])
@@ -256,9 +282,12 @@ fun UserDetailScreen(
                                         onStartChat?.invoke() ?: onBack()
                                     },
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                                    shape = RoundedCornerShape(14.dp)
+                                    shape = RoundedCornerShape(14.dp),
                                 ) {
-                                    Text(if (isFriend) s["user.detail.send.message"] else s["user.detail.send.greeting"])
+                                    Text(
+                                        if (isFriend) s["user.detail.send.message"]
+                                        else s["user.detail.send.greeting"]
+                                    )
                                 }
                             }
                         }
@@ -269,22 +298,26 @@ fun UserDetailScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = MaterialTheme.colors.surface.copy(alpha = 0.20f),
                                 shape = RoundedCornerShape(18.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-                                elevation = 0.dp
+                                border =
+                                    BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colors.onSurface.copy(alpha = 0.08f),
+                                    ),
+                                elevation = 0.dp,
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     if (successMessage.isNotBlank()) {
                                         Text(
                                             text = successMessage,
                                             color = MaterialTheme.colors.secondary,
-                                            style = MaterialTheme.typography.body2
+                                            style = MaterialTheme.typography.body2,
                                         )
                                     }
                                     if (errorMessage.isNotBlank()) {
                                         Text(
                                             text = errorMessage,
                                             color = MaterialTheme.colors.error,
-                                            style = MaterialTheme.typography.body2
+                                            style = MaterialTheme.typography.body2,
                                         )
                                     }
                                 }
@@ -293,11 +326,15 @@ fun UserDetailScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
                     }
-                } ?: run {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(s["user.detail.not.found"])
-                    }
                 }
+                    ?: run {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(s["user.detail.not.found"])
+                        }
+                    }
             }
         }
     }
@@ -306,20 +343,20 @@ fun UserDetailScreen(
 @Composable
 private fun DetailCard(
     title: String,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colors.surface.copy(alpha = 0.24f),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.08f)),
-        elevation = 0.dp
+        elevation = 0.dp,
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.subtitle1,
-                color = MaterialTheme.colors.onSurface
+                color = MaterialTheme.colors.onSurface,
             )
             Spacer(modifier = Modifier.height(14.dp))
             content()
@@ -331,49 +368,50 @@ private fun DetailCard(
 private fun DetailBadge(
     text: String,
     backgroundColor: Color,
-    contentColor: Color
+    contentColor: Color,
 ) {
     Surface(
         color = backgroundColor,
         shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.10f))
+        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.10f)),
     ) {
         Text(
             text = text,
             color = contentColor,
             style = MaterialTheme.typography.caption,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
     }
 }
 
 @Composable
 private fun DetailDivider() {
-    Divider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colors.onSurface.copy(alpha = 0.06f))
+    Divider(
+        modifier = Modifier.padding(vertical = 12.dp),
+        color = MaterialTheme.colors.onSurface.copy(alpha = 0.06f),
+    )
 }
 
-/**
- * 信息行组件
- */
+/** 信息行组件 */
 @Composable
 private fun InfoRow(
     label: String,
     value: String,
-    valueColor: Color = MaterialTheme.colors.onSurface
+    valueColor: Color = MaterialTheme.colors.onSurface,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.body2,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.58f)
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.58f),
         )
         Text(
             text = value,
             style = MaterialTheme.typography.body2,
-            color = valueColor
+            color = valueColor,
         )
     }
 }

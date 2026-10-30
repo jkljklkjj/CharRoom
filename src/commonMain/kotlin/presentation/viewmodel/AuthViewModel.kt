@@ -11,31 +11,25 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/**
- * 认证ViewModel
- * 处理登录注册相关的UI逻辑和状态
- */
+/** 认证ViewModel 处理登录注册相关的UI逻辑和状态 */
 class AuthViewModel(
     private val authRepository: AuthRepository,
-    private var coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var coroutineScope: CoroutineScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
 ) {
     private val throttle = Throttle()
 
     // 认证状态，暴露给UI层观察
     val authState: StateFlow<AuthState> = authRepository.authState
 
-    /**
-     * 初始化，尝试自动登录
-     */
+    /** 初始化，尝试自动登录 */
     fun init() {
         coroutineScope.launch {
             authRepository.init()
         }
     }
 
-    /**
-     * 登录
-     */
+    /** 登录 */
     fun login(account: String, password: String, rememberMe: Boolean = false) {
         if (throttle.shouldThrottle(ThrottleOp.LOGIN, 1000L)) return
         coroutineScope.launch {
@@ -43,9 +37,7 @@ class AuthViewModel(
         }
     }
 
-    /**
-     * 注册
-     */
+    /** 注册 */
     fun register(username: String, password: String, onResult: (Result<Int>) -> Unit) {
         if (throttle.shouldThrottle(ThrottleOp.REGISTER, 2000L)) return
         coroutineScope.launch {
@@ -54,10 +46,14 @@ class AuthViewModel(
         }
     }
 
-    /**
-     * 验证注册（与网页端逻辑一致）
-     */
-    fun verifyRegister(username: String, password: String, email: String = "", verifyCode: String = "", onResult: (Result<Int>) -> Unit) {
+    /** 验证注册（与网页端逻辑一致） */
+    fun verifyRegister(
+        username: String,
+        password: String,
+        email: String = "",
+        verifyCode: String = "",
+        onResult: (Result<Int>) -> Unit,
+    ) {
         if (throttle.shouldThrottle(ThrottleOp.REGISTER, 2000L)) return
         coroutineScope.launch {
             val result = authRepository.verifyRegister(username, password, email, verifyCode)
@@ -65,9 +61,7 @@ class AuthViewModel(
         }
     }
 
-    /**
-     * 发送注册验证码
-     */
+    /** 发送注册验证码 */
     fun sendRegisterVerifyCode(email: String, onResult: (Result<Boolean>) -> Unit) {
         if (throttle.shouldThrottle(ThrottleOp.SEND_VERIFY_CODE, 3000L)) return
         coroutineScope.launch {
@@ -76,9 +70,7 @@ class AuthViewModel(
         }
     }
 
-    /**
-     * 退出登录
-     */
+    /** 退出登录 */
     fun logout() {
         // 取消旧协程（清理登录过程中启动的定时器、网络请求等）
         coroutineScope.coroutineContext[Job]?.cancel()
@@ -89,13 +81,9 @@ class AuthViewModel(
         }
     }
 
-    /**
-     * 获取当前token
-     */
+    /** 获取当前token */
     fun getCurrentToken(): String? = authRepository.getCurrentToken()
 
-    /**
-     * 获取当前账号
-     */
+    /** 获取当前账号 */
     fun getCurrentAccount(): String? = authRepository.getCurrentAccount()
 }

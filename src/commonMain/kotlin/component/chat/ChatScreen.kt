@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,86 +17,84 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.AlertDialog
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.platform.LocalDensity
-import kotlinx.coroutines.delay
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.collect
+import com.chatlite.i18n.LocalStrings
+import component.QingliaoColors
+import component.UserAvatar
+import component.chatHeaderBrush
+import component.io.FilePicker
+import component.refinedMessageBubbleBrush
+import component.rememberElasticScale
+import core.FileUploader
+import core.ServerConfig
+import core.state.GlobalAppState
+import core.state.GlobalChatState
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import model.Message
 import model.MessageType
 import model.User
-import component.chat.isSameDay
-import component.chat.DateSeparator
-import component.chat.MessageBubble
-import component.chat.ChatInputBar
-import core.FileUploader
-import androidx.compose.material.IconButton
-import androidx.compose.ui.draw.alpha
-import component.io.FilePicker
-import component.UserAvatar
-import component.QingliaoColors
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.Videocam
-import component.chatHeaderBrush
-import component.rememberElasticScale
-import component.refinedMessageBubbleBrush
-import core.LocalChatHistoryStore
-import core.ServerConfig
-import core.state.GlobalAppState
-import core.state.GlobalChatState
 import presentation.viewmodel.ChatViewModel
-import com.chatlite.i18n.LocalStrings
-import kotlin.time.Duration.Companion.milliseconds
+import presentation.viewmodel.deleteFriend
+import presentation.viewmodel.deleteMessage
+import presentation.viewmodel.loadContacts
+import presentation.viewmodel.loadOlderMessages
+import presentation.viewmodel.retryMessage
 
-/**
- * 发送消息
- */
+/** 发送消息 */
 fun sendMessage(
     chatViewModel: ChatViewModel,
     user: User,
@@ -109,7 +106,7 @@ fun sendMessage(
     replyToMessageId: String? = null,
     replyToContent: String? = null,
     replyToSender: String? = null,
-    onDone: () -> Unit = {}
+    onDone: () -> Unit = {},
 ) {
     // 委托给ViewModel处理，使用ViewModel的协程作用域
     chatViewModel.sendPrivateMessage(
@@ -122,20 +119,16 @@ fun sendMessage(
         replyToMessageId = replyToMessageId,
         replyToContent = replyToContent,
         replyToSender = replyToSender,
-        onDone = onDone
+        onDone = onDone,
     )
 }
 
-/**
- * 重发消息
- */
-fun resendMessage(chatViewModel: ChatViewModel, user: User, message: Message) {
+/** 重发消息 */
+fun resendMessage(chatViewModel: ChatViewModel, message: Message) {
     chatViewModel.retryMessage(message)
 }
 
-/**
- * 好友聊天界面
- */
+/** 好友聊天界面 */
 @Composable
 fun ChatScreen(
     chatViewModel: ChatViewModel,
@@ -144,7 +137,7 @@ fun ChatScreen(
     onMyAvatarClick: (() -> Unit)? = null, // 点击自己头像回调
     onBackClick: (() -> Unit)? = null, // 点击返回按钮回调
     onVideoCallClick: ((String) -> Unit)? = null, // 点击视频通话按钮回调
-    onUserMenuClick: ((User) -> Unit)? = null // 点击好友菜单回调（查看资料/删除）
+    onUserMenuClick: ((User) -> Unit)? = null, // 点击好友菜单回调（查看资料/删除）
 ) {
     // Local conversation data can render immediately; no artificial loading delay.
     androidx.compose.runtime.key(user.id) {
@@ -155,7 +148,7 @@ fun ChatScreen(
             onMyAvatarClick = onMyAvatarClick,
             onBackClick = onBackClick,
             onVideoCallClick = onVideoCallClick,
-            onUserMenuClick = onUserMenuClick
+            onUserMenuClick = onUserMenuClick,
         )
     }
 }
@@ -168,10 +161,14 @@ private fun ChatScreenContent(
     onMyAvatarClick: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
     onVideoCallClick: ((String) -> Unit)? = null,
-    onUserMenuClick: ((User) -> Unit)? = null
+    onUserMenuClick: ((User) -> Unit)? = null,
 ) {
     val s = LocalStrings.current
-    var messageText by rememberComposerDraft(GlobalAppState.currentUserId, model.ConversationKey.privateChat(user.id))
+    var messageText by
+        rememberComposerDraft(
+            GlobalAppState.currentUserId,
+            model.ConversationKey.privateChat(user.id),
+        )
     var showDeleteConfirm by remember { mutableStateOf(false) }
     // 从ViewModel收集用户列表状态
     val allUsers by chatViewModel.usersFlow.collectAsState()
@@ -179,27 +176,30 @@ private fun ChatScreenContent(
     // 使用 per-conversation StateFlow，消息到达时只更新本会话的订阅者
     val userMessages by GlobalChatState.messagesFor(user.id).collectAsState()
     // 获取当前登录用户信息（自己）
-    val currentUser: User? by remember(allUsers) {
-        derivedStateOf {
-            allUsers.find { user -> !user.isGroup && user.id == GlobalAppState.currentUserId }
-        }
-    }
-    var historyQuery by remember { mutableStateOf("") }
-    val filteredMessages by remember(user.id, historyQuery) {
-        derivedStateOf {
-            val query = historyQuery.trim().lowercase()
-            userMessages.filter { message ->
-                if (query.isBlank()) return@filter true
-                val senderName = if (message.sender) {
-                    currentUser?.username ?: s["chat.me"]
-                } else {
-                    user.username
-                }
-                message.message.lowercase().contains(query) ||
-                    senderName.lowercase().contains(query)
+    val currentUser: User? by
+        remember(allUsers) {
+            derivedStateOf {
+                allUsers.find { user -> !user.isGroup && user.id == GlobalAppState.currentUserId }
             }
         }
-    }
+    var historyQuery by remember { mutableStateOf("") }
+    val filteredMessages by
+        remember(user.id, historyQuery) {
+            derivedStateOf {
+                val query = historyQuery.trim().lowercase()
+                userMessages.filter { message ->
+                    if (query.isBlank()) return@filter true
+                    val senderName =
+                        if (message.sender) {
+                            currentUser?.username ?: s["chat.me"]
+                        } else {
+                            user.username
+                        }
+                    message.message.lowercase().contains(query) ||
+                        senderName.lowercase().contains(query)
+                }
+            }
+        }
     // History is loaded in bounded pages; every loaded older row remains scrollable.
     val displayMessages = filteredMessages
     var isSending by remember { mutableStateOf(false) }
@@ -224,14 +224,16 @@ private fun ChatScreenContent(
     }
     val scope = rememberCoroutineScope()
     val isDarkMode = !MaterialTheme.colors.isLight
-    @Suppress("DEPRECATION")
-    val clipboardManager = LocalClipboardManager.current
+    @Suppress("DEPRECATION") val clipboardManager = LocalClipboardManager.current
     // 消息动画控制：仅新消息第一次显示时才有动画，滚动历史消息无动画
     val animatedMessageIds = remember { mutableSetOf<String>() }
     val pageCreateTime = remember { System.currentTimeMillis() }
 
     // 分页加载相关状态
-    var historyCursor by remember(GlobalAppState.currentUserId, user.id) { mutableStateOf<core.HistoryCursor?>(null) }
+    var historyCursor by
+        remember(GlobalAppState.currentUserId, user.id) {
+            mutableStateOf<core.HistoryCursor?>(null)
+        }
     var isLoadingMore by remember(GlobalAppState.currentUserId, user.id) { mutableStateOf(false) }
     var hasMoreHistory by remember(GlobalAppState.currentUserId, user.id) { mutableStateOf(true) }
 
@@ -301,21 +303,17 @@ private fun ChatScreenContent(
                     isSending = false
                     replyToMessage = null // 发送后清空回复状态
                 }
-            }
+            },
         )
     }
 
-    /**
-     * 处理表情选择
-     */
+    /** 处理表情选择 */
     fun onEmojiSelected(emoji: String) {
         messageText += emoji
         showEmojiPanel = false
     }
 
-    /**
-     * 处理图片选择
-     */
+    /** 处理图片选择 */
     fun pickImage() {
         FilePicker.pickImage { bytes, fileName ->
             scope.launch {
@@ -327,9 +325,10 @@ private fun ChatScreenContent(
                 }
 
                 isUploading = true
-                val fileUrl = withContext(Dispatchers.IO) {
-                    FileUploader.uploadImage(bytes, fileName)
-                }
+                val fileUrl =
+                    withContext(Dispatchers.IO) {
+                        FileUploader.uploadImage(bytes, fileName)
+                    }
                 if (fileUrl != null) {
                     // 发送图片消息
                     sendMessage(
@@ -342,10 +341,11 @@ private fun ChatScreenContent(
                         fileSize = bytes.size.toLong(),
                         replyToMessageId = replyToMessage?.messageId,
                         replyToContent = replyToMessage?.message,
-                        replyToSender = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
+                        replyToSender =
+                            if (replyToMessage?.sender == true) s["chat.me"] else user.username,
                         onDone = {
                             replyToMessage = null
-                        }
+                        },
                     )
                 }
                 isUploading = false
@@ -353,9 +353,7 @@ private fun ChatScreenContent(
         }
     }
 
-    /**
-     * 处理文件选择
-     */
+    /** 处理文件选择 */
     fun pickFile() {
         FilePicker.pickFile { bytes, fileName, fileSize ->
             scope.launch {
@@ -367,9 +365,10 @@ private fun ChatScreenContent(
                 }
 
                 isUploading = true
-                val fileUrl = withContext(Dispatchers.IO) {
-                    FileUploader.uploadFile(bytes, fileName)
-                }
+                val fileUrl =
+                    withContext(Dispatchers.IO) {
+                        FileUploader.uploadFile(bytes, fileName)
+                    }
                 if (fileUrl != null) {
                     // 发送文件消息
                     sendMessage(
@@ -382,10 +381,11 @@ private fun ChatScreenContent(
                         fileSize = fileSize,
                         replyToMessageId = replyToMessage?.messageId,
                         replyToContent = replyToMessage?.message,
-                        replyToSender = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
+                        replyToSender =
+                            if (replyToMessage?.sender == true) s["chat.me"] else user.username,
                         onDone = {
                             replyToMessage = null
-                        }
+                        },
                     )
                 }
                 isUploading = false
@@ -393,24 +393,18 @@ private fun ChatScreenContent(
         }
     }
 
-    /**
-     * 复制消息内容
-     */
+    /** 复制消息内容 */
     fun copyMessage(message: Message) {
         clipboardManager.setText(AnnotatedString(message.message))
     }
 
-    /**
-     * 删除消息
-     */
+    /** 删除消息 */
     fun deleteMessage(message: Message) {
         // 通过ViewModel删除消息
         chatViewModel.deleteMessage(message)
     }
 
-    /**
-     * 转发消息
-     */
+    /** 转发消息 */
     fun forwardMessage(message: Message, targetUser: User) {
         sendMessage(
             chatViewModel = chatViewModel,
@@ -419,43 +413,53 @@ private fun ChatScreenContent(
             messageType = message.messageType,
             fileUrl = message.fileUrl,
             fileName = message.fileName,
-            fileSize = message.fileSize
+            fileSize = message.fileSize,
         )
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Reserve room for avatars and padding before measuring a long message.
         val maxBubbleWidth = (maxWidth - 108.dp).coerceIn(120.dp, 400.dp)
-        Column(modifier = Modifier.fillMaxSize().background(QingliaoColors.paper).padding(horizontal = 12.dp, vertical = 8.dp).statusBarsPadding().imePadding()) {
+        Column(
+            modifier =
+                Modifier.fillMaxSize()
+                    .background(QingliaoColors.paper)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .statusBarsPadding()
+                    .imePadding()
+        ) {
             // Chat header
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = QingliaoColors.paper,
                 shape = RoundedCornerShape(0.dp),
-                elevation = 0.dp
+                elevation = 0.dp,
             ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(chatHeaderBrush(isDarkMode))
-                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .background(chatHeaderBrush(isDarkMode))
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // 返回按钮（仅在onBackClick存在时显示）
                         onBackClick?.let { onBack ->
                             val backInteraction = remember { MutableInteractionSource() }
-                            val backScale = rememberElasticScale(backInteraction, pressedScale = 0.97f)
+                            val backScale =
+                                rememberElasticScale(backInteraction, pressedScale = 0.97f)
                             IconButton(
                                 onClick = onBack,
                                 interactionSource = backInteraction,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .graphicsLayer { scaleX = backScale; scaleY = backScale }
+                                modifier =
+                                    Modifier.size(48.dp).graphicsLayer {
+                                        scaleX = backScale
+                                        scaleY = backScale
+                                    },
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = s["chat.back"],
-                                    tint = MaterialTheme.colors.onBackground
+                                    tint = MaterialTheme.colors.onBackground,
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
@@ -465,17 +469,20 @@ private fun ChatScreenContent(
                         UserAvatar(
                             user = user,
                             size = 36.dp,
-                            onClick = { onAvatarClick?.invoke(user) }
+                            onClick = { onAvatarClick?.invoke(user) },
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))
 
                         // 在线状态指示器
                         Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (user.online == true) Color(0xFF4CAF50) else Color(0xFF9AA5B1))
+                            modifier =
+                                Modifier.size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (user.online == true) Color(0xFF4CAF50)
+                                        else Color(0xFF9AA5B1)
+                                    )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
 
@@ -485,54 +492,83 @@ private fun ChatScreenContent(
                                 style = MaterialTheme.typography.subtitle1,
                                 color = MaterialTheme.colors.onBackground,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                text = if (user.online == true) s["chat.status.online"] else if (user.online == false) s["chat.status.offline"] else s["chat.status.syncing"],
+                                text =
+                                    if (user.online == true) s["chat.status.online"]
+                                    else if (user.online == false) s["chat.status.offline"]
+                                    else s["chat.status.syncing"],
                                 style = MaterialTheme.typography.caption,
-                                color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f)
+                                color = MaterialTheme.colors.onBackground.copy(alpha = 0.6f),
                             )
                         }
 
                         if (onVideoCallClick != null) {
                             // 视频通话按钮
                             val callInteraction = remember { MutableInteractionSource() }
-                            val callScale = rememberElasticScale(callInteraction, pressedScale = 0.97f)
+                            val callScale =
+                                rememberElasticScale(callInteraction, pressedScale = 0.97f)
                             IconButton(
                                 onClick = { onVideoCallClick(user.id.toString()) },
                                 interactionSource = callInteraction,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .graphicsLayer { scaleX = callScale; scaleY = callScale }
+                                modifier =
+                                    Modifier.size(48.dp).graphicsLayer {
+                                        scaleX = callScale
+                                        scaleY = callScale
+                                    },
                             ) {
-                                Icon(Icons.Default.Videocam, s["paper.videoCall"], tint = QingliaoColors.muted)
+                                Icon(
+                                    Icons.Default.Videocam,
+                                    s["paper.videoCall"],
+                                    tint = QingliaoColors.muted,
+                                )
                             }
-
                         }
 
                         // 好友菜单按钮
                         Box {
                             var showMenu by remember { mutableStateOf(false) }
                             val menuInteraction = remember { MutableInteractionSource() }
-                            val menuScale = rememberElasticScale(menuInteraction, pressedScale = 0.97f)
+                            val menuScale =
+                                rememberElasticScale(menuInteraction, pressedScale = 0.97f)
                             IconButton(
                                 onClick = { showMenu = true },
                                 interactionSource = menuInteraction,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .graphicsLayer { scaleX = menuScale; scaleY = menuScale }
+                                modifier =
+                                    Modifier.size(48.dp).graphicsLayer {
+                                        scaleX = menuScale
+                                        scaleY = menuScale
+                                    },
                             ) {
-                                Icon(Icons.Default.MoreHoriz, s["paper.chatActions"], tint = QingliaoColors.muted)
+                                Icon(
+                                    Icons.Default.MoreHoriz,
+                                    s["paper.chatActions"],
+                                    tint = QingliaoColors.muted,
+                                )
                             }
                             DropdownMenu(
                                 expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
+                                onDismissRequest = { showMenu = false },
                             ) {
-                                DropdownMenuItem(onClick = { showMenu = false; onUserMenuClick?.invoke(user) }) {
+                                DropdownMenuItem(
+                                    onClick = {
+                                        showMenu = false
+                                        onUserMenuClick?.invoke(user)
+                                    }
+                                ) {
                                     Text(s["friend.menu.info"])
                                 }
-                                DropdownMenuItem(onClick = { showMenu = false; showDeleteConfirm = true }) {
-                                    Text(s["friend.menu.delete"], color = MaterialTheme.colors.error)
+                                DropdownMenuItem(
+                                    onClick = {
+                                        showMenu = false
+                                        showDeleteConfirm = true
+                                    }
+                                ) {
+                                    Text(
+                                        s["friend.menu.delete"],
+                                        color = MaterialTheme.colors.error,
+                                    )
                                 }
                             }
                         }
@@ -547,49 +583,72 @@ private fun ChatScreenContent(
             Spacer(modifier = Modifier.height(8.dp))
 
             Surface(
-                modifier = Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
+                modifier =
+                    Modifier.weight(1f).fillMaxWidth().alpha(if (isViewportReady) 1f else 0f),
                 color = QingliaoColors.paper,
                 shape = RoundedCornerShape(0.dp),
-                elevation = 0.dp
+                elevation = 0.dp,
             ) {
                 // 监听滚动位置，滚动到顶部时加载更多历史
                 LaunchedEffect(GlobalAppState.currentUserId, user.id, listState) {
-                    androidx.compose.runtime.snapshotFlow {
-                        Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, hasInitializedScroll)
-                    }.collect { (index, offset, initialized) ->
-                        if (initialized && !isLoadingMore && hasMoreHistory && index == 0 && offset == 0) {
-                            isLoadingMore = true
-                            try {
-                                val page = chatViewModel.loadOlderMessages(user.id, historyCursor)
-                                if (page != null) {
-                                    historyCursor = page.before
-                                    hasMoreHistory = page.hasMore
-                                }
-                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                throw cancelled
-                            } catch (failure: Exception) {
-                                core.AppLogger.e("Failed to load older local history", failure)
-                            } finally { isLoadingMore = false }
+                    androidx.compose.runtime
+                        .snapshotFlow {
+                            Triple(
+                                listState.firstVisibleItemIndex,
+                                listState.firstVisibleItemScrollOffset,
+                                hasInitializedScroll,
+                            )
                         }
-                    }
+                        .collect { (index, offset, initialized) ->
+                            if (
+                                core.shouldLoadEarlierHistory(
+                                    initialized,
+                                    isLoadingMore,
+                                    hasMoreHistory,
+                                    index,
+                                    offset,
+                                )
+                            ) {
+                                isLoadingMore = true
+                                try {
+                                    core.recoverOperation(
+                                        onFailure = { failure ->
+                                            core.AppLogger.e(
+                                                "Failed to load older local history",
+                                                failure,
+                                            )
+                                        }
+                                    ) {
+                                        val page =
+                                            chatViewModel.loadOlderMessages(user.id, historyCursor)
+                                        if (page != null) {
+                                            historyCursor = page.before
+                                            hasMoreHistory = page.hasMore
+                                        }
+                                    }
+                                } finally {
+                                    isLoadingMore = false
+                                }
+                            }
+                        }
                 }
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 10.dp),
                     state = listState,
-                    reverseLayout = false // 正常顺序，最新消息在底部
+                    reverseLayout = false, // 正常顺序，最新消息在底部
                 ) {
                     // 加载更多提示
                     if (isLoadingMore) {
                         item(key = "loading_indicator") {
                             Box(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                                contentAlignment = Alignment.Center
+                                contentAlignment = Alignment.Center,
                             ) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
                                     strokeWidth = 2.dp,
-                                    color = MaterialTheme.colors.primary
+                                    color = MaterialTheme.colors.primary,
                                 )
                             }
                         }
@@ -597,12 +656,12 @@ private fun ChatScreenContent(
                         item(key = "no_more_messages") {
                             Box(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                                contentAlignment = Alignment.Center
+                                contentAlignment = Alignment.Center,
                             ) {
                                 Text(
                                     text = s["chat.no.earlier.messages"],
                                     style = MaterialTheme.typography.caption,
-                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                                 )
                             }
                         }
@@ -610,17 +669,24 @@ private fun ChatScreenContent(
 
                     itemsIndexed(
                         items = displayMessages,
-                        key = { index, message -> "${user.id}_${message.messageId}_${message.timestamp}" }
+                        key = { index, message ->
+                            "${user.id}_${message.messageId}_${message.timestamp}"
+                        },
                     ) { index, message ->
                         // 显示日期分隔线
-                        if (index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)) {
+                        if (
+                            index == 0 ||
+                                !isSameDay(filteredMessages[index - 1].timestamp, message.timestamp)
+                        ) {
                             DateSeparator(timestamp = message.timestamp)
                         }
 
                         // 动画规则：仅新消息（页面打开后新收到/新发送的）显示弹出动画
                         // 历史消息（包括滚动加载的）直接显示，无动画
                         val messageTime = message.timestamp
-                        val isNewMessage = messageTime > pageCreateTime && !animatedMessageIds.contains(message.messageId)
+                        val isNewMessage =
+                            messageTime > pageCreateTime &&
+                                !animatedMessageIds.contains(message.messageId)
                         var visible by remember(message.messageId) { mutableStateOf(!isNewMessage) }
 
                         LaunchedEffect(message.messageId) {
@@ -632,23 +698,29 @@ private fun ChatScreenContent(
 
                         AnimatedVisibility(
                             visible = visible,
-                            enter = if (isNewMessage) fadeIn(
-                                animationSpec = tween(200, easing = FastOutSlowInEasing)
-                            ) + scaleIn(
-                                initialScale = 0.98f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                )
-                            ) + slideInVertically(
-                                initialOffsetY = { (it / 8).coerceAtMost(12) },
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                )
-                            ) else fadeIn(initialAlpha = 1f), // 历史消息无动画直接显示
-                            modifier = Modifier
-                                .fillMaxWidth()
+                            enter =
+                                if (isNewMessage)
+                                    fadeIn(
+                                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                                    ) +
+                                        scaleIn(
+                                            initialScale = 0.98f,
+                                            animationSpec =
+                                                spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMedium,
+                                                ),
+                                        ) +
+                                        slideInVertically(
+                                            initialOffsetY = { (it / 8).coerceAtMost(12) },
+                                            animationSpec =
+                                                spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMedium,
+                                                ),
+                                        )
+                                else fadeIn(initialAlpha = 1f), // 历史消息无动画直接显示
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Column {
                                 MessageBubble(
@@ -656,29 +728,34 @@ private fun ChatScreenContent(
                                     isMine = message.sender,
                                     isDarkMode = isDarkMode,
                                     maxBubbleWidth = maxBubbleWidth,
-                                    bubbleBrush = refinedMessageBubbleBrush(message.sender, isDarkMode),
+                                    bubbleBrush =
+                                        refinedMessageBubbleBrush(message.sender, isDarkMode),
                                     showTimestamp = true,
-                                    senderAvatar = {
-                                        UserAvatar(
-                                            user = user,
-                                            size = 32.dp,
-                                            onClick = { onAvatarClick?.invoke(user) }
-                                        )
-                                    },
-                                    myAvatar = if (currentUser != null) {
-                                        {
-                                            UserAvatar(
-                                                user = currentUser!!,
-                                                size = 32.dp,
-                                                onClick = { onMyAvatarClick?.invoke() }
-                                            )
-                                        }
-                                    } else null,
-                                    onResend = { resendMessage(chatViewModel, user, message) },
+                                    avatars =
+                                        MessageAvatars(
+                                            senderAvatar = {
+                                                UserAvatar(
+                                                    user = user,
+                                                    size = 32.dp,
+                                                    onClick = { onAvatarClick?.invoke(user) },
+                                                )
+                                            },
+                                            myAvatar =
+                                                if (currentUser != null) {
+                                                    {
+                                                        UserAvatar(
+                                                            user = currentUser!!,
+                                                            size = 32.dp,
+                                                            onClick = { onMyAvatarClick?.invoke() },
+                                                        )
+                                                    }
+                                                } else null,
+                                        ),
+                                    onResend = { resendMessage(chatViewModel, message) },
                                     onLongClick = {
                                         longPressMessage = message
                                         showLongPressMenu = true
-                                    }
+                                    },
                                 )
 
                                 // 长按菜单
@@ -699,31 +776,35 @@ private fun ChatScreenContent(
                                             replyToMessage = message
                                             showLongPressMenu = false
                                         },
-                                        onShare = { /* shareText unavailable on Android */ }
+                                        onShare = { /* shareText unavailable on Android */ },
                                     )
                                 }
                             }
                         }
 
-                        if (message.sender && message.deliveryState == model.MessageDeliveryState.FAILED) {
+                        if (
+                            message.sender &&
+                                message.deliveryState == model.MessageDeliveryState.FAILED
+                        ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
                                     text = s["chat.send.failed"],
                                     style = MaterialTheme.typography.caption,
-                                    color = MaterialTheme.colors.error
+                                    color = MaterialTheme.colors.error,
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = s["chat.resend"],
                                     style = MaterialTheme.typography.caption,
                                     color = MaterialTheme.colors.primary,
-                                    modifier = Modifier.clickable {
-                                        chatViewModel.retryMessage(message)
-                                    }
+                                    modifier =
+                                        Modifier.clickable {
+                                            chatViewModel.retryMessage(message)
+                                        },
                                 )
                             }
                         }
@@ -755,30 +836,31 @@ private fun ChatScreenContent(
                     onSubmit = { submitMessage() },
                     isSending = isSending,
                     isUploading = isUploading,
-                    replyPreview = replyToMessage?.let { _ ->
-                        {
-                            ReplyPreviewBar(
-                                replyToMessage = replyToMessage,
-                                senderName = if (replyToMessage?.sender == true) s["chat.me"] else user.username,
-                                onCancel = { replyToMessage = null }
-                            )
-                        }
-                    },
-                    onClearReply = { replyToMessage = null },
+                    replyPreview =
+                        replyToMessage?.let { _ ->
+                            {
+                                ReplyPreviewBar(
+                                    replyToMessage = replyToMessage,
+                                    senderName =
+                                        if (replyToMessage?.sender == true) s["chat.me"]
+                                        else user.username,
+                                    onCancel = { replyToMessage = null },
+                                )
+                            }
+                        },
                     onEmojiClick = { showEmojiPanel = !showEmojiPanel },
-                    onAttachClick = { pickImage() }
+                    onAttachClick = { pickImage() },
                 )
 
                 // 表情面板
                 if (showEmojiPanel) {
                     EmojiPickerPanel(
                         onEmojiSelected = ::onEmojiSelected,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
         }
-
     }
 
     // 转发选择对话框
@@ -791,7 +873,7 @@ private fun ChatScreenContent(
                     forwardMessage(message, targetUser)
                 }
                 showForwardDialog = false
-            }
+            },
         )
     }
 
@@ -803,7 +885,8 @@ private fun ChatScreenContent(
             text = { Text(s["friend.delete.confirm"]) },
             confirmButton = {
                 Button(
-                    colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error),
+                    colors =
+                        ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error),
                     onClick = {
                         showDeleteConfirm = false
                         chatViewModel.deleteFriend(user.id) { success ->
@@ -811,7 +894,7 @@ private fun ChatScreenContent(
                                 chatViewModel.loadContacts()
                             }
                         }
-                    }
+                    },
                 ) {
                     Text(s["friend.delete.title"])
                 }
@@ -820,7 +903,7 @@ private fun ChatScreenContent(
                 Button(onClick = { showDeleteConfirm = false }) {
                     Text(s["dialog.add.cancel"])
                 }
-            }
+            },
         )
     }
 }

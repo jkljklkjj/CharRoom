@@ -1,142 +1,136 @@
 package core
 
+import com.chatlite.proto.AgentStreamProtos.AgentStreamChunk
 import com.chatlite.proto.MessageProtos
-import java.nio.charset.StandardCharsets
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.google.protobuf.InvalidProtocolBufferException
+import java.nio.charset.StandardCharsets
 
-/**
- * 解析Protobuf响应消息
- */
-fun parseProtoResponse(bytes: ByteArray): ApiUnwrap {
-    val mapper = jacksonObjectMapper()
+/** Wrapper, response and plain-text fallback preserve the existing compatibility order. */
+fun parseProtoResponse(bytes: ByteArray): ApiUnwrap =
+    ProtobufResponseParser.wrapper(bytes)
+        ?: ProtobufResponseParser.response(bytes)
+        ?: ApiUnwrap(false, true, String(bytes, StandardCharsets.UTF_8), null)
 
-    // 1) Try to parse as MessageWrapper (the common envelope you send)
-    try {
-        val wrapper = MessageProtos.MessageWrapper.parseFrom(bytes)
-        val node = mapper.createObjectNode()
-        node.put("type", wrapper.type.name)
-        AppLog.i { "Parsed MessageWrapper with type: ${wrapper.type.name}" }
+private object ProtobufResponseParser {
+    private val mapper = jacksonObjectMapper()
 
-        when (wrapper.payloadCase) {
-            MessageProtos.MessageWrapper.PayloadCase.LOGIN -> {
-                val v = wrapper.login
-                val payload = mapper.createObjectNode()
-                payload.put("token", v.token)
-                node.set<ObjectNode>("payload", payload)
-            }
-            MessageProtos.MessageWrapper.PayloadCase.CHAT -> {
-                val v = wrapper.chat
-                val payload = mapper.createObjectNode()
-                payload.put("targetClientId", v.targetClientId)
-                payload.put("content", v.content)
-                payload.put("userId", v.userId)
-                payload.put("timestamp", v.timestamp)
-                node.set<ObjectNode>("payload", payload)
-            }
-            MessageProtos.MessageWrapper.PayloadCase.GROUPCHAT -> {
-                val v = wrapper.groupChat
-                val payload = mapper.createObjectNode()
-                payload.put("targetClientId", v.targetClientId)
-                payload.put("content", v.content)
-                payload.put("userId", v.userId)
-                node.set<ObjectNode>("payload", payload)
-            }
-            MessageProtos.MessageWrapper.PayloadCase.CHECK -> {
-                val v = wrapper.check
-                val payload = mapper.createObjectNode()
-                payload.put("targetClientId", v.targetClientId)
-                node.set<ObjectNode>("payload", payload)
-            }
-            MessageProtos.MessageWrapper.PayloadCase.HEARTBEAT -> {
-                val v = wrapper.heartbeat
-                val payload = mapper.createObjectNode()
-                payload.put("timestamp", v.timestamp)
-                node.set<ObjectNode>("payload", payload)
-            }
-            MessageProtos.MessageWrapper.PayloadCase.LOGOUT -> {
-                val v = wrapper.logout
-                val payload = mapper.createObjectNode()
-                payload.put("userId", v.userId)
-                node.set<ObjectNode>("payload", payload)
-            }
-            MessageProtos.MessageWrapper.PayloadCase.AGENTSTREAM -> {
-                val v = wrapper.agentStream
-                val payload = mapper.createObjectNode()
-                payload.put("type", v.typeValue)  // 0=TEXT, 1=TOOL_CALL, 2=TOOL_RESULT, 3=USAGE, 4=DONE, 5=ERROR
-                payload.put("requestId", v.requestId)
-                payload.put("traceId", v.traceId)
-
-                when (v.payloadCase) {
-                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.TEXT -> {
-                        payload.put("text", v.text)
-                    }
-                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.TOOL_CALL -> {
-                        val tc = v.toolCall
-                        val toolCallNode = mapper.createObjectNode()
-                        toolCallNode.put("id", tc.id)
-                        toolCallNode.put("name", tc.name)
-                        toolCallNode.put("arguments", tc.arguments)
-                        payload.set<ObjectNode>("toolCall", toolCallNode)
-                    }
-                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.TOOL_RESULT -> {
-                        val tr = v.toolResult
-                        val toolResultNode = mapper.createObjectNode()
-                        toolResultNode.put("toolCallId", tr.toolCallId)
-                        toolResultNode.put("result", tr.result)
-                        toolResultNode.put("success", tr.success)
-                        payload.set<ObjectNode>("toolResult", toolResultNode)
-                    }
-                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.USAGE -> {
-                        val u = v.usage
-                        val usageNode = mapper.createObjectNode()
-                        usageNode.put("inputTokens", u.inputTokens)
-                        usageNode.put("outputTokens", u.outputTokens)
-                        usageNode.put("totalTokens", u.totalTokens)
-                        usageNode.put("model", u.model)
-                        payload.set<ObjectNode>("usage", usageNode)
-                    }
-                    com.chatlite.proto.AgentStreamProtos.AgentStreamChunk.PayloadCase.ERROR -> {
-                        val e = v.error
-                        val errorNode = mapper.createObjectNode()
-                        errorNode.put("code", e.code)
-                        errorNode.put("message", e.message)
-                        payload.set<ObjectNode>("error", errorNode)
-                    }
-                    else -> {}
-                }
-                node.set<ObjectNode>("payload", payload)
-            }
-            MessageProtos.MessageWrapper.PayloadCase.PAYLOAD_NOT_SET, null -> {
-                // no payload
-            }
-            else -> {
-                // unknown payload, ignore
-            }
+    fun wrapper(bytes: ByteArray): ApiUnwrap? =
+        try {
+            val wrapper = MessageProtos.MessageWrapper.parseFrom(bytes)
+            val node = mapper.createObjectNode().put("type", wrapper.type.name)
+            AppLog.i { "Parsed MessageWrapper with type: ${wrapper.type.name}" }
+            payload(wrapper)?.let { node.set<ObjectNode>("payload", it) }
+            ApiUnwrap(false, true, mapper.writeValueAsString(node), null)
+        } catch (_: InvalidProtocolBufferException) {
+            null
+        } catch (_: JsonProcessingException) {
+            null
         }
 
-        val dataJson = mapper.writeValueAsString(node)
-        return ApiUnwrap(hasEnvelope = false, success = true, dataJson = dataJson, message = null)
-    } catch (_: Exception) {
-        // not a MessageWrapper -> try ResponseMessage
+    fun response(bytes: ByteArray): ApiUnwrap? =
+        try {
+            val response = MessageProtos.ResponseMessage.parseFrom(bytes)
+            val node =
+                mapper
+                    .createObjectNode()
+                    .put("message", response.message)
+                    .put("success", response.success)
+                    .put("online", response.online)
+            if (response.clientId.isNotBlank()) node.put("clientId", response.clientId)
+            ApiUnwrap(
+                true,
+                response.success,
+                mapper.writeValueAsString(node),
+                if (response.success) null else response.message,
+            )
+        } catch (_: InvalidProtocolBufferException) {
+            null
+        } catch (_: JsonProcessingException) {
+            null
+        }
+
+    private fun payload(wrapper: MessageProtos.MessageWrapper): ObjectNode? =
+        when (wrapper.payloadCase) {
+            MessageProtos.MessageWrapper.PayloadCase.LOGIN -> login(wrapper.login)
+            MessageProtos.MessageWrapper.PayloadCase.CHAT -> chat(wrapper.chat)
+            MessageProtos.MessageWrapper.PayloadCase.GROUPCHAT -> group(wrapper.groupChat)
+            MessageProtos.MessageWrapper.PayloadCase.CHECK ->
+                mapper.createObjectNode().put("targetClientId", wrapper.check.targetClientId)
+            MessageProtos.MessageWrapper.PayloadCase.HEARTBEAT ->
+                mapper.createObjectNode().put("timestamp", wrapper.heartbeat.timestamp)
+            MessageProtos.MessageWrapper.PayloadCase.LOGOUT ->
+                mapper.createObjectNode().put("userId", wrapper.logout.userId)
+            MessageProtos.MessageWrapper.PayloadCase.AGENTSTREAM -> agent(wrapper.agentStream)
+            else -> null
+        }
+
+    private fun login(value: MessageProtos.LoginMessage) =
+        mapper.createObjectNode().put("token", value.token)
+
+    private fun chat(value: MessageProtos.ChatMessage) =
+        mapper
+            .createObjectNode()
+            .put("targetClientId", value.targetClientId)
+            .put("content", value.content)
+            .put("userId", value.userId)
+            .put("timestamp", value.timestamp)
+
+    private fun group(value: MessageProtos.GroupChatMessage) =
+        mapper
+            .createObjectNode()
+            .put("targetClientId", value.targetClientId)
+            .put("content", value.content)
+            .put("userId", value.userId)
+
+    private fun agent(value: AgentStreamChunk): ObjectNode {
+        val payload =
+            mapper
+                .createObjectNode()
+                .put("type", value.typeValue)
+                .put("requestId", value.requestId)
+                .put("traceId", value.traceId)
+        when (value.payloadCase) {
+            AgentStreamChunk.PayloadCase.TEXT -> payload.put("text", value.text)
+            AgentStreamChunk.PayloadCase.TOOL_CALL ->
+                payload.set<ObjectNode>("toolCall", toolCall(value))
+            AgentStreamChunk.PayloadCase.TOOL_RESULT ->
+                payload.set<ObjectNode>("toolResult", toolResult(value))
+            AgentStreamChunk.PayloadCase.USAGE -> payload.set<ObjectNode>("usage", usage(value))
+            AgentStreamChunk.PayloadCase.ERROR ->
+                payload.set<ObjectNode>(
+                    "error",
+                    mapper
+                        .createObjectNode()
+                        .put("code", value.error.code)
+                        .put("message", value.error.message),
+                )
+            else -> Unit
+        }
+        return payload
     }
 
-    // 2) Try to parse as ResponseMessage (ACK/response)
-    try {
-        val resp = MessageProtos.ResponseMessage.parseFrom(bytes)
-        val success = resp.success
-        val respNode = mapper.createObjectNode()
-        respNode.put("message", resp.message)
-        respNode.put("success", success)
-        if (resp.clientId.isNotBlank()) respNode.put("clientId", resp.clientId)
-        respNode.put("online", resp.online)
-        val dataJsonStr = mapper.writeValueAsString(respNode)
-        val message = if (!success) resp.message else null
-        return ApiUnwrap(hasEnvelope = true, success = success, dataJson = dataJsonStr, message = message)
-    } catch (_: Exception) {
-        // fall through to plain text
-    }
+    private fun toolCall(value: AgentStreamChunk) =
+        mapper
+            .createObjectNode()
+            .put("id", value.toolCall.id)
+            .put("name", value.toolCall.name)
+            .put("arguments", value.toolCall.arguments)
 
-    // 3) fallback: treat as UTF-8 text
-    return ApiUnwrap(hasEnvelope = false, success = true, dataJson = String(bytes, StandardCharsets.UTF_8), message = null)
+    private fun toolResult(value: AgentStreamChunk) =
+        mapper
+            .createObjectNode()
+            .put("toolCallId", value.toolResult.toolCallId)
+            .put("result", value.toolResult.result)
+            .put("success", value.toolResult.success)
+
+    private fun usage(value: AgentStreamChunk) =
+        mapper
+            .createObjectNode()
+            .put("inputTokens", value.usage.inputTokens)
+            .put("outputTokens", value.usage.outputTokens)
+            .put("totalTokens", value.usage.totalTokens)
+            .put("model", value.usage.model)
 }

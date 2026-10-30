@@ -1,12 +1,6 @@
 package component.settings
 
-import com.chatlite.i18n.LocalStrings
-import com.chatlite.i18n.Strings
-import component.AppTopBar
-import core.AppLog
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
@@ -32,7 +28,6 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Language
@@ -40,21 +35,21 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.chatlite.i18n.LocalStrings
+import component.AppTopBar
 import core.AppConfig
 import core.AppSettings
 import core.GlobalAppUpdateManager
@@ -65,28 +60,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import presentation.viewmodel.ChatViewModel
 
-/**
- * Platform type
- */
-enum class Platform {
-    ANDROID, DESKTOP, WEB
-}
+/** Platform type */
 
-/**
- * Current platform, set by each platform during initialization
- */
+/** Current platform, set by each platform during initialization */
 lateinit var CurrentPlatform: Platform
 
-/**
- * Settings screen
- */
+/** Settings screen */
 @Composable
 fun SettingsScreen(
     chatViewModel: ChatViewModel,
     onBackClick: () -> Unit,
     onLogout: () -> Unit,
     onProfileClick: () -> Unit = {},
-    onQuotaClick: () -> Unit = {}
+    onQuotaClick: () -> Unit = {},
 ) {
     val s = LocalStrings.current
     val coroutineScope = rememberCoroutineScope()
@@ -96,16 +82,16 @@ fun SettingsScreen(
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colors.background)
-            .statusBarsPadding()
-            .padding(16.dp)
+        modifier =
+            Modifier.fillMaxSize()
+                .background(MaterialTheme.colors.background)
+                .statusBarsPadding()
+                .padding(16.dp)
     ) {
         // Top bar title
         AppTopBar(
             title = s["settings.title"],
-            onBack = onBackClick
+            onBack = onBackClick,
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -113,7 +99,7 @@ fun SettingsScreen(
         // Settings options list
         Column(
             modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             LocalPlatformSettings.current.invoke()
             // Profile
@@ -121,7 +107,7 @@ fun SettingsScreen(
                 icon = Icons.Default.Person,
                 title = s["settings.profile"],
                 subtitle = s["settings.profile.subtitle"],
-                onClick = onProfileClick
+                onClick = onProfileClick,
             )
 
             // Token Quota
@@ -129,7 +115,7 @@ fun SettingsScreen(
                 icon = Icons.Default.Star,
                 title = s["settings.token.quota"],
                 subtitle = s["settings.token.quota.subtitle"],
-                onClick = onQuotaClick
+                onClick = onQuotaClick,
             )
 
             // Theme
@@ -137,14 +123,15 @@ fun SettingsScreen(
             SettingItem(
                 icon = Icons.Default.Palette,
                 title = s["settings.theme"],
-                subtitle = s["settings.theme.subtitle"].format(
-                    when (themeMode) {
-                        ThemeMode.SYSTEM -> s["settings.theme.follow.system"]
-                        ThemeMode.LIGHT -> s["settings.theme.light"]
-                        ThemeMode.DARK -> s["settings.theme.dark"]
-                    }
-                ),
-                onClick = { showThemeDialog = true }
+                subtitle =
+                    s["settings.theme.subtitle"].format(
+                        when (themeMode) {
+                            ThemeMode.SYSTEM -> s["settings.theme.follow.system"]
+                            ThemeMode.LIGHT -> s["settings.theme.light"]
+                            ThemeMode.DARK -> s["settings.theme.dark"]
+                        }
+                    ),
+                onClick = { showThemeDialog = true },
             )
 
             // Language
@@ -153,35 +140,38 @@ fun SettingsScreen(
             SettingItem(
                 icon = Icons.Default.Language,
                 title = s["settings.language"],
-                subtitle = s["settings.language.subtitle"].format(
-                    when (effectiveLanguage) {
-                        "zh" -> s["settings.language.zh"]
-                        "en" -> s["settings.language.en"]
-                        "ja" -> s["settings.language.ja"]
-                        else -> s["settings.language.en"]
-                    }
-                ),
-                onClick = { showLanguageDialog = true }
+                subtitle =
+                    s["settings.language.subtitle"].format(
+                        when (effectiveLanguage) {
+                            "zh" -> s["settings.language.zh"]
+                            "en" -> s["settings.language.en"]
+                            "ja" -> s["settings.language.ja"]
+                            else -> s["settings.language.en"]
+                        }
+                    ),
+                onClick = { showLanguageDialog = true },
             )
 
             // Check for updates
             SettingItem(
                 icon = Icons.Default.SystemUpdate,
                 title = s["settings.check.update"],
-                subtitle = s["settings.version"].format(AppConfig.VERSION_NAME, AppConfig.VERSION_CODE),
+                subtitle =
+                    s["settings.version"].format(AppConfig.VERSION_NAME, AppConfig.VERSION_CODE),
                 onClick = {
                     // Launch coroutine to check for updates
                     coroutineScope.launch(Dispatchers.IO) {
                         GlobalAppUpdateManager.checkForUpdates(
-                            platform = when (CurrentPlatform) {
-                                Platform.ANDROID -> "android"
-                                Platform.DESKTOP -> "desktop"
-                                Platform.WEB -> "web"
-                            },
-                            autoDownload = false
+                            platform =
+                                when (CurrentPlatform) {
+                                    Platform.ANDROID -> "android"
+                                    Platform.DESKTOP -> "desktop"
+                                    Platform.WEB -> "web"
+                                },
+                            autoDownload = false,
                         )
                     }
-                }
+                },
             )
 
             // Clear chat history
@@ -192,7 +182,7 @@ fun SettingsScreen(
                 onClick = {
                     showClearHistoryDialog = true
                 },
-                tint = MaterialTheme.colors.error
+                tint = MaterialTheme.colors.error,
             )
 
             // Clear cache
@@ -203,7 +193,7 @@ fun SettingsScreen(
                 onClick = {
                     showClearCacheDialog = true
                 },
-                tint = MaterialTheme.colors.error
+                tint = MaterialTheme.colors.error,
             )
 
             // Logout
@@ -214,7 +204,7 @@ fun SettingsScreen(
                 onClick = {
                     showLogoutDialog = true
                 },
-                tint = MaterialTheme.colors.error
+                tint = MaterialTheme.colors.error,
             )
         }
     }
@@ -233,10 +223,11 @@ fun SettingsScreen(
                         chatViewModel.clear()
                         onLogout()
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = MaterialTheme.colors.error,
-                        contentColor = Color.White
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            backgroundColor = MaterialTheme.colors.error,
+                            contentColor = Color.White,
+                        ),
                 ) {
                     Text(s["settings.logout.confirm.button"])
                 }
@@ -245,7 +236,7 @@ fun SettingsScreen(
                 TextButton(onClick = { showLogoutDialog = false }) {
                     Text(s["settings.cancel"])
                 }
-            }
+            },
         )
     }
 
@@ -265,10 +256,11 @@ fun SettingsScreen(
                         }
                         chatViewModel.clearMessages()
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = MaterialTheme.colors.error,
-                        contentColor = Color.White
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            backgroundColor = MaterialTheme.colors.error,
+                            contentColor = Color.White,
+                        ),
                 ) {
                     Text(s["settings.clear"])
                 }
@@ -277,7 +269,7 @@ fun SettingsScreen(
                 TextButton(onClick = { showClearHistoryDialog = false }) {
                     Text(s["settings.cancel"])
                 }
-            }
+            },
         )
     }
 
@@ -293,10 +285,11 @@ fun SettingsScreen(
                         showClearCacheDialog = false
                         // Cache clearing logic will be implemented later
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = MaterialTheme.colors.error,
-                        contentColor = Color.White
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            backgroundColor = MaterialTheme.colors.error,
+                            contentColor = Color.White,
+                        ),
                 ) {
                     Text(s["settings.clear"])
                 }
@@ -305,7 +298,7 @@ fun SettingsScreen(
                 TextButton(onClick = { showClearCacheDialog = false }) {
                     Text(s["settings.cancel"])
                 }
-            }
+            },
         )
     }
 
@@ -318,32 +311,33 @@ fun SettingsScreen(
             text = {
                 Column {
                     ThemeMode.entries.forEach { mode ->
-                        val label = when (mode) {
-                            ThemeMode.SYSTEM -> s["settings.theme.follow.system"]
-                            ThemeMode.LIGHT -> s["settings.theme.light"]
-                            ThemeMode.DARK -> s["settings.theme.dark"]
-                        }
+                        val label =
+                            when (mode) {
+                                ThemeMode.SYSTEM -> s["settings.theme.follow.system"]
+                                ThemeMode.LIGHT -> s["settings.theme.light"]
+                                ThemeMode.DARK -> s["settings.theme.dark"]
+                            }
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    AppSettings.setThemeMode(mode)
-                                    showThemeDialog = false
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .clickable {
+                                        AppSettings.setThemeMode(mode)
+                                        showThemeDialog = false
+                                    }
+                                    .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
                                 selected = currentTheme == mode,
                                 onClick = {
                                     AppSettings.setThemeMode(mode)
                                     showThemeDialog = false
-                                }
+                                },
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = label,
-                                style = MaterialTheme.typography.body1
+                                style = MaterialTheme.typography.body1,
                             )
                         }
                     }
@@ -353,18 +347,19 @@ fun SettingsScreen(
                 TextButton(onClick = { showThemeDialog = false }) {
                     Text(s["settings.confirm"])
                 }
-            }
+            },
         )
     }
 
     // ── Language selection dialog ──
     if (showLanguageDialog) {
         val currentLang by AppSettings.language.collectAsState()
-        val langOptions = listOf(
-            "zh" to s["settings.language.zh"],
-            "en" to s["settings.language.en"],
-            "ja" to s["settings.language.ja"]
-        )
+        val langOptions =
+            listOf(
+                "zh" to s["settings.language.zh"],
+                "en" to s["settings.language.en"],
+                "ja" to s["settings.language.ja"],
+            )
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
             title = { Text(s["settings.language"]) },
@@ -372,26 +367,26 @@ fun SettingsScreen(
                 Column {
                     langOptions.forEach { (code, displayName) ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    AppSettings.setLanguage(code)
-                                    showLanguageDialog = false
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .clickable {
+                                        AppSettings.setLanguage(code)
+                                        showLanguageDialog = false
+                                    }
+                                    .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
                                 selected = currentLang == code,
                                 onClick = {
                                     AppSettings.setLanguage(code)
                                     showLanguageDialog = false
-                                }
+                                },
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = displayName,
-                                style = MaterialTheme.typography.body1
+                                style = MaterialTheme.typography.body1,
                             )
                         }
                     }
@@ -401,74 +396,63 @@ fun SettingsScreen(
                 TextButton(onClick = { showLanguageDialog = false }) {
                     Text(s["settings.confirm"])
                 }
-            }
+            },
         )
     }
 }
 
-/**
- * Format file size to human-readable string
- */
+/** Format file size to human-readable string */
 
-
-/**
- * Settings item component
- */
+/** Settings item component */
 @Composable
 private fun SettingItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    tint: Color = MaterialTheme.colors.onBackground
+    tint: Color = MaterialTheme.colors.onBackground,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         color = MaterialTheme.colors.surface.copy(alpha = 0.7f),
         shape = RoundedCornerShape(12.dp),
-        elevation = 0.dp
+        elevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Icon
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = tint.copy(alpha = 0.1f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier.size(40.dp)
+                        .background(
+                            color = tint.copy(alpha = 0.1f),
+                            shape = CircleShape,
+                        ),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
                     tint = tint,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.subtitle1,
-                    color = MaterialTheme.colors.onBackground
+                    color = MaterialTheme.colors.onBackground,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.body2,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                 )
             }
         }

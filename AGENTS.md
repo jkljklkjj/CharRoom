@@ -31,7 +31,7 @@ AI 辅助文件存放在 `.agent/`，技能源目录是 `.agent/skills/`。聚�
 | 联系人与消息仓库 | `data/repository/ChatRepository.kt`、`data/datasource/local/`、`core/LocalChatHistoryStore.kt` |
 | 传输接口与协议 | `core/ChatTransport.kt`、`core/QuicStreamProtocol.kt`、`core/ProtobufBuilders.kt`、`core/ProtobufResponseParser.kt` |
 | 消息类型 / 收包 / 发送确认 | `core/MessageProtocol.kt`、`core/ProtobufMessageDispatcher.kt`、`core/PendingMessageAcks.kt`；组织与验证边界见 [消息契约](docs/development/MESSAGE-CONTRACT.md) |
-| 桌面 QUIC | `src/desktopMain/kotlin/core/QuicClientImpl.kt`、`QuicNettyClient.kt`、`QuicChannelInitializer.kt` |
+| 桌面 QUIC | `src/desktopMain/kotlin/core/QuicClientImpl.kt`、`QuicNettyClient.kt`、`QuicStreamInitializer.kt` |
 | Android 传输 | `src/androidMain/kotlin/com/chatlite/charroom/core/QuicheChatClient.kt`、同目录 `quic/`、`native/quiche-jni/`；构建见 [原生 QUIC](native/README.md) |
 | DI / 行为上下文 | `core/di/`、平台 DI、`core/ActionLogger.kt` |
 

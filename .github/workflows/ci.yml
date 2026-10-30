@@ -68,8 +68,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.5'
-      - name: Compile desktop and run shared, desktop and CLI tests
-        run: xvfb-run -a gradle compileKotlin :test :cli:test :cli:verifyHeadlessRuntime --no-daemon
+      - name: Compile desktop, check Detekt and run shared, desktop and CLI tests
+        run: xvfb-run -a gradle compileKotlin detekt :test :cli:test :cli:verifyHeadlessRuntime --no-daemon
       - name: Require executed JVM and CLI tests
         run: python3 scripts/check-test-results.py build/test-results/test cli/build/test-results/test
       - name: Upload test reports
@@ -80,6 +80,7 @@ jobs:
           path: |
             build/test-results/test/
             cli/build/test-results/test/
+            build/reports/detekt/
 
   android:
     runs-on: ubuntu-latest
@@ -100,8 +101,8 @@ jobs:
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       # Kotlin/JVM validation does not load JNI. Actual native builds and packaging
       # stay in build-installers.yml; this job makes no APK or interop claim.
-      - name: Compile Android and run unit tests
-        run: gradle :androidApp:compileDebugKotlin :androidApp:testDebugUnitTest -x :androidApp:buildQuicNative --no-daemon
+      - name: Compile Android, run Lint and unit tests
+        run: gradle :androidApp:compileDebugKotlin :androidApp:lintDebug :androidApp:testDebugUnitTest -x :androidApp:buildQuicNative --no-daemon
       - name: Require executed Android unit tests
         run: python3 scripts/check-test-results.py androidApp/build/test-results/testDebugUnitTest
       - name: Upload Android test reports
@@ -109,4 +110,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: android-unit-test-reports
-          path: androidApp/build/test-results/testDebugUnitTest/
+          path: |
+            androidApp/build/test-results/testDebugUnitTest/
+            androidApp/build/reports/lint-results-debug.*
