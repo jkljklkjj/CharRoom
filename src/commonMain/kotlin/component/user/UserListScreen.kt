@@ -108,7 +108,8 @@ fun UserList(
             extra.lowercase().contains(keyword) || displayName.contains(keyword) || accountId.contains(keyword)
         }
     }
-    val directoryLocale = java.util.Locale.getDefault()
+    val localeTag = androidx.compose.ui.text.intl.Locale.current.toLanguageTag()
+    val directoryLocale = remember(localeTag) { java.util.Locale.forLanguageTag(localeTag) }
     val sortedDirectory = remember(userListState, currentUser?.id, directoryLocale) {
         buildContactDirectory(userListState, currentUser?.id ?: core.state.GlobalAppState.currentUserId, directoryLocale)
     }

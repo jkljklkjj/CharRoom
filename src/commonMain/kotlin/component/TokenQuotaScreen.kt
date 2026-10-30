@@ -33,6 +33,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun TokenQuotaScreen(onBack: () -> Unit) {
     val s = com.chatlite.i18n.LocalStrings.current
+    val localeTag = androidx.compose.ui.text.intl.Locale.current.toLanguageTag()
+    val displayLocale = remember(localeTag) { java.util.Locale.forLanguageTag(localeTag) }
     val scope = rememberCoroutineScope()
     val token = GlobalAppState.currentToken ?: ""
 
@@ -98,7 +100,7 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
                 ) {
                     Text("账户余额", fontSize = 13.sp, color = Color.Gray)
                     Text(
-                        text = String.format("%.2f", q.balanceYuan),
+                        text = String.format(displayLocale, "%.2f", q.balanceYuan),
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
@@ -122,7 +124,7 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("免费剩余", fontSize = 13.sp, color = Color.Gray)
                         Text(
-                            String.format("%.2f", q.freeRemainingYuan) + " 元",
+                            String.format(displayLocale, "%.2f", q.freeRemainingYuan) + " 元",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colors.primary,
@@ -152,7 +154,7 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
 
                     Spacer(Modifier.height(4.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("本周已用: ${String.format("%.2f", q.weeklyCostFen / 100.0)} 元", fontSize = 11.sp, color = Color.Gray)
+                        Text("本周已用: ${String.format(displayLocale, "%.2f", q.weeklyCostFen / 100.0)} 元", fontSize = 11.sp, color = Color.Gray)
                         Text("in ${q.weeklyInputUsed} / out ${q.weeklyOutputUsed}", fontSize = 11.sp, color = Color.Gray)
                     }
                 }
@@ -211,9 +213,10 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
             if (purchaseAmount > 0) {
                 Text(
                     "约可消耗 输入${String.format(
+                        displayLocale,
                         "%.0f",
                         purchaseAmount / 1.2 * 100,
-                    )}万 / 输出${String.format("%.0f", purchaseAmount / 2.5 * 100)}万",
+                    )}万 / 输出${String.format(displayLocale, "%.0f", purchaseAmount / 2.5 * 100)}万",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 4.dp),

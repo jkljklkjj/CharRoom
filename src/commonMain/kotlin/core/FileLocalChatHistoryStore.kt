@@ -165,7 +165,6 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
 
     override fun saveConversationSeqIds(accountId: String, ids: Map<String, Long>) {
         runCatching {
-            val userHome = System.getProperty("user.home")
             val folder = getAccountDir(accountId)
             if (!folder.exists()) folder.mkdirs()
             val file = java.io.File(folder, "seq_ids.json")
@@ -177,7 +176,6 @@ open class FileLocalChatHistoryStore(private val directory: () -> File, private 
 
     override fun restoreConversationSeqIds(accountId: String): Map<String, Long> {
         return runCatching<Map<String, Long>> {
-            val userHome = System.getProperty("user.home")
             val folder = getAccountDir(accountId)
             val file = java.io.File(folder, "seq_ids.json")
             if (!file.exists()) return@runCatching emptyMap<String, Long>()

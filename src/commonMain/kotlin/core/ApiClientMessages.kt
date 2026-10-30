@@ -114,6 +114,8 @@ suspend fun sendPrivateMessage(
         val apiResponse = response.body<ApiResponse<Unit>>()
         AppLogger.d("发送私聊消息解析结果: isSuccess=${apiResponse.isSuccess}, code=${apiResponse.code}")
         apiResponse.isSuccess
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
     } catch (e: Exception) {
         AppLogger.w("发送消息异常: ${e.message}")
         false
@@ -150,7 +152,10 @@ suspend fun sendGroupMessage(
         }
         val apiResponse = response.body<ApiResponse<Unit>>()
         apiResponse.isSuccess
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
     } catch (e: Exception) {
+        AppLogger.e("Group message request failed", e)
         false
     }
 }
@@ -169,6 +174,8 @@ suspend fun batchOnlineStatus(token: String, userIds: List<Int>): Map<String, Bo
         }
         val apiResponse = response.body<ApiResponse<Map<String, Boolean>>>()
         apiResponse.data ?: emptyMap()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
     } catch (e: Exception) {
         AppLogger.w("批量在线状态查询失败: ${e.message}")
         emptyMap()

@@ -36,7 +36,7 @@ Windows 通过 `scripts/gradle-windows.ps1` 运行上述 Gradle 任务，遵循�
 
 ## 继续审查的优先项
 
-1. 初轮后端 SpotBugs 失败共 39 条；后续 [快照列表隔离](../../../chat-room/docs/development/SNAPSHOT-COLLECTIONS.md) 已消除 28 条，仍剩 11 条。应区分真实风险与分析器误报后逐项修复，不扩大排除列表掩盖问题。例如 WebTransport 的 parent 非空由 `wtReady` 的提前返回保证，不能仅凭该告警宣称可复现空指针。
+1. 初轮后端 SpotBugs 失败共 39 条；后续 [快照列表隔离](../../../chat-room/docs/development/SNAPSHOT-COLLECTIONS.md) 已消除 28 条，当时仍剩 11 条，后续 [静态检查修复](../../../chat-room/docs/development/STATIC-CHECK-FIXES.md) 已完成处理，SpotBugs 复扫为零。应区分真实风险与分析器误报，不扩大排除列表掩盖问题。例如 WebTransport 的 parent 非空由 `wtReady` 的提前返回保证，不能仅凭该告警宣称可复现空指针。
 2. 为七天热点缓存补命中率、回源次数/时延、写入开销和内存测量，再决定继续保留、缩减或取消缓存。当前实现存在不等于已有收益证据。
 3. 原生单会话深分页仍使用 `drop(skip)`。跨会话深页后续已增加 [有界多路归并](HISTORY-MERGE-FRONTIER.md)，最多 64 个会话时缩小候选空间；更多会话保留原 top-k。跨请求 `(timestamp, id)` 游标和真实大历史基准仍待完成。
 4. 别名生命周期仍需设计：清空会话只删正文 journal，别名文件保留；中断 ACK 后残留的 client-ID 行与按 canonical-ID 删除之间也值得补专门故障回归。这些是本轮静态审查发现的后续项，未宣称已经验证修复，不能直接删掉别名来节省空间，否则晚到快照可能恢复重复行。

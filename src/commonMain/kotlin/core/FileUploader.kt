@@ -45,8 +45,9 @@ object FileUploader {
                 AppLogger.w("File upload failed: ${response.status}")
                 null
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
             AppLogger.e("File upload error: ${e.message}")
             null
         }
@@ -91,8 +92,9 @@ object FileUploader {
                 AppLogger.w("Avatar upload failed: ${response.status}")
                 null
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
             AppLogger.e("Avatar upload error: ${e.message}")
             null
         }

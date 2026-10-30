@@ -48,6 +48,8 @@ fun UserDetailScreen(
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val s = LocalStrings.current
+    val localeTag = androidx.compose.ui.text.intl.Locale.current.toLanguageTag()
+    val dateLocale = remember(localeTag) { java.util.Locale.forLanguageTag(localeTag) }
 
     // 加载用户信息
     LaunchedEffect(userId) {
@@ -220,7 +222,7 @@ fun UserDetailScreen(
                                 DetailDivider()
                                 InfoRow(
                                     label = s["user.detail.registered"],
-                                    value = java.text.SimpleDateFormat(s["chat.date.format"], java.util.Locale.getDefault())
+                                    value = java.text.SimpleDateFormat(s["chat.date.format"], dateLocale)
                                         .format(java.util.Date(timestamp))
                                 )
                             }

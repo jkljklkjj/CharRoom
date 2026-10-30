@@ -128,8 +128,9 @@ suspend inline fun <reified T> sendRequest(
                 )
             }
         }
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
     } catch (e: Exception) {
-        if (e is kotlinx.coroutines.CancellationException) throw e
         ApiResponse(
             code = -1,
             message = e.message ?: "Unknown error"
@@ -172,7 +173,10 @@ suspend fun uploadFile(
         if (!response.status.isSuccess()) return null
         val result = response.body<ApiResponse<String>>()
         result.data
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
     } catch (e: Exception) {
+        AppLogger.e("File upload failed", e)
         null
     }
 }

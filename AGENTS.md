@@ -47,6 +47,7 @@ AI 辅助文件存放在 `.agent/`，技能源目录是 `.agent/skills/`。聚�
 | 协议生成 | `./gradlew.bat :proto:generateProto` |
 | JVM 编译 / 启动 | `./gradlew.bat compileKotlin`、`./gradlew.bat run` |
 | JVM 检查 | `./gradlew.bat test detekt`（先确认测试源存在；NO-SOURCE 不代表回归通过） |
+| 静态扫描解释 | Detekt 配置须匹配插件版本，配置无法解析不算通过；现存问题和验证范围见 [静态检查修复](docs/development/STATIC-CHECK-FIXES.md) |
 | CLI 检查 / 包 | `./gradlew.bat :cli:test :cli:verifyHeadlessRuntime cliJar` |
 | 跨仓库协议副本检查 | `python scripts/check-protocol-copies.py`；默认读取相邻 `../chat-room`，只读且漂移返回非零 |
 | 确认测试实际执行 | `python scripts/check-test-results.py build/test-results/test cli/build/test-results/test`；先运行测试，缺少报告或全跳过均失败 |
