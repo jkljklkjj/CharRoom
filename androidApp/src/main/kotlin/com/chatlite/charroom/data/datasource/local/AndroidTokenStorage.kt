@@ -12,16 +12,15 @@ object AndroidTokenStorage {
     data class StoredAuth(
         val token: String,
         val refreshToken: String,
-        val accountId: Int
+        val accountId: Int,
     )
 
     fun save(context: Context, token: String, accountId: Int, refreshToken: String = "") {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_TOKEN, token)
-            .putString(KEY_REFRESH_TOKEN, refreshToken)
-            .putInt(KEY_ACCOUNT_ID, accountId)
-            .apply()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+            putString(KEY_TOKEN, token)
+            putString(KEY_REFRESH_TOKEN, refreshToken)
+            putInt(KEY_ACCOUNT_ID, accountId)
+        }
     }
 
     fun load(context: Context): StoredAuth? {
@@ -37,11 +36,8 @@ object AndroidTokenStorage {
     }
 
     fun clear(context: Context) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit {
-                remove(KEY_TOKEN)
-                    .remove(KEY_REFRESH_TOKEN)
-                    .remove(KEY_ACCOUNT_ID)
-            }
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+            remove(KEY_TOKEN).remove(KEY_REFRESH_TOKEN).remove(KEY_ACCOUNT_ID)
+        }
     }
 }

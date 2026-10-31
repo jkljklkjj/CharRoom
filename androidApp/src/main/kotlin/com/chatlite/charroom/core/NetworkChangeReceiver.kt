@@ -7,7 +7,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
-import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,27 +19,26 @@ class NetworkChangeReceiver : BroadcastReceiver() {
     // 网络状态变化监听器
     interface NetworkStateListener {
         fun onNetworkConnected()
+
         fun onNetworkDisconnected()
     }
 
     companion object {
         var listener: NetworkStateListener? = null
         private var networkCallback: ConnectivityManager.NetworkCallback? = null
-        private var broadcastReceiver: NetworkChangeReceiver? = null
 
-        /**
-         * 注册网络状态回调（Android 7.0+推荐使用）
-         */
+        /** 注册网络状态回调（Android 7.0+推荐使用） */
         fun registerNetworkCallback(context: Context) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val connectivityManager =
+                context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-                // 避免重复注册
-                if (networkCallback != null) {
-                    unregisterNetworkCallback(context)
-                }
+            // 避免重复注册
+            if (networkCallback != null) {
+                unregisterNetworkCallback(context)
+            }
 
-                networkCallback = object : ConnectivityManager.NetworkCallback() {
+            networkCallback =
+                object : ConnectivityManager.NetworkCallback() {
                     override fun onAvailable(network: android.net.Network) {
                         super.onAvailable(network)
                         listener?.onNetworkConnected()
@@ -52,17 +50,15 @@ class NetworkChangeReceiver : BroadcastReceiver() {
                     }
                 }
 
-                // 注册默认网络回调
-                connectivityManager.registerDefaultNetworkCallback(networkCallback!!)
-            }
+            // 注册默认网络回调
+            connectivityManager.registerDefaultNetworkCallback(networkCallback!!)
         }
 
-        /**
-         * 注销网络状态回调
-         */
+        /** 注销网络状态回调 */
         fun unregisterNetworkCallback(context: Context) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && networkCallback != null) {
-                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            if (networkCallback != null) {
+                val connectivityManager =
+                    context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                 try {
                     connectivityManager.unregisterNetworkCallback(networkCallback!!)
                 } catch (e: IllegalArgumentException) {
@@ -92,18 +88,13 @@ class NetworkChangeReceiver : BroadcastReceiver() {
     }
 
     private fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = connectivityManager.activeNetwork ?: return false
-            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-        } else {
-            @Suppress("DEPRECATION")
-            val networkInfo = connectivityManager.activeNetworkInfo
-            @Suppress("DEPRECATION")
-            networkInfo != null && networkInfo.isConnected
-        }
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun onNetworkStateChanged(isConnected: Boolean) {

@@ -39,9 +39,9 @@ fun TokenQuotaScreen(onBack: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     var quota by remember { mutableStateOf<QuotaInfo?>(null) }
     var prices by remember { mutableStateOf<TokenPrices?>(null) }
-    var purchaseAmount by remember { mutableStateOf(10) }
+    var purchaseAmount by remember { mutableIntStateOf(10) }
     var qrUrl by remember { mutableStateOf("") }
-    var purchaseId by remember { mutableStateOf(0L) }
+    var purchaseId by remember { mutableLongStateOf(0L) }
     var errMsg by remember { mutableStateOf("") }
 
     // 加载配额信息

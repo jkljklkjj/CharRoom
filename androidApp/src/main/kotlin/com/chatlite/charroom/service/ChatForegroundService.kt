@@ -6,15 +6,14 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.chatlite.charroom.ChatApplication
 import com.chatlite.charroom.R
 import com.chatlite.charroom.core.ChatNotificationManager
+import com.chatlite.i18n.currentStrings
 import core.Chat
 import core.state.GlobalAppState
-import com.chatlite.i18n.currentStrings
 
 class ChatForegroundService : Service() {
     private var isRunning = false
@@ -26,24 +25,22 @@ class ChatForegroundService : Service() {
         createNotificationChannel()
     }
 
-    /**
-     * 创建前台服务需要的通知渠道
-     */
+    /** 创建前台服务需要的通知渠道 */
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                ChatNotificationManager.CHANNEL_ID_SERVICE,
-                currentStrings["android.service.channel"],
-                android.app.NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = currentStrings["android.service.running"]
-                enableLights(false)
-                enableVibration(false)
-                setShowBadge(false)
-            }
-            val notificationManager = getSystemService(android.app.NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
-        }
+        val channel =
+            NotificationChannel(
+                    ChatNotificationManager.CHANNEL_ID_SERVICE,
+                    currentStrings["android.service.channel"],
+                    android.app.NotificationManager.IMPORTANCE_LOW,
+                )
+                .apply {
+                    description = currentStrings["android.service.running"]
+                    enableLights(false)
+                    enableVibration(false)
+                    setShowBadge(false)
+                }
+        val notificationManager = getSystemService(android.app.NotificationManager::class.java)
+        notificationManager.createNotificationChannel(channel)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -54,24 +51,26 @@ class ChatForegroundService : Service() {
 
         // 创建前台服务通知
         val notificationIntent = packageManager.getLaunchIntentForPackage(packageName)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent =
+            PendingIntent.getActivity(
+                this,
+                0,
+                notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
 
-        val notification: Notification = NotificationCompat.Builder(this, ChatApplication.NOTIFICATION_CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(currentStrings["android.service.running"])
-            .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFFD78345.toInt())
-            .setColorized(true)
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(Notification.CATEGORY_SERVICE)
-            .setOngoing(true)
-            .build()
+        val notification: Notification =
+            NotificationCompat.Builder(this, ChatApplication.NOTIFICATION_CHANNEL_ID)
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(currentStrings["android.service.running"])
+                .setSmallIcon(R.drawable.ic_notification)
+                .setColor(0xFFD78345.toInt())
+                .setColorized(true)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setOngoing(true)
+                .build()
 
         // 启动前台服务，类型由 AndroidManifest 中的 foregroundServiceType 决定
         startForeground(ChatApplication.NOTIFICATION_ID, notification)
@@ -81,12 +80,12 @@ class ChatForegroundService : Service() {
         return START_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 
     // Android 15+ bounds dataSync foreground execution. Exit promptly instead of crashing.
-    override fun onTimeout(startId: Int, fgsType: Int) { stopSelf() }
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        stopSelf()
+    }
 
     override fun onDestroy() {
         super.onDestroy()

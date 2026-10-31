@@ -54,7 +54,7 @@ fun LoginRegisterApp(
     var email by remember { mutableStateOf("") } // 注册模式下邮箱
     var verifyCode by remember { mutableStateOf("") } // 注册模式下验证码
     var isSendingCode by remember { mutableStateOf(false) } // 验证码发送中状态
-    var countdownTime by remember { mutableStateOf(0) } // 倒计时秒数
+    var countdownTime by remember { mutableIntStateOf(0) } // 倒计时秒数
     var isSuccessMessage by remember { mutableStateOf(false) }
 
     val s = LocalStrings.current

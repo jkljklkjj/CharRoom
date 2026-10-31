@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
         }
         if (restored != null)
             pendingNotification.value =
-                OpenNotification(restored, savedInstanceState!!.getLong("pending.request"))
+                OpenNotification(restored, savedInstanceState.getLong("pending.request"))
         else handleNotificationIntent(intent)
 
         setContent {

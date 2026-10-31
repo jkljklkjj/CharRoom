@@ -82,6 +82,7 @@ android {
     // Enable Compose in this module and set the Kotlin compiler extension version
     buildFeatures {
         compose true
+        buildConfig true
     }
     // composeOptions block 不需要 — Kotlin 2.x 的 org.jetbrains.kotlin.plugin.compose
     // 已自动管理 Compose 编译器版本映射
@@ -174,7 +175,6 @@ android {
 
             debuggable false
             jniDebuggable false
-            renderscriptDebuggable false
         }
     }
 }
@@ -187,11 +187,12 @@ repositories {
 dependencies {
     testImplementation 'junit:junit:4.13.2'
     implementation 'androidx.core:core-ktx:1.18.0'
+    implementation 'androidx.exifinterface:exifinterface:1.4.1'
     implementation "androidx.activity:activity-compose:$activityComposeVersion"
     implementation "androidx.compose.ui:ui:$androidComposeVersion"
     implementation "androidx.compose.material:material:$androidComposeVersion"
     implementation "androidx.compose.animation:animation:$androidComposeVersion"
-    debugImplementation "androidx.compose.ui:ui-tooling:$androidComposeVersion"
+    debugRuntimeOnly "androidx.compose.ui:ui-tooling:$androidComposeVersion"
     debugImplementation "androidx.compose.ui:ui-tooling-preview:$androidComposeVersion"
     // AppCompat is required by the styles in androidApp/src/main/res/values/styles.xml
     implementation 'androidx.appcompat:appcompat:1.7.1'

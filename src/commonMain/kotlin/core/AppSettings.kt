@@ -104,7 +104,7 @@ object AppSettings {
 
     private fun detectSystemDarkMode(): Boolean =
         try {
-            val os = System.getProperty("os.name").lowercase()
+            val os = System.getProperty("os.name").orEmpty().lowercase()
             when {
                 os.contains("mac") || os.contains("os x") -> {
                     val proc =

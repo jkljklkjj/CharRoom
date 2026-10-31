@@ -429,7 +429,7 @@ fun ProfileScreen(
                                                 KeyboardOptions(keyboardType = KeyboardType.Email),
                                             enabled =
                                                 viewModel.isEditing.value &&
-                                                    viewModel.emailVerifyCountdown.value == 0 &&
+                                                    viewModel.emailVerifyCountdown.intValue == 0 &&
                                                     !viewModel.isSendingEmailCode.value,
                                             shape = RoundedCornerShape(14.dp),
                                             colors =
@@ -450,7 +450,7 @@ fun ProfileScreen(
                                                     viewModel.newEmail.value.isNotBlank() &&
                                                     viewModel.newEmail.value !=
                                                         viewModel.email.value &&
-                                                    viewModel.emailVerifyCountdown.value == 0 &&
+                                                    viewModel.emailVerifyCountdown.intValue == 0 &&
                                                     !viewModel.isSendingEmailCode.value,
                                             modifier = Modifier.height(56.dp),
                                             shape = RoundedCornerShape(14.dp),
@@ -461,8 +461,10 @@ fun ProfileScreen(
                                                     color = MaterialTheme.colors.onPrimary,
                                                     strokeWidth = 2.dp,
                                                 )
-                                            } else if (viewModel.emailVerifyCountdown.value > 0) {
-                                                Text("${viewModel.emailVerifyCountdown.value}s")
+                                            } else if (
+                                                viewModel.emailVerifyCountdown.intValue > 0
+                                            ) {
+                                                Text("${viewModel.emailVerifyCountdown.intValue}s")
                                             } else {
                                                 Text(s["profile.send.code"])
                                             }

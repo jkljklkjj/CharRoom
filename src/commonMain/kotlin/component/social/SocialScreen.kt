@@ -818,11 +818,11 @@ private fun EncounterPanel(room: EncounterRoom, busy: Boolean, vm: SocialViewMod
     var draft by remember(room.roomId) { mutableStateOf("") }
     var pending by remember(room.roomId) { mutableStateOf<Pair<String, String>?>(null) }
     var reporting by remember(room.roomId) { mutableStateOf(false) }
-    var clock by remember { mutableStateOf(System.currentTimeMillis()) }
-    var received by remember { mutableStateOf(System.currentTimeMillis()) }
+    var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var received by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val messageList = androidx.compose.foundation.lazy.rememberLazyListState()
     var following by remember(room.roomId) { mutableStateOf(true) }
-    var unseen by remember(room.roomId) { mutableStateOf(0) }
+    var unseen by remember(room.roomId) { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(messageList) {
         snapshotFlow {

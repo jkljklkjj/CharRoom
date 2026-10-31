@@ -100,7 +100,7 @@ fun ChatApp(
     var showSocial by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
     var showQuotaScreen by remember { mutableStateOf(false) }
-    var pendingRefreshTrigger by remember { mutableStateOf(0L) }
+    var pendingRefreshTrigger by remember { mutableLongStateOf(0L) }
 
     // 用户详情页状态
     var showUserDetailScreen by remember { mutableStateOf(false) }

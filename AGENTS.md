@@ -14,6 +14,7 @@ AI 辅助文件存放在 `.agent/`，技能源目录是 `.agent/skills/`。聚�
 - Vue Web 是独立 TypeScript 应用，协议与功能需要单独同步。
 - 原生更新检查使用 GET `/app/version/check` 与语义版本名，`PublishedAppVersion` 映射到更新提示；Web `/admin` 管理发布，启用与边界见相邻后端 [后台说明](../chat-room/docs/development/ADMIN-CONSOLE.md)。
 - 安装包元数据、校验、恢复及安装交接见 [可靠更新](docs/development/RELIABLE-UPDATES.md)。版本统一修改 `gradle.properties` 的 `appVersion/appVersionCode`，不手改生成的 `BuildReleaseVersion`；启动安装器不代表更新成功。
+- 更新下载接口在共享 `core/update/UpdateDownload.kt`，HTTP 实现在 `src/desktopMain/kotlin/core/update/HttpUpdateDownload.kt`；Android 使用 DownloadManager。Android 空间检查与静态检查边界见 [Android 检查修复](docs/development/ANDROID-CHECK-FIXES.md)。
 - CLI 的命令、服务器隔离存储与验证见 [CLI 说明](docs/development/CLI.md)；发送复用 QUIC ACK，命令行不接受明文密码，未知斜杠命令不得转为 AI 请求。
 - 消息 ID 在 `model/MessageIdGenerator.kt` 生成；ACK 的 `serverMessageId` 用于主键归并，`core/MessageIdAliases.kt` 先持久化账号/会话别名，再完成发送回调；历史/同步行携带的 `clientMessageId` 是第二个别名来源（ACK 丢失后仍能归并），`FileLocalChatHistoryStore` 在读写两侧都按别名归一，所以残留 `local_` 行不会与服务端行同时显示。
 - `core/IndexedHistoryJournal.kt` 为桌面/Android 提供增量历史与索引分页；仅使用 `.history` 格式，不读取旧 JSON。格式边界见相邻后端的 `docs/development/JVM-AND-INTERACTION.md`。

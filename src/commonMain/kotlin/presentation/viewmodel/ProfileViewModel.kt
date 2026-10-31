@@ -1,5 +1,6 @@
 package presentation.viewmodel
 
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import com.chatlite.i18n.currentStrings
 import core.FileUploader
@@ -35,7 +36,7 @@ class ProfileViewModel(
     val confirmPassword = mutableStateOf("")
     val newEmail = mutableStateOf("")
     val emailVerifyCode = mutableStateOf("")
-    val emailVerifyCountdown = mutableStateOf(0)
+    val emailVerifyCountdown = mutableIntStateOf(0)
     val isSendingEmailCode = mutableStateOf(false)
     val isSaving = mutableStateOf(false)
     val isEditing = mutableStateOf(false)
@@ -106,12 +107,12 @@ class ProfileViewModel(
                     val success = chatRepository.sendEmailUpdateVerifyCode(newEmail.value)
                     if (success) {
                         successMessage.value = currentStrings["profile.email.code.sent"]
-                        emailVerifyCountdown.value = 60 // 60秒倒计时
+                        emailVerifyCountdown.intValue = 60 // 60秒倒计时
                         // 启动倒计时
                         launch {
-                            while (emailVerifyCountdown.value > 0) {
+                            while (emailVerifyCountdown.intValue > 0) {
                                 kotlinx.coroutines.delay(1000.milliseconds)
-                                emailVerifyCountdown.value--
+                                emailVerifyCountdown.intValue--
                             }
                         }
                     } else {
